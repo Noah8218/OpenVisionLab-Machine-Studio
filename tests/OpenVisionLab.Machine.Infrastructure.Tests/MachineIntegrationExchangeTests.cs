@@ -95,6 +95,52 @@ public sealed class MachineIntegrationExchangeTests
     }
 
     [Fact]
+    public void ReadProgress_ReturnsPendingThenAcknowledgedWithoutRequiringResult()
+    {
+        using var directory = new TemporaryDirectory();
+        var project = directory.Write("source/project.ovmachine", [1, 2, 3]);
+        var source = directory.Write("source/frame.c3d", [4, 5, 6]);
+        var handoff = MachineIntegrationExchange.PublishHandoff(CreateRequest(
+            directory.Path,
+            project,
+            source));
+
+        var pending = MachineIntegrationExchange.ReadProgress(
+            directory.Path,
+            handoff.TransactionId);
+
+        Assert.Equivalent(handoff, pending.Handoff, strict: true);
+        Assert.Null(pending.Acknowledgement);
+        Assert.Null(pending.Result);
+
+        var acknowledgement = new IntegrationAcknowledgement(
+            IntegrationContractSchema.Current,
+            IntegrationMessageKind.Acknowledgement,
+            Guid.NewGuid(),
+            handoff.TransactionId,
+            handoff.MessageId,
+            handoff.CreatedAtUtc.AddSeconds(1),
+            ThreeDIdentity(),
+            IntegrationAcknowledgementStatus.Accepted,
+            null);
+        File.WriteAllBytes(
+            Path.Combine(
+                TransactionDirectory(directory.Path, handoff.TransactionId),
+                IntegrationTransactionLayout.AcknowledgementFileName),
+            IntegrationContractJson.Serialize(acknowledgement));
+
+        var acknowledged = MachineIntegrationExchange.ReadProgress(
+            directory.Path,
+            handoff.TransactionId);
+
+        Assert.Equal(acknowledgement, acknowledged.Acknowledgement);
+        Assert.Null(acknowledged.Result);
+        var exception = Assert.Throws<IntegrationContractException>(() =>
+            MachineIntegrationExchange.ReadResult(directory.Path, handoff.TransactionId));
+        Assert.Equal(IntegrationErrorCode.InvalidState, exception.ErrorCode);
+    }
+
+    [Fact]
     public void ReadResult_WhenRunRecordChanges_FailsClosed()
     {
         using var directory = new TemporaryDirectory();

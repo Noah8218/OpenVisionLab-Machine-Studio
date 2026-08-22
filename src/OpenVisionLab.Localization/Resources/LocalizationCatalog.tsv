@@ -1390,3 +1390,16 @@ Sensor.StatusRejected	{0} 명령이 거부되었습니다.	{0} was rejected.
 Equipment.ManualCommissioning	수동 커미셔닝	Manual commissioning
 Equipment.StartManualControl	수동 운전 시작	Start manual control
 Equipment.StartManualControlTooltip	선택 장비를 자동 또는 시퀀스 운전과 분리된 수동 제어로 전환합니다.	Switch the selected equipment to manual control separately from automatic or sequence operation.
+Integration.Tab	3D 연동	3D Exchange
+Integration.Title	3D Studio 연동	3D Studio exchange
+Integration.SetupTitle	한 번만 설정	One-time setup
+Integration.SetupHint	공유 폴더와 이 프로젝트의 C3D 소스를 저장합니다. 설정 복원만으로는 내보내기, 읽기 또는 검사가 실행되지 않습니다.	Save the shared folder and this project's C3D source. Restoring setup never exports, reads, or runs an inspection.
+Integration.ExchangeRoot	공유 교환 폴더	Shared exchange folder
+Integration.Source	이 프로젝트의 C3D 검사 소스	C3D inspection source for this project
+Integration.Browse	찾아보기	Browse
+Integration.SaveSetup	설정 저장	Save setup
+Integration.Reset	초기화	Reset
+Integration.MachineStepTitle	Machine Studio 작업	Machine Studio action
+Integration.MachineStepHint	내보내기는 현재 저장된 프로젝트와 C3D 소스를 새 거래로 복사합니다. 새로고침은 결과만 읽으며 시뮬레이션을 시작하지 않습니다.	Export copies the currently saved project and C3D source into a new transaction. Refresh only reads status and never starts simulation.
+Integration.Export	3D로 내보내기	Export to 3D
+Integration.Refresh	결과 새로고침	Refresh result

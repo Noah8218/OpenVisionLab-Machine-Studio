@@ -36,6 +36,7 @@ using OpenVisionLab.Machine.Vision.Contracts;
 using OpenVisionLab.Machine.Vision.Models;
 using OpenVisionLab.MachineStudio.Models.Simulation;
 using OpenVisionLab.MachineStudio.ViewModel.Simulation;
+using OpenVisionLab.MachineStudio.ViewModel.Integration;
 using OpenVisionLab.Wpf.MessageDialogs;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
@@ -275,6 +276,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             OnConnectionCheckpointTemplateApplied,
             OpenProcessBlockSequenceStep);
         SequenceEditor = new SequenceEditorViewModel();
+        IntegrationExchange = new MachineIntegrationViewModel(CreateIntegrationProjectContext);
         SimulationWorkspace = new SimulationWorkspaceViewModel();
         MultiAxisCommissioningRecipe = new MultiAxisCommissioningRecipeEditorViewModel(
             OnMultiAxisCommissioningRecipeChanged);
@@ -447,6 +449,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     public bool HasSelectedAxisDefinition => AxisDriveTuningEditor is not null;
     public MachineLayoutViewModel Layout { get; }
     public RecipeConnectionWorkbenchViewModel RecipeConnections { get; }
+    public MachineIntegrationViewModel IntegrationExchange { get; }
     public SequenceEditorViewModel SequenceEditor { get; }
     public SimulationWorkspaceViewModel SimulationWorkspace { get; }
     public MultiAxisCommissioningRecipeEditorViewModel MultiAxisCommissioningRecipe { get; }
@@ -1528,6 +1531,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         RefreshVisionEvidenceContext();
         PersistVisionEvidence();
         AcceptCurrentProjectAsSaved();
+        IntegrationExchange.SyncProjectContext();
         Log("Project", $"Saved {_project.Name}");
     }
 
@@ -3257,7 +3261,26 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(CurrentCameraFrameText));
         NotifyCameraCommissioningChanged(invalidateCommands: false);
         NotifyMultiAxisCommissioningRecipeChanged();
+        IntegrationExchange.SyncProjectContext();
         InvalidateCommands();
+    }
+
+    private MachineIntegrationProjectContext CreateIntegrationProjectContext()
+    {
+        var sequence = SequenceEditor.SelectedSequence ?? _project.Sequences.FirstOrDefault();
+        var stepId = SequenceEditor.SelectedStep?.Id
+            ?? sequence?.Steps.FirstOrDefault()?.Id
+            ?? "step-unselected";
+        var cameraId = _selectedCameraId
+            ?? _project.Devices.FirstOrDefault(device => device.Kind == DeviceKind.Camera)?.Id
+            ?? "camera-unselected";
+        return new(
+            _project,
+            _currentProjectPath,
+            sequence?.Id ?? "sequence-unselected",
+            stepId,
+            cameraId,
+            HasUnsavedChanges);
     }
 
     private static SimulationRuntimeConfiguration BuildRuntimeConfiguration(
@@ -6569,6 +6592,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         DigitalIo.RefreshLocalization();
         FaultManager.RefreshLocalization();
         SequenceEditor.RefreshLocalization();
+        IntegrationExchange.RefreshLocalization();
     }
 
     private static readonly string[] LocalizedPropertyNames =

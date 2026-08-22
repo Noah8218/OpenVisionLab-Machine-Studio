@@ -26,6 +26,11 @@ public sealed record MachineIntegrationResult(
     IntegrationAcknowledgement Acknowledgement,
     IntegrationResult Result);
 
+public sealed record MachineIntegrationProgress(
+    IntegrationHandoff Handoff,
+    IntegrationAcknowledgement? Acknowledgement,
+    IntegrationResult? Result);
+
 /// <summary>
 /// Owns explicit Machine-side file exchange. It never saves a project, starts
 /// simulation, or invokes a 3D workflow.
@@ -93,6 +98,21 @@ public static class MachineIntegrationExchange
         string exchangeRoot,
         Guid transactionId)
     {
+        var progress = ReadProgress(exchangeRoot, transactionId);
+        if (progress.Acknowledgement is null || progress.Result is null)
+        {
+            throw new IntegrationContractException(
+                IntegrationErrorCode.InvalidState,
+                "The integration transaction does not have a completed Result.");
+        }
+
+        return new(progress.Handoff, progress.Acknowledgement, progress.Result);
+    }
+
+    public static MachineIntegrationProgress ReadProgress(
+        string exchangeRoot,
+        Guid transactionId)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(exchangeRoot);
         if (transactionId == Guid.Empty)
         {
@@ -104,23 +124,40 @@ public static class MachineIntegrationExchange
         var transactionDirectory = GetTransactionDirectory(exchangeRoot, transactionId);
         var handoff = IntegrationContractJson.DeserializeHandoff(
             ReadMessage(transactionDirectory, IntegrationTransactionLayout.HandoffFileName));
-        var acknowledgement = IntegrationContractJson.DeserializeAcknowledgement(
-            ReadMessage(
-                transactionDirectory,
-                IntegrationTransactionLayout.AcknowledgementFileName));
-        var result = IntegrationContractJson.DeserializeResult(
-            ReadMessage(transactionDirectory, IntegrationTransactionLayout.ResultFileName));
-
-        ThrowIfInvalid(IntegrationContractValidator.ValidateSequence(
-            handoff,
-            acknowledgement,
-            result));
         foreach (var artifact in handoff.Context.Artifacts)
         {
             ThrowIfInvalid(IntegrationContractValidator.ValidateArtifactFile(
                 artifact,
                 transactionDirectory));
         }
+
+        var acknowledgementPath = Path.Combine(
+            transactionDirectory,
+            IntegrationTransactionLayout.AcknowledgementFileName);
+        if (!File.Exists(acknowledgementPath))
+        {
+            return new(handoff, null, null);
+        }
+
+        var acknowledgement = IntegrationContractJson.DeserializeAcknowledgement(
+            File.ReadAllBytes(acknowledgementPath));
+        ThrowIfInvalid(IntegrationContractValidator.ValidateSequence(
+            handoff,
+            acknowledgement));
+
+        var resultPath = Path.Combine(
+            transactionDirectory,
+            IntegrationTransactionLayout.ResultFileName);
+        if (!File.Exists(resultPath))
+        {
+            return new(handoff, acknowledgement, null);
+        }
+
+        var result = IntegrationContractJson.DeserializeResult(File.ReadAllBytes(resultPath));
+        ThrowIfInvalid(IntegrationContractValidator.ValidateSequence(
+            handoff,
+            acknowledgement,
+            result));
         if (result.RunRecord is not null)
         {
             ThrowIfInvalid(IntegrationContractValidator.ValidateArtifactFile(
