@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="OpenVisionLab.Integration.Contracts" Version="[0.1.0]" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\OpenVisionLab.Machine.Vision\OpenVisionLab.Machine.Vision.csproj" />
   </ItemGroup>
 

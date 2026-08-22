@@ -5,6 +5,7 @@
              xmlns:scene="clr-namespace:OpenVisionLab.MachineStudio.View.Scene"
              xmlns:project="clr-namespace:OpenVisionLab.MachineStudio.View.Project"
              xmlns:sequence="clr-namespace:OpenVisionLab.MachineStudio.View.Sequence"
+             xmlns:integration="clr-namespace:OpenVisionLab.MachineStudio.View.Integration"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
     <TabControl SelectedIndex="{Binding SelectedDocumentTabIndex, Mode=TwoWay}">
         <TabItem Header="{loc:Loc Key=Shell.MachineLayout}">
@@ -398,6 +399,9 @@
                 <sequence:SequenceEditorView Grid.Row="1"
                                              DataContext="{Binding SequenceEditor}" />
             </Grid>
+        </TabItem>
+        <TabItem Header="{loc:Loc Key=Integration.Tab}">
+            <integration:MachineIntegrationExchangeView />
         </TabItem>
     </TabControl>
 </UserControl>

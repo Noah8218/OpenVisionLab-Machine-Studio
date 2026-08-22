@@ -372,6 +372,7 @@ internal static class DirectExeSmokeHost
         var evidenceDrawerState = GetArgumentValue(args, "--smoke-evidence-state");
         var leftToolTab = GetArgumentValue(args, "--smoke-left-tool-tab");
         var documentTab = GetArgumentValue(args, "--smoke-document-tab");
+        var integrationExchangeState = GetArgumentValue(args, "--smoke-integration-exchange-state");
         var sequenceState = GetArgumentValue(args, "--smoke-sequence-state");
         var pickPlaceState = GetArgumentValue(args, "--smoke-pick-place-state");
         var roundTripSavePath = GetArgumentValue(args, "--smoke-roundtrip-save");
@@ -1240,6 +1241,7 @@ internal static class DirectExeSmokeHost
                 "Simulation Workspace" => OpenVisionLanguageService.T("Shell.SimulationWorkspace"),
                 "Sequence" => OpenVisionLanguageService.T("Shell.Sequence"),
                 "Connections" => OpenVisionLanguageService.T("Connections.Tab"),
+                "3D Exchange" => OpenVisionLanguageService.T("Integration.Tab"),
                 _ => documentTab
             };
             var tab = tabs.Items.OfType<TabItem>().FirstOrDefault(item =>
@@ -1253,6 +1255,11 @@ internal static class DirectExeSmokeHost
             tab.IsSelected = true;
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             await Task.Delay(100);
+        }
+
+        if (!string.IsNullOrWhiteSpace(integrationExchangeState))
+        {
+            await ApplyIntegrationExchangeSmokeStateAsync(window, vm, integrationExchangeState);
         }
 
         if (!string.IsNullOrWhiteSpace(connectionWorkbenchState))
@@ -10503,6 +10510,127 @@ internal static class DirectExeSmokeHost
 
         mouse_event(MouseEventLeftUp, 0, 0, 0, UIntPtr.Zero);
         _smokePointerHeld = false;
+    }
+
+    private static async Task ApplyIntegrationExchangeSmokeStateAsync(
+        ShellWindow window,
+        MainViewModel viewModel,
+        string state)
+    {
+        const string longExchangeRoot = @"D:\OpenVisionLab-Exchange\Projects\Automated-Optical-Inspection-Line-With-A-Deliberately-Long-Commissioning-Name\Shared-Exchange";
+        const string longSourcePath = @"D:\Inspection\Production-Qualification\Camera-Station-07\Very-Long-Recipe-And-Device-Identifier\representative-height-field-frame.c3d";
+        viewModel.IntegrationExchange.ExchangeRoot = longExchangeRoot;
+        viewModel.IntegrationExchange.InspectionSourcePath = longSourcePath;
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        window.UpdateLayout();
+
+        var exchangeView = FindVisualDescendant<
+            OpenVisionLab.MachineStudio.View.Integration.MachineIntegrationExchangeView>(window)
+            ?? throw new InvalidOperationException("3D Exchange view was not available.");
+
+        switch (state.Trim().ToLowerInvariant())
+        {
+            case "input-focus":
+                exchangeView.ExchangeRootTextBox.BringIntoView();
+                window.Activate();
+                exchangeView.ExchangeRootTextBox.Text = longExchangeRoot;
+                exchangeView.ExchangeRootTextBox
+                    .GetBindingExpression(TextBox.TextProperty)
+                    ?.UpdateSource();
+                AssertSmoke(
+                    viewModel.IntegrationExchange.ExchangeRoot == longExchangeRoot,
+                    "3D Exchange folder input did not update its ViewModel source.");
+                viewModel.IntegrationExchange.ExchangeRoot = longExchangeRoot + @"\Restored-From-ViewModel";
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.DataBind);
+                exchangeView.ExchangeRootTextBox.Focus();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Input);
+                AssertSmoke(
+                    exchangeView.ExchangeRootTextBox.IsKeyboardFocusWithin,
+                    "3D Exchange folder input did not enter keyboard-focus state.");
+                AssertSmoke(
+                    string.Equals(
+                        exchangeView.ExchangeRootTextBox.Text,
+                        longExchangeRoot + @"\Restored-From-ViewModel",
+                        StringComparison.Ordinal),
+                    "3D Exchange folder input did not render the representative value.");
+                break;
+            case "interaction-matrix":
+                var buttons = FindVisualDescendants<Button>(exchangeView)
+                    .Where(button => button.IsVisible)
+                    .ToArray();
+                AssertSmoke(buttons.Length >= 6, "3D Exchange buttons were not all visible.");
+                window.Activate();
+                foreach (var button in buttons.Where(button => button.IsEnabled))
+                {
+                    button.BringIntoView();
+                    window.UpdateLayout();
+                    button.Focus();
+                    await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Input);
+                    AssertSmoke(button.IsKeyboardFocusWithin, "A 3D Exchange button rejected keyboard focus.");
+                    AssertSmoke(
+                        button.Command is null
+                        || button.IsEnabled == button.Command.CanExecute(button.CommandParameter),
+                        "A 3D Exchange button visual enabled state disagreed with CanExecute.");
+                }
+                exchangeView.ExchangeRootTextBox.BringIntoView();
+                window.UpdateLayout();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
+                var representativeHoverButton = buttons[0];
+                representativeHoverButton.BringIntoView();
+                window.UpdateLayout();
+                MovePointerToCenter(representativeHoverButton);
+                await Task.Delay(100);
+                AssertSmoke(
+                    representativeHoverButton.IsMouseOver,
+                    "3D Exchange Browse button did not enter pointer-hover state.");
+                var away = window.PointToScreen(new Point(8, 8));
+                SetCursorPos((int)Math.Round(away.X), (int)Math.Round(away.Y));
+                Mouse.Synchronize();
+                await Task.Delay(100);
+                AssertSmoke(
+                    !representativeHoverButton.IsMouseOver,
+                    "3D Exchange Browse button did not recover after mouse leave.");
+                exchangeView.ExchangeRootTextBox.Focus();
+                AssertSmoke(
+                    exchangeView.ExchangeRootTextBox.MoveFocus(
+                        new TraversalRequest(FocusNavigationDirection.Next)),
+                    "Tab traversal did not leave the 3D Exchange folder input.");
+                AssertSmoke(
+                    Keyboard.FocusedElement is Button,
+                    "Tab traversal did not reach the next 3D Exchange button.");
+                exchangeView.SaveIntegrationSetupButton.Focus();
+                break;
+            case "save-pressed":
+                exchangeView.SaveIntegrationSetupButton.BringIntoView();
+                window.Activate();
+                exchangeView.SaveIntegrationSetupButton.Focus();
+                MovePointerToCenter(exchangeView.SaveIntegrationSetupButton);
+                await Task.Delay(100);
+                AssertSmoke(
+                    exchangeView.SaveIntegrationSetupButton.IsMouseOver,
+                    "3D Exchange Save setup button did not enter pointer-hover state.");
+                mouse_event(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
+                _smokePointerHeld = true;
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await Task.Delay(150);
+                AssertSmoke(
+                    exchangeView.SaveIntegrationSetupButton.IsPressed,
+                    "3D Exchange Save setup button did not enter pointer-down state.");
+                break;
+            case "validation-error":
+                viewModel.IntegrationExchange.RefreshResultCommand.Execute(null);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.DataBind);
+                AssertSmoke(
+                    !string.IsNullOrWhiteSpace(viewModel.IntegrationExchange.StatusText),
+                    "3D Exchange validation error did not render a status message.");
+                break;
+            default:
+                throw new ArgumentException(
+                    $"Unsupported --smoke-integration-exchange-state '{state}'. " +
+                    "Expected input-focus, interaction-matrix, save-pressed, or validation-error.");
+        }
+
+        Console.WriteLine($"3D Exchange visual state applied: {state}");
     }
 
     private static void SelectLayoutItemsThroughScene(
