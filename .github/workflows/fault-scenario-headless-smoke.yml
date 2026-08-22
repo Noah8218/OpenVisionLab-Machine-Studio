@@ -1,0 +1,103 @@
+﻿name: Fault Scenario Headless Determinism
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_mismatch_gate:
+        description: "Run intentional mismatch gate (expects exit code 2)."
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  fault-scenario-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          global-json-file: global.json
+
+      - name: Run deterministic headless fault scenario baseline and diff
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $artifactsPath = ".\\artifacts\\ci-fault-scenario"
+          $baselinePath = Join-Path $artifactsPath "baseline-fault-scenario-report.json"
+          $reportPath = Join-Path $artifactsPath "fault-scenario-report.json"
+          $mismatchPath = Join-Path $artifactsPath "fault-scenario-mismatch.json"
+
+          New-Item -ItemType Directory -Path $artifactsPath -Force | Out-Null
+          $env:OPENVISIONLAB_FAULT_SMOKE_ARTIFACTS = (Resolve-Path $artifactsPath).Path
+
+          Write-Host "[01/02] running smoke baseline + compare"
+          & .\\scripts\\smoke-fault-scenario-headless.ps1
+          $smokeExitCode = $LASTEXITCODE
+          if ($smokeExitCode -ne 0)
+          {
+              Write-Error "Smoke check failed. exit=$smokeExitCode"
+              exit $smokeExitCode
+          }
+
+          if (-not (Test-Path -LiteralPath $baselinePath))
+          {
+              Write-Error "Baseline report file not created as expected: $baselinePath"
+              exit 2
+          }
+          if (-not (Test-Path -LiteralPath $reportPath))
+          {
+              Write-Error "Fault-scenario report file not created as expected: $reportPath"
+              exit 2
+          }
+          if (Test-Path -LiteralPath $mismatchPath)
+          {
+              Write-Error "Mismatch report exists after a successful comparison. Remove stale mismatch artifacts from previous runs."
+              exit 1
+          }
+
+          Write-Host "Deterministic headless fault scenario check passed."
+
+      - name: Upload fault-scenario headless artifacts
+        if: failure() || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: fault-scenario-headless-artifacts-${{ github.run_id }}
+          path: |
+            artifacts/ci-fault-scenario/baseline-fault-scenario-report.json
+            artifacts/ci-fault-scenario/fault-scenario-report.json
+            artifacts/ci-fault-scenario/fault-scenario-mismatch.json
+          if-no-files-found: warn
+
+      - name: Optional mismatch gate (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_mismatch_gate == 'true'
+        shell: pwsh
+        run: |
+          Write-Host "[02/02] running intentional mismatch gate"
+          try
+          {
+              & .\scripts\smoke-fault-scenario-headless.ps1 -InjectMismatchBeforeCompare
+          }
+          catch
+          {
+              Write-Error "Mismatch gate failed to execute."
+              exit 2
+          }
+
+          if ($LASTEXITCODE -ne 2)
+          {
+              Write-Error "Mismatch gate did not return expected exit code 2. exit=$LASTEXITCODE"
+              exit $LASTEXITCODE
+          }
+
+          Write-Host "Mismatch gate passed (expected mismatch code 2)."

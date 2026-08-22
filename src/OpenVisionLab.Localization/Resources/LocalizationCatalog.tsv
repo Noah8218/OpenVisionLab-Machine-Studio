@@ -1,0 +1,1392 @@
+Key	Korean	English
+Simulation.ScheduledFaultRecovery	예약 장애 및 복구	Scheduled fault and recovery
+Simulation.ScheduledFaultRecoveryHint	선언한 Tick에 선택한 장애를 주입하고 해제한 뒤 같은 엔진에서 복구합니다.	Inject the selected fault at the authored tick, clear it, and recover in the same engine.
+Simulation.EnableScheduledFault	예약 장애 사용	Enable scheduled fault
+Simulation.FaultKind	장애 종류	Fault type
+Simulation.FaultTarget	장애 대상	Fault target
+Simulation.StuckInputForceOn	입력을 ON으로 고정	Force stuck input ON
+Simulation.ScheduledFaultScheduleSummary	{0} · {1} · Tick {2} 주입 · {3} Tick 유지 · {4}	{0} · {1} · inject at tick {2} · hold {3} ticks · {4}
+Simulation.FaultInjectTick	주입 Tick	Inject tick
+Simulation.FaultHoldTicks	유지 Tick	Hold ticks
+Simulation.RestartSequence	장애 해제 후 시퀀스 재시작	Restart sequence after clear
+Simulation.RecoverySequence	복구 시퀀스	Recovery sequence
+Simulation.FaultScheduleDisabled	예약 장애 사용 안 함	Scheduled fault disabled
+Simulation.FaultScheduleInvalid	장애 주입과 해제 Tick은 시나리오 기간 안에 있어야 하며 복구 대상을 선택해야 합니다.	Injection and clear ticks must fit within the scenario, and a recovery target must be selected.
+Simulation.RecoveryClearOnly	장애 해제만	Clear only
+Simulation.RecoveryRestart	{0} 재시작	Restart {0}
+Shell.Edit	편집	Edit
+Shell.Undo	실행 취소	Undo
+Shell.Redo	다시 실행	Redo
+Shell.Copy	복사	Copy
+Shell.Duplicate	복제	Duplicate
+Shell.Delete	삭제	Delete
+Gallery.Open	반도체 레시피 갤러리...	Semiconductor recipe gallery...
+Gallery.OpenTooltip	10개 반도체 장비 레시피에서 시작합니다.	Start from 10 semiconductor equipment recipes.
+Gallery.CommandLabel	레시피	Recipes
+Gallery.Title	반도체 레시피 갤러리	Semiconductor recipe gallery
+Gallery.Subtitle	장비 구성을 한눈에 비교하고 복사본을 만들어 편집하십시오.	Compare equipment configurations at a glance, then create an editable copy.
+Gallery.Close	닫기	Close
+Gallery.CreateCopy	복사본 만들기	Create a copy
+Gallery.CopyHint	원본 템플릿은 변경되지 않습니다.	The original template remains unchanged.
+Gallery.SafePreview	레시피를 선택해도 시뮬레이션은 시작되지 않습니다. 복사본은 설계 모드로 열립니다.	Selecting a recipe does not start simulation. The copy opens in Design mode.
+Gallery.ValidateAll	10개 모두 검증	Validate all 10
+Gallery.ValidateAllTooltip	내장 레시피 10개를 순서대로 컴파일하고 격리 드라이런합니다.	Compile and isolated-dry-run all 10 bundled recipes in order.
+Gallery.ValidationPending	대기	Pending
+Gallery.ValidationRunning	검증 중	Validating
+Gallery.ValidationPassed	통과	Passed
+Gallery.ValidationFailed	실패	Failed
+Gallery.ValidationProgressFormat	레시피 검증 {0}/{1}	Recipe validation {0}/{1}
+Gallery.ValidationPassedSummaryFormat	{0}/{1}개 레시피가 컴파일과 격리 드라이런을 모두 통과했습니다.	{0}/{1} recipes passed compilation and isolated dry run.
+Gallery.ValidationFailedSummaryFormat	{0}개 실패 · 첫 실패: {1} · 단계 {2} · {3}	{0} failed · First failure: {1} · Step {2} · {3}
+Gallery.ValidationCompileStage	컴파일	Compile
+Gallery.ValidationLoadStage	불러오기	Load
+Gallery.ValidationSequenceMissing	자동 실행 시퀀스가 구성되지 않았습니다.	No automatic-run sequence is configured.
+Gallery.ProjectSchema	프로젝트 스키마	Project schema
+Gallery.ProjectSchemaFormat	스키마 {0}	Schema {0}
+Gallery.ValidatedBuild	검증 빌드	Validated build
+Gallery.ValidationContextFormat	스키마 {0} · 빌드 {1}	Schema {0} · Build {1}
+Gallery.SaveCompatibilityReport	호환성 보고서 저장	Save compatibility report
+Gallery.SaveCompatibilityReportTooltip	각 레시피의 스키마, 검증 결과, 실행 빌드와 커밋을 JSON으로 저장합니다.	Save each recipe schema, validation result, executable build, and commit as JSON.
+Gallery.CompatibilityReportRequiresValidation	10개 레시피 검증을 완료한 뒤 보고서를 저장하십시오.	Complete validation of all 10 recipes before saving the report.
+Gallery.CompareCompatibilityReports	보고서 비교	Compare reports
+Gallery.CompareCompatibilityReportsTooltip	저장된 기준 보고서와 현재 보고서를 불러와 레시피 호환성 변화를 비교합니다.	Load a saved baseline and current report to compare recipe compatibility changes.
+Gallery.CompareBaselineReport	기준 호환성 보고서 선택	Select baseline compatibility report
+Gallery.CompareCurrentReport	현재 호환성 보고서 선택	Select current compatibility report
+Gallery.CompatibilityReportUnsupported	지원하지 않는 호환성 보고서 버전입니다.	The compatibility report version is not supported.
+Gallery.CompatibilityReportLoadFailed	호환성 보고서가 손상되었거나 필수 결과가 없습니다.	The compatibility report is damaged or missing required results.
+Gallery.ComparisonTitle	레시피 팩 호환성 비교	Recipe pack compatibility comparison
+Gallery.ComparisonSummaryFormat	신규 실패 {0} · 복구 {1} · 메타데이터 변경 {2} · 추가 {3} · 제거 {4}	New failures {0} · Recovered {1} · Metadata changes {2} · Added {3} · Removed {4}
+Gallery.Comparison.BaselineFormat	기준: {0}	Baseline: {0}
+Gallery.Comparison.CurrentFormat	현재: {0}	Current: {0}
+Gallery.Comparison.ProjectSchemaFormat	프로젝트 스키마 {0} → {1}	Project schema {0} → {1}
+Gallery.Comparison.Unchanged	변경 없음	Unchanged
+Gallery.Comparison.MetadataChanged	메타데이터 변경	Metadata changed
+Gallery.Comparison.NewlyFailed	신규 실패	New failure
+Gallery.Comparison.Recovered	복구	Recovered
+Gallery.Comparison.Added	추가	Added
+Gallery.Comparison.Removed	제거	Removed
+Gallery.Comparison.OutcomeFormat	결과 {0} → {1}	Outcome {0} → {1}
+Gallery.Comparison.SchemaFormat	스키마 {0} → {1}	Schema {0} → {1}
+Gallery.Comparison.BuildFormat	빌드 {0} → {1}	Build {0} → {1}
+Gallery.Comparison.NotPresent	없음	Not present
+Gallery.Comparison.SafeHint	보고서 비교는 프로젝트를 열거나 레시피를 실행·저장하지 않습니다.	Comparing reports does not open a project or run or save a recipe.
+Gallery.CloseComparison	비교 닫기	Close comparison
+Gallery.Sequence	시퀀스	Sequence
+Gallery.EquipmentFocus	고유 장비	Distinctive equipment
+Gallery.TopologySummaryCompact	축 {0} · 센서 {1} · 실린더 {2} · 컨베이어 {3} · 워크 {4}	Axes {0} · Sensors {1} · Cyl {2} · Conv {3} · Wafers {4}
+Gallery.Axes	축	Axes
+Gallery.Devices	장치	Devices
+Gallery.Channels	I/O 채널	I/O channels
+Gallery.Components	레이아웃 구성요소	Layout components
+Gallery.Steps	시퀀스 단계	Sequence steps
+Gallery.LoadFailed	내장 반도체 레시피를 불러오지 못했습니다.	The bundled semiconductor recipes could not be loaded.
+Gallery.TemplateOverwriteRejected	내장 원본 레시피는 덮어쓸 수 없습니다. 다른 위치에 복사본을 저장하십시오.	The bundled recipe cannot be overwritten. Save the copy to another location.
+Gallery.CopySucceeded	'{0}' 복사본을 설계 모드로 열었습니다.	Opened a copy of '{0}' in Design mode.
+Connections.Tab	연결	Connections
+Connections.Title	레시피 연결	Recipe connections
+Connections.QuickAddTitle	구성요소 추가 및 자동 연결	Add and connect equipment
+Connections.QuickAddHint	기존 프로젝트 모델에 축·장치·I/O가 함께 생성됩니다. 센서는 스테이지 또는 워크피스 카드를 먼저 선택하면 해당 대상을 연결하며, 상세 연결은 오른쪽 속성에서 편집합니다.	Axis, device, and I/O definitions are created together in the existing project model. For a sensor, first select its stage or workpiece target; edit detailed links in Properties.
+Connections.StationSkeletonPreview	반도체 스테이션 구성	Configure semiconductor station
+Connections.StationSkeletonPreviewTooltip	현재 레시피에서 누락된 반도체 이송 스테이션 역할을 찾아 적용 전에 보여줍니다.	Find missing semiconductor transfer-station roles in the current recipe and show them before applying.
+Connections.LoadLockSetupPreview	로드락 설정	Load-lock setup
+Connections.LoadLockSetupPreviewTooltip	현재 프로젝트의 로드락 도어, 압력 I/O, 펌프·벤트 시간을 한 화면에서 확인하고 편집합니다.	Review and edit this project's load-lock doors, pressure I/O, and pump/vent timings in one place.
+Connections.LoadLockSetupTitle	로드락 챔버 설정	Load-lock chamber setup
+Connections.LoadLockSetupScope	현재 프로젝트 · 로드락 1대	Current project · one load-lock chamber
+Connections.LoadLockSetupHint	저장된 설정을 불러왔습니다. 적용 전에는 프로젝트가 바뀌지 않으며 적용은 실행 또는 파일 저장을 시작하지 않습니다.	Saved values are restored here. Nothing changes before Apply, and Apply does not run or save the project file.
+Connections.LoadLockSetupApply	설정 적용	Apply setup
+Connections.LoadLockSetupApplyTooltip	표시된 로드락 설정을 현재 프로젝트 모델에 적용합니다. 실행과 파일 저장은 시작하지 않습니다.	Apply the shown load-lock setup to the current project model. This does not run or save the project file.
+Connections.LoadLockSetupClose	닫기	Close
+Connections.LoadLockSetupCloseTooltip	프로젝트를 변경하지 않고 로드락 설정을 닫습니다.	Close the load-lock setup without changing the project.
+Connections.LoadLockSetupReset	저장값 복원	Restore saved
+Connections.LoadLockSetupResetTooltip	현재 프로젝트에서 읽은 값으로 되돌립니다. 아직 저장된 설정이 없으면 현재 후보의 제안값으로 되돌립니다.	Restore values read from the current project. If no setup exists yet, restore the suggested values from current candidates.
+Connections.LoadLockSetupOuterDoor	외측 도어 실린더	Outer-door cylinder
+Connections.LoadLockSetupInnerDoor	내측 도어 실린더	Inner-door cylinder
+Connections.LoadLockSetupEvacuate	배기 명령 (DO)	Evacuate output (DO)
+Connections.LoadLockSetupVent	벤트 명령 (DO)	Vent output (DO)
+Connections.LoadLockSetupVacuumReady	진공 준비 센서 (DI)	Vacuum-ready DI
+Connections.LoadLockSetupAtmosphereReady	대기압 준비 센서 (DI)	Atmosphere-ready DI
+Connections.LoadLockSetupPumpDown	펌프다운 시간 (ms)	Pump-down time (ms)
+Connections.LoadLockSetupVentDuration	벤트 시간 (ms)	Vent time (ms)
+Connections.LoadLockSetupMissing	누락	missing
+Connections.LoadLockSetupValidationReady	값이 유효합니다. 적용 후 일반 저장을 사용하면 현재 프로젝트에 유지됩니다.	Values are valid. Apply, then use the normal Save command to retain them in this project.
+Connections.LoadLockSetupValidationError	서로 다른 도어 실린더, 서로 다른 배기·벤트 출력과 진공·대기압 입력을 선택하십시오. 시간은 양수이며 고정 스텝의 배수여야 합니다.	Select distinct door cylinders, distinct evacuate/vent outputs, and distinct vacuum/atmosphere inputs. Timings must be positive multiples of the fixed step.
+Connections.LoadLockSetupMultipleError	현재 설정 화면은 프로젝트당 로드락 1대를 지원합니다. 중복 로드락 장치를 먼저 정리하십시오.	This setup surface supports one load-lock chamber per project. Remove duplicate load-lock devices first.
+Connections.LoadLockSetupAppliedStatus	로드락 설정을 적용했습니다. 실행은 시작되지 않았으며 파일 저장 후 다시 열면 복원됩니다.	Applied the load-lock setup. No run started; save the file to restore it when reopened.
+Connections.LoadLockSetupNoChangesStatus	로드락 설정에 적용할 변경이 없습니다.	There are no load-lock setup changes to apply.
+Connections.WaferHandlerSetupPreview	웨이퍼 핸들러 설정	Wafer-handler setup
+Connections.WaferHandlerSetupPreviewTooltip	레시피 08의 축·워크피스·핸들러 I/O와 위치를 한 화면에서 편집합니다.	Edit recipe 08 axes, workpiece, handler I/O, and positions in one place.
+Connections.PrealignerSetupPreview	프리얼라이너 설정	Pre-aligner setup
+Connections.PrealignerSetupPreviewTooltip	레시피 03의 회전 스테이지·클램프·정렬 I/O를 한 화면에서 편집합니다.	Edit recipe 03 rotary stage, clamp, and alignment I/O in one place.
+Connections.WaferHandlerSetupTitle	웨이퍼 핸들러 설정	Wafer-handler setup
+Connections.PrealignerSetupTitle	프리얼라이너 설정	Pre-aligner setup
+Connections.SemanticSetupHint	적용 전에는 프로젝트가 변경되지 않으며 실행이나 저장을 시작하지 않습니다.	Nothing changes before Apply; Apply does not run or save the project.
+Connections.SemanticSetupApply	설정 적용	Apply setup
+Connections.SemanticSetupClose	닫기	Close
+Connections.SemanticSetupReset	저장값 복원	Restore saved
+Connections.WaferHandlerHorizontalAxis	수평축	Horizontal axis
+Connections.WaferHandlerVerticalAxis	수직축	Vertical axis
+Connections.WaferHandlerWorkpiece	워크피스	Workpiece
+Connections.WaferHandlerSourcePresent	소스 감지 DI	Source-present DI
+Connections.WaferHandlerGateInput	게이트 열림 DI	Gate-open DI
+Connections.WaferHandlerPickCommand	픽 명령 DO	Pick command DO
+Connections.WaferHandlerPlaceCommand	플레이스 명령 DO	Place command DO
+Connections.WaferHandlerHoldingFeedback	홀딩 피드백 DI	Holding feedback DI
+Connections.WaferHandlerPlacedFeedback	배치 피드백 DI	Placed feedback DI
+Connections.WaferHandlerPickHorizontal	픽 수평 위치	Pick horizontal position
+Connections.WaferHandlerPickVertical	픽 수직 위치	Pick vertical position
+Connections.WaferHandlerPlaceHorizontal	플레이스 수평 위치	Place horizontal position
+Connections.WaferHandlerPlaceVertical	플레이스 수직 위치	Place vertical position
+Connections.PrealignerStage	회전 스테이지	Rotary stage
+Connections.PrealignerClamp	클램프 실린더	Clamp cylinder
+Connections.PrealignerWaferPresentInput	웨이퍼 감지 DI	Wafer-present DI
+Connections.PrealignerAccepted	정렬 승인 DO	Alignment accepted DO
+Connections.PrealignerReady	정렬 준비 DI	Alignment ready DI
+Connections.PrealignerComplete	정렬 완료 DI	Alignment complete DI
+Connections.PrealignerTarget	목표 각도 (deg)	Target angle (deg)
+Connections.PrealignerTolerance	허용오차 (deg)	Tolerance (deg)
+Connections.WaferHandlerSetupValidationReady	값이 유효합니다. 적용 후 일반 저장을 사용하십시오.	Values are valid. Apply, then use the normal Save command.
+Connections.WaferHandlerSetupValidationError	서로 다른 유효한 축·워크피스·I/O를 선택하고 위치를 축 한계 안에 입력하십시오.	Select valid distinct axes, workpiece, I/O, and positions within axis limits.
+Connections.WaferHandlerSetupMultipleError	프로젝트당 웨이퍼 핸들러 1대만 지원합니다. 중복 장치를 먼저 정리하십시오.	This setup surface supports one wafer handler per project. Remove duplicates first.
+Connections.WaferHandlerSetupAppliedStatus	웨이퍼 핸들러 설정을 적용했습니다. 실행은 시작되지 않았습니다.	Applied the wafer-handler setup. No run started.
+Connections.WaferHandlerSetupNoChangesStatus	웨이퍼 핸들러 설정에 적용할 변경이 없습니다.	There are no wafer-handler changes to apply.
+Connections.PrealignerSetupValidationReady	값이 유효합니다. 적용 후 일반 저장을 사용하십시오.	Values are valid. Apply, then use the normal Save command.
+Connections.PrealignerSetupValidationError	유효한 회전 스테이지·클램프·서로 다른 I/O와 범위 내 각도를 입력하십시오.	Select a valid rotary stage, clamp, distinct I/O, and in-range angles.
+Connections.PrealignerSetupMultipleError	프로젝트당 프리얼라이너 1대만 지원합니다. 중복 장치를 먼저 정리하십시오.	This setup surface supports one pre-aligner per project. Remove duplicates first.
+Connections.PrealignerSetupAppliedStatus	프리얼라이너 설정을 적용했습니다. 실행은 시작되지 않았습니다.	Applied the pre-aligner setup. No run started.
+Connections.PrealignerSetupNoChangesStatus	프리얼라이너 설정에 적용할 변경이 없습니다.	There are no pre-aligner changes to apply.
+Connections.InspectionHandoffSetupPreview	검사 인계 설정	Inspection handoff setup
+Connections.InspectionHandoffSetupPreviewTooltip	검사 카메라와 위치·준비·완료 I/O를 한 화면에서 편집합니다.	Edit the inspection camera and position, ready, and complete I/O in one place.
+Connections.InspectionSortSetupPreview	검사 분류 설정	Inspection sort setup
+Connections.InspectionSortSetupPreviewTooltip	검사 카메라, PASS/NG 컨베이어와 라우팅 피드백을 한 화면에서 편집합니다.	Edit the inspection camera, PASS/NG conveyors, and route feedback in one place.
+Connections.OhtSetupPreview	OHT 인계 설정	OHT handoff setup
+Connections.OhtSetupPreviewTooltip	운송 컨베이어와 OHT 인계 입력을 한 화면에서 편집합니다.	Edit the transport conveyor and OHT handoff inputs in one place.
+Connections.InspectionHandoffSetupTitle	검사 인계 설정	Inspection handoff setup
+Connections.InspectionSortSetupTitle	검사 분류 설정	Inspection sort setup
+Connections.OhtSetupTitle	OHT 인계 설정	OHT handoff setup
+Connections.InspectionSetupCamera	검사 카메라	Inspection camera
+Connections.InspectionSetupPosition	검사 위치 DI	Inspection-position DI
+Connections.InspectionSetupAccepted	결과 승인 DO	Result-accepted DO
+Connections.InspectionSetupReady	검사 준비 DI	Inspection-ready DI
+Connections.InspectionSetupComplete	검사 완료 DI	Inspection-complete DI
+Connections.InspectionSortPassConveyor	PASS 컨베이어	PASS conveyor
+Connections.InspectionSortNgConveyor	NG 컨베이어	NG conveyor
+Connections.InspectionSortPassFeedback	PASS 라우팅 DI	PASS-routed DI
+Connections.InspectionSortNgFeedback	NG 라우팅 DI	NG-routed DI
+Connections.OhtTransportConveyor	운송 컨베이어	Transport conveyor
+Connections.OhtSetupRouteAvailable	경로 가용 DI	Route-available DI
+Connections.OhtSetupVehicleDocked	차량 도킹 DI	Vehicle-docked DI
+Connections.OhtSetupLoadPortReady	로드포트 준비 DI	Load-port-ready DI
+Connections.OhtCarrierReceived	캐리어 수신 DI	Carrier-received DI
+Connections.OhtHandoffReady	인계 준비 DI	Handoff-ready DI
+Connections.OhtCarrierTransferred	캐리어 인계 DI	Carrier-transferred DI
+Connections.InspectionHandoffSetupValidationReady	값이 유효합니다. 적용 후 일반 저장을 사용하십시오.	Values are valid. Apply, then use the normal Save command.
+Connections.InspectionHandoffSetupValidationError	카메라와 서로 다른 검사 위치·준비·완료 DI 및 결과 승인 DO를 선택하십시오.	Select a camera, distinct inspection position/ready/complete DI channels, and a result-accepted DO.
+Connections.InspectionHandoffSetupMultipleError	프로젝트당 검사 인계 장치 1대만 지원합니다. 중복 장치를 먼저 정리하십시오.	This setup surface supports one inspection handoff per project. Remove duplicates first.
+Connections.InspectionHandoffSetupAppliedStatus	검사 인계 설정을 적용했습니다. 실행은 시작되지 않았습니다.	Applied the inspection handoff setup. No run started.
+Connections.InspectionHandoffSetupNoChangesStatus	검사 인계 설정에 적용할 변경이 없습니다.	There are no inspection-handoff changes to apply.
+Connections.InspectionSortSetupValidationReady	값이 유효합니다. 적용 후 일반 저장을 사용하십시오.	Values are valid. Apply, then use the normal Save command.
+Connections.InspectionSortSetupValidationError	카메라, 서로 다른 PASS/NG 컨베이어와 라우팅 DI를 선택하십시오.	Select a camera, distinct PASS/NG conveyors, and distinct route feedback DI channels.
+Connections.InspectionSortSetupMultipleError	프로젝트당 검사 분류 장치 1대만 지원합니다. 중복 장치를 먼저 정리하십시오.	This setup surface supports one inspection sorter per project. Remove duplicates first.
+Connections.InspectionSortSetupAppliedStatus	검사 분류 설정을 적용했습니다. 실행은 시작되지 않았습니다.	Applied the inspection sort setup. No run started.
+Connections.InspectionSortSetupNoChangesStatus	검사 분류 설정에 적용할 변경이 없습니다.	There are no inspection-sort changes to apply.
+Connections.OhtSetupValidationReady	값이 유효합니다. 적용 후 일반 저장을 사용하십시오.	Values are valid. Apply, then use the normal Save command.
+Connections.OhtSetupValidationError	컨베이어와 서로 다른 6개의 OHT DigitalInput을 선택하십시오.	Select a conveyor and six distinct OHT DigitalInput channels.
+Connections.OhtSetupMultipleError	프로젝트당 OHT 인계 장치 1대만 지원합니다. 중복 장치를 먼저 정리하십시오.	This setup surface supports one OHT handoff per project. Remove duplicates first.
+Connections.OhtSetupAppliedStatus	OHT 인계 설정을 적용했습니다. 실행은 시작되지 않았습니다.	Applied the OHT handoff setup. No run started.
+Connections.OhtSetupNoChangesStatus	OHT 인계 설정에 적용할 변경이 없습니다.	There are no OHT setup changes to apply.
+Connections.StationSkeletonTitle	반도체 스테이션 골격	Semiconductor station skeleton
+Connections.StationSkeletonHintCurrent	기존 구성은 유지됩니다. 적용은 누락 역할만 연결하며 실행 또는 저장을 시작하지 않습니다.	Existing definitions are kept. Apply connects only missing roles and does not run or save the project.
+Connections.StationSkeletonSummaryFormat	추가 {0:N0}개 · 기존 유지 {1:N0}개 · 확인 필요 {2:N0}개	{0:N0} to add · {1:N0} existing kept · {2:N0} need review
+Connections.StationSkeletonApplyFormat	누락 역할 {0:N0}개 적용	Apply {0:N0} missing roles
+Connections.StationSetupApplyOnly	설정 적용	Apply setup
+Connections.StationSetupApplyWithRolesFormat	설정 및 누락 역할 {0:N0}개 적용	Apply setup + {0:N0} roles
+Connections.StationSkeletonApply	반도체 스테이션 골격 적용	Apply semiconductor station skeleton
+Connections.StationSkeletonApplyTooltip	미리보기에서 추가로 표시된 역할만 현재 레시피에 연결합니다.	Connect only the roles marked as additions in the preview to the current recipe.
+Connections.StationSkeletonClose	닫기	Close
+Connections.StationSkeletonCloseTooltip	변경하지 않고 반도체 스테이션 미리보기를 닫습니다.	Close the semiconductor-station preview without changing the recipe.
+Connections.StationSkeletonRole.StationLayout	스테이션 레이아웃	Station layout
+Connections.StationSkeletonRole.MachineFrame	장비 프레임	Machine frame
+Connections.StationSkeletonRole.Transport	웨이퍼 이송	Wafer transport
+Connections.StationSkeletonRole.Workpiece	웨이퍼	Wafer
+Connections.StationSkeletonRole.ProcessAxisStage	공정 축·스테이지	Process axis and stage
+Connections.StationSkeletonRole.EntrySensor	진입 센서	Entry sensor
+Connections.StationSkeletonRole.ProcessSensor	공정 위치 센서	Process-position sensor
+Connections.StationSkeletonRole.ProcessCylinder	공정 실린더	Process cylinder
+Connections.StationSkeletonRole.RequiredIo	필수 I/O	Required I/O
+Connections.StationSkeletonRole.AutomaticSequence	자동 시퀀스	Automatic sequence
+Connections.StationSkeletonIoFormat	{0:N0}개 채널	{0:N0} channels
+Connections.StationSkeletonProposedFormat	추가 · {0}	Add · {0}
+Connections.StationSkeletonExistingFormat	기존 유지 · {0}	Keep existing · {0}
+Connections.StationSkeletonLayoutConflict	적용 안 함 · 활성 레이아웃을 먼저 선택하십시오.	Not applied · select a valid active layout first.
+Connections.StationSkeletonSequenceConflict	적용 안 함 · 자동 실행 시퀀스 연결을 먼저 수정하십시오.	Not applied · repair the automatic-sequence link first.
+Connections.StationSkeletonUnavailable	적용 안 함 · 기존 역할의 연결을 먼저 확인하십시오.	Not applied · review the existing role connection first.
+Connections.StationSkeletonAppliedStatus	반도체 스테이션 누락 역할 {0:N0}개를 연결했습니다. 저장하면 현재 프로젝트에 유지됩니다.	Connected {0:N0} missing semiconductor-station roles. Save to retain them in the current project.
+Connections.StationSkeletonNoChangesStatus	적용할 반도체 스테이션 누락 역할이 없습니다.	There are no missing semiconductor-station roles to apply.
+Connections.StationSetupAppliedStatus	반도체 스테이션 설정을 적용했습니다. 파일 저장 후 다시 열면 같은 프로젝트에서 복원됩니다.	Applied the semiconductor station setup. Save the file to restore it with this project when reopened.
+Connections.StationSetupTitle	반도체 스테이션 설정	Semiconductor station setup
+Connections.StationSetupHint	한 화면에서 설정값과 연결 역할을 확인하십시오. 적용 전에는 프로젝트가 바뀌지 않으며 실행 또는 저장도 시작하지 않습니다.	Review setup values and connected roles in one place. Nothing changes before Apply, and Apply does not run or save the project.
+Connections.StationSetupApply	반도체 스테이션 설정 적용	Apply semiconductor station setup
+Connections.StationSetupApplyTooltip	표시된 설정을 현재 프로젝트에 저장하고 누락된 역할을 연결합니다. 실행과 파일 저장은 시작하지 않습니다.	Store the shown setup in the current project and connect missing roles. This does not run or save the project file.
+Connections.StationSetupStationName	스테이션명	Station name
+Connections.StationSetupWaferType	웨이퍼 유형	Wafer type
+Connections.StationSetupAxisTravel	축 이동거리 (mm)	Axis travel (mm)
+Connections.StationSetupTransportSpeed	이송 속도 (mm/s)	Transport speed (mm/s)
+Connections.StationSetupEntrySensor	진입 센서 X	Entry sensor X
+Connections.StationSetupProcessSensor	공정 센서 X	Process sensor X
+Connections.StationSetupCylinderTiming	실린더 시간 (ms)	Cylinder time (ms)
+Connections.StationSetupReset	기본값	Defaults
+Connections.StationSetupResetTooltip	표시된 스테이션 설정을 기본값으로 되돌립니다. 적용 전에는 프로젝트가 변경되지 않습니다.	Reset the shown station setup to defaults. The project remains unchanged until Apply.
+Connections.StationSetupValidationReady	값이 유효합니다. 적용 후 일반 저장을 사용하면 현재 프로젝트에 유지됩니다.	Values are valid. Apply, then use the normal Save command to retain them in this project.
+Connections.StationSetupValidationError	이름을 입력하고 양수인 이동거리·속도·시간을 사용하십시오. 진입 센서 X는 공정 센서 X보다 작아야 합니다.	Enter both names and positive travel, speed, and time values. Entry sensor X must be less than process sensor X.
+Connections.StationSetupInvalidRestored	저장된 설정이 유효하지 않아 프로젝트에서 확인된 값 또는 기본값을 불러왔습니다.	The saved setup was invalid, so detected project values or defaults were loaded.
+Connections.ProcessBlockPreview	공정 블록 구성	Compose process block
+Connections.ProcessBlockPreviewTooltip	적재·정렬·공정·검사·배출 블록을 선택하고 통합 누락 연결과 시퀀스 단계를 적용 전에 보여줍니다.	Select load, align, process, inspect, and unload blocks and preview their combined missing connections and Sequence steps before applying.
+Connections.ProcessBlockTitle	반도체 공정 계획	Semiconductor process plan
+Connections.ProcessBlockHint	필요한 블록을 공정 순서대로 선택하십시오. 한 번의 적용은 통합 누락 연결과 단계만 추가하며 실행 또는 저장을 시작하지 않습니다.	Select the needed blocks in process order. One Apply adds only the combined missing connections and steps; it does not run or save the project.
+Connections.ProcessBlock.Load	적재	Load
+Connections.ProcessBlock.Align	정렬	Align
+Connections.ProcessBlock.Process	공정	Process
+Connections.ProcessBlock.Inspect	검사	Inspect
+Connections.ProcessBlock.Unload	배출	Unload
+Connections.ProcessBlockSummaryFormat	연결 추가 {0:N0}개 · 단계 추가 {1:N0}개 · 기존 단계 {2:N0}개 · 확인 필요 {3:N0}개	{0:N0} connections to add · {1:N0} steps to add · {2:N0} existing steps · {3:N0} need review
+Connections.ProcessBlockPlanSelectionFormat	선택 {0:N0}개 블록	{0:N0} blocks selected
+Connections.ProcessBlockPlanReady	선택한 블록을 공정 순서대로 한 번에 적용합니다.	The selected blocks will be applied once in process order.
+Connections.ProcessBlockPlanEmpty	하나 이상의 공정 블록을 선택하십시오.	Select at least one process block.
+Connections.ProcessBlockApply	공정 블록 적용	Apply process block
+Connections.ProcessBlockApplyFormat	연결 {0:N0}개 + 단계 {1:N0}개 적용	Apply {0:N0} connections + {1:N0} steps
+Connections.ProcessBlockApplyTooltip	선택한 모든 블록의 누락 연결과 호환 시퀀스 단계를 현재 프로젝트에 한 번에 원자적으로 추가합니다.	Atomically add all selected blocks' missing connections and compatible Sequence steps to the current project in one operation.
+Connections.ProcessBlockClose	닫기	Close
+Connections.ProcessBlockCloseTooltip	프로젝트를 변경하지 않고 공정 블록 미리보기를 닫습니다.	Close the process-block preview without changing the project.
+Connections.ProcessBlockStepProposed	추가	Add
+Connections.ProcessBlockStepExisting	기존 유지	Keep existing
+Connections.ProcessBlockStepCustomized	사용자 조정	Customized
+Connections.ProcessBlockStepProposedRemoval	삭제 예정	Remove
+Connections.ProcessBlockStepUnavailable	적용 안 함	Not applied
+Connections.ProcessBlockTemplateValueFormat	기본값 {0}	template {0}
+Connections.ProcessBlockFilterLabel	단계 보기	Show steps
+Connections.ProcessBlockFilterAll	전체	All
+Connections.ProcessBlockFilterConflict	충돌	Conflict
+Connections.ProcessBlockFilterCountFormat	{0} {1:N0}	{0} {1:N0}
+Connections.ProcessBlockFilterEmpty	선택한 상태의 단계가 없습니다.	No steps match this status.
+Connections.ProcessBlockTimeoutTitle	표시 단계 타임아웃 일괄 조정	Batch timeout for shown steps
+Connections.ProcessBlockTimeoutInput	새 타임아웃(밀리초)	New timeout (milliseconds)
+Connections.ProcessBlockTimeoutPreview	변경 미리보기	Preview changes
+Connections.ProcessBlockTimeoutPreviewTooltip	현재 필터에 표시된 호환 대기 단계의 기존값과 새 값을 비교합니다. 프로젝트는 변경하지 않습니다.	Compare current and new values for compatible wait steps shown by the current filter. This does not change the project.
+Connections.ProcessBlockTimeoutApply	타임아웃 적용	Apply timeouts
+Connections.ProcessBlockTimeoutApplyFormat	{0:N0}개 타임아웃 적용	Apply {0:N0} timeouts
+Connections.ProcessBlockTimeoutApplyTooltip	미리보기한 모든 단계가 그대로 유효할 때만 타임아웃을 한 번에 적용합니다.	Apply all previewed timeouts only when every step is still valid and unchanged.
+Connections.ProcessBlockTimeoutCancel	미리보기 취소	Cancel preview
+Connections.ProcessBlockTimeoutCancelTooltip	프로젝트를 변경하지 않고 타임아웃 미리보기를 닫습니다.	Close the timeout preview without changing the project.
+Connections.ProcessBlockTimeoutScopeFormat	표시 단계 {1:N0}개 중 호환 대기 단계 {0:N0}개	{0:N0} compatible wait steps among {1:N0} shown steps
+Connections.ProcessBlockTimeoutInvalid	0 이상의 정수 밀리초를 입력하십시오.	Enter an integer number of milliseconds greater than or equal to 0.
+Connections.ProcessBlockTimeoutNoCompatible	현재 필터에는 조정 가능한 기존 대기 단계가 없습니다.	The current filter has no adjustable existing wait steps.
+Connections.ProcessBlockTimeoutHint	값을 입력하고 변경 미리보기를 확인한 뒤 적용하십시오. 0은 타임아웃을 사용하지 않습니다.	Enter a value and review the changes before applying. Zero disables the timeout.
+Connections.ProcessBlockTimeoutReady	모든 대상이 확인되었습니다. 적용 전까지 프로젝트는 변경되지 않습니다.	Every target is validated. The project remains unchanged until Apply.
+Connections.ProcessBlockTimeoutNoChanges	모든 대상이 이미 입력한 타임아웃을 사용하고 있습니다.	Every target already uses the entered timeout.
+Connections.ProcessBlockTimeoutItemFormat	{0} · {1} · {2:N0} → {3:N0} ms	{0} · {1} · {2:N0} → {3:N0} ms
+Connections.ProcessBlockTimeoutRejectedStatus	단계가 미리보기 이후 변경되어 타임아웃 일괄 적용을 중단했습니다.	Batch timeout apply was stopped because a step changed after preview.
+Connections.ProcessBlockTimeoutAppliedStatus	관리 대기 단계 {0:N0}개의 타임아웃을 {1:N0} ms로 적용했습니다. 실행 또는 저장은 시작하지 않았습니다.	Applied a {1:N0} ms timeout to {0:N0} managed wait steps without running or saving the project.
+Connections.ProcessBlockStep.process-block.load.start	적재 · 이송 시작	Load · Start transport
+Connections.ProcessBlockStep.process-block.load.wait-entry	적재 · 진입 센서 대기	Load · Wait entry sensor
+Connections.ProcessBlockStep.process-block.load.stop	적재 · 이송 정지	Load · Stop transport
+Connections.ProcessBlockStep.process-block.align.move	정렬 · 공정 축 이동	Align · Move process axis
+Connections.ProcessBlockStep.process-block.align.wait	정렬 · 공정 축 완료 대기	Align · Wait process axis
+Connections.ProcessBlockStep.process-block.process.extend	공정 · 실린더 전진	Process · Extend cylinder
+Connections.ProcessBlockStep.process-block.process.wait-extended	공정 · 실린더 전진 완료 대기	Process · Wait cylinder extended
+Connections.ProcessBlockStep.process-block.process.retract	공정 · 실린더 후진	Process · Retract cylinder
+Connections.ProcessBlockStep.process-block.process.wait-retracted	공정 · 실린더 후진 완료 대기	Process · Wait cylinder retracted
+Connections.ProcessBlockStep.process-block.inspect.confirm-position	검사 · 공정 위치 확인	Inspect · Confirm process position
+Connections.ProcessBlockStep.process-block.unload.start	배출 · 이송 시작	Unload · Start transport
+Connections.ProcessBlockStep.process-block.unload.wait-clear	배출 · 공정 위치 해제 대기	Unload · Wait process position clear
+Connections.ProcessBlockStep.process-block.unload.stop	배출 · 이송 정지	Unload · Stop transport
+Connections.ProcessBlockNoChangesStatus	선택한 공정 블록에 적용할 누락 연결 또는 단계가 없습니다.	The selected process block has no missing connections or steps to apply.
+Connections.ProcessBlockAppliedStatus	{0:N0}개 블록 계획을 적용했습니다. 연결 {1:N0}개와 단계 {2:N0}개를 추가했으며 실행 또는 저장은 시작하지 않았습니다.	Applied a {0:N0}-block plan. Added {1:N0} connections and {2:N0} steps without running or saving the project.
+Connections.ProcessBlockEditPreviewTooltip	적재·정렬·공정·검사·배출 블록을 선택하고 추가 또는 삭제할 관리 단계를 적용 전에 보여줍니다.	Select load, align, process, inspect, and unload blocks and preview managed steps to add or remove before applying.
+Connections.ProcessBlockEditHint	유지하거나 추가할 블록을 선택하십시오. 선택 해제한 기존 블록은 관리 단계만 삭제하며 장비는 유지합니다. 적용은 실행 또는 저장을 시작하지 않습니다.	Select blocks to keep or add. Clearing an existing block removes only its managed steps and keeps the equipment. Apply does not run or save the project.
+Connections.ProcessBlockEditSummaryFormat	연결 추가 {0:N0}개 · 단계 추가 {1:N0}개 · 단계 삭제 {2:N0}개 · 기존 유지 {3:N0}개 · 확인 필요 {4:N0}개	{0:N0} connections to add · {1:N0} steps to add · {2:N0} steps to remove · {3:N0} steps kept · {4:N0} need review
+Connections.ProcessBlockEditSummaryWithCustomizedFormat	연결 추가 {0:N0}개 · 단계 추가 {1:N0}개 · 단계 삭제 {2:N0}개 · 기존 유지 {3:N0}개 · 사용자 조정 {4:N0}개 · 충돌 {5:N0}개	{0:N0} connections to add · {1:N0} steps to add · {2:N0} steps to remove · {3:N0} steps kept · {4:N0} customized · {5:N0} conflicts
+Connections.ProcessBlockEditSelectionFormat	계획 {0:N0}개 블록 · 현재 {1:N0}개	{0:N0} blocks planned · {1:N0} current
+Connections.ProcessBlockEditPlanReady	표시된 추가·삭제 내용을 한 번에 적용합니다.	Apply the shown additions and removals in one operation.
+Connections.ProcessBlockEditPlanEmpty	현재 관리 블록이 없습니다. 하나 이상의 블록을 선택하십시오.	There are no current managed blocks. Select at least one block.
+Connections.ProcessBlockEditPlanNoChanges	현재 계획과 같습니다. 변경할 블록을 선택하거나 해제하십시오.	This matches the current plan. Select or clear a block to make a change.
+Connections.ProcessBlockEditPlanUnavailable	충돌 또는 사용할 수 없는 연결을 먼저 확인하십시오.	Review the conflict or unavailable connection before applying.
+Connections.ProcessBlockEditApplyFormat	적용 +연결 {0:N0} · +단계 {1:N0} · -단계 {2:N0}	Apply +{0:N0} links · +{1:N0} steps · -{2:N0} steps
+Connections.ProcessBlockEditApplyTooltip	선택한 계획의 누락 연결과 단계를 추가하고 선택 해제한 기존 블록의 관리 단계만 원자적으로 삭제합니다.	Atomically add missing connections and steps for the selected plan and remove only managed steps from cleared existing blocks.
+Connections.ProcessBlockEditNoChangesStatus	현재 공정 계획과 동일하여 적용할 변경이 없습니다.	The process plan matches the current project; there are no changes to apply.
+Connections.ProcessBlockEditAppliedStatus	{0:N0}개 블록 계획을 적용했습니다. 연결 {1:N0}개와 단계 {2:N0}개를 추가하고 관리 단계 {3:N0}개를 삭제했으며 실행 또는 저장은 시작하지 않았습니다.	Applied a {0:N0}-block plan. Added {1:N0} connections and {2:N0} steps, removed {3:N0} managed steps, and did not run or save the project.
+Connections.AddStage	축 + 스테이지	Axis + stage
+Connections.AddStageTooltip	새 가상 선형축과 연결된 스테이지를 추가합니다.	Add a new virtual linear axis and its connected stage.
+Connections.AddRotaryStage	회전축 + 스테이지	Rotary axis + stage
+Connections.AddRotaryStageTooltip	새 가상 회전축과 연결된 회전 스테이지를 추가합니다.	Add a new virtual rotary axis and its connected rotary stage.
+Connections.AddSensor	센서	Sensor
+Connections.AddSensorTooltip	선택한 스테이지 또는 워크피스를 감지하는 DI 센서를 추가합니다.	Add a DI sensor that detects the selected stage or workpiece.
+Connections.AddCylinder	실린더	Cylinder
+Connections.AddCylinderTooltip	명령 DO와 확장/복귀 DI가 연결된 실린더를 추가합니다.	Add a cylinder connected to command DO and extended/retracted DI.
+Connections.AddConveyor	컨베이어	Conveyor
+Connections.AddConveyorTooltip	운전/역방향 DO가 연결된 컨베이어를 추가합니다.	Add a conveyor connected to run and reverse DO.
+Connections.AddWorkpiece	워크피스	Workpiece
+Connections.AddWorkpieceTooltip	프로젝트의 컨베이어에 연결된 워크피스를 추가합니다.	Add a workpiece connected to a project conveyor.
+Connections.SummaryFormat	구성요소 {0}개 · 유효 연결 {1}개 · 시퀀스 사용 {2}건	{0} components · {1} valid connections · {2} sequence uses
+Connections.CheckpointCoverageFormat	종료 상태 검증 {0:N0}/{1:N0}단계	End-state checks {0:N0}/{1:N0} steps
+Connections.CheckpointCoverageTooltip	드라이런에서 단계 종료 상태를 확인하도록 설정된 단계 수입니다.	Steps configured to validate equipment state at the end of the step during dry run.
+Connections.CheckpointTemplatePreview	대표 검증점 구성	Configure representative checks
+Connections.CheckpointTemplatePreviewTooltip	연결된 장비와 시퀀스에서 대표 종료 상태 검증점을 찾아 적용 전에 보여줍니다.	Find representative end-state checks from connected equipment and the sequence, then show them before applying.
+Connections.CheckpointTemplateTitle	대표 종료 상태 검증점	Representative end-state checks
+Connections.CheckpointTemplateHint	기존 검증점은 변경하지 않습니다. 아래 후보를 확인한 뒤 추가할 항목만 한 번에 적용하십시오.	Existing checks are not changed. Review the candidates, then apply only the additions in one action.
+Connections.CheckpointTemplateSummaryFormat	추가 {0:N0}개 · 기존 유지 {1:N0}개 · 적용 불가 {2:N0}개	{0:N0} to add · {1:N0} existing kept · {2:N0} unavailable
+Connections.CheckpointTemplateApplyFormat	{0:N0}개 적용	Apply {0:N0}
+Connections.CheckpointTemplateApply	대표 검증점 적용	Apply representative checks
+Connections.CheckpointTemplateApplyTooltip	미리보기에서 추가로 표시된 검증점만 현재 레시피에 적용합니다.	Apply only the checks marked as additions in the preview to the current recipe.
+Connections.CheckpointTemplateClose	닫기	Close
+Connections.CheckpointTemplateCloseTooltip	변경하지 않고 대표 검증점 미리보기를 닫습니다.	Close the representative-check preview without changing the recipe.
+Connections.CheckpointTemplateRole.CylinderExtended	실린더 전진	Cylinder extended
+Connections.CheckpointTemplateRole.SensorDetected	공정 센서 감지	Process sensor detected
+Connections.CheckpointTemplateRole.AxisIdle	공정 축 정지	Process axis idle
+Connections.CheckpointTemplateRole.CylinderRetracted	실린더 후진	Cylinder retracted
+Connections.CheckpointTemplateRole.ConveyorStopped	컨베이어 정지	Conveyor stopped
+Connections.CheckpointTemplateProposedFormat	추가 · {0} → {1} = {2}	Add · {0} → {1} = {2}
+Connections.CheckpointTemplateExistingFormat	기존 유지 · {0} → {1} = {2}	Keep existing · {0} → {1} = {2}
+Connections.CheckpointTemplateConflictFormat	적용 안 함 · {0} 단계에 다른 검증점이 있습니다.	Not applied · {0} already has another check.
+Connections.CheckpointTemplateUnavailable	적용 안 함 · 연결된 장비 또는 안정된 단계 경계를 찾지 못했습니다.	Not applied · no connected equipment or stable step boundary was found.
+Connections.CheckpointTemplateAppliedStatus	대표 종료 상태 검증점 {0:N0}개를 적용했습니다. 저장하면 현재 프로젝트에 유지됩니다.	Applied {0:N0} representative end-state checks. Save to retain them in the current project.
+Connections.CheckpointTemplateNoChangesStatus	적용할 새 대표 검증점이 없습니다.	There are no new representative checks to apply.
+Connections.ValidationPassed	모든 연결 유효	All connections valid
+Connections.ValidationErrors	연결 확인 필요	Check connections
+Connections.Valid	유효	Valid
+Connections.CheckRequired	확인 필요	Check required
+Connections.Behavior	동작 바인딩	Behavior binding
+Connections.IoAndTarget	I/O 및 대상	I/O and target
+Connections.SequenceUse	시퀀스 사용	Sequence use
+Connections.None	연결 없음	No binding
+Connections.NotApplicable	런타임 연결 없음	No runtime link
+Connections.MissingAxis	축 연결 누락	Missing axis binding
+Connections.MissingDevice	장치 연결 누락	Missing device binding
+Connections.StaticComponent	정적 구성요소	Static component
+Connections.NoSequenceUse	직접 사용하는 단계 없음	No directly linked step
+Connections.StageLinkFormat	스테이지 {0} → 축 {1}	Stage {0} → axis {1}
+Connections.SensorLinkFormat	DI {0} → 감지 대상 {1}	DI {0} → target {1}
+Connections.CylinderLinkFormat	확장 DO {0} · 확장 DI {1} · 복귀 DI {2}	Extend DO {0} · extended DI {1} · retracted DI {2}
+Connections.ConveyorLinkFormat	운전 DO {0} · 역방향 DO {1}	Run DO {0} · reverse DO {1}
+Connections.WorkpieceLinkFormat	이송 컨베이어 {0}	Carrier conveyor {0}
+Connections.CheckReadiness	시뮬레이션 준비 확인	Check simulation readiness
+Connections.CheckReadinessTooltip	현재 프로젝트 전체를 컴파일해 실행 가능 여부를 확인하며 시뮬레이션은 시작하지 않습니다.	Compile the current project to check whether it can run without starting simulation.
+Connections.ReadinessNotChecked	미확인	Not checked
+Connections.ReadinessPassed	실행 준비 완료	Ready to run
+Connections.ReadinessFailed	실행 준비 오류	Not ready
+Connections.ReadinessNotCheckedDetail	운전 전에 시뮬레이션 준비 확인을 실행하십시오.	Check simulation readiness before Run.
+Connections.ReadinessPassedDetail	현재 연결과 시퀀스가 컴파일되었습니다. 이 확인은 시뮬레이션을 시작하지 않습니다.	The current connections and sequence compile successfully. This check does not start simulation.
+Connections.ReadinessFailedDetail	실행할 수 없습니다: {0}	Cannot run: {0}
+Connections.ReadinessPassedStatus	시뮬레이션 준비 확인을 통과했습니다. 시뮬레이션은 시작되지 않았습니다.	Simulation readiness passed. Simulation was not started.
+Connections.ReadinessFailedStatus	시뮬레이션 준비 확인에서 오류가 발견되었습니다.	Simulation readiness found an error.
+Connections.PreviewStep	단계 미리보기	Preview step
+Connections.PreviewStepTooltip	준비 확인을 통과한 뒤 이 단계만 격리된 고정 스텝 시뮬레이션으로 실행합니다.	After readiness passes, run only this step in an isolated fixed-step simulation.
+Connections.PreviewCompleted	미리보기 완료	Preview completed
+Connections.PreviewLimitReached	미리보기 제한 도달	Preview limit reached
+Connections.PreviewFaulted	미리보기 오류	Preview faulted
+Connections.PreviewRejected	미리보기 거절	Preview rejected
+Connections.PreviewDetailFormat	{0:N0}/{1:N0}틱 · {2}	{0:N0}/{1:N0} ticks · {2}
+Connections.PreviewAxisFormat	위치 {0:0.###} · 상태 {1}	Position {0:0.###} · state {1}
+Connections.PreviewSignalFormat	신호 {0} · {1}	Signal {0} · {1}
+Connections.PreviewCylinderFormat	명령 {0} · 실린더 {1} · 진행률 {2:P0}	Command {0} · cylinder {1} · progress {2:P0}
+Connections.PreviewConveyorFormat	운전 {0} · 방향 {1}	Run {0} · direction {1}
+Connections.PreviewSensorFormat	감지 {0}	Detected {0}
+Connections.PreviewCompletedStatus	격리된 단계 미리보기가 완료되었습니다. 메인 시뮬레이션은 변경되지 않았습니다.	The isolated step preview completed. The main simulation was unchanged.
+Connections.PreviewStoppedStatus	격리된 단계 미리보기가 완료되지 않았습니다. 카드의 결과를 확인하십시오.	The isolated step preview did not complete. Check the result on the card.
+Connections.DryRun	전체 레시피 검증	Dry run recipe
+Connections.DryRunTooltip	준비 확인을 통과한 현재 레시피 전체를 격리 실행하고 단계별 결과를 표시합니다.	Run the ready recipe in isolation and show its step-by-step result.
+Connections.DryRunCompleted	전체 레시피 검증 완료	Recipe dry run completed
+Connections.DryRunCompletedWithIssue	분기 오류 후 완료	Completed after routed issue
+Connections.DryRunCompletedWithMismatch	기대 상태 불일치로 완료	Completed with expected-state mismatch
+Connections.DryRunLimitReached	전체 실행 제한 도달	Recipe dry run limit reached
+Connections.DryRunFaulted	전체 레시피 검증 오류	Recipe dry run faulted
+Connections.DryRunRejected	전체 레시피 검증 거절	Recipe dry run rejected
+Connections.DryRunDetailFormat	{0} · {1:N0}/{2:N0}틱 · 실행 단계 {3:N0}개	{0} · {1:N0}/{2:N0} ticks · {3:N0} steps
+Connections.DryRunNoIssue	오류 또는 타임아웃이 관측되지 않았습니다.	No failure or timeout was observed.
+Connections.DryRunIssueFormat	최초 문제: {0} · {1:N0}틱 · {2} · {3}	First issue: {0} · tick {1:N0} · {2} · {3}
+Connections.DryRunMismatchFormat	최초 상태 불일치: {0} · {1:N0}틱 · {2} · 기대 {3} · 실제 {4}	First state mismatch: {0} · tick {1:N0} · {2} · expected {3} · actual {4}
+Connections.DryRunCheckpointFormat	{0}: {1} → {2}	{0}: {1} → {2}
+Connections.DryRunFinalStates	최종 장비 상태	Final equipment states
+Connections.DryRunTimeline	단계 타임라인	Step timeline
+Connections.DryRunOpenStepTooltip	이 실행 단계와 연결된 장비를 강조하고 정확한 시퀀스 단계를 엽니다.	Highlight the connected equipment and open this exact Sequence step.
+Connections.DryRunPlaybackOpen	레이아웃에서 상태 보기	View state on layout
+Connections.DryRunPlaybackOpenTooltip	이 단계가 끝난 시점의 격리 장비 상태를 읽기 전용 레이아웃에서 봅니다.	View the isolated equipment state at the end of this step on the read-only layout.
+Connections.DryRunPlaybackTitleFormat	드라이런 상태 {0}/{1} · {2}	Dry-run state {0}/{1} · {2}
+Connections.DryRunPlaybackDetailFormat	읽기 전용 · {0} · 메인 시뮬레이션 변경 없음	Read-only · {0} · main simulation unchanged
+Connections.DryRunPlaybackPrevious	이전	Previous
+Connections.DryRunPlaybackNext	다음	Next
+Connections.DryRunPlaybackExit	재생 종료	Exit playback
+Connections.DryRunPlaybackStatus	격리된 단계 종료 상태를 레이아웃에 표시했습니다. 메인 시뮬레이션은 변경되지 않았습니다.	The isolated step-end state is shown on the layout. The main simulation was unchanged.
+Connections.DryRunTickRangeFormat	{0:N0}–{1:N0}틱	{0:N0}–{1:N0} ticks
+Connections.DryRunAxisStateFormat	축 {0}: {1:0.###} · {2}	Axis {0}: {1:0.###} · {2}
+Connections.DryRunCylinderStateFormat	실린더 {0}: {1} · {2:P0}	Cylinder {0}: {1} · {2:P0}
+Connections.DryRunConveyorStateFormat	컨베이어 {0}: {1} · {2}	Conveyor {0}: {1} · {2}
+Connections.DryRunSensorStateFormat	센서 {0}: {1}	Sensor {0}: {1}
+Connections.DryRunWorkpieceStateFormat	워크피스 {0}: X {1:0.##} · Y {2:0.##}	Workpiece {0}: X {1:0.##} · Y {2:0.##}
+Connections.DryRunLoadLockStateFormat	로드락 {0}: {1} · 진공 준비 {2} · 대기압 준비 {3} · 외측 도어 {4} · 내측 도어 {5}	Load lock {0}: {1} · vacuum ready {2} · atmosphere ready {3} · outer door {4} · inner door {5}
+Connections.LoadLockState.Atmosphere	대기압	Atmosphere
+Connections.LoadLockState.PumpingDown	펌프다운 중	Pumping down
+Connections.LoadLockState.Vacuum	진공	Vacuum
+Connections.LoadLockState.Venting	벤트 중	Venting
+Connections.LoadLockState.InterlockFault	인터록 결함	Interlock fault
+Connections.LoadLockReady	준비	Ready
+Connections.LoadLockNotReady	미준비	Not ready
+Connections.LoadLockDoorAllowed	허용	Allowed
+Connections.LoadLockDoorBlocked	차단	Blocked
+Connections.DryRunWaferHandlerStateFormat	웨이퍼 핸들러 {0}: {1} · H {2:0.###} · V {3:0.###} · 게이트 {4}	Wafer handler {0}: {1} · H {2:0.###} · V {3:0.###} · gate {4}
+Connections.WaferHandlerState.Source	소스 소유	Source owns wafer
+Connections.WaferHandlerState.Handler	핸들러 소유	Handler owns wafer
+Connections.WaferHandlerState.Destination	목적지 소유	Destination owns wafer
+Connections.WaferHandlerState.InterlockFault	인터록 결함	Interlock fault
+Connections.WaferHandlerGateOpen	열림	Open
+Connections.WaferHandlerGateClosed	닫힘	Closed
+Connections.DryRunInspectionSorterStateFormat	검사 분류기 {0}: {1} · 판정 {2}	Inspection sorter {0}: {1} · decision {2}
+Connections.InspectionSortState.AwaitingDecision	판정 대기	Awaiting decision
+Connections.InspectionSortState.PassReady	PASS 경로 준비	PASS route ready
+Connections.InspectionSortState.NgReady	NG 경로 준비	NG route ready
+Connections.InspectionSortState.PassRouted	PASS 경로 선택	PASS route selected
+Connections.InspectionSortState.NgRouted	NG 경로 선택	NG route selected
+Connections.InspectionSortState.InterlockFault	인터록 결함	Interlock fault
+Connections.InspectionSortDecision.Awaiting	대기	Awaiting
+Connections.InspectionSortDecision.Pass	PASS	PASS
+Connections.InspectionSortDecision.Fail	NG	NG
+Connections.DryRunInspectionHandoffStateFormat	검사 인계 {0}: {1} · 판정 {2} · 소재 {3} · 결과 {4}	Inspection handoff {0}: {1} · decision {2} · material {3} · result {4}
+Connections.InspectionHandoffState.AwaitingMaterial	소재 대기	Awaiting material
+Connections.InspectionHandoffState.Ready	검사 준비	Ready for inspection
+Connections.InspectionHandoffState.Inspecting	검사 중	Inspecting
+Connections.InspectionHandoffState.ResultAvailable	결과 대기	Result available
+Connections.InspectionHandoffState.Complete	인계 완료	Handoff complete
+Connections.InspectionHandoffState.InterlockFault	인터록 결함	Interlock fault
+Connections.DryRunPrealignerStateFormat	프리얼라이너 {0}: {1} · 회전 {2:0.###}° / 목표 {3:0.###}° · 웨이퍼 {4}	Pre-aligner {0}: {1} · rotary {2:0.###}° / target {3:0.###}° · wafer {4}
+Connections.PrealignerState.AwaitingWafer	웨이퍼 대기	Awaiting wafer
+Connections.PrealignerState.AwaitingClamp	클램프 대기	Awaiting clamp
+Connections.PrealignerState.Ready	정렬 준비	Ready to align
+Connections.PrealignerState.Aligning	정렬 중	Aligning
+Connections.PrealignerState.Aligned	정렬 완료	Aligned
+Connections.PrealignerState.Released	해제 완료	Released
+Connections.PrealignerState.InterlockFault	인터록 결함	Interlock fault
+Connections.PrealignerWaferPresent	있음	present
+Connections.PrealignerWaferAbsent	없음	absent
+Connections.InspectionMaterialPresent	감지	Present
+Connections.InspectionMaterialAbsent	없음	Absent
+Connections.InspectionResultAccepted	수락	Accepted
+Connections.InspectionResultPending	대기	Pending
+Connections.DryRunOhtHandoffStateFormat	OHT 인계 {0}: {1} · 경로 {2} · 차량 {3} · 로드포트 {4}	OHT handoff {0}: {1} · route {2} · vehicle {3} · load port {4}
+Connections.OhtHandoffState.Vehicle	차량 소유	Vehicle owns carrier
+Connections.OhtHandoffState.Ready	인계 준비	Ready to hand off
+Connections.OhtHandoffState.Transferring	인계 중	Transferring
+Connections.OhtHandoffState.LoadPort	로드포트 소유	Load port owns carrier
+Connections.OhtHandoffState.InterlockFault	인터록 결함	Interlock fault
+Connections.OhtRouteAvailable	가용	Available
+Connections.OhtRouteBlocked	차단	Blocked
+Connections.OhtVehicleDocked	도킹됨	Docked
+Connections.OhtVehicleAway	미도킹	Not docked
+Connections.OhtLoadPortReady	준비	Ready
+Connections.OhtLoadPortNotReady	미준비	Not ready
+Connections.DryRunCompletedStatus	격리된 전체 레시피 검증이 완료되었습니다. 메인 시뮬레이션은 변경되지 않았습니다.	The isolated recipe dry run completed. The main simulation was unchanged.
+Connections.DryRunStoppedStatus	격리된 전체 레시피 검증이 완료되지 않았습니다. 결과의 최초 문제를 확인하십시오.	The isolated recipe dry run did not complete. Check its first issue.
+Connections.OpenStep	단계 열기	Open step
+Connections.OpenStepTooltip	이 연결을 사용하는 첫 번째 시퀀스 단계를 선택합니다.	Select the first sequence step that uses this connection.
+Connections.OpenStepStatus	시퀀스 단계 '{0}'을(를) 열었습니다.	Opened sequence step '{0}'.
+Connections.OpenStepRejectedStatus	연결된 시퀀스 단계를 찾을 수 없습니다.	The linked sequence step could not be found.
+Connections.ReturnToProcessPlan	공정 계획으로 돌아가기	Return to process plan
+Connections.ReturnToProcessPlanTooltip	열어 둔 공정 계획의 같은 단계 카드로 돌아갑니다.	Return to the same step card in the open process plan.
+Connections.ReturnToProcessPlanHint	이 단계를 조정한 뒤 같은 공정 카드 위치로 돌아갑니다.	Return to the same process card after tuning this step.
+Connections.ReturnToProcessPlanStatus	공정 계획의 '{0}' 단계로 돌아왔습니다.	Returned to process plan step '{0}'.
+Connections.ProcessPlanReviewPrevious	이전 단계	Previous step
+Connections.ProcessPlanReviewPreviousTooltip	현재 필터의 이전 관리 단계를 Sequence에서 엽니다.	Open the previous managed step from the current filter in Sequence.
+Connections.ProcessPlanReviewNext	다음 단계	Next step
+Connections.ProcessPlanReviewNextTooltip	현재 필터의 다음 관리 단계를 Sequence에서 엽니다.	Open the next managed step from the current filter in Sequence.
+Connections.ProcessPlanReviewPositionFormat	검토 {0:N0}/{1:N0}	Review {0:N0}/{1:N0}
+Connections.ProcessPlanReviewStatus	현재 필터의 {0:N0}/{1:N0} '{2}' 단계를 열었습니다.	Opened filtered step {0:N0}/{1:N0}, '{2}'.
+Connections.AddStep	대상 단계 추가	Add target step
+Connections.AddStepTooltip	현재 시퀀스의 완료 단계 앞에 이 연결을 사용하는 기본 단계를 추가합니다.	Add a default step using this connection before the current sequence's Complete step.
+Connections.AddStepStatus	대상 {0}의 시퀀스 단계를 추가했습니다.	Added a sequence step for target {0}.
+Connections.AddStepRejectedStatus	시퀀스 단계를 추가하지 못했습니다: {0}	Could not add the sequence step: {0}
+Shell.Paste	붙여넣기	Paste
+Shell.NoSequenceConfigured	시퀀스가 설정되지 않았습니다	No sequence configured
+Sequence.Complete	완료	Complete
+UserText.sequence.auto-transfer-cycle.name	자동 이송 사이클	Automatic Transfer Cycle
+UserText.sequence.auto-transfer-cycle.step.cycle-active-on.name	사이클 활성화	Cycle Active On
+UserText.sequence.auto-transfer-cycle.step.extend-stopper.name	스테이션 스토퍼 전진	Extend Station Stopper
+UserText.sequence.auto-transfer-cycle.step.wait-stopper-extended.name	스토퍼 전진 대기	Wait Stopper Extended
+UserText.sequence.auto-transfer-cycle.step.conveyor-forward.name	컨베이어 정방향 선택	Select Conveyor Forward
+UserText.sequence.auto-transfer-cycle.step.conveyor-run-forward.name	컨베이어 정방향 운전	Run Conveyor Forward
+UserText.sequence.auto-transfer-cycle.step.move-station.name	스테이션 위치로 이송	Move Stage to Station
+UserText.sequence.auto-transfer-cycle.step.wait-station-position.name	스테이션 위치 도달 대기	Wait Stage at Station
+UserText.sequence.auto-transfer-cycle.step.wait-station-sensor.name	스테이션 센서 대기	Wait Station Sensor
+UserText.sequence.auto-transfer-cycle.step.conveyor-stop-at-station.name	스테이션에서 컨베이어 정지	Stop Conveyor at Station
+UserText.sequence.auto-transfer-cycle.step.station-ready-on.name	스테이션 준비 ON	Station Ready On
+UserText.sequence.auto-transfer-cycle.step.move-home.name	원점으로 복귀	Return Stage Home
+UserText.sequence.auto-transfer-cycle.step.wait-home.name	원점 도달 대기	Wait Stage Home
+UserText.sequence.auto-transfer-cycle.step.station-ready-off.name	스테이션 준비 OFF	Station Ready Off
+UserText.sequence.auto-transfer-cycle.step.retract-stopper.name	스테이션 스토퍼 후진	Retract Station Stopper
+UserText.sequence.auto-transfer-cycle.step.wait-stopper-retracted.name	스토퍼 후진 대기	Wait Stopper Retracted
+UserText.sequence.auto-transfer-cycle.step.conveyor-reverse.name	컨베이어 역방향 선택	Select Conveyor Reverse
+UserText.sequence.auto-transfer-cycle.step.conveyor-run-reverse.name	컨베이어 역방향 운전	Run Conveyor Reverse
+UserText.sequence.auto-transfer-cycle.step.wait-conveyor-home.name	워크피스 원점 도달 대기	Wait Workpiece at Conveyor Home
+UserText.sequence.auto-transfer-cycle.step.conveyor-stop-home.name	원점에서 컨베이어 정지	Stop Conveyor at Home
+UserText.sequence.auto-transfer-cycle.step.conveyor-direction-home.name	컨베이어 정방향 복원	Restore Conveyor Forward Direction
+UserText.sequence.auto-transfer-cycle.step.cycle-active-off.name	사이클 비활성화	Cycle Active Off
+Shell.File	파일	File
+Shell.Simulation	시뮬레이션	Simulation
+Shell.New	새 프로젝트	New
+Shell.Open	열기	Open
+Shell.Save	저장	Save
+Shell.SaveAs	다른 이름으로 저장	Save As
+Shell.Exit	종료	Exit
+Shell.Design	설계	Design
+Shell.Run	운전	Run
+Shell.SimulationOn	시뮬레이션 시작	Simulation ON
+Shell.Pause	일시정지	Pause
+Shell.Step	단계 실행	Step
+Shell.Reset	초기화	Reset
+Shell.CycleStart	사이클 시작	Cycle Start
+Shell.Language	언어	Language
+Shell.LanguageTooltip	표시 언어를 선택합니다.	Select the display language.
+Shell.RunSummary	운전 요약	Run Summary
+Shell.AddComponentHint	Main Cell에 지원 장비를 추가합니다.	Add a supported component to Main Cell
+Shell.LibraryPlacementHint	항목을 Main Layout에 끌어 배치하거나 클릭하여 추가합니다.	Drag an item onto Main Layout to place it, or click to add it
+Layout.Library.Category.Actuators	액추에이터	Actuators
+Layout.Library.Category.Material	소재	Material
+Layout.Library.Category.Mechanics	기구	Mechanics
+Layout.Library.Category.Motion	모션	Motion
+Layout.Library.Category.Sensors	센서	Sensors
+Layout.Library.Category.Transport	이송	Transport
+Layout.Library.Conveyor.Description	운전 및 방향 출력에 따라 연결된 워크피스를 일정 속도로 이송합니다.	Run and direction outputs move bound workpieces at fixed speed
+Layout.Library.Conveyor.Name	컨베이어	Conveyor
+Layout.Library.DigitalSensor.Description	감지 영역의 상태를 시뮬레이션 디지털 입력에 기록합니다.	Detection area that writes a simulated digital input
+Layout.Library.DigitalSensor.Name	디지털 센서	Digital Sensor
+Layout.Library.LinearStage.Description	모션 축 위치를 따라 움직이는 스테이지입니다.	Axis-bound stage whose runtime pose follows motion
+Layout.Library.LinearStage.Name	리니어 스테이지	Linear Stage
+Layout.Library.MachineFrame.Description	장비 셀의 고정 구조와 시각적 경계를 정의합니다.	Static cell structure and visual boundary
+Layout.Library.MachineFrame.Name	머신 프레임	Machine Frame
+Layout.Library.PneumaticCylinder.Description	출력으로 동작하며 종단 위치 피드백을 결정적으로 제공합니다.	Output-driven actuator with deterministic end-position feedback
+Layout.Library.PneumaticCylinder.Name	공압 실린더	Pneumatic Cylinder
+Layout.Library.RotaryStage.Description	모션 축 각도를 따라 회전하는 스테이지입니다.	Rotary-axis stage whose runtime angle follows motion
+Layout.Library.RotaryStage.Name	로터리 스테이지	Rotary Stage
+Layout.Library.Workpiece.Description	명시적으로 연결된 컨베이어가 이송하는 유형 지정 부품입니다.	Typed part transported by an explicitly bound conveyor
+Layout.Library.Workpiece.Name	워크피스	Workpiece
+Shell.Runtime	실행 상태	Runtime
+Shell.ProjectStatus	프로젝트: {0}	Project: {0}
+Shell.ProjectStatusUnsaved	프로젝트: {0} · 미저장	Project: {0} · Unsaved
+Project.UnsavedTitle	저장하지 않은 프로젝트	Unsaved project
+Project.UnsavedMessage	현재 프로젝트의 변경 내용을 저장하시겠습니까?	Save changes to the current project?
+Project.Save	저장	Save
+Project.DontSave	저장 안 함	Don't save
+Project.Cancel	취소	Cancel
+Project.SaveFailedStatus	프로젝트를 저장하지 못했습니다	The project could not be saved
+Project.SaveFailedTitle	프로젝트 저장 실패	Project save failed
+Project.SaveFailedMessage	프로젝트 파일을 안전하게 저장하지 못했습니다.{0}{0}{1}	The project file could not be saved safely.{0}{0}{1}
+MessageBox.Message	메시지	Message
+MessageBox.OK	확인	OK
+MessageBox.Cancel	취소	Cancel
+Shell.SelectionStatus	선택됨: {0}	Selected: {0}
+Shell.SelectionMultiple	{0}개 선택 · 기준: {1}	{0} selected · reference: {1}
+Shell.SelectionNone	선택됨: 없음	Selected: None
+Shell.SimulationStatus	시뮬레이션 {0:hh\:mm\:ss\.fff}	Sim {0:hh\:mm\:ss\.fff}
+Shell.TickStatus	틱 {0}	Tick {0}
+Shell.ControlOwnerAutomatic	시뮬레이션 시작 시 자동 시퀀스를 시작하고 반복합니다.	Simulation ON starts and repeats the authored automatic sequence.
+Shell.ControlOwnerSequence	운전 모드에서 내장 시퀀스가 모션과 출력을 제어합니다.	The embedded sequence owns motion and outputs in Run mode.
+Shell.ControlOwnerManual	수동 모션 명령은 운전 모드에서만 사용할 수 있습니다.	Manual motion commands are enabled only in Run mode.
+Shell.ControlOwnerLabel.Definition	정의	Definition
+Shell.ControlOwnerLabel.Manual	수동	Manual
+Shell.ControlOwnerLabel.EmbeddedSequence	내장 시퀀스	Embedded sequence
+Shell.Definition	정의	Definition
+Shell.SceneControl	제어: {0}	Control: {0}
+Scene.FitLayout	화면 맞춤	Fit
+Scene.FitLayoutTooltip	장비 레이아웃을 화면에 맞춤	Fit the machine layout to the canvas
+Scene.StartTitle	장비 레이아웃 시작	Start a machine layout
+Scene.StartHint	빈 레이아웃을 직접 만들거나 자동 이송 셀 샘플에서 시작하세요.	Build a layout from scratch or start from the automatic transfer cell sample.
+Scene.StartBlank	새 빈 레이아웃	New blank layout
+Scene.StartSample	샘플에서 시작	Start from sample
+Scene.StartSampleTooltip	Automatic Transfer Cell 샘플을 편집 가능한 설계로 엽니다.	Open the Automatic Transfer Cell sample as an editable design.
+Scene.EmptyTitle	첫 장비를 배치하세요	Place your first component
+Scene.EmptyHint	왼쪽 라이브러리에서 장비를 클릭하거나 캔버스로 끌어 배치하세요.	Click a component in the library or drag it onto the canvas.
+Scene.BlankLayoutReadyStatus	빈 레이아웃을 만들었습니다. 라이브러리에서 첫 장비를 선택하세요.	Blank layout ready. Choose the first component from the library.
+Scene.SampleOpenedStatus	자동 이송 셀 샘플을 열었습니다. 파일 저장 전까지 원본 샘플은 변경되지 않습니다.	Opened the automatic transfer cell sample. The bundled sample remains unchanged until you save a project file.
+Scene.GripperClosed	그리퍼 닫힘	GRIPPER CLOSED
+Scene.GripperOpen	그리퍼 열림	GRIPPER OPEN
+Scene.WorkpieceAvailable	작업물 대기	AVAILABLE
+Scene.WorkpieceAttached	그리퍼 부착	ATTACHED
+Scene.WorkpiecePlaced	배치 완료	PLACED
+Shell.NoAxis	설정된 축 없음	No axis configured
+Shell.NoCamera	설정된 카메라 없음	No camera configured
+Shell.Unavailable	사용할 수 없음	Unavailable
+Shell.NotConfigured	설정되지 않음	Not configured
+Shell.SignalOn	ON	ON
+Shell.SignalOff	OFF	OFF
+Shell.ResultPass	통과	PASS
+Shell.ResultFail	실패	FAIL
+Shell.ResultPending	대기	PENDING
+Shell.AutomaticRunNotConfigured	설정되지 않음	Not configured
+Shell.AutomaticRunWaiting	재시작 대기 중 ({0}틱)	Waiting to restart ({0} ticks)
+Shell.AutomaticRunRunning	자동 사이클 실행 중	Automatic cycle running
+Shell.AutomaticRunReady	준비	Ready
+Shell.Project	프로젝트	Project
+Shell.Library	라이브러리	Library
+Shell.Properties	속성	Properties
+Shell.Events	이벤트	Events
+Shell.SimulationJournal	시뮬레이션 기록	Simulation journal
+Shell.Evidence	증거	Evidence
+Shell.EvidenceDrawer	이벤트 증거 펼치기 또는 접기	Expand or collapse event evidence
+Shell.EvidenceDrawerHint	결정적 시뮬레이션 이벤트 증거를 표시하거나 숨깁니다.	Show or hide deterministic simulation event evidence.
+Shell.MachineLayout	머신 레이아웃	Machine Layout
+Shell.SimulationWorkspace	시뮬레이션 작업공간	Simulation Workspace
+Shell.Sequence	시퀀스	Sequence
+Shell.Selected	선택됨	Selected
+Shell.None	없음	None
+Shell.Paused	일시정지	PAUSED
+Shell.Running	실행 중	RUNNING
+Shell.FixedStep	고정 5 ms	Fixed 5 ms
+Shell.Tick	틱	Tick
+Shell.SimulationShort	시뮬레이션	Sim
+Shell.Control	제어	Control
+Simulation.Workspace	시뮬레이션 작업공간	Simulation Workspace
+Simulation.Start	시작	Start
+Simulation.Resume	재개	Resume
+Simulation.Stop	정지	Stop
+Simulation.EmergencyStop	비상 정지	Emergency Stop
+Simulation.LoadJson	JSON 불러오기	Load JSON
+Simulation.Seed	시드	Seed
+Simulation.DurationCycles	기간 (사이클)	Duration (cycles)
+Simulation.ResetScenario	시나리오 초기화	Reset Scenario
+Simulation.FleetSummary	장비 요약	Fleet Summary
+Simulation.Events	시뮬레이션 이벤트	Simulation Events
+Simulation.CurrentCycle	현재 사이클: {0}	Current cycle: {0}
+Simulation.Throughput	처리량 사용률: {0}%	Throughput utilization: {0}%
+Simulation.AlarmsActive	활성 알람: {0}	Alarms active: {0}
+Simulation.FleetHealth	장비 상태 {0:F1}	Fleet health {0:F1}
+Simulation.SeedTooltip	장비 상태 변화를 재현하기 위한 시드입니다.	Seed used to reproduce equipment condition changes.
+Simulation.DurationTooltip	시나리오의 최대 실행 사이클입니다.	Maximum scenario cycle count.
+Left.PlacedComponents	배치된 장비	Placed components
+Left.MachineState	머신 상태	Machine state
+Left.AutomaticSimulation	자동 시뮬레이션	Automatic simulation
+Left.CompletedCycles	완료 사이클	Completed cycles
+Left.ConfiguredAxes	설정된 축	Configured axes
+Left.LayoutComponents	레이아웃 장비	Layout components
+Left.VirtualCameras	가상 카메라	Virtual cameras
+Left.EmbeddedSequence	내장 시퀀스	Embedded sequence
+Left.State	상태	State
+Left.CurrentStep	현재 단계	Current step
+Left.ControlOwner	제어 소유자	Control owner
+Left.SelectEquipmentHint	머신 장면에서 장비를 선택하면 실시간 상태를 확인할 수 있습니다.	Select equipment in the machine scene to inspect its live state.
+Left.RemoveSelected	선택 항목 제거	Remove selected
+Inspector.LayoutTransform	레이아웃 변환	Layout transform
+Inspector.AspectRatioHint	모서리 크기 조절 중 Shift를 누르면 종횡비를 유지합니다.	Hold Shift while resizing a corner to preserve the aspect ratio.
+Inspector.AuthoredProperties	작성 속성	Authored properties
+Inspector.SelectedComponents	{0}개 장비 선택	{0} components selected
+Inspector.AlignmentReferenceHint	마지막으로 선택한 장비를 기준으로 정렬합니다.	Alignment uses the last selected component as the reference.
+Inspector.HorizontalAlignment	가로 정렬	Horizontal alignment
+Inspector.VerticalAlignment	세로 정렬	Vertical alignment
+Alignment.Left	왼쪽	Left
+Alignment.HorizontalCenter	가운데	Center
+Alignment.Right	오른쪽	Right
+Alignment.Top	위	Top
+Alignment.VerticalCenter	중앙	Middle
+Alignment.Bottom	아래	Bottom
+Alignment.LeftTooltip	기준 장비의 왼쪽 경계에 정렬	Align left edges to the reference component
+Alignment.HorizontalCenterTooltip	기준 장비의 가로 중심에 정렬	Align horizontal centers to the reference component
+Alignment.RightTooltip	기준 장비의 오른쪽 경계에 정렬	Align right edges to the reference component
+Alignment.TopTooltip	기준 장비의 위쪽 경계에 정렬	Align top edges to the reference component
+Alignment.VerticalCenterTooltip	기준 장비의 세로 중심에 정렬	Align vertical centers to the reference component
+Alignment.BottomTooltip	기준 장비의 아래쪽 경계에 정렬	Align bottom edges to the reference component
+Status.LayoutAligned	선택 장비를 {0} 기준으로 정렬했습니다.	Aligned selected components to {0}.
+Inspector.LayerOrder	레이어 순서	Layer order
+Inspector.LayerOrderHint	겹치는 장비의 앞뒤 표시 순서를 변경합니다.	Change the front-to-back order of overlapping equipment.
+LayerOrder.SendToBack	맨 뒤	Send to back
+LayerOrder.SendBackward	뒤로	Move backward
+LayerOrder.BringForward	앞으로	Move forward
+LayerOrder.BringToFront	맨 앞	Bring to front
+LayerOrder.SendToBackTooltip	선택 장비를 모든 장비 뒤로 이동	Send selected equipment behind all other equipment
+LayerOrder.SendBackwardTooltip	선택 장비를 한 단계 뒤로 이동	Move selected equipment backward by one layer
+LayerOrder.BringForwardTooltip	선택 장비를 한 단계 앞으로 이동	Move selected equipment forward by one layer
+LayerOrder.BringToFrontTooltip	선택 장비를 모든 장비 앞으로 이동	Bring selected equipment in front of all other equipment
+Status.LayerOrderChanged	선택 장비를 {0} 위치로 이동했습니다.	Moved selected equipment to {0}.
+Inspector.PropertiesValid	작성 속성이 유효합니다.	Authored properties are valid.
+Inspector.PropertiesInvalid	속성을 확인하세요.	Check the authored properties.
+Inspector.SelectedEquipment	선택 장비	Selected equipment
+Inspector.OperatingState	운전 상태	Operating state
+Inspector.VirtualCamera	가상 카메라	Virtual camera
+Camera.Commissioning	카메라 커미셔닝	Camera commissioning
+Camera.SelectedCamera	선택 카메라	Selected camera
+Camera.Recipe	검사 레시피	Inspection recipe
+Camera.State	상태	State
+Camera.ExposureRemaining	노출 잔여 Tick	Exposure ticks remaining
+Camera.TransferRemaining	전송 잔여 Tick	Transfer ticks remaining
+Camera.Result	결과	Result
+Camera.Frame	프레임	Frame
+Camera.Source	이미지 소스	Image source
+Camera.SourceSetup	이미지 소스 설정	Image source setup
+Camera.SourceRelativePath	프로젝트 상대 경로	Project-relative path
+Camera.Browse	찾아보기	Browse
+Camera.BrowseTooltip	프로젝트 폴더 안의 단일 이미지 파일을 선택합니다.	Select a single-image file inside the project folder.
+Camera.SourceWidth	폭 (px)	Width (px)
+Camera.SourceHeight	높이 (px)	Height (px)
+Camera.SourcePixelFormat	픽셀 형식	Pixel format
+Camera.PixelFormatTooltip	획득 증거에 기록할 픽셀 형식을 입력합니다. 예: Mono8	Enter the pixel format recorded in acquisition evidence, for example Mono8.
+Camera.ApplySource	설정 적용	Apply settings
+Camera.ApplySourceTooltip	검증된 설정을 프로젝트에 적용합니다. 획득은 자동으로 시작하지 않습니다.	Apply validated settings to the project without starting acquisition.
+Camera.RevertSource	편집 취소	Revert edits
+Camera.RevertSourceTooltip	아직 적용하지 않은 편집을 현재 프로젝트 설정으로 되돌립니다.	Restore fields from the current project settings without acquisition.
+Camera.SelectSourceFile	카메라 이미지 소스 선택	Select camera image source
+Camera.SourceMustBeProjectOwned	프로젝트 폴더 안의 파일을 선택해 주세요.	Select a file inside the project folder.
+Camera.SaveProjectBeforeSource	프로젝트를 먼저 저장한 뒤 이미지 소스를 선택하세요.	Save the project before selecting an image source.
+Camera.SourceFileRequired	프로젝트 안의 이미지 파일을 선택하세요.	Select an image file inside the project.
+Camera.SourceDimensionsInvalid	폭과 높이는 1 이상이어야 합니다.	Width and height must be at least 1.
+Camera.SourcePixelFormatInvalid	픽셀 형식을 앞뒤 공백 없이 입력하세요.	Enter a pixel format without leading or trailing spaces.
+Camera.SourceFileEmpty	이미지 소스 파일이 비어 있습니다.	The image-source file is empty.
+Camera.SourceFileInvalid	이미지 소스 파일이 없거나 프로젝트 밖을 가리킵니다.	The image-source file is missing or resolves outside the project.
+Camera.SourceDraftReady	유효한 변경입니다. 설정 적용을 선택하세요.	Valid changes. Select Apply settings.
+Camera.SourceAppliedSave	설정이 적용되었습니다. 프로젝트를 저장해야 유지됩니다.	Settings applied. Save the project to keep them.
+Camera.SourceConfigured	프로젝트에 저장된 이미지 소스 설정입니다.	Image-source settings restored from the project.
+Camera.StartManualControl	수동 운전 시작	Start manual
+Camera.StartManualShort	수동 운전 시작	Start manual
+Camera.StartManualControlTooltip	자동 또는 시퀀스 운전과 분리된 카메라 수동 획득 제어를 시작합니다.	Start manual camera acquisition control separately from automatic or sequence operation.
+Camera.Trigger	트리거	Trigger
+Camera.TriggerTooltip	일시정지 상태에서 프로젝트 이미지의 SHA-256 증거를 포함해 선택 카메라 획득을 시작합니다.	While paused, trigger the selected camera with SHA-256 evidence from the project image.
+Camera.NoCameraHint	커미셔닝할 가상 카메라를 선택하세요.	Select a virtual camera to commission.
+Camera.ConfigureSourceHint	프로젝트에 단일 이미지 소스와 검사 레시피를 설정하세요.	Configure a project single-image source and inspection recipe.
+Camera.StartManualHint	수동 운전을 시작한 뒤 일시정지하고 트리거하세요.	Start manual control, pause, then trigger acquisition.
+Camera.ResetForManualHint	자동 또는 시퀀스 운전 중입니다. 초기화한 뒤 수동 운전을 시작하세요.	Automatic or sequence operation is active. Reset before starting manual control.
+Camera.PauseBeforeTriggerHint	일시정지한 뒤 트리거하여 획득을 고정 Tick으로 진행하세요.	Pause, then trigger acquisition so fixed ticks remain under your control.
+Camera.TriggerReadyHint	트리거한 뒤 단계 실행으로 노출과 전송을 정확히 한 Tick씩 진행하세요.	Trigger, then use Step to advance exposure and transfer exactly one tick at a time.
+Camera.StepAcquisitionHint	단계 실행으로 노출과 전송을 정확히 한 Tick씩 진행하세요.	Use Step to advance exposure and transfer exactly one tick at a time.
+Camera.ActionStartManual	카메라 수동 운전 시작	Start camera manual control
+Camera.ActionTrigger	카메라 트리거	Trigger camera
+Camera.CommandAccepted	{0} 명령 승인 · {1}	{0} accepted · {1}
+Camera.CommandRejected	{0} 명령 거부 · {1}: {2}	{0} rejected · {1}: {2}
+Camera.StatusAccepted	카메라 명령이 승인되었습니다.	Camera command accepted.
+Camera.StatusRejected	카메라 명령이 거부되었습니다.	Camera command rejected.
+Camera.SourceRejected	이미지 소스 증거 생성 실패 · {0}	Image-source evidence failed · {0}
+Camera.InspectionRejected	결정적 검사 실행 실패 · {0}	Deterministic inspection failed · {0}
+Camera.ContextChanged	이미지 증거 생성 중 런타임 상태가 변경되어 트리거하지 않았습니다.	The runtime changed while image evidence was prepared; acquisition was not triggered.
+Camera.InspectionId	검사 ID	Inspection ID
+Camera.InspectionMessage	검사 메시지	Inspection message
+Camera.InspectionMetrics	검사 메트릭	Inspection metrics
+Camera.ExecutionEvidence	실행 증거	Execution evidence
+Camera.EvidenceNone	저장된 실행 증거 없음	No saved execution evidence
+Camera.EvidenceCapturing	실행 증거 수집 중	Capturing execution evidence
+Camera.EvidenceSaved	프로젝트 실행 증거 저장됨	Project execution evidence saved
+Camera.EvidenceRestored	프로젝트 실행 증거 복원됨	Project execution evidence restored
+Camera.EvidenceStale	프로젝트·빌드·카메라 또는 레시피가 달라 기존 증거가 만료됨	Existing evidence is stale for the project, build, camera, or recipe
+Camera.EvidenceSaveFailed	실행 증거 저장 실패	Execution evidence save failed
+Camera.EvidenceNoComparison	비교할 이전 실행 증거 없음	No prior execution evidence to compare
+Camera.EvidenceMatch	이전 실행 증거와 일치	Matches prior execution evidence
+Camera.EvidenceMismatch	이전 실행 증거와 불일치 · {0}	Differs from prior execution evidence · {0}
+Inspector.DigitalIo	디지털 I/O	Digital I/O
+Inspector.FaultManager	장애 관리자	Fault manager
+Inspector.ActiveFaults	활성 장애	Active faults
+Inspector.VirtualInput	가상 입력	Virtual input
+Inspector.CycleStartDi	사이클 시작 (DI)	Cycle Start (DI)
+Inspector.CycleActiveDo	사이클 활성 (DO)	Cycle Active (DO)
+Inspector.CycleDoneDo	사이클 완료 (DO)	Cycle Done (DO)
+Inspector.FaultRecoveryHint	입력을 강제하거나 액추에이터를 차단해 복구 동작을 테스트합니다.	Test recovery by forcing an input or blocking an actuator.
+Inspector.FaultType	고장 유형	Fault type
+Inspector.RuntimeTarget	런타임 대상	Runtime target
+Inspector.RuntimeTargetTooltip	최신 시뮬레이션 스냅샷에서 대상을 가져옵니다.	Targets are derived from the latest simulation snapshot
+Inspector.ForcedValue	강제 값	Forced value
+Inspector.InjectFault	고장 주입	Inject fault
+Inspector.ClearSelected	선택 항목 해제	Clear selected
+Inspector.ClearAll	모두 해제	Clear all
+Inspector.NoActiveFaults	현재 스냅샷에 활성 고장이 없습니다.	No active faults in the current snapshot.
+Inspector.CycleStartTooltip	사이클 시작 디지털 입력을 ON으로 설정합니다.	Set the Cycle Start digital input to ON
+Inspector.CycleStart	사이클 시작	Cycle Start
+Inspector.CycleStartHint	DI 트리거만 사용하며 모션과 출력은 시퀀스가 계속 소유합니다.	DI trigger only · Motion and outputs remain sequence-owned
+Inspector.IoCommissioning	로컬 I/O 커미셔닝	Local I/O commissioning
+Inspector.IoCommissioningHint	불변 엔진 스냅샷의 신호를 확인하고 선택한 DI만 명시적으로 Force 합니다.	Inspect immutable engine-snapshot signals and explicitly force only the selected DI.
+Inspector.Signal	신호	Signal
+Inspector.Kind	유형	Type
+Inspector.Value	값	Value
+Inspector.RuntimeOwner	런타임 소유자	Runtime owner
+Inspector.Revision	리비전	Revision
+Inspector.NominalValue	실제 값	Nominal value
+Inspector.ForceState	Force 상태	Force state
+Io.DigitalInput	DI	DI
+Io.DigitalOutput	DO	DO
+Io.StartManualControl	수동 운전 시작	Start manual control
+Io.StartManualControlTooltip	일시정지 상태에서 로컬 I/O 수동 운전을 명시적으로 시작합니다.	Explicitly start local I/O manual control while paused.
+Io.ForceOn	Force ON	Force ON
+Io.ForceOff	Force OFF	Force OFF
+Io.ClearForce	Force 해제	Clear force
+Io.ForceOnTooltip	선택한 DI의 유효 값을 ON으로 고정하고 실제 값은 계속 보존합니다.	Force the selected DI effective value ON while retaining its nominal value.
+Io.ForceOffTooltip	선택한 DI의 유효 값을 OFF로 고정하고 실제 값은 계속 보존합니다.	Force the selected DI effective value OFF while retaining its nominal value.
+Io.ClearForceTooltip	선택한 DI Force를 해제하고 최신 실제 값으로 복귀합니다.	Clear the selected DI force and return to its latest nominal value.
+Io.FaultOverride	장애 강제	Fault override
+Io.ForcedOn	Force ON	Forced ON
+Io.ForcedOff	Force OFF	Forced OFF
+Io.ForceReleased	해제됨	Released
+Io.NoSignalsHint	현재 런타임에 디지털 신호가 없습니다.	No digital signals are available in the current runtime.
+Io.SelectSignalHint	확인할 I/O 신호를 선택하세요.	Select an I/O signal to inspect.
+Io.OutputReadOnlyHint	DO는 시퀀스 또는 장비 동작 결과이며 이 표에서는 읽기 전용입니다.	DO is a sequence or equipment result and is read-only in this table.
+Io.FaultInterlockHint	선택한 DI에 stuck-input 장애가 활성화되어 있습니다. 장애를 먼저 해제하세요.	The selected DI has an active stuck-input fault. Clear the fault first.
+Io.PauseForManualHint	일시정지한 뒤 수동 운전을 시작하면 DI Force를 사용할 수 있습니다.	Pause, then start manual control to use DI forcing.
+Io.StartManualHint	수동 운전을 시작하면 선택한 DI를 Force할 수 있습니다.	Start manual control to force the selected DI.
+Io.ForcedHint	Force 중에도 실제 값은 보존되며 해제 즉시 복귀합니다.	The nominal value is retained while forced and returns immediately when cleared.
+Io.ManualHint	선택한 DI를 Force ON/OFF 하거나 기존 Force를 해제할 수 있습니다.	Force the selected DI ON or OFF, or clear an existing force.
+Io.ActionStartManual	I/O 수동 운전 시작	Start I/O manual control
+Io.ActionForceOn	DI Force ON	Force DI ON
+Io.ActionForceOff	DI Force OFF	Force DI OFF
+Io.ActionClearForce	DI Force 해제	Clear DI force
+Io.ActionCommand	I/O 명령	I/O command
+Io.CommandAccepted	{0} 명령 승인 · {1}	{0} accepted · {1}
+Io.CommandRejected	{0} 명령 거부 · {1}: {2}	{0} rejected · {1}: {2}
+Io.StatusAccepted	{0} 명령을 승인했습니다.	{0} was accepted.
+Io.StatusRejected	{0} 명령이 거부되었습니다.	{0} was rejected.
+Sequence.Editor	시퀀스 편집기	Sequence Editor
+Sequence.Tagline	결정적 자동 사이클을 작성합니다.	Author the deterministic automatic cycle
+Sequence.NewStep	새 단계	New step
+Sequence.Add	추가	Add
+Sequence.Delete	삭제	Delete
+Sequence.MoveUp	위로 이동	Move up
+Sequence.MoveDown	아래로 이동	Move down
+Sequence.Name	이름	Name
+Sequence.Action	동작	Action
+Sequence.Target	대상	Target
+Sequence.Value	값	Value
+Sequence.Timeout	시간 제한	Timeout
+Sequence.Next	다음	Next
+Sequence.Error	오류	Error
+Sequence.Failure	실패	Failure
+Sequence.StepId	단계 ID	Step ID
+Sequence.Validation	검증	Validation
+Sequence.ExpectedCheckpoint	종료 상태 검증	End-state check
+Sequence.ExpectedCheckpointTooltip	이 단계가 끝날 때 선택한 장비 상태를 검증합니다.	Validate the selected equipment state when this step ends.
+Sequence.ExpectedState	기대 상태	Expected
+Simulation.ScenarioSummary	시나리오: {0} | 모드: {1} | 시드: {2} | 기간: {3}사이클	Scenario: {0} | Mode: {1} | Seed: {2} | Duration: {3} cycles
+Simulation.WorkspaceRunning	시뮬레이션 실행 중 | 사이클 {0} | 활성 {1} | 알람 {2} | {3}	Simulation running | cycle {0} | {1} active | {2} alarm | {3}
+Simulation.WorkspacePaused	시뮬레이션 일시정지 | 사이클 {0} | 활성 {1} | 알람 {2} | {3}	Simulation paused | cycle {0} | {1} active | {2} alarm | {3}
+Simulation.WorkspaceIdle	시뮬레이션 대기 | 활성 {0} | 알람 {1} | {2}	Simulation idle | {0} active | {1} alarm | {2}
+Simulation.SelectedEquipmentEmpty	장비를 선택하면 상세 텔레메트리를 확인할 수 있습니다.	Select an equipment item to see detailed telemetry.
+Simulation.EventSeveritySummary	정보 {0} | 경고 {1} | 알람 {2} | 복구 {3}	INFO {0} | WARN {1} | ALARM {2} | RECOVERY {3}
+Simulation.Mode.Normal	정상	Normal
+Simulation.Mode.Fault	고장	Fault
+Simulation.Mode.Recovery	복구	Recovery
+Simulation.Mode.Congested	혼잡	Congested
+Simulation.ScenarioName.normal	정상	Normal
+Simulation.ScenarioName.fault-injection	고장 주입	Fault Injection
+Simulation.ScenarioName.recovery	복구	Recovery
+Simulation.ScenarioName.congested	혼잡 라인	Congested Line
+Simulation.ScenarioDescription.normal	장시간 처리량과 안정적인 알람을 위한 균형 잡힌 정상 운전입니다.	Normal operation with balanced behavior for long-run throughput and stable alarms.
+Simulation.ScenarioDescription.fault-injection	운영자 대응 훈련을 위해 초기 경고와 알람 동작을 주입합니다.	Inject early warning and alarm behavior; useful for training operator responses.
+Simulation.ScenarioDescription.recovery	초기 불안정 후 높은 복구 확률로 안정 상태로 돌아가는 복구 경로입니다.	Tough recovery path: initial instability then stable return with high recovery chance.
+Simulation.ScenarioDescription.congested	장비 전체의 처리량 병목과 혼잡 압력을 재현합니다.	Throughput bottleneck and congestion pressure across equipment.
+Simulation.TestScenario	테스트 시나리오	Test scenario
+Simulation.TestScenarioHint	엔진 스냅샷 기반의 결정적 조건 변화를 실행합니다.	Run deterministic condition changes from the engine snapshot.
+Simulation.ScenarioProfile	시나리오 프로필	Scenario profile
+Simulation.RuntimeTarget	런타임 대상	Runtime target
+Simulation.DurationTicks	기간 (Tick)	Duration (ticks)
+Simulation.StartScenario	시나리오 시작	Start scenario
+Simulation.StopScenario	시나리오 중지	Stop scenario
+Simulation.ReplayScenario	시나리오 재생	Replay scenario
+Simulation.ScenarioStatus	시나리오 상태	Scenario status
+Simulation.ScenarioNotConfigured	구성되지 않음	Not configured
+Simulation.ScenarioNoProgress	진행 정보 없음	No progress
+Simulation.ScenarioNoHealth	상태 점수 없음	No health score
+Simulation.ScenarioProgress	진행: {0} / {1} Tick	Progress: {0} / {1} ticks
+Simulation.ScenarioHealth	상태 점수: {0}	Health score: {0}
+Simulation.ConditionState.Normal	정상	Normal
+Simulation.ConditionState.Degraded	저하	Degraded
+Simulation.ConditionState.Fault	장애	Fault
+Simulation.ConditionState.Recovering	복구 중	Recovering
+Simulation.ScenarioTargetRequired	시나리오 대상 장비를 선택하세요.	Select a scenario target.
+Simulation.ScenarioStartRejected	시나리오 시작이 거부되었습니다.	Scenario start was rejected.
+Simulation.ScenarioStopRejected	시나리오 중지가 거부되었습니다.	Scenario stop was rejected.
+Simulation.ScenarioStarted	시나리오가 시작되었습니다.	Scenario started.
+Simulation.ScenarioStopped	시나리오가 중지되었습니다.	Scenario stopped.
+Simulation.ScenarioReplayed	시나리오를 처음부터 재생합니다.	Scenario replayed from the beginning.
+Simulation.LoadJsonHint	JSON 시나리오 파일 경로를 입력하세요.	Enter a JSON scenario file path.
+Simulation.LoadJsonPath	JSON 시나리오 로드: {0}	Load JSON scenario: {0}
+Simulation.ResetScenarioHint	정상 프로필, 시드 1001, 200 Tick으로 복원합니다.	Restore Normal, seed 1001, and 200 ticks.
+Simulation.EquipmentStatus	{0} [{1}] - {2} | 온도 {3:F1}°C | RPM {4:F1} | 진동 {5:F2} | 사이클 {6} | 알람 {7}	{0} [{1}] - {2} | Temp {3:F1}°C | RPM {4:F1} | Vibration {5:F2} | Cycles {6} | Alarms {7}
+Simulation.AcceptanceCriteria	통과 조건	Acceptance criteria
+Simulation.AcceptanceCriteriaHint	반복 실행이 성공하려면 만족해야 하는 결과를 선택합니다.	Choose the outcomes required for a successful repeat run.
+Simulation.RequireAutomaticCycleCompleted	자동 사이클 완료	Automatic cycle completed
+Simulation.MinimumCompletedCycles	최소 완료 횟수	Minimum completions
+Simulation.RequireNoActiveFaults	마지막에 활성 장애 없음	No active faults at finish
+Simulation.RequireFinalEquipmentState	마지막 장비 상태 확인	Check final equipment state
+Simulation.AssertionTarget	대상 장비	Equipment
+Simulation.ExpectedFinalState	예상 상태	Expected state
+Simulation.ExpectedFinalStateHint	예: Idle, Extended, Retracted, Stopped	For example: Idle, Extended, Retracted, Stopped
+Simulation.AssertionSummary	선택한 통과 조건: {0}개	Selected acceptance criteria: {0}
+Simulation.AssertionConfigurationInvalid	장비와 예상 상태를 모두 지정하세요.	Select equipment and enter its expected state.
+Simulation.AssertionOutcomes	통과 조건 결과	Acceptance results
+Simulation.AssertionPassed	통과	Pass
+Simulation.AssertionFailed	실패	Fail
+Simulation.AssertionOutcomeCycle	완료 {0}회 / 기준 {1}회 · Tick {2}	Completed {0} / required {1} · tick {2}
+Simulation.AssertionOutcomeFaults	활성 장애 {0}개 · Tick {1}	Active faults {0} · tick {1}
+Simulation.AssertionOutcomeEquipment	{0}: {1} / 예상 {2} · Tick {3}	{0}: {1} / expected {2} · tick {3}
+Simulation.RepeatValidation	반복 검증	Repeat validation
+Simulation.RepeatValidationHint	같은 조건을 순차 실행하고 각 결과를 첫 실행 또는 승인 기준선과 비교합니다.	Run the same conditions sequentially and compare each result with the first run or accepted baseline.
+Simulation.RepetitionCount	반복 횟수	Repetitions
+Simulation.RunBatch	반복 실행	Run batch
+Simulation.CancelBatch	취소	Cancel
+Simulation.AcceptBaseline	기준선 승인	Accept baseline
+Simulation.ClearBaseline	기준선 해제	Clear baseline
+Simulation.GoToMismatch	첫 불일치로 이동	Go to first mismatch
+Simulation.BatchIdle	반복 검증 대기	Repeat validation ready
+Simulation.BatchRunning	반복 검증 실행 중: {0} / {1}	Repeat validation running: {0} / {1}
+Simulation.BatchCanceled	반복 검증이 취소되었습니다.	Repeat validation canceled.
+Simulation.BatchPassed	반복 검증 통과: {0}회	Repeat validation passed: {0} runs
+Simulation.BatchMismatch	반복 검증에서 불일치가 발견되었습니다.	Repeat validation found a mismatch.
+Simulation.BatchNoResult	아직 실행 결과가 없습니다.	No batch result yet.
+Simulation.BatchResultPassed	{0}회 동일 · 증거 {1}	{0} identical runs · evidence {1}
+Simulation.BatchResultMismatch	실행 {0} · {1} · {2} · Tick {3}	Run {0} · {1} · {2} · Tick {3}
+Simulation.BatchBaselineNone	승인된 기준선 없음	No accepted baseline
+Simulation.BatchBaselineAccepted	승인 기준선: {0}	Accepted baseline: {0}
+Simulation.BatchPauseRejected	반복 검증 전 메인 런타임을 일시정지하지 못했습니다.	The main runtime could not be paused before repeat validation.
+Simulation.BatchStarted	반복 검증을 시작했습니다.	Repeat validation started.
+Simulation.BatchPassedStatus	반복 검증이 동일한 결과로 완료되었습니다.	Repeat validation completed with identical results.
+Simulation.BatchMismatchStatus	반복 검증에서 첫 불일치가 발견되었습니다.	Repeat validation found its first mismatch.
+Simulation.BatchBaselineAcceptedStatus	현재 결과를 승인 기준선으로 설정했습니다.	The current result is now the accepted baseline.
+Simulation.BatchMismatchNavigationStatus	{0} 장비의 Tick {1} 불일치를 선택했습니다.	Selected the mismatch on {0} at tick {1}.
+Runtime.Category.Batch	반복 검증	Batch
+Simulation.BatchArtifactNone	저장된 결과 없음	No retained result
+Simulation.BatchArtifactMemoryOnly	프로젝트를 저장하면 결과가 함께 보존됩니다.	Save the project to retain this result.
+Simulation.BatchArtifactSaved	결과가 프로젝트와 함께 저장되었습니다.	Result saved with the project.
+Simulation.BatchArtifactRestored	저장된 결과와 기준선을 복원했습니다.	Saved result and baseline restored.
+Simulation.BatchArtifactStale	저장된 증거가 현재 프로젝트 또는 시나리오와 일치하지 않습니다.	Saved evidence does not match the current project or scenario.
+Simulation.BatchArtifactSaveFailed	결과를 저장하지 못해 메모리에만 유지합니다.	Result could not be saved and remains in memory.
+Simulation.BatchBaselineClearedStatus	승인 기준선을 해제했습니다.	Accepted baseline cleared.
+Equipment.MachineFrame	머신 프레임	Machine frame
+Equipment.LinearStageMotor	리니어 스테이지 / 모터	Linear stage / motor
+Equipment.RotaryStageMotor	회전 스테이지 / 모터	Rotary stage / motor
+Equipment.DigitalSensor	디지털 센서	Digital sensor
+Equipment.PneumaticCylinder	공압 실린더	Pneumatic cylinder
+Equipment.ConveyorMotor	컨베이어 / 모터	Conveyor / motor
+Equipment.Workpiece	워크피스	Workpiece
+Equipment.Fixed	고정	FIXED
+Equipment.NoRuntimeData	런타임 데이터 없음	NO RUNTIME DATA
+Equipment.Unavailable	사용 불가	UNAVAILABLE
+Equipment.Normal	정상	NORMAL
+Equipment.Fault	고장	FAULT
+Equipment.On	ON · 1	ON · 1
+Equipment.Off	OFF · 0	OFF · 0
+Equipment.Present	감지됨	Present
+Equipment.Clear	해제	Clear
+Equipment.None	없음	None
+Equipment.Position	위치	Position
+Equipment.Velocity	속도	Velocity
+Equipment.Detection	감지	Detection
+Equipment.PendingDelay	대기 지연	Pending delay
+Equipment.Travel	이동	Travel
+Equipment.Binding	바인딩	Binding
+Equipment.Speed	속도	Speed
+Equipment.Direction	방향	Direction
+Equipment.Type	유형	Type
+Equipment.Size	크기	Size
+Equipment.Ticks	틱	ticks
+Equipment.PositionFormat	X {0:F1} · Y {1:F1} mm	X {0:F1} · Y {1:F1} mm
+Equipment.Direction.Forward	정방향	Forward
+Equipment.Direction.Reverse	역방향	Reverse
+Equipment.Pending	대기	PENDING
+Equipment.Passed	통과	PASS
+Equipment.Failed	실패	FAIL
+Equipment.Skipped	건너뜀	SKIP
+Equipment.State.Idle	대기	IDLE
+Equipment.State.Moving	이동 중	MOVING
+Equipment.State.Stopped	정지	STOPPED
+Equipment.State.Error	오류	ERROR
+Equipment.State.Limited	제한	LIMITED
+Equipment.State.Ready	준비	READY
+Equipment.State.Completed	완료	COMPLETED
+Equipment.State.Faulted	고장	FAULTED
+Equipment.State.Exposing	노출 중	EXPOSING
+Equipment.State.Transferring	전송 중	TRANSFERRING
+Equipment.State.FrameReady	프레임 준비	FRAME READY
+Equipment.State.Retracted	후퇴	RETRACTED
+Equipment.State.Extending	전진 중	EXTENDING
+Equipment.State.Extended	전진 완료	EXTENDED
+Equipment.State.Retracting	후퇴 중	RETRACTING
+Equipment.State.Running	운전 중	RUNNING
+Equipment.State.Warning	경고	WARNING
+Equipment.State.Alarm	알람	ALARM
+Equipment.State.Recovery	복구	RECOVERY
+Equipment.State.Fault	고장	FAULT
+Equipment.State.Offline	오프라인	Offline
+Equipment.Healthy	정상	Healthy
+Equipment.HealthWarning	주의	Warning
+Equipment.Critical	위험	Critical
+Equipment.FaultStuckInput	입력 고정	STUCK INPUT
+Equipment.FaultTravelBlocked	이동 차단	TRAVEL BLOCKED
+Equipment.FaultAxisMotionBlocked	축 이동 차단	AXIS MOTION BLOCKED
+Equipment.FaultAxisFollowingError	축 추종 오차	AXIS FOLLOWING ERROR
+Properties.Message	메시지	Message
+Properties.EmptyMessage	항목을 선택하면 속성을 확인할 수 있습니다.	Select an item to view properties.
+Properties.Type	형식	Type
+Properties.Metadata	메타데이터	Metadata
+Properties.General	일반	General
+Properties.Transform	변환	Transform
+Properties.Bounds	경계	Bounds
+Properties.Simulation	시뮬레이션	Simulation
+Properties.Properties	속성	Properties
+Properties.Camera	카메라	Camera
+Properties.Sensor	센서	Sensor
+Properties.Cylinder	실린더	Cylinder
+Properties.Conveyor	컨베이어	Conveyor
+Properties.Workpiece	워크피스	Workpiece
+Properties.Id	ID	Id
+Properties.Name	이름	Name
+Properties.X	X	X
+Properties.Y	Y	Y
+Properties.Rotation	회전	Rotation
+Properties.Width	너비	Width
+Properties.Height	높이	Height
+Properties.Behavior	동작 바인딩	Behavior
+Properties.ExposureDelay	노출 지연	Exposure delay
+Properties.TransferDelay	전송 지연	Transfer delay
+Properties.PlaceholderResult	임시 결과	Placeholder result
+Properties.OutputChannel	출력 채널	Output channel
+Properties.TargetComponent	대상 컴포넌트	Target component
+Properties.OnDelay	ON 지연	On delay
+Properties.OffDelay	OFF 지연	Off delay
+Properties.ExtendCommand	전진 명령	Extend command
+Properties.ExtendedSensor	전진 센서	Extended sensor
+Properties.RetractedSensor	후퇴 센서	Retracted sensor
+Properties.ExtendDuration	전진 시간	Extend duration
+Properties.RetractDuration	후퇴 시간	Retract duration
+Properties.Stroke	스트로크	Stroke
+Properties.ExtendedSensorDelay	전진 센서 지연	Extended sensor delay
+Properties.RetractedSensorDelay	후퇴 센서 지연	Retracted sensor delay
+Properties.RunCommand	운전 명령	Run command
+Properties.ReverseCommand	역방향 명령	Reverse command
+Properties.Speed	속도	Speed
+Properties.InspectionState	검사 상태	Inspection state
+Properties.ValueTrue	참	True
+Properties.ValueFalse	거짓	False
+Properties.ValueNull	널	(null)
+Properties.ValueNone	없음	None
+Properties.ValueNormal	정상	Normal
+Properties.ValueFault	고장	Fault
+Properties.ValueReady	준비	Ready
+Properties.ValueRunning	실행 중	Running
+Properties.ValueStopped	정지	Stopped
+Properties.ValueIdle	대기	Idle
+Properties.ValueMoving	이동 중	Moving
+Properties.ValueExtended	전진 완료	Extended
+Properties.ValueRetracted	후퇴	Retracted
+Properties.ValueExtending	전진 중	Extending
+Properties.ValueRetracting	후퇴 중	Retracting
+Properties.ValuePass	통과	Pass
+Properties.ValueFail	실패	Fail
+Properties.ValuePending	대기	Pending
+Properties.Value.Static	정적	Static
+Properties.Value.MachineFrame	머신 프레임	Machine frame
+Properties.Value.LinearStage	리니어 스테이지	Linear stage
+Properties.Value.RotaryStage	회전 스테이지	Rotary stage
+Properties.Value.DigitalSensor	디지털 센서	Digital sensor
+Properties.Value.PneumaticCylinder	공압 실린더	Pneumatic cylinder
+Properties.Value.Conveyor	컨베이어	Conveyor
+Properties.Value.Workpiece	워크피스	Workpiece
+Properties.Value.Passed	통과	Passed
+Properties.Value.Failed	실패	Failed
+Properties.Value.Skipped	건너뜀	Skipped
+Properties.Model.Project	머신 프로젝트	Machine project
+Properties.Model.Layout	머신 레이아웃	Machine layout
+Properties.Model.Axis	가상 축	Virtual axis
+Properties.Model.Device	가상 장비	Virtual device
+Properties.Model.Channel	I/O 채널	I/O channel
+Properties.Model.Sequence	시퀀스	Sequence
+Properties.Model.SequenceStep	시퀀스 단계	Sequence step
+Properties.Model.Item	프로젝트 항목	Project item
+Properties.ValueConfigured	구성됨	Configured
+Properties.Position	위치	Position
+Properties.MountPosition	설치 위치	Mount position
+Properties.Steps	단계	Steps
+Properties.Layouts	레이아웃	Layouts
+Properties.Axes	축	Axes
+Properties.Devices	장비	Devices
+Properties.Channels	채널	Channels
+Properties.Sequences	시퀀스	Sequences
+Runtime.Info	정보	INFO
+Runtime.Warning	경고	WARN
+Runtime.Alarm	알람	ALARM
+Runtime.Recovery	복구	RECOVERY
+Runtime.Category.System	시스템	System
+Runtime.Category.Runtime	런타임	Runtime
+Runtime.Category.Command	명령	Command
+Runtime.Category.Simulation	시뮬레이션	Simulation
+Runtime.Category.Fault	고장	Fault
+Runtime.Category.Layout	레이아웃	Layout
+Runtime.Category.Project	프로젝트	Project
+Runtime.Category.Sequence	시퀀스	Sequence
+Runtime.Category.Error	오류	Error
+Runtime.Category.AutomaticRun	자동 실행	AutomaticRun
+Runtime.Category.I/O	I/O	I/O
+Runtime.Category.Conveyor	컨베이어	Conveyor
+Runtime.WorkspaceInitialized	시뮬레이션 작업공간이 초기화되었습니다. 시작을 눌러 가상 장비를 실행하세요.	Simulation workspace initialized. Press Start Simulation to run virtual equipment.
+Runtime.MachineRuntimeReady	결정론적 머신 런타임 준비 완료 · 고정 스텝 5 ms	Deterministic machine runtime ready · fixed step 5 ms
+Runtime.ConfiguredPrefix	구성됨	Configured
+Runtime.AxisCount	축	axis/axes
+Runtime.SignalCount	신호	signal(s)
+Runtime.CameraCount	카메라	camera(s)
+Runtime.SequenceCount	시퀀스	sequence(s)
+Runtime.LayoutCount	레이아웃 컴포넌트	layout component(s)
+Runtime.And	및	and
+Runtime.ConfigurationApplied	런타임 구성을 원자적으로 적용했습니다.	Runtime configuration applied atomically.
+Runtime.SimulationOnRequested	시뮬레이션 ON 요청 · {0}	Simulation ON requested · {0}
+Runtime.AutomaticSequenceStarted	자동 시퀀스 '{0}' 시작	Automatic sequence '{0}' started.
+Runtime.SequenceEntered	{0}이(가) {1}에 진입했습니다.	{0} entered {1}.
+Runtime.CycleActiveOn	do.cycle-active = ON	do.cycle-active = ON.
+Runtime.SimulationStarted	시뮬레이션 시작	Simulation started.
+Runtime.SimulationResumed	시뮬레이션 재개	Simulation resumed.
+Runtime.SimulationPaused	시뮬레이션 일시정지	Simulation paused.
+Runtime.SimulationStopped	시뮬레이션 정지	Simulation stopped.
+Runtime.EmergencyStop	비상 정지 활성화. 모든 장비를 오프라인으로 전환했습니다.	Emergency stop activated. All equipment forced offline.
+Runtime.SimulationReset	시뮬레이션을 대기 상태로 초기화했습니다.	Simulation reset to idle state.
+Runtime.AlarmsAcknowledged	모든 장비 알람을 확인 처리했습니다.	All equipment alarms were acknowledged.
+Runtime.ScenarioPathEmpty	시나리오 JSON 경로가 비어 있습니다. 파일 경로를 입력하세요.	Scenario JSON path is empty. Please enter a file path.
+Runtime.ScenarioProfileNotFound	시나리오 프로필을 찾을 수 없습니다: {0}	Scenario profile not found: {0}
+Runtime.ScenarioParseFailed	시나리오 프로필을 해석할 수 없습니다: {0}	Could not parse scenario profile from: {0}
+Runtime.ScenarioLoaded	시나리오 프로필을 불러왔습니다: {0}	Loaded scenario profile: {0}
+Runtime.ScenarioReset	시나리오를 정상, 시드 1001, 200사이클로 초기화했습니다.	Scenario reset to Normal with seed 1001 and 200 cycles.
+Runtime.ScenarioApplied	시나리오 적용: {0}	Scenario applied: {0}
+Runtime.EquipmentWarning	{0}: 경고 - {1}	{0}: warning - {1}
+Runtime.EquipmentAlarm	{0}: 알람 - {1}	{0}: alarm - {1}
+Runtime.AlarmMessage.High_temperature	고온	High temperature
+Runtime.AlarmMessage.Pressure_spike	압력 급등	Pressure spike
+Runtime.AlarmMessage.Communication_loss	통신 끊김	Communication loss
+Runtime.AlarmMessage.Servo_jitter	서보 진동	Servo jitter
+Runtime.StartupComplete	{0}: 시작 완료	{0}: startup complete
+Runtime.WarningHighTemperature	{0}: 경고 - 고온 상태 지속	{0}: warning - high temperature holdover
+Runtime.WarningCleared	{0}: 경고 해제, 정상 복구	{0}: warning cleared, recovered to normal
+Runtime.WarningEscalated	{0}: 경고가 알람으로 상승	{0}: warning escalated to alarm
+Runtime.AutoRecoveryStarted	{0}: 자동 복구 시퀀스 시작	{0}: auto recovery sequence started
+Runtime.RecoveredWaiting	{0}: 복구 완료, 재시작 대기	{0}: recovered, waiting for restart
+Fault.SelectTargetHint	런타임 대상을 선택해 고장을 주입하세요.	Select a runtime target to inject a fault.
+Fault.NoMatchingTarget	현재 스냅샷에 이 고장 유형과 일치하는 런타임 대상이 없습니다.	No matching runtime target for this fault type in the current snapshot.
+Fault.NoActiveFaults	활성 고장 없음	No active faults
+Fault.OneActiveFault	활성 고장 1개	1 active fault
+Fault.ActiveFaults	활성 고장 {0}개	{0} active faults
+Fault.StuckDigitalInput	고정 디지털 입력	Stuck DI
+Fault.CylinderTravelBlocked	실린더 이동 차단	Blocked cylinder
+Fault.AxisMotionBlocked	축 이동 차단	Blocked axis
+Fault.AxisFollowingError	축 추종 오차	Axis following error
+Fault.Rejected	거부됨	Rejected
+Fault.Kind.StuckDigitalInput	고정 디지털 입력	Stuck digital input
+Fault.Kind.CylinderTravelBlocked	실린더 이동 차단	Blocked cylinder travel
+Fault.Kind.AxisMotionBlocked	축 이동 차단	Blocked axis motion
+Fault.Kind.AxisFollowingError	축 추종 오차	Axis following error
+Fault.ForceOn	ON 강제	Force ON
+Fault.ForceOff	OFF 강제	Force OFF
+Fault.ActiveHint	활성 고장을 선택해 해제하거나 전체 해제하세요.	Select an active fault to clear it, or clear all.
+Fault.Injected	{0} 고장을 {1}에 주입했습니다.	Injected {0} on {1}.
+Fault.Cleared	{0} 고장을 {1}에서 해제했습니다.	Cleared {0} on {1}.
+Fault.ClearPartial	활성 고장 {0}/{1}개를 해제했습니다. {2}	Cleared {0}/{1} active fault(s). {2}
+Fault.RuntimeCleared	런타임에서 모든 활성 고장이 해제되었습니다.	The runtime cleared all active faults.
+Fault.ActionInject	주입	Inject
+Fault.ActionClear	해제	Clear
+Fault.CommandAccepted	{0} 명령 승인 · {1}	{0} accepted · {1}
+Fault.CommandRejected	{0} 명령 거부 · {1}: {2}	{0} rejected · {1}: {2}
+Fault.StatusRejected	고장 {0} 명령이 거부되었습니다.	Fault {0} was rejected.
+Fault.InjectAcceptedStatus	시뮬레이션 고장을 주입했습니다.	Simulation fault injected.
+Fault.ClearAcceptedStatus	시뮬레이션 고장을 해제했습니다.	Simulation fault cleared.
+Axis.Commissioning	축 커미셔닝	Axis commissioning
+Axis.AuthoredDriveTuning	작성된 축 설정	Authored axis setup
+Axis.TravelSetup	이동 범위	Travel setup
+Axis.DriveTuning	드라이브 튜닝	Drive tuning
+Axis.MultiAxisRecipe	다축 커미셔닝 레시피	Multi-axis commissioning recipe
+Axis.RecipeDesignHint	프로젝트 축의 실행 순서와 절대 목표 위치를 저장합니다. 선택만으로 실행되지는 않습니다.	Store the project-axis execution order and absolute targets. Selection never starts execution.
+Axis.CreateRecipe	레시피 만들기	Create recipe
+Axis.DeleteRecipe	레시피 삭제	Delete recipe
+Axis.RecipeName	레시피 이름	Recipe name
+Axis.RecipeTargets	순서 지정 목표	Ordered targets
+Axis.AddRecipeTarget	목표 추가	Add target
+Axis.MoveTargetUp	목표 위로 이동	Move target up
+Axis.MoveTargetDown	목표 아래로 이동	Move target down
+Axis.RemoveTarget	목표 제거	Remove target
+Axis.RecipeRunHint	저장된 순서로 기존 원자적 다축 명령을 실행합니다. Pause와 Step은 모든 축에 같은 고정 Tick을 적용합니다.	Run the existing atomic multi-axis command in the saved order. Pause and Step apply the same fixed Tick to every axis.
+Axis.RunRecipe	레시피 실행	Run recipe
+Axis.StopRecipe	레시피 정지	Stop recipe
+Axis.RecipeNotConfigured	구성되지 않음	Not configured
+Axis.RecipeNotConfiguredHint	두 개 이상의 축이 있는 프로젝트에서 레시피를 만들 수 있습니다.	Create a recipe in a project with at least two axes.
+Axis.RecipeNameRequired	레시피 이름을 입력하세요.	Enter a recipe name.
+Axis.RecipeTwoAxesRequired	다축 레시피에는 서로 다른 축이 두 개 이상 필요합니다.	A multi-axis recipe requires at least two distinct axes.
+Axis.RecipeDuplicateAxis	같은 축을 두 번 사용할 수 없습니다.	The same axis cannot be used twice.
+Axis.RecipeTargetInvalid	축과 소프트 한계 안의 유효한 목표 위치를 확인하세요.	Check each axis and use a finite target within its soft limits.
+Axis.RecipeValid	저장 가능한 다축 레시피입니다.	The multi-axis recipe is valid and ready to save.
+Axis.RecipeInvalid	레시피가 유효하지 않음	Recipe invalid
+Axis.RecipeMoving	다축 이동 중	Multi-axis move running
+Axis.RecipeAtTarget	모든 축이 목표에 도달함	All axes at target
+Axis.RecipeReady	실행 준비	Ready to run
+Axis.ActionRunRecipe	다축 레시피 실행	Run multi-axis recipe
+Axis.ActionStopRecipe	다축 레시피 정지	Stop multi-axis recipe
+Axis.RecipeValidationRepetitions	검증 반복 횟수	Validation repetitions
+Axis.RecipeRepetitionsInvalid	검증 반복 횟수는 2~100 사이여야 합니다.	Validation repetitions must be between 2 and 100.
+Axis.RecipeRepeatValidation	반복 실행 검증	Repeat execution validation
+Axis.RecipeRepeatValidationHint	매 실행을 Reset 상태에서 시작하고 스냅샷과 이벤트 증거를 비교합니다.	Start every run from Reset and compare snapshot and event evidence.
+Axis.RunRecipeValidation	반복 검증	Validate repeats
+Axis.RecipeValidationReady	반복 검증 대기	Repeat validation ready
+Axis.RecipeValidationRunning	반복 검증 실행 중: {0} / {1}	Repeat validation running: {0} / {1}
+Axis.RecipeValidationPassed	반복 검증 통과: {0}회 동일	Repeat validation passed: {0} identical runs
+Axis.RecipeValidationMismatch	반복 검증 불일치	Repeat validation mismatch
+Axis.RecipeValidationNoResult	아직 실행 결과가 없습니다.	No validation result yet.
+Axis.RecipeValidationEvidence	증거 SHA-256 {0}	Evidence SHA-256 {0}
+Axis.RecipeValidationMismatchDetail	실행 {0} · {1} · Tick {2}	Run {0} · {1} · Tick {2}
+Axis.RecipeEvidenceMemoryOnly	프로젝트를 저장하면 결과 기록도 함께 연결됩니다.	Save the project to link this result record.
+Axis.RecipeEvidenceSaved	프로젝트 옆에 결과 기록을 저장했습니다.	Result record saved beside the project.
+Axis.RecipeEvidenceRestored	저장된 결과 기록을 복원했습니다. 자동 실행하지 않았습니다.	Saved result record restored without execution.
+Axis.RecipeEvidenceStale	프로젝트 또는 레시피가 변경되어 이전 결과를 사용하지 않습니다.	Previous evidence is stale because the project or recipe changed.
+Axis.RecipeEvidenceSaveFailed	결과 기록을 저장하지 못했습니다.	Result record could not be saved.
+Axis.RecipeEvidenceNone	저장된 결과 기록 없음	No saved result record
+Axis.RecipeValidationStarted	다축 레시피 반복 검증을 시작했습니다.	Multi-axis recipe repeat validation started.
+Axis.RecipeValidationPassedStatus	모든 레시피 실행 결과가 동일합니다.	All recipe runs produced identical evidence.
+Axis.RecipeValidationMismatchStatus	레시피 반복 실행에서 불일치가 발견되었습니다.	Recipe repeat execution found a mismatch.
+Axis.RecipeValidationRejected	다축 레시피 반복 검증을 시작할 수 없습니다.	Multi-axis recipe repeat validation could not start.
+Axis.RecipeHistory	검증 결과 이력	Validation result history
+Axis.RecipeHistoryEmpty	저장된 검증 결과 이력이 없습니다.	No saved validation result history.
+Axis.RecipeHistorySummary	최근 결과 {0}/{1}개	Recent results {0}/{1}
+Axis.RecipeAcceptBaseline	선택 결과 승인	Accept selected
+Axis.RecipeClearBaseline	기준선 해제	Clear baseline
+Axis.RecipeGoToMismatch	불일치 축으로 이동	Go to mismatch axis
+Axis.RecipeBaselineNone	승인된 기준선이 없습니다.	No accepted baseline.
+Axis.RecipeBaselineAccepted	승인 기준선 SHA-256 {0}	Accepted baseline SHA-256 {0}
+Axis.RecipeBaselineMatch	기준선과 동일 · SHA-256 {0}	Matches baseline · SHA-256 {0}
+Axis.RecipeBaselineMismatch	승인 기준선과 일치하지 않습니다.	Does not match the accepted baseline.
+Axis.RecipeBaselineMismatchDetail	{0} · {1} · Tick {2}에서 첫 불일치	First mismatch at {0} · {1} · Tick {2}
+Axis.RecipeBaselineAcceptedStatus	선택한 검증 결과를 커미셔닝 기준선으로 승인했습니다.	Selected validation result accepted as the commissioning baseline.
+Axis.RecipeBaselineClearedStatus	커미셔닝 기준선을 해제했습니다.	Commissioning baseline cleared.
+Axis.RecipeMismatchNavigationStatus	{0} 축의 첫 불일치 Tick {1}을 선택했습니다.	Selected axis {0} at first mismatch Tick {1}.
+Axis.HomePosition	원점 위치	Home position
+Axis.SoftLimits	소프트 한계	Soft limits
+Axis.SoftLimitMin	최소 소프트 한계	Minimum soft limit
+Axis.SoftLimitMax	최대 소프트 한계	Maximum soft limit
+Axis.MaxVelocity	최대 속도	Maximum velocity
+Axis.MaxAcceleration	최대 가속도	Maximum acceleration
+Axis.MaxDeceleration	최대 감속도	Maximum deceleration
+Axis.FollowingErrorLimit	추종 오차 한계	Following error limit
+Axis.ResetDriveDefaults	드라이브 기본값 복원	Restore drive defaults
+Axis.ResetDriveDefaultsTooltip	속도, 가속도, 감속도와 추종 오차 한계를 기본값으로 복원합니다.	Restore velocity, acceleration, deceleration, and following-error limit defaults.
+Axis.TuningValid	작성된 축 설정이 유효합니다.	Authored axis setup is valid.
+Axis.TuningTravelInvalid	소프트 한계와 원점 위치의 범위를 확인하세요.	Check the soft-limit and home-position range.
+Axis.TuningDriveInvalid	속도, 가속도, 감속도와 추종 오차 한계는 0보다 큰 유한값이어야 합니다.	Velocity, acceleration, deceleration, and following-error limit must be finite and greater than zero.
+Axis.DriveTuningFormat	V {0:F3} {3}/s · A/D {1:F3}/{2:F3} {3}/s²	V {0:F3} {3}/s · A/D {1:F3}/{2:F3} {3}/s²
+Axis.TargetPosition	목표 위치	Target position
+Axis.Move	이동	Move
+Axis.MoveTooltip	입력한 절대 위치로 선택 축을 이동합니다.	Move the selected axis to the entered absolute position.
+Axis.TargetInvalid	숫자로 목표 위치를 입력하세요.	Enter a numeric target position.
+Axis.TargetOutOfRange	목표 위치는 {0:F3} … {1:F3} {2} 범위여야 합니다.	Target position must be within {0:F3} … {1:F3} {2}.
+Axis.RelativeDistance	상대 거리	Relative distance
+Axis.MoveRelative	상대 이동	Move relative
+Axis.MoveRelativeTooltip	현재 위치에서 입력한 부호 거리만큼 선택 축을 이동합니다.	Move the selected axis by the signed distance from its current position.
+Axis.RelativeInvalid	0이 아닌 숫자로 상대 거리를 입력하세요.	Enter a non-zero numeric relative distance.
+Axis.CommandVelocity	명령 속도	Command velocity
+Axis.MoveVelocity	속도 운전	Run velocity
+Axis.MoveVelocityTooltip	부호로 방향을 정하고 입력한 속도로 선택 축을 소프트 리밋까지 운전합니다.	Run the selected axis toward a soft limit at the signed velocity.
+Axis.VelocityInvalid	0이 아닌 숫자로 명령 속도를 입력하세요.	Enter a non-zero numeric command velocity.
+Axis.VelocityOutOfRange	명령 속도 크기는 {0:F3} {1} 이하여야 합니다.	Command velocity magnitude must be no greater than {0:F3} {1}.
+Axis.StartManualControl	수동 운전 시작	Start manual control
+Axis.StartManualControlTooltip	자동 또는 시퀀스 운전과 분리된 수동 축 제어를 시작합니다.	Start manual axis control separately from automatic or sequence operation.
+Axis.JogNegative	조그 −	Jog −
+Axis.JogPositive	조그 +	Jog +
+Axis.Home	원점	Home
+Axis.Stop	정지	Stop
+Axis.HoldJogNegativeTooltip	누르고 있는 동안 음의 소프트 한계 방향으로 이동합니다.	Move toward the negative soft limit while held.
+Axis.HoldJogPositiveTooltip	누르고 있는 동안 양의 소프트 한계 방향으로 이동합니다.	Move toward the positive soft limit while held.
+Axis.HomeTooltip	작성된 원점 위치로 이동합니다.	Move to the authored home position.
+Axis.StopTooltip	현재 축 이동을 정지합니다.	Stop the current axis motion.
+Axis.NoAxisHint	커미셔닝할 축이 없습니다.	No axis is available for commissioning.
+Axis.StartManualHint	수동 운전을 시작한 뒤 원점 또는 조그 명령을 사용하세요.	Start manual control, then use Home or Jog.
+Axis.MoveStartManualHint	수동 운전을 시작한 뒤 목표 위치 이동, 원점 또는 조그 명령을 사용하세요.	Start manual control, then use Move, Home, or Jog.
+Axis.RelativeMoveStartManualHint	수동 운전을 시작한 뒤 절대·상대 이동, 원점 또는 조그 명령을 사용하세요.	Start manual control, then use absolute or relative Move, Home, or Jog.
+Axis.ManualMoveHint	절대·상대 이동을 실행하거나 조그 버튼을 누르는 동안 이동하세요.	Use absolute or relative Move, or hold a Jog button to move.
+Axis.VelocityMoveStartManualHint	수동 운전을 시작한 뒤 절대·상대·속도 운전, 원점 또는 조그 명령을 사용하세요.	Start manual control, then use absolute, relative, or velocity motion, Home, or Jog.
+Axis.ManualVelocityMoveHint	절대·상대·속도 운전을 실행하거나 조그 버튼을 누르는 동안 이동하세요.	Use absolute, relative, or velocity motion, or hold a Jog button to move.
+Axis.HoldJogHint	조그 버튼은 누르는 동안만 이동하며 놓으면 정지합니다.	A Jog button moves only while held and stops when released.
+Axis.ResetForManualHint	자동 또는 시퀀스 운전 중입니다. 초기화 후 수동 운전을 시작하세요.	Automatic or sequence operation is active. Reset before starting manual control.
+Axis.ActionStartManual	수동 운전 시작	Start manual control
+Axis.ActionMove	목표 위치 이동	Move to target
+Axis.ActionMoveRelative	상대 거리 이동	Move by distance
+Axis.ActionMoveVelocity	속도 운전	Run by velocity
+Axis.ActionHome	원점 이동	Home
+Axis.ActionJogNegative	음의 방향 조그	Jog negative
+Axis.ActionJogPositive	양의 방향 조그	Jog positive
+Axis.ActionStop	축 정지	Stop axis
+Axis.CommandAccepted	{0} 명령 승인 · {1}	{0} accepted · {1}
+Axis.CommandRejected	{0} 명령 거부 · {1}: {2}	{0} rejected · {1}: {2}
+Axis.StatusAccepted	{0} 명령이 승인되었습니다.	{0} was accepted.
+Axis.StatusRejected	{0} 명령이 거부되었습니다.	{0} was rejected.
+Axis.MotionInterlock	모션 인터록	Motion interlock
+Axis.FollowingError	추종 오차 / 한계	Following error / limit
+Axis.DriveAlarm	드라이브 알람	Drive alarm
+Axis.DriveAlarmReady	정상	Ready
+Axis.DriveAlarmActive	활성	Active
+Axis.InterlockReady	정상	Ready
+Axis.InterlockBlocked	이동 차단	Motion blocked
+Axis.ClearInterlockHint	축 이동 차단 고장을 해제하거나 초기화한 뒤 수동 운전을 시작하세요.	Clear the blocked-axis fault or Reset before starting manual control.
+Axis.ClearDriveAlarmHint	Fault Manager에서 축 추종 오차를 해제하거나 초기화한 뒤 수동 운전을 시작하세요.	Clear the axis following-error fault in Fault Manager or Reset before starting manual control.
+Cylinder.Commissioning	실린더 커미셔닝	Cylinder commissioning
+Cylinder.TravelInterlock	이동 인터록	Travel interlock
+Cylinder.InterlockReady	정상	Ready
+Cylinder.InterlockBlocked	이동 차단	Travel blocked
+Cylinder.StartManualControl	수동 운전 시작	Start manual control
+Cylinder.StartManualControlTooltip	자동 또는 시퀀스 운전과 분리된 수동 실린더 제어를 시작합니다.	Start manual cylinder control separately from automatic or sequence operation.
+Cylinder.Retract	후퇴	Retract
+Cylinder.Extend	전진	Extend
+Cylinder.RetractTooltip	선택한 실린더의 작성된 출력으로 후퇴를 명령합니다.	Command the selected cylinder to retract through its authored output.
+Cylinder.ExtendTooltip	선택한 실린더의 작성된 출력으로 전진을 명령합니다.	Command the selected cylinder to extend through its authored output.
+Cylinder.NoCylinderHint	커미셔닝할 실린더를 선택하세요.	Select a cylinder to commission.
+Cylinder.StartManualHint	수동 운전을 시작한 뒤 전진 또는 후퇴 명령을 사용하세요.	Start manual control, then use Extend or Retract.
+Cylinder.ManualRunningHint	전진·후퇴 동작은 엔진의 고정 Tick과 피드백으로 진행됩니다.	Extend and Retract advance through fixed engine ticks and feedback.
+Cylinder.ManualPausedHint	전진 또는 후퇴를 선택한 뒤 단계 실행으로 정확히 한 Tick씩 진행하세요.	Choose Extend or Retract, then use Step to advance exactly one tick.
+Cylinder.ResetForManualHint	자동 또는 시퀀스 운전 중입니다. 초기화 후 수동 운전을 시작하세요.	Automatic or sequence operation is active. Reset before starting manual control.
+Cylinder.ClearInterlockHint	이동 차단 고장을 해제한 뒤 전진 또는 후퇴를 다시 명령하세요.	Clear the travel fault, then explicitly command Extend or Retract again.
+Cylinder.ActionStartManual	수동 운전 시작	Start manual control
+Cylinder.ActionRetract	실린더 후퇴	Retract cylinder
+Cylinder.ActionExtend	실린더 전진	Extend cylinder
+Cylinder.CommandAccepted	{0} 명령 승인 · {1}	{0} accepted · {1}
+Cylinder.CommandRejected	{0} 명령 거부 · {1}: {2}	{0} rejected · {1}: {2}
+Cylinder.StatusAccepted	{0} 명령이 승인되었습니다.	{0} was accepted.
+Cylinder.StatusRejected	{0} 명령이 거부되었습니다.	{0} was rejected.
+Conveyor.Commissioning	컨베이어 커미셔닝	Conveyor commissioning
+Conveyor.StartManualControl	수동 운전 시작	Start manual control
+Conveyor.StartManualControlTooltip	자동 또는 시퀀스 운전과 분리된 수동 컨베이어 제어를 시작합니다.	Start manual conveyor control separately from automatic or sequence operation.
+Conveyor.Forward	정방향	Forward
+Conveyor.Stop	정지	Stop
+Conveyor.Reverse	역방향	Reverse
+Conveyor.ForwardTooltip	선택한 컨베이어를 작성된 속도로 정방향 운전합니다.	Run the selected conveyor forward at its authored speed.
+Conveyor.StopTooltip	선택한 컨베이어를 정지합니다.	Stop the selected conveyor.
+Conveyor.ReverseTooltip	선택한 컨베이어를 작성된 속도로 역방향 운전합니다.	Run the selected conveyor in reverse at its authored speed.
+Conveyor.NoConveyorHint	커미셔닝할 컨베이어를 선택하세요.	Select a conveyor to commission.
+Conveyor.StartManualHint	수동 운전을 시작한 뒤 정방향 또는 역방향을 선택하세요.	Start manual control, then choose Forward or Reverse.
+Conveyor.ManualRunningHint	정방향·정지·역방향 명령은 엔진의 고정 Tick에서 반영됩니다.	Forward, Stop, and Reverse are applied on fixed engine ticks.
+Conveyor.ManualPausedHint	방향 또는 정지를 선택한 뒤 단계 실행으로 정확히 한 Tick씩 확인하세요.	Choose a direction or Stop, then use Step to verify exactly one tick.
+Conveyor.ResetForManualHint	자동 또는 시퀀스 운전 중입니다. 초기화 후 수동 운전을 시작하세요.	Automatic or sequence operation is active. Reset before starting manual control.
+Conveyor.ActionStartManual	수동 운전 시작	Start manual control
+Conveyor.ActionRunForward	컨베이어 정방향	Run conveyor forward
+Conveyor.ActionRunReverse	컨베이어 역방향	Run conveyor in reverse
+Conveyor.ActionStop	컨베이어 정지	Stop conveyor
+Conveyor.CommandAccepted	{0} 명령 승인 · {1}	{0} accepted · {1}
+Conveyor.CommandRejected	{0} 명령 거부 · {1}: {2}	{0} rejected · {1}: {2}
+Conveyor.StatusAccepted	{0} 명령이 승인되었습니다.	{0} was accepted.
+Conveyor.StatusRejected	{0} 명령이 거부되었습니다.	{0} was rejected.
+Sensor.Commissioning	센서 커미셔닝	Sensor commissioning
+Sensor.ForceState	입력 소유 상태	Input ownership
+Sensor.ForceReleased	자동 감지	Automatic detection
+Sensor.ForcedOn	수동 Force ON	Manual Force ON
+Sensor.ForcedOff	수동 Force OFF	Manual Force OFF
+Sensor.FaultOverride	고장 Override	Fault override
+Sensor.StartManualControl	수동 운전 시작	Start manual control
+Sensor.StartManualControlTooltip	자동 또는 시퀀스 운전과 분리된 수동 센서 입력 제어를 시작합니다.	Start manual sensor input control separately from automatic or sequence operation.
+Sensor.ForceOn	Force ON	Force ON
+Sensor.ForceOff	Force OFF	Force OFF
+Sensor.ClearForce	Force 해제	Clear force
+Sensor.ForceOnTooltip	선택 센서의 유효 입력을 ON으로 고정하고 실제 감지값은 계속 보존합니다.	Force the selected sensor input ON while retaining its current detected value.
+Sensor.ForceOffTooltip	선택 센서의 유효 입력을 OFF로 고정하고 실제 감지값은 계속 보존합니다.	Force the selected sensor input OFF while retaining its current detected value.
+Sensor.ClearForceTooltip	수동 Force를 해제하고 최신 실제 감지값으로 복귀합니다.	Clear the manual force and return to the latest detected value.
+Sensor.NoSensorHint	커미셔닝할 디지털 센서를 선택하세요.	Select a digital sensor to commission.
+Sensor.StartManualHint	수동 운전을 시작한 뒤 Force ON 또는 Force OFF를 선택하세요.	Start manual control, then choose Force ON or Force OFF.
+Sensor.ManualRunningHint	Force 중에도 실제 감지값은 고정 Tick마다 갱신되며 해제 시 즉시 복귀합니다.	The detected value keeps updating on fixed ticks and is restored immediately when force is cleared.
+Sensor.ManualPausedHint	Force를 선택한 뒤 단계 실행으로 정확히 한 Tick 이후에도 유지되는지 확인하세요.	Choose a force, then use Step to verify that it remains active after exactly one tick.
+Sensor.ResetForManualHint	자동 또는 시퀀스 운전 중입니다. 초기화한 뒤 수동 운전을 시작하세요.	Automatic or sequence operation is active. Reset before starting manual control.
+Sensor.ClearFaultHint	Stuck-input 고장을 해제하거나 초기화한 뒤 수동 Force를 사용하세요.	Clear the stuck-input fault or Reset before using manual force.
+Sensor.ActionStartManual	수동 운전 시작	Start manual control
+Sensor.ActionForceOn	센서 Force ON	Force sensor ON
+Sensor.ActionForceOff	센서 Force OFF	Force sensor OFF
+Sensor.ActionClearForce	센서 Force 해제	Clear sensor force
+Sensor.CommandAccepted	{0} 명령 승인 · {1}	{0} accepted · {1}
+Sensor.CommandRejected	{0} 명령 거부 · {1}: {2}	{0} rejected · {1}: {2}
+Sensor.StatusAccepted	{0} 명령을 승인했습니다.	{0} was accepted.
+Sensor.StatusRejected	{0} 명령이 거부되었습니다.	{0} was rejected.
+Equipment.ManualCommissioning	수동 커미셔닝	Manual commissioning
+Equipment.StartManualControl	수동 운전 시작	Start manual control
+Equipment.StartManualControlTooltip	선택 장비를 자동 또는 시퀀스 운전과 분리된 수동 제어로 전환합니다.	Switch the selected equipment to manual control separately from automatic or sequence operation.

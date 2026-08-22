@@ -1,0 +1,29 @@
+﻿<UserControl x:Class="OpenVisionLab.MachineStudio.View.PropertiesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" Padding="8,6" Background="{DynamicResource Machine.PanelHeaderBrush}">
+            <TextBlock FontWeight="SemiBold" Text="Properties" />
+        </Border>
+        <DataGrid Grid.Row="1"
+                  Margin="4"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  IsReadOnly="True"
+                  ItemsSource="{Binding Items}">
+            <DataGrid.Columns>
+                <DataGridTextColumn Width="*"
+                                    Binding="{Binding Name}"
+                                    Header="Name" />
+                <DataGridTextColumn Width="*"
+                                    Binding="{Binding Value}"
+                                    Header="Value" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>

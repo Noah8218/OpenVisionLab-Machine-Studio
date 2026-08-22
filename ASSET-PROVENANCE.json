@@ -1,0 +1,88 @@
+{
+  "schema": "1.0",
+  "inventoryRoots": [
+    "src/OpenVisionLab.MachineStudio/Assets"
+  ],
+  "extensions": [
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".bmp",
+    ".ico",
+    ".svg",
+    ".webp",
+    ".ttf",
+    ".otf",
+    ".woff",
+    ".woff2"
+  ],
+  "assets": [
+    {
+      "path": "src/OpenVisionLab.MachineStudio/Assets/Equipment/conveyor.png",
+      "sha256": "37f4f4f8530f97c66b36edd25de2406f24729a81296cc471574af3a20cb63e31",
+      "mediaType": "image/png",
+      "purpose": "Vendor-neutral conveyor illustration",
+      "originSummary": "OpenVisionLab project owner confirmed on 2026-08-19 that this first-party asset was generated for the project with OpenAI GPT without external reference material.",
+      "firstRecordedCommit": "06c9e73ad4353894115dc8d90936e3226d95d774",
+      "vendorReferenceStatus": "none-recorded",
+      "distributionStatus": "approved",
+      "reviewNote": "Project owner attested on 2026-08-19 that OpenVisionLab created the asset with OpenAI GPT, used no external reference material, and authorizes repository inclusion and redistribution; visual review found no logo or model badge."
+    },
+    {
+      "path": "src/OpenVisionLab.MachineStudio/Assets/Equipment/digital-sensor.png",
+      "sha256": "195ed8b278850cf0a5bf85c577e1d5ed03095032d7cea0a9dd42f6752123ab21",
+      "mediaType": "image/png",
+      "purpose": "Vendor-neutral digital sensor illustration",
+      "originSummary": "OpenVisionLab project owner confirmed on 2026-08-19 that this first-party asset was generated for the project with OpenAI GPT without external reference material.",
+      "firstRecordedCommit": "06c9e73ad4353894115dc8d90936e3226d95d774",
+      "vendorReferenceStatus": "none-recorded",
+      "distributionStatus": "approved",
+      "reviewNote": "Project owner attested on 2026-08-19 that OpenVisionLab created the asset with OpenAI GPT, used no external reference material, and authorizes repository inclusion and redistribution; visual review found no logo or model badge."
+    },
+    {
+      "path": "src/OpenVisionLab.MachineStudio/Assets/Equipment/linear-stage.png",
+      "sha256": "f88a354cedf32647a7b4111b52059afcbd4f0ef79d08482761659b44433b8626",
+      "mediaType": "image/png",
+      "purpose": "Vendor-neutral linear stage illustration",
+      "originSummary": "OpenVisionLab project owner confirmed on 2026-08-19 that this first-party asset was generated for the project with OpenAI GPT without external reference material.",
+      "firstRecordedCommit": "06c9e73ad4353894115dc8d90936e3226d95d774",
+      "vendorReferenceStatus": "none-recorded",
+      "distributionStatus": "approved",
+      "reviewNote": "Project owner attested on 2026-08-19 that OpenVisionLab created the asset with OpenAI GPT, used no external reference material, and authorizes repository inclusion and redistribution; visual review found no logo or model badge."
+    },
+    {
+      "path": "src/OpenVisionLab.MachineStudio/Assets/Equipment/machine-frame.png",
+      "sha256": "b63af864bf9c61c52ec18413957c77050dc1068f57b9c448d5ce16f9a7d7ac24",
+      "mediaType": "image/png",
+      "purpose": "Vendor-neutral machine frame illustration",
+      "originSummary": "OpenVisionLab project owner confirmed on 2026-08-19 that this first-party asset was generated for the project with OpenAI GPT without external reference material.",
+      "firstRecordedCommit": "06c9e73ad4353894115dc8d90936e3226d95d774",
+      "vendorReferenceStatus": "none-recorded",
+      "distributionStatus": "approved",
+      "reviewNote": "Project owner attested on 2026-08-19 that OpenVisionLab created the asset with OpenAI GPT, used no external reference material, and authorizes repository inclusion and redistribution; visual review found no logo or model badge."
+    },
+    {
+      "path": "src/OpenVisionLab.MachineStudio/Assets/Equipment/pneumatic-cylinder.png",
+      "sha256": "94b1398e96b57863cb22145318b3db486ae1f1ec9e04d392a08bbf317d0b23fb",
+      "mediaType": "image/png",
+      "purpose": "Vendor-neutral pneumatic cylinder illustration",
+      "originSummary": "OpenVisionLab project owner confirmed on 2026-08-19 that this first-party asset was generated for the project with OpenAI GPT without external reference material.",
+      "firstRecordedCommit": "06c9e73ad4353894115dc8d90936e3226d95d774",
+      "vendorReferenceStatus": "none-recorded",
+      "distributionStatus": "approved",
+      "reviewNote": "Project owner attested on 2026-08-19 that OpenVisionLab created the asset with OpenAI GPT, used no external reference material, and authorizes repository inclusion and redistribution; visual review found no logo or model badge."
+    },
+    {
+      "path": "src/OpenVisionLab.MachineStudio/Assets/Equipment/workpiece.png",
+      "sha256": "94219595da6cfe238da1f8fda63c665e7b093ac71ab1193ceea4bbd714908e03",
+      "mediaType": "image/png",
+      "purpose": "Vendor-neutral workpiece illustration",
+      "originSummary": "OpenVisionLab project owner confirmed on 2026-08-19 that this first-party asset was generated for the project with OpenAI GPT without external reference material.",
+      "firstRecordedCommit": "06c9e73ad4353894115dc8d90936e3226d95d774",
+      "vendorReferenceStatus": "none-recorded",
+      "distributionStatus": "approved",
+      "reviewNote": "Project owner attested on 2026-08-19 that OpenVisionLab created the asset with OpenAI GPT, used no external reference material, and authorizes repository inclusion and redistribution; visual review found no logo or model badge."
+    }
+  ]
+}

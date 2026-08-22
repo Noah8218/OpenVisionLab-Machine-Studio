@@ -1,0 +1,527 @@
+{
+  "schema": "1.9",
+  "id": "semi-foup-load-port-001",
+  "name": "Semiconductor 01 - FOUP Load Port",
+  "createdAt": "2026-08-15T00:00:00+00:00",
+  "modifiedAt": "2026-08-15T00:00:00+00:00",
+  "simulation": {
+    "fixedStepMilliseconds": 5,
+    "defaultTimeScale": 1,
+    "seed": 2101,
+    "activeLayoutId": "main-layout",
+    "automaticRun": {
+      "sequenceId": "automatic-cycle",
+      "startInputId": null,
+      "startInputValue": true,
+      "repeat": false,
+      "repeatDelayMilliseconds": 0
+    }
+  },
+  "layouts": [
+    {
+      "id": "main-layout",
+      "name": "FOUP load port layout",
+      "gridSize": 10,
+      "snapToGrid": true,
+      "components": [
+        {
+          "id": "frame",
+          "name": "FOUP Load Port Frame",
+          "kind": "MachineFrame",
+          "transform": {
+            "x": 360,
+            "y": 250,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 680,
+            "height": 360
+          },
+          "zIndex": -100
+        },
+        {
+          "id": "transport",
+          "name": "FOUP load port transport",
+          "kind": "Conveyor",
+          "transform": {
+            "x": 340,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 560,
+            "height": 70
+          },
+          "zIndex": 10,
+          "behaviorBindingId": "device.transport"
+        },
+        {
+          "id": "sensor-entry",
+          "name": "Carrier Entry Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 200,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-entry"
+        },
+        {
+          "id": "sensor-process",
+          "name": "Load Position Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 430,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-process"
+        },
+        {
+          "id": "process-stage",
+          "name": "Wafer Transfer Servo Stage",
+          "kind": "LinearStage",
+          "transform": {
+            "x": 100,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 90,
+            "height": 50
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "axis.process"
+        },
+        {
+          "id": "process-cylinder",
+          "name": "FOUP Door Cylinder",
+          "kind": "PneumaticCylinder",
+          "transform": {
+            "x": 430,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 100,
+            "height": 38
+          },
+          "zIndex": 30,
+          "behaviorBindingId": "device.process-cylinder"
+        },
+        {
+          "id": "wafer",
+          "name": "300 mm Wafer Carrier",
+          "kind": "Workpiece",
+          "transform": {
+            "x": 97,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 34,
+            "height": 34
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "device.wafer"
+        }
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "id": "axis.process",
+      "name": "Wafer Transfer Servo Axis",
+      "kind": "Linear",
+      "unit": "mm",
+      "homePosition": 0,
+      "softLimitMin": 0,
+      "softLimitMax": 320,
+      "maxVelocity": 180,
+      "maxAcceleration": 700,
+      "maxDeceleration": 650,
+      "followingErrorLimit": 0.05,
+      "position": {
+        "x": 100,
+        "y": 230,
+        "z": 0
+      }
+    }
+  ],
+  "devices": [
+    {
+      "id": "device.transport",
+      "name": "FOUP load port transport",
+      "kind": "Conveyor",
+      "mountPosition": {
+        "x": 340,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "do.transport.run",
+        "do.transport.reverse"
+      ],
+      "conveyor": {
+        "runCommandChannelId": "do.transport.run",
+        "reverseCommandChannelId": "do.transport.reverse",
+        "speedUnitsPerSecond": 240
+      },
+      "properties": {
+        "semiconductorProcess": "FOUP load port",
+        "connectionRole": "material transport"
+      }
+    },
+    {
+      "id": "device.sensor-entry",
+      "name": "Carrier Entry Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 200,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-entry"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-entry",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 10,
+        "offDelayMilliseconds": 10
+      },
+      "properties": {
+        "semiconductorProcess": "FOUP load port",
+        "connectionRole": "entry detection"
+      }
+    },
+    {
+      "id": "device.sensor-process",
+      "name": "Load Position Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 430,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-process"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-process",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 10,
+        "offDelayMilliseconds": 10
+      },
+      "properties": {
+        "semiconductorProcess": "FOUP load port",
+        "connectionRole": "process-position detection"
+      }
+    },
+    {
+      "id": "device.process-cylinder",
+      "name": "FOUP Door Cylinder",
+      "kind": "Cylinder",
+      "mountPosition": {
+        "x": 430,
+        "y": 230,
+        "z": 0
+      },
+      "channelIds": [
+        "do.cylinder.extend",
+        "di.cylinder.extended",
+        "di.cylinder.retracted"
+      ],
+      "cylinder": {
+        "extendCommandChannelId": "do.cylinder.extend",
+        "extendedSensorChannelId": "di.cylinder.extended",
+        "retractedSensorChannelId": "di.cylinder.retracted",
+        "extendDurationMilliseconds": 120,
+        "retractDurationMilliseconds": 120,
+        "extendedSensorDelayMilliseconds": 10,
+        "retractedSensorDelayMilliseconds": 10,
+        "stroke": 60
+      },
+      "properties": {
+        "semiconductorProcess": "FOUP load port",
+        "connectionRole": "station interlock"
+      }
+    },
+    {
+      "id": "device.wafer",
+      "name": "300 mm Wafer Carrier",
+      "kind": "Workpiece",
+      "mountPosition": {
+        "x": 97,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [],
+      "workpiece": {
+        "type": "300 mm Wafer Carrier",
+        "conveyorComponentId": "transport",
+        "inspectionState": "Pending"
+      },
+      "properties": {
+        "semiconductorProcess": "FOUP load port",
+        "connectionRole": "process material"
+      }
+    },
+    {
+      "id": "device.oht-handoff",
+      "name": "OHT Carrier Handoff",
+      "kind": "Oht",
+      "mountPosition": {
+        "x": 100,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.oht.route-available",
+        "di.oht.vehicle-docked",
+        "di.cylinder.extended",
+        "di.sensor-process",
+        "di.oht.handoff-ready",
+        "di.oht.carrier-transferred"
+      ],
+      "ohtHandoff": {
+        "transportConveyorComponentId": "transport",
+        "routeAvailableSensorChannelId": "di.oht.route-available",
+        "vehicleDockedSensorChannelId": "di.oht.vehicle-docked",
+        "loadPortReadySensorChannelId": "di.cylinder.extended",
+        "carrierReceivedSensorChannelId": "di.sensor-process",
+        "handoffReadyFeedbackChannelId": "di.oht.handoff-ready",
+        "carrierTransferredFeedbackChannelId": "di.oht.carrier-transferred"
+      },
+      "properties": {
+        "semiconductorProcess": "FOUP load port",
+        "connectionRole": "vehicle-to-load-port carrier ownership"
+      }
+    }
+  ],
+  "channels": [
+    {
+      "id": "di.sensor-entry",
+      "name": "Carrier Entry Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.sensor-process",
+      "name": "Load Position Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.extended",
+      "name": "FOUP Door Cylinder Extended",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.retracted",
+      "name": "FOUP Door Cylinder Retracted",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "di.oht.route-available",
+      "name": "OHT Route Available",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "di.oht.vehicle-docked",
+      "name": "OHT Vehicle Docked",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "di.oht.handoff-ready",
+      "name": "OHT Handoff Ready",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.oht.carrier-transferred",
+      "name": "OHT Carrier Transferred",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.transport.run",
+      "name": "Transport Run",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.transport.reverse",
+      "name": "Transport Reverse",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cylinder.extend",
+      "name": "FOUP Door Cylinder Extend",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-active",
+      "name": "Cycle Active",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-done",
+      "name": "Cycle Done",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    }
+  ],
+  "sequences": [
+    {
+      "id": "automatic-cycle",
+      "name": "FOUP load port automatic cycle",
+      "steps": [
+        {
+          "id": "cycle-active",
+          "name": "Cycle Active",
+          "action": "SetSignal",
+          "targetId": "do.cycle-active",
+          "parameter": "true",
+          "nextStepId": "extend-cylinder"
+        },
+        {
+          "id": "extend-cylinder",
+          "name": "Extend FOUP Door Cylinder",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "true",
+          "nextStepId": "wait-cylinder-extended"
+        },
+        {
+          "id": "wait-cylinder-extended",
+          "name": "Wait FOUP Door Cylinder Extended",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.extended",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "wait-oht-handoff-ready",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Extended"
+        },
+        {
+          "id": "wait-oht-handoff-ready",
+          "name": "Wait OHT Handoff Ready",
+          "action": "WaitSignal",
+          "targetId": "di.oht.handoff-ready",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "start-transport"
+        },
+        {
+          "id": "start-transport",
+          "name": "Start Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "true",
+          "nextStepId": "wait-process-position"
+        },
+        {
+          "id": "wait-process-position",
+          "name": "Wait Load Position Sensor",
+          "action": "WaitSignal",
+          "targetId": "di.sensor-process",
+          "parameter": "true",
+          "timeoutMs": 5000,
+          "nextStepId": "stop-transport",
+          "expectedTargetId": "sensor-process",
+          "expectedState": "Detected"
+        },
+        {
+          "id": "stop-transport",
+          "name": "Stop Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "false",
+          "nextStepId": "wait-oht-carrier-transferred"
+        },
+        {
+          "id": "wait-oht-carrier-transferred",
+          "name": "Wait OHT Carrier Transferred",
+          "action": "WaitSignal",
+          "targetId": "di.oht.carrier-transferred",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "move-process-axis"
+        },
+        {
+          "id": "move-process-axis",
+          "name": "Move Wafer Transfer Servo Axis",
+          "action": "MoveAxis",
+          "targetId": "axis.process",
+          "parameter": "160",
+          "nextStepId": "wait-process-axis"
+        },
+        {
+          "id": "wait-process-axis",
+          "name": "Wait Wafer Transfer Servo Axis",
+          "action": "WaitAxisDone",
+          "targetId": "axis.process",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "nextStepId": "retract-cylinder",
+          "expectedTargetId": "axis.process",
+          "expectedState": "Idle"
+        },
+        {
+          "id": "retract-cylinder",
+          "name": "Retract FOUP Door Cylinder",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "false",
+          "nextStepId": "wait-cylinder-retracted"
+        },
+        {
+          "id": "wait-cylinder-retracted",
+          "name": "Wait FOUP Door Cylinder Retracted",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.retracted",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "cycle-done",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Retracted"
+        },
+        {
+          "id": "cycle-done",
+          "name": "Cycle Done",
+          "action": "SetSignal",
+          "targetId": "do.cycle-done",
+          "parameter": "true",
+          "nextStepId": "complete",
+          "expectedTargetId": "transport",
+          "expectedState": "Stopped"
+        },
+        {
+          "id": "complete",
+          "name": "Complete",
+          "action": "Complete",
+          "targetId": "",
+          "parameter": ""
+        }
+      ]
+    }
+  ]
+}

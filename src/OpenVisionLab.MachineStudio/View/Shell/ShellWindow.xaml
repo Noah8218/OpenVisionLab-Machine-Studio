@@ -1,0 +1,83 @@
+<shell:MachineFluentWindow x:Class="OpenVisionLab.MachineStudio.View.Shell.ShellWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:OpenVisionLab.MachineStudio.View.Shell"
+        xmlns:project="clr-namespace:OpenVisionLab.MachineStudio.View.Project"
+        xmlns:scene="clr-namespace:OpenVisionLab.MachineStudio.View.Scene"
+        xmlns:inspector="clr-namespace:OpenVisionLab.MachineStudio.View.Inspector"
+        xmlns:diagnostics="clr-namespace:OpenVisionLab.MachineStudio.View.Diagnostics"
+        Title="{Binding Title}"
+        MinWidth="1280"
+        MinHeight="720"
+        Background="{DynamicResource Surface.Root}"
+        ExtendsContentIntoTitleBar="True"
+        WindowStartupLocation="CenterScreen">
+    <shell:MachineFluentWindow.InputBindings>
+        <KeyBinding Key="N" Modifiers="Control" Command="{Binding NewProjectCommand}" />
+        <KeyBinding Key="O" Modifiers="Control" Command="{Binding OpenProjectCommand}" />
+        <KeyBinding Key="S" Modifiers="Control" Command="{Binding SaveProjectCommand}" />
+        <KeyBinding Key="S" Modifiers="Control+Shift" Command="{Binding SaveProjectAsCommand}" />
+        <KeyBinding Key="Z" Modifiers="Control" Command="{Binding UndoLayoutEditCommand}" />
+        <KeyBinding Key="Y" Modifiers="Control" Command="{Binding RedoLayoutEditCommand}" />
+        <KeyBinding Key="C" Modifiers="Control" Command="{Binding CopyLayoutSelectionCommand}" />
+        <KeyBinding Key="V" Modifiers="Control" Command="{Binding PasteLayoutSelectionCommand}" />
+        <KeyBinding Key="F5" Command="{Binding RunCommand}" />
+        <KeyBinding Key="F6" Command="{Binding PauseCommand}" />
+        <KeyBinding Key="F10" Command="{Binding StepCommand}" />
+        <KeyBinding Key="R" Modifiers="Control+Shift" Command="{Binding ResetCommand}" />
+        <KeyBinding Key="Escape" Command="{Binding SemiconductorRecipes.CloseCommand}" />
+    </shell:MachineFluentWindow.InputBindings>
+
+    <Grid x:Name="ShellRoot"
+          Background="{DynamicResource Surface.Root}"
+          UseLayoutRounding="True"
+          SnapsToDevicePixels="True">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="32" />
+            <RowDefinition Height="26" />
+            <RowDefinition Height="42" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="24" />
+        </Grid.RowDefinitions>
+
+        <shell:StudioTitleBar Grid.Row="0" />
+        <shell:MainMenuView Grid.Row="1" />
+        <shell:GlobalCommandBarView Grid.Row="2" />
+
+        <Grid x:Name="WorkspaceRowsGrid" Grid.Row="3">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" MinHeight="300" />
+                <RowDefinition x:Name="BottomWorkspaceRow" Height="34" />
+            </Grid.RowDefinitions>
+
+            <Grid x:Name="WorkspaceColumnsGrid" Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="LeftWorkspaceColumn" Width="260" MinWidth="220" MaxWidth="420" />
+                    <ColumnDefinition Width="4" />
+                    <ColumnDefinition x:Name="CenterWorkspaceColumn" Width="*" MinWidth="620" />
+                    <ColumnDefinition Width="4" />
+                    <ColumnDefinition x:Name="RightWorkspaceColumn" Width="320" MinWidth="300" MaxWidth="520" />
+                </Grid.ColumnDefinitions>
+
+                <project:LeftToolRegionView Grid.Column="0" />
+                <GridSplitter Grid.Column="1"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch" />
+                <scene:SceneDocumentView Grid.Column="2" />
+                <GridSplitter Grid.Column="3"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch" />
+                <inspector:RightToolRegionView Grid.Column="4" />
+            </Grid>
+
+            <diagnostics:EventJournalView Grid.Row="0"
+                                          Grid.RowSpan="2"
+                                          Panel.ZIndex="10"
+                                          VerticalAlignment="Bottom" />
+        </Grid>
+
+        <project:SemiconductorRecipeGalleryView Grid.Row="3" Panel.ZIndex="100" />
+
+        <shell:StudioStatusBarView Grid.Row="4" />
+    </Grid>
+</shell:MachineFluentWindow>

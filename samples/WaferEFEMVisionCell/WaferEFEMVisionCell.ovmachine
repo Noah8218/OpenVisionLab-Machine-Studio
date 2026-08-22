@@ -1,0 +1,490 @@
+{
+  "schema": "1.5",
+  "id": "wafer-efem-vision-cell-001",
+  "name": "Wafer EFEM Vision Cell (Reference)",
+  "createdAt": "2026-08-07T00:00:00+00:00",
+  "modifiedAt": "2026-08-07T00:00:00+00:00",
+  "units": {
+    "linear": "mm",
+    "angular": "degree"
+  },
+  "simulation": {
+    "fixedStepMilliseconds": 5,
+    "defaultTimeScale": 1.0,
+    "seed": 1001,
+    "activeLayoutId": "wafer-efem-layout",
+    "automaticRun": {
+      "sequenceId": "wafer-efem-cycle",
+      "startInputId": null,
+      "startInputValue": true,
+      "repeat": true,
+      "repeatDelayMilliseconds": 250
+    }
+  },
+  "layouts": [
+    {
+      "id": "wafer-efem-layout",
+      "name": "Wafer EFEM Layout",
+      "gridSize": 10,
+      "snapToGrid": true,
+      "components": [
+        {
+          "id": "frame-1",
+          "name": "EFEM Frame",
+          "kind": "MachineFrame",
+          "transform": { "x": 50, "y": 180, "rotationDegrees": 0 },
+          "size": { "width": 680, "height": 340 },
+          "zIndex": -100
+        },
+        {
+          "id": "conveyor-1",
+          "name": "OHT Conveyor",
+          "kind": "Conveyor",
+          "transform": { "x": 80, "y": 360, "rotationDegrees": 0 },
+          "size": { "width": 560, "height": 72 },
+          "zIndex": 10,
+          "behaviorBindingId": "device.conveyor-1"
+        },
+        {
+          "id": "sensor-load",
+          "name": "Load Sensor",
+          "kind": "DigitalSensor",
+          "transform": { "x": 180, "y": 360, "rotationDegrees": 0 },
+          "size": { "width": 18, "height": 74 },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-load"
+        },
+        {
+          "id": "sensor-prealign",
+          "name": "Prealign Sensor",
+          "kind": "DigitalSensor",
+          "transform": { "x": 320, "y": 360, "rotationDegrees": 0 },
+          "size": { "width": 18, "height": 74 },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-prealign"
+        },
+        {
+          "id": "sensor-camera",
+          "name": "Camera Trigger Zone",
+          "kind": "DigitalSensor",
+          "transform": { "x": 470, "y": 360, "rotationDegrees": 0 },
+          "size": { "width": 18, "height": 74 },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-camera"
+        },
+        {
+          "id": "wafer-stage",
+          "name": "WTR Stage",
+          "kind": "LinearStage",
+          "transform": { "x": 120, "y": 255, "rotationDegrees": 0 },
+          "size": { "width": 84, "height": 48 },
+          "zIndex": 25,
+          "behaviorBindingId": "x"
+        },
+        {
+          "id": "cylinder-foup-gate",
+          "name": "FOUP Gate Cylinder",
+          "kind": "PneumaticCylinder",
+          "transform": { "x": 560, "y": 240, "rotationDegrees": 0 },
+          "size": { "width": 96, "height": 36 },
+          "zIndex": 30,
+          "behaviorBindingId": "device.foup-gate-cylinder"
+        },
+        {
+          "id": "wafer-workpiece",
+          "name": "Wafer",
+          "kind": "Workpiece",
+          "transform": { "x": 120, "y": 360, "rotationDegrees": 0 },
+          "size": { "width": 34, "height": 34 },
+          "zIndex": 25,
+          "behaviorBindingId": "device.wafer"
+        }
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "id": "x",
+      "name": "WTR X Axis",
+      "kind": "Linear",
+      "unit": "mm",
+      "homePosition": 120,
+      "softLimitMin": 80,
+      "softLimitMax": 500,
+      "maxVelocity": 220,
+      "maxAcceleration": 700,
+      "position": { "x": 120, "y": 255, "z": 0 }
+    }
+  ],
+  "devices": [
+    {
+      "id": "device.conveyor-1",
+      "name": "OHT Conveyor",
+      "kind": "Conveyor",
+      "mountPosition": { "x": 80, "y": 360, "z": 0 },
+      "channelIds": ["do.conveyor.run", "do.conveyor.reverse"],
+      "conveyor": {
+        "runCommandChannelId": "do.conveyor.run",
+        "reverseCommandChannelId": "do.conveyor.reverse",
+        "speedUnitsPerSecond": 320
+      },
+      "properties": {}
+    },
+    {
+      "id": "device.sensor-load",
+      "name": "Load Sensor",
+      "kind": "Sensor",
+      "mountPosition": { "x": 180, "y": 360, "z": 0 },
+      "channelIds": ["di.load-sensor"],
+      "sensor": {
+        "outputChannelId": "di.load-sensor",
+        "targetComponentId": "wafer-workpiece",
+        "onDelayMilliseconds": 20,
+        "offDelayMilliseconds": 20
+      },
+      "properties": {}
+    },
+    {
+      "id": "device.sensor-prealign",
+      "name": "Prealign Sensor",
+      "kind": "Sensor",
+      "mountPosition": { "x": 320, "y": 360, "z": 0 },
+      "channelIds": ["di.prealign-sensor"],
+      "sensor": {
+        "outputChannelId": "di.prealign-sensor",
+        "targetComponentId": "wafer-workpiece",
+        "onDelayMilliseconds": 20,
+        "offDelayMilliseconds": 20
+      },
+      "properties": {}
+    },
+    {
+      "id": "device.sensor-camera",
+      "name": "Camera Zone Sensor",
+      "kind": "Sensor",
+      "mountPosition": { "x": 470, "y": 360, "z": 0 },
+      "channelIds": ["di.camera-zone"],
+      "sensor": {
+        "outputChannelId": "di.camera-zone",
+        "targetComponentId": "wafer-workpiece",
+        "onDelayMilliseconds": 20,
+        "offDelayMilliseconds": 20
+      },
+      "properties": {}
+    },
+    {
+      "id": "device.foup-gate-cylinder",
+      "name": "FOUP Gate Cylinder",
+      "kind": "Cylinder",
+      "mountPosition": { "x": 560, "y": 240, "z": 0 },
+      "channelIds": [
+        "do.foup-gate-open",
+        "di.foup-gate-open",
+        "di.foup-gate-closed"
+      ],
+      "cylinder": {
+        "extendCommandChannelId": "do.foup-gate-open",
+        "extendedSensorChannelId": "di.foup-gate-open",
+        "retractedSensorChannelId": "di.foup-gate-closed",
+        "extendDurationMilliseconds": 90,
+        "retractDurationMilliseconds": 90,
+        "extendedSensorDelayMilliseconds": 10,
+        "retractedSensorDelayMilliseconds": 10,
+        "stroke": 60
+      },
+      "properties": {}
+    },
+    {
+      "id": "device.wafer",
+      "name": "Wafer",
+      "kind": "Workpiece",
+      "mountPosition": { "x": 120, "y": 360, "z": 0 },
+      "channelIds": [],
+      "workpiece": {
+        "type": "Wafer",
+        "conveyorComponentId": "conveyor-1",
+        "inspectionState": "Pending"
+      },
+      "properties": {}
+    },
+    {
+      "id": "device.camera-1",
+      "name": "Top Wafer Camera",
+      "kind": "Camera",
+      "mountPosition": { "x": 470, "y": 230, "z": 120 },
+      "channelIds": [],
+      "camera": {
+        "exposureDelayMilliseconds": 20,
+        "transferDelayMilliseconds": 30,
+        "placeholderDecision": "Pass"
+      },
+      "properties": {}
+    }
+  ],
+  "channels": [
+    {
+      "id": "di.load-sensor",
+      "name": "Load Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.prealign-sensor",
+      "name": "Prealign Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.camera-zone",
+      "name": "Camera Zone Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.foup-gate-open",
+      "name": "FOUP Gate Opened",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.foup-gate-closed",
+      "name": "FOUP Gate Closed",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "do.cycle-active",
+      "name": "Cycle Active",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.stage-ready",
+      "name": "Stage Ready",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.conveyor.run",
+      "name": "Conveyor Run",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.conveyor.reverse",
+      "name": "Conveyor Reverse",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.foup-gate-open",
+      "name": "FOUP Gate Open Command",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.inspection-pass",
+      "name": "Inspection Pass",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.inspection-fail",
+      "name": "Inspection Fail",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-done",
+      "name": "Cycle Done",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    }
+  ],
+  "sequences": [
+    {
+      "id": "wafer-efem-cycle",
+      "name": "Wafer EFEM Vision Cycle",
+      "steps": [
+        {
+          "id": "active-on",
+          "name": "Cycle Active On",
+          "action": "SetSignal",
+          "targetId": "do.cycle-active",
+          "parameter": "true",
+          "nextStepId": "feed-on"
+        },
+        {
+          "id": "feed-on",
+          "name": "Run OHT Conveyor",
+          "action": "SetSignal",
+          "targetId": "do.conveyor.run",
+          "parameter": "true",
+          "nextStepId": "wait-load-sensor"
+        },
+        {
+          "id": "wait-load-sensor",
+          "name": "Wait Wafer Load Sensor",
+          "action": "WaitSignal",
+          "targetId": "di.load-sensor",
+          "parameter": "true",
+          "timeoutMs": 5000,
+          "nextStepId": "foup-gate-open"
+        },
+        {
+          "id": "foup-gate-open",
+          "name": "Open FOUP Gate",
+          "action": "SetSignal",
+          "targetId": "do.foup-gate-open",
+          "parameter": "true",
+          "nextStepId": "wait-foup-gate-open"
+        },
+        {
+          "id": "wait-foup-gate-open",
+          "name": "Wait FOUP Gate Open",
+          "action": "WaitSignal",
+          "targetId": "di.foup-gate-open",
+          "parameter": "true",
+          "nextStepId": "stage-to-prealign"
+        },
+        {
+          "id": "stage-to-prealign",
+          "name": "Move WTR to Prealign",
+          "action": "MoveAxis",
+          "targetId": "x",
+          "parameter": "240",
+          "nextStepId": "wait-stage-prealign-axis"
+        },
+        {
+          "id": "wait-stage-prealign-axis",
+          "name": "Wait WTR Prealign Position",
+          "action": "WaitAxisDone",
+          "targetId": "x",
+          "parameter": "",
+          "nextStepId": "wait-prealign"
+        },
+        {
+          "id": "wait-prealign",
+          "name": "Wait Prealign Position Sensor",
+          "action": "WaitSignal",
+          "targetId": "di.prealign-sensor",
+          "parameter": "true",
+          "nextStepId": "stage-ready-on"
+        },
+        {
+          "id": "stage-ready-on",
+          "name": "Stage Ready",
+          "action": "SetSignal",
+          "targetId": "do.stage-ready",
+          "parameter": "true",
+          "nextStepId": "stage-to-camera"
+        },
+        {
+          "id": "stage-to-camera",
+          "name": "Move WTR to Camera Position",
+          "action": "MoveAxis",
+          "targetId": "x",
+          "parameter": "390",
+          "nextStepId": "wait-stage-camera-axis"
+        },
+        {
+          "id": "wait-stage-camera-axis",
+          "name": "Wait WTR Camera Position",
+          "action": "WaitAxisDone",
+          "targetId": "x",
+          "parameter": "",
+          "nextStepId": "trigger-camera"
+        },
+        {
+          "id": "trigger-camera",
+          "name": "Trigger Camera",
+          "action": "TriggerCamera",
+          "targetId": "device.camera-1",
+          "parameter": "presence-check",
+          "nextStepId": "wait-vision-result"
+        },
+        {
+          "id": "wait-vision-result",
+          "name": "Wait Vision Result",
+          "action": "WaitVisionResult",
+          "targetId": "device.camera-1",
+          "parameter": "",
+          "timeoutMs": 2000,
+          "nextStepId": "inspection-pass",
+          "failureStepId": "inspection-fail"
+        },
+        {
+          "id": "inspection-pass",
+          "name": "Inspection Pass Path",
+          "action": "SetSignal",
+          "targetId": "do.inspection-pass",
+          "parameter": "true",
+          "nextStepId": "stage-to-home-pass"
+        },
+        {
+          "id": "inspection-fail",
+          "name": "Inspection Fail Path",
+          "action": "SetSignal",
+          "targetId": "do.inspection-fail",
+          "parameter": "true",
+          "nextStepId": "stage-to-home-fail"
+        },
+        {
+          "id": "stage-to-home-pass",
+          "name": "Return Stage (Pass)",
+          "action": "MoveAxis",
+          "targetId": "x",
+          "parameter": "120",
+          "nextStepId": "wait-stage-home-pass-axis"
+        },
+        {
+          "id": "stage-to-home-fail",
+          "name": "Return Stage (Fail)",
+          "action": "MoveAxis",
+          "targetId": "x",
+          "parameter": "120",
+          "nextStepId": "wait-stage-home-fail-axis"
+        },
+        {
+          "id": "wait-stage-home-pass-axis",
+          "name": "Wait WTR Home (Pass)",
+          "action": "WaitAxisDone",
+          "targetId": "x",
+          "parameter": "",
+          "nextStepId": "cycle-end-pass"
+        },
+        {
+          "id": "wait-stage-home-fail-axis",
+          "name": "Wait WTR Home (Fail)",
+          "action": "WaitAxisDone",
+          "targetId": "x",
+          "parameter": "",
+          "nextStepId": "cycle-end-fail"
+        },
+        {
+          "id": "cycle-end-pass",
+          "name": "Cycle End (Pass)",
+          "action": "SetSignal",
+          "targetId": "do.cycle-done",
+          "parameter": "true",
+          "nextStepId": "complete"
+        },
+        {
+          "id": "cycle-end-fail",
+          "name": "Cycle End (Fail)",
+          "action": "SetSignal",
+          "targetId": "do.cycle-done",
+          "parameter": "true",
+          "nextStepId": "complete"
+        },
+        {
+          "id": "complete",
+          "name": "Complete",
+          "action": "Complete",
+          "targetId": "",
+          "parameter": ""
+        }
+      ]
+    }
+  ]
+}

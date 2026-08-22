@@ -1,0 +1,792 @@
+{
+  "schema": "1.7",
+  "id": "semi-dry-etch-transfer-008",
+  "name": "Semiconductor 08 - Dry Etch Transfer",
+  "createdAt": "2026-08-15T00:00:00+00:00",
+  "modifiedAt": "2026-08-18T00:00:00+00:00",
+  "simulation": {
+    "fixedStepMilliseconds": 5,
+    "defaultTimeScale": 1,
+    "seed": 2108,
+    "activeLayoutId": "main-layout",
+    "automaticRun": {
+      "sequenceId": "automatic-cycle",
+      "startInputId": null,
+      "startInputValue": true,
+      "repeat": false,
+      "repeatDelayMilliseconds": 0
+    }
+  },
+  "layouts": [
+    {
+      "id": "main-layout",
+      "name": "dry-etch transfer layout",
+      "gridSize": 10,
+      "snapToGrid": true,
+      "components": [
+        {
+          "id": "frame",
+          "name": "Dry Etch Transfer Frame",
+          "kind": "MachineFrame",
+          "transform": {
+            "x": 360,
+            "y": 250,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 680,
+            "height": 360
+          },
+          "zIndex": -100
+        },
+        {
+          "id": "transport",
+          "name": "dry-etch transfer transport",
+          "kind": "Conveyor",
+          "transform": {
+            "x": 340,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 560,
+            "height": 70
+          },
+          "zIndex": 10,
+          "behaviorBindingId": "device.transport"
+        },
+        {
+          "id": "sensor-entry",
+          "name": "Transfer Entry Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 200,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-entry"
+        },
+        {
+          "id": "sensor-process",
+          "name": "Chamber Handoff Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 500,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-process"
+        },
+        {
+          "id": "process-stage",
+          "name": "Chamber Transfer Servo Stage",
+          "kind": "LinearStage",
+          "transform": {
+            "x": 100,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 90,
+            "height": 50
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "axis.process"
+        },
+        {
+          "id": "process-cylinder",
+          "name": "Chamber Slit Valve Cylinder",
+          "kind": "PneumaticCylinder",
+          "transform": {
+            "x": 500,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 100,
+            "height": 38
+          },
+          "zIndex": 30,
+          "behaviorBindingId": "device.process-cylinder"
+        },
+        {
+          "id": "wafer",
+          "name": "Etch Process Wafer",
+          "kind": "Workpiece",
+          "transform": {
+            "x": 97,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 34,
+            "height": 34
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "device.wafer"
+        },
+        {
+          "id": "robot-reach-stage",
+          "name": "Etch Transfer Robot Arm",
+          "kind": "LinearStage",
+          "transform": {
+            "x": 250,
+            "y": 140,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 120,
+            "height": 50
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "axis.robot-reach"
+        },
+        {
+          "id": "sensor-chamber-entry",
+          "name": "Etch Chamber Entry Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 360,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-chamber-entry"
+        },
+        {
+          "id": "chamber-gate",
+          "name": "Etch Chamber Gate Cylinder",
+          "kind": "PneumaticCylinder",
+          "transform": {
+            "x": 650,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 100,
+            "height": 38
+          },
+          "zIndex": 30,
+          "behaviorBindingId": "device.chamber-gate"
+        }
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "id": "axis.process",
+      "name": "Chamber Transfer Servo Axis",
+      "kind": "Linear",
+      "unit": "mm",
+      "homePosition": 0,
+      "softLimitMin": 0,
+      "softLimitMax": 320,
+      "maxVelocity": 180,
+      "maxAcceleration": 700,
+      "maxDeceleration": 650,
+      "followingErrorLimit": 0.05,
+      "position": {
+        "x": 100,
+        "y": 230,
+        "z": 0
+      }
+    },
+    {
+      "id": "axis.robot-reach",
+      "name": "Etch Transfer Robot Reach Axis",
+      "kind": "Linear",
+      "unit": "mm",
+      "homePosition": 0,
+      "softLimitMin": 0,
+      "softLimitMax": 240,
+      "maxVelocity": 160,
+      "maxAcceleration": 650,
+      "maxDeceleration": 650,
+      "followingErrorLimit": 0.05,
+      "position": {
+        "x": 250,
+        "y": 140,
+        "z": 0
+      }
+    }
+  ],
+  "devices": [
+    {
+      "id": "device.transport",
+      "name": "dry-etch transfer transport",
+      "kind": "Conveyor",
+      "mountPosition": {
+        "x": 340,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "do.transport.run",
+        "do.transport.reverse"
+      ],
+      "conveyor": {
+        "runCommandChannelId": "do.transport.run",
+        "reverseCommandChannelId": "do.transport.reverse",
+        "speedUnitsPerSecond": 250
+      },
+      "properties": {
+        "semiconductorProcess": "dry-etch transfer",
+        "connectionRole": "material transport"
+      }
+    },
+    {
+      "id": "device.sensor-entry",
+      "name": "Transfer Entry Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 200,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-entry"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-entry",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 15,
+        "offDelayMilliseconds": 15
+      },
+      "properties": {
+        "semiconductorProcess": "dry-etch transfer",
+        "connectionRole": "entry detection"
+      }
+    },
+    {
+      "id": "device.sensor-process",
+      "name": "Chamber Handoff Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 500,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-process"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-process",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 15,
+        "offDelayMilliseconds": 15
+      },
+      "properties": {
+        "semiconductorProcess": "dry-etch transfer",
+        "connectionRole": "process-position detection"
+      }
+    },
+    {
+      "id": "device.process-cylinder",
+      "name": "Chamber Slit Valve Cylinder",
+      "kind": "Cylinder",
+      "mountPosition": {
+        "x": 500,
+        "y": 230,
+        "z": 0
+      },
+      "channelIds": [
+        "do.cylinder.extend",
+        "di.cylinder.extended",
+        "di.cylinder.retracted"
+      ],
+      "cylinder": {
+        "extendCommandChannelId": "do.cylinder.extend",
+        "extendedSensorChannelId": "di.cylinder.extended",
+        "retractedSensorChannelId": "di.cylinder.retracted",
+        "extendDurationMilliseconds": 220,
+        "retractDurationMilliseconds": 220,
+        "extendedSensorDelayMilliseconds": 10,
+        "retractedSensorDelayMilliseconds": 10,
+        "stroke": 60
+      },
+      "properties": {
+        "semiconductorProcess": "dry-etch transfer",
+        "connectionRole": "station interlock"
+      }
+    },
+    {
+      "id": "device.wafer",
+      "name": "Etch Process Wafer",
+      "kind": "Workpiece",
+      "mountPosition": {
+        "x": 97,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [],
+      "workpiece": {
+        "type": "Etch Process Wafer",
+        "conveyorComponentId": "transport",
+        "inspectionState": "Pending"
+      },
+      "properties": {
+        "semiconductorProcess": "dry-etch transfer",
+        "connectionRole": "process material"
+      }
+    },
+    {
+      "id": "device.wafer-handler",
+      "name": "Etch Transfer Wafer Handler",
+      "kind": "Handler",
+      "mountPosition": {
+        "x": 500,
+        "y": 230,
+        "z": 0
+      },
+      "channelIds": [
+        "do.handler.pick",
+        "do.handler.place",
+        "di.handler.holding",
+        "di.handler.placed"
+      ],
+      "waferHandler": {
+        "horizontalAxisId": "axis.robot-reach",
+        "verticalAxisId": "axis.process",
+        "workpieceComponentId": "wafer",
+        "sourcePresentSensorChannelId": "di.sensor-process",
+        "gateOpenSensorChannelId": "di.chamber-gate.extended",
+        "pickCommandChannelId": "do.handler.pick",
+        "placeCommandChannelId": "do.handler.place",
+        "holdingFeedbackChannelId": "di.handler.holding",
+        "placedFeedbackChannelId": "di.handler.placed",
+        "pickHorizontalPosition": 0,
+        "pickVerticalPosition": 260,
+        "placeHorizontalPosition": 140,
+        "placeVerticalPosition": 260
+      },
+      "properties": {
+        "semiconductorProcess": "dry-etch transfer",
+        "connectionRole": "wafer transfer ownership and interlock"
+      }
+    },
+    {
+      "id": "device.sensor-chamber-entry",
+      "name": "Etch Chamber Entry Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 360,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-chamber-entry"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-chamber-entry",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 10,
+        "offDelayMilliseconds": 10
+      },
+      "properties": {
+        "semiconductorProcess": "dry-etch transfer",
+        "connectionRole": "Etch Chamber Entry Sensor"
+      }
+    },
+    {
+      "id": "device.chamber-gate",
+      "name": "Etch Chamber Gate Cylinder",
+      "kind": "Cylinder",
+      "mountPosition": {
+        "x": 650,
+        "y": 230,
+        "z": 0
+      },
+      "channelIds": [
+        "do.chamber-gate.extend",
+        "di.chamber-gate.extended",
+        "di.chamber-gate.retracted"
+      ],
+      "cylinder": {
+        "extendCommandChannelId": "do.chamber-gate.extend",
+        "extendedSensorChannelId": "di.chamber-gate.extended",
+        "retractedSensorChannelId": "di.chamber-gate.retracted",
+        "extendDurationMilliseconds": 160,
+        "retractDurationMilliseconds": 160,
+        "extendedSensorDelayMilliseconds": 10,
+        "retractedSensorDelayMilliseconds": 10,
+        "stroke": 65
+      },
+      "properties": {
+        "semiconductorProcess": "dry-etch transfer",
+        "connectionRole": "Etch Chamber Gate Cylinder"
+      }
+    }
+  ],
+  "channels": [
+    {
+      "id": "di.sensor-entry",
+      "name": "Transfer Entry Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.sensor-process",
+      "name": "Chamber Handoff Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.extended",
+      "name": "Chamber Slit Valve Cylinder Extended",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.retracted",
+      "name": "Chamber Slit Valve Cylinder Retracted",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "do.transport.run",
+      "name": "Transport Run",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.transport.reverse",
+      "name": "Transport Reverse",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cylinder.extend",
+      "name": "Chamber Slit Valve Cylinder Extend",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-active",
+      "name": "Cycle Active",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-done",
+      "name": "Cycle Done",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.sensor-chamber-entry",
+      "name": "Etch Chamber Entry Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.chamber-gate.extended",
+      "name": "Etch Chamber Gate Cylinder Extended",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.chamber-gate.retracted",
+      "name": "Etch Chamber Gate Cylinder Retracted",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "do.chamber-gate.extend",
+      "name": "Etch Chamber Gate Cylinder Extend",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.handler.pick",
+      "name": "Wafer Handler Pick",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.handler.place",
+      "name": "Wafer Handler Place",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.handler.holding",
+      "name": "Wafer Handler Holding",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.handler.placed",
+      "name": "Wafer Handler Placed",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    }
+  ],
+  "sequences": [
+    {
+      "id": "automatic-cycle",
+      "name": "dry-etch transfer automatic cycle",
+      "steps": [
+        {
+          "id": "cycle-active",
+          "name": "Cycle Active",
+          "action": "SetSignal",
+          "targetId": "do.cycle-active",
+          "parameter": "true",
+          "nextStepId": "extend-cylinder"
+        },
+        {
+          "id": "extend-cylinder",
+          "name": "Extend Chamber Slit Valve Cylinder",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "true",
+          "nextStepId": "wait-cylinder-extended"
+        },
+        {
+          "id": "wait-cylinder-extended",
+          "name": "Wait Chamber Slit Valve Cylinder Extended",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.extended",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "start-transport",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Extended"
+        },
+        {
+          "id": "start-transport",
+          "name": "Start Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "true",
+          "nextStepId": "wait-chamber-entry"
+        },
+        {
+          "id": "wait-chamber-entry",
+          "name": "Wait Etch Chamber Entry",
+          "action": "WaitSignal",
+          "targetId": "di.sensor-chamber-entry",
+          "parameter": "true",
+          "timeoutMs": 5000,
+          "expectedTargetId": "sensor-chamber-entry",
+          "expectedState": "Detected",
+          "nextStepId": "wait-process-position"
+        },
+        {
+          "id": "wait-process-position",
+          "name": "Wait Chamber Handoff Sensor",
+          "action": "WaitSignal",
+          "targetId": "di.sensor-process",
+          "parameter": "true",
+          "timeoutMs": 5000,
+          "nextStepId": "stop-transport",
+          "expectedTargetId": "sensor-process",
+          "expectedState": "Detected"
+        },
+        {
+          "id": "stop-transport",
+          "name": "Stop Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "false",
+          "nextStepId": "move-process-axis"
+        },
+        {
+          "id": "move-process-axis",
+          "name": "Move Chamber Transfer Servo Axis",
+          "action": "MoveAxis",
+          "targetId": "axis.process",
+          "parameter": "260",
+          "nextStepId": "wait-process-axis"
+        },
+        {
+          "id": "wait-process-axis",
+          "name": "Wait Chamber Transfer Servo Axis",
+          "action": "WaitAxisDone",
+          "targetId": "axis.process",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "nextStepId": "pick-wafer",
+          "expectedTargetId": "axis.process",
+          "expectedState": "Idle"
+        },
+        {
+          "id": "pick-wafer",
+          "name": "Pick Wafer At Handoff",
+          "action": "SetSignal",
+          "targetId": "do.handler.pick",
+          "parameter": "true",
+          "nextStepId": "wait-handler-holding"
+        },
+        {
+          "id": "wait-handler-holding",
+          "name": "Wait Wafer Handler Holding",
+          "action": "WaitSignal",
+          "targetId": "di.handler.holding",
+          "parameter": "true",
+          "timeoutMs": 1000,
+          "nextStepId": "release-pick-command"
+        },
+        {
+          "id": "release-pick-command",
+          "name": "Release Wafer Pick Command",
+          "action": "SetSignal",
+          "targetId": "do.handler.pick",
+          "parameter": "false",
+          "nextStepId": "extend-chamber-gate"
+        },
+        {
+          "id": "extend-chamber-gate",
+          "name": "Open Etch Chamber Gate",
+          "action": "SetSignal",
+          "targetId": "do.chamber-gate.extend",
+          "parameter": "true",
+          "nextStepId": "wait-chamber-gate-open"
+        },
+        {
+          "id": "wait-chamber-gate-open",
+          "name": "Wait Etch Chamber Gate Open",
+          "action": "WaitSignal",
+          "targetId": "di.chamber-gate.extended",
+          "parameter": "true",
+          "timeoutMs": 4000,
+          "expectedTargetId": "chamber-gate",
+          "expectedState": "Extended",
+          "nextStepId": "move-robot-reach"
+        },
+        {
+          "id": "move-robot-reach",
+          "name": "Move Transfer Robot Into Chamber",
+          "action": "MoveAxis",
+          "targetId": "axis.robot-reach",
+          "parameter": "140",
+          "nextStepId": "wait-robot-reach"
+        },
+        {
+          "id": "wait-robot-reach",
+          "name": "Wait Transfer Robot Reach",
+          "action": "WaitAxisDone",
+          "targetId": "axis.robot-reach",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "expectedTargetId": "axis.robot-reach",
+          "expectedState": "Idle",
+          "nextStepId": "place-wafer"
+        },
+        {
+          "id": "place-wafer",
+          "name": "Place Wafer In Chamber",
+          "action": "SetSignal",
+          "targetId": "do.handler.place",
+          "parameter": "true",
+          "nextStepId": "wait-handler-placed"
+        },
+        {
+          "id": "wait-handler-placed",
+          "name": "Wait Wafer Handler Placed",
+          "action": "WaitSignal",
+          "targetId": "di.handler.placed",
+          "parameter": "true",
+          "timeoutMs": 1000,
+          "nextStepId": "release-place-command"
+        },
+        {
+          "id": "release-place-command",
+          "name": "Release Wafer Place Command",
+          "action": "SetSignal",
+          "targetId": "do.handler.place",
+          "parameter": "false",
+          "nextStepId": "return-robot-reach"
+        },
+        {
+          "id": "return-robot-reach",
+          "name": "Return Transfer Robot Reach",
+          "action": "MoveAxis",
+          "targetId": "axis.robot-reach",
+          "parameter": "0",
+          "nextStepId": "wait-robot-returned"
+        },
+        {
+          "id": "wait-robot-returned",
+          "name": "Wait Transfer Robot Returned",
+          "action": "WaitAxisDone",
+          "targetId": "axis.robot-reach",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "expectedTargetId": "axis.robot-reach",
+          "expectedState": "Idle",
+          "nextStepId": "retract-chamber-gate"
+        },
+        {
+          "id": "retract-chamber-gate",
+          "name": "Close Etch Chamber Gate",
+          "action": "SetSignal",
+          "targetId": "do.chamber-gate.extend",
+          "parameter": "false",
+          "nextStepId": "wait-chamber-gate-closed"
+        },
+        {
+          "id": "wait-chamber-gate-closed",
+          "name": "Wait Etch Chamber Gate Closed",
+          "action": "WaitSignal",
+          "targetId": "di.chamber-gate.retracted",
+          "parameter": "true",
+          "timeoutMs": 4000,
+          "expectedTargetId": "chamber-gate",
+          "expectedState": "Retracted",
+          "nextStepId": "retract-cylinder"
+        },
+        {
+          "id": "retract-cylinder",
+          "name": "Retract Chamber Slit Valve Cylinder",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "false",
+          "nextStepId": "wait-cylinder-retracted"
+        },
+        {
+          "id": "wait-cylinder-retracted",
+          "name": "Wait Chamber Slit Valve Cylinder Retracted",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.retracted",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "cycle-done",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Retracted"
+        },
+        {
+          "id": "cycle-done",
+          "name": "Cycle Done",
+          "action": "SetSignal",
+          "targetId": "do.cycle-done",
+          "parameter": "true",
+          "nextStepId": "complete",
+          "expectedTargetId": "transport",
+          "expectedState": "Stopped"
+        },
+        {
+          "id": "complete",
+          "name": "Complete",
+          "action": "Complete",
+          "targetId": "",
+          "parameter": ""
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+    <RootNamespace>OpenVisionLab.MachineStudio</RootNamespace>
+    <AssemblyName>OpenVisionLab.MachineStudio</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <WpfUiVersion>4.3.0</WpfUiVersion>
+    <GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.122" />
+    <PackageReference Include="WPF-UI" Version="$(WpfUiVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenVisionLab.Machine.Core\OpenVisionLab.Machine.Core.csproj" />
+    <ProjectReference Include="..\OpenVisionLab.Machine.IO\OpenVisionLab.Machine.IO.csproj" />
+    <ProjectReference Include="..\OpenVisionLab.Machine.Infrastructure\OpenVisionLab.Machine.Infrastructure.csproj" />
+    <ProjectReference Include="..\OpenVisionLab.Machine.Sequence\OpenVisionLab.Machine.Sequence.csproj" />
+    <ProjectReference Include="..\OpenVisionLab.Machine.Simulation\OpenVisionLab.Machine.Simulation.csproj" />
+    <ProjectReference Include="..\OpenVisionLab.Machine.Vision\OpenVisionLab.Machine.Vision.csproj" />
+    <ProjectReference Include="..\OpenVisionLab.Localization\OpenVisionLab.Localization.csproj" />
+    <ProjectReference Include="..\OpenVisionLab.Logging\OpenVisionLab.Logging.csproj" />
+    <ProjectReference Include="..\OpenVisionLab.Logging.Controls\OpenVisionLab.Logging.Controls.csproj" />
+    <ProjectReference Include="..\OpenVisionLab.Wpf.MessageDialogs\OpenVisionLab.Wpf.MessageDialogs.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\samples\AutomaticTransferCell\AutomaticTransferCell.ovmachine"
+             Link="Samples\AutomaticTransferCell.ovmachine">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\samples\SemiconductorRecipes\*.ovmachine"
+             Link="Samples\SemiconductorRecipes\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\LICENSE" Link="LICENSE.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\NOTICE" Link="NOTICE.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\ASSET-PROVENANCE.json" Link="ASSET-PROVENANCE.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="$(NuGetPackageRoot)wpf-ui\$(WpfUiVersion)\LICENSE.md"
+             Link="THIRD-PARTY-NOTICES\WPF-UI-LICENSE.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="$(NuGetPackageRoot)wpf-ui\$(WpfUiVersion)\ThirdPartyNotices.txt"
+             Link="THIRD-PARTY-NOTICES\WPF-UI-THIRD-PARTY-NOTICES.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Assets\Equipment\*.png" />
+    <Resource Include="Assets\Equipment\*.png" />
+  </ItemGroup>
+
+  <Target Name="GenerateOpenVisionBuildIdentity" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <_OpenVisionRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..'))</_OpenVisionRepositoryRoot>
+      <_OpenVisionBuildIdentityFile>$(IntermediateOutputPath)OpenVisionBuildIdentity.g.cs</_OpenVisionBuildIdentityFile>
+    </PropertyGroup>
+    <Exec Command="git -C &quot;$(_OpenVisionRepositoryRoot)&quot; rev-parse HEAD"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="Low"
+          IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" ItemName="_OpenVisionCommitOutput" />
+      <Output TaskParameter="ExitCode" PropertyName="_OpenVisionCommitExitCode" />
+    </Exec>
+    <Exec Command="git -C &quot;$(_OpenVisionRepositoryRoot)&quot; status --porcelain=v1 --untracked-files=normal -- . &quot;:(exclude)src/OpenVisionLab.MachineStudio/*_wpftmp.csproj&quot;"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="Low"
+          IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" ItemName="_OpenVisionStatusOutput" />
+      <Output TaskParameter="ExitCode" PropertyName="_OpenVisionStatusExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <_OpenVisionSourceCommit Condition="'$(_OpenVisionCommitExitCode)' == '0'">@(_OpenVisionCommitOutput)</_OpenVisionSourceCommit>
+      <_OpenVisionSourceCommit Condition="'$(_OpenVisionSourceCommit)' == ''">unknown</_OpenVisionSourceCommit>
+      <_OpenVisionSourceState Condition="'$(_OpenVisionCommitExitCode)' != '0' or '$(_OpenVisionStatusExitCode)' != '0'">unknown</_OpenVisionSourceState>
+      <_OpenVisionSourceState Condition="'$(_OpenVisionSourceState)' == '' and '@(_OpenVisionStatusOutput)' == ''">clean</_OpenVisionSourceState>
+      <_OpenVisionSourceState Condition="'$(_OpenVisionSourceState)' == ''">dirty</_OpenVisionSourceState>
+      <_OpenVisionInformationalVersion>$(Version)+g$(_OpenVisionSourceCommit).$(_OpenVisionSourceState)</_OpenVisionInformationalVersion>
+    </PropertyGroup>
+    <ItemGroup>
+      <_OpenVisionBuildIdentityAttribute Include="System.Reflection.AssemblyInformationalVersionAttribute">
+        <_Parameter1>$(_OpenVisionInformationalVersion)</_Parameter1>
+      </_OpenVisionBuildIdentityAttribute>
+      <_OpenVisionBuildIdentityAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>OpenVisionSourceCommit</_Parameter1>
+        <_Parameter2>$(_OpenVisionSourceCommit)</_Parameter2>
+      </_OpenVisionBuildIdentityAttribute>
+      <_OpenVisionBuildIdentityAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>OpenVisionSourceState</_Parameter1>
+        <_Parameter2>$(_OpenVisionSourceState)</_Parameter2>
+      </_OpenVisionBuildIdentityAttribute>
+      <Compile Include="$(_OpenVisionBuildIdentityFile)" />
+    </ItemGroup>
+    <WriteCodeFragment Language="C#"
+                       OutputFile="$(_OpenVisionBuildIdentityFile)"
+                       AssemblyAttributes="@(_OpenVisionBuildIdentityAttribute)" />
+  </Target>
+
+</Project>

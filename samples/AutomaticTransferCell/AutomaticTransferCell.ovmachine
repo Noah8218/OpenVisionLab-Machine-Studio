@@ -1,0 +1,462 @@
+{
+  "schema": "1.5",
+  "id": "automatic-transfer-cell-001",
+  "name": "Automatic Transfer Cell",
+  "createdAt": "2026-08-06T00:00:00+00:00",
+  "modifiedAt": "2026-08-06T00:00:00+00:00",
+  "simulation": {
+    "fixedStepMilliseconds": 5,
+    "defaultTimeScale": 1.0,
+    "seed": 1001,
+    "testScenarioProfileId": "normal",
+    "testScenarioSeed": 1001,
+    "testScenarioDurationCycles": 1200,
+    "testScenarioTargetId": "cylinder-1",
+    "testScenarioBatchRepetitions": 3,
+    "testScenarioFault": {
+      "enabled": true,
+      "kind": "StuckDigitalInput",
+      "targetId": "di.cylinder-1.extended",
+      "forcedValue": false,
+      "injectTick": 1,
+      "holdTicks": 110,
+      "restartSequenceId": "auto-transfer-cycle"
+    },
+    "testScenarioAssertions": [
+      {
+        "assertionId": "automatic-cycle-completed",
+        "kind": "AutomaticCycleCompleted",
+        "minimumCount": 1
+      },
+      {
+        "assertionId": "final-faults-cleared",
+        "kind": "NoActiveFaults"
+      },
+      {
+        "assertionId": "final-cylinder-extended",
+        "kind": "FinalEquipmentState",
+        "targetId": "cylinder-1",
+        "expectedState": "Extended"
+      }
+    ],
+    "activeLayoutId": "main-cell",
+    "automaticRun": {
+      "sequenceId": "auto-transfer-cycle",
+      "startInputId": null,
+      "startInputValue": true,
+      "repeat": true,
+      "repeatDelayMilliseconds": 250
+    }
+  },
+  "layouts": [
+    {
+      "id": "main-cell",
+      "name": "Main Cell",
+      "gridSize": 10,
+      "snapToGrid": true,
+      "components": [
+        {
+          "id": "frame-1",
+          "name": "Machine Frame",
+          "kind": "MachineFrame",
+          "transform": { "x": 190, "y": 200, "rotationDegrees": 0 },
+          "size": { "width": 520, "height": 300 },
+          "zIndex": -100
+        },
+        {
+          "id": "stage-1",
+          "name": "Transfer Stage",
+          "kind": "LinearStage",
+          "transform": { "x": 40, "y": 200, "rotationDegrees": 0 },
+          "size": { "width": 84, "height": 48 },
+          "zIndex": 20,
+          "behaviorBindingId": "x"
+        },
+        {
+          "id": "sensor-1",
+          "name": "Station Sensor",
+          "kind": "DigitalSensor",
+          "transform": { "x": 300, "y": 250, "rotationDegrees": 0 },
+          "size": { "width": 18, "height": 70 },
+          "zIndex": 30,
+          "behaviorBindingId": "device.sensor-1"
+        },
+        {
+          "id": "cylinder-1",
+          "name": "Station Stopper Cylinder",
+          "kind": "PneumaticCylinder",
+          "transform": { "x": 310, "y": 120, "rotationDegrees": 0 },
+          "size": { "width": 96, "height": 36 },
+          "zIndex": 25,
+          "behaviorBindingId": "device.cylinder-1"
+        },
+        {
+          "id": "conveyor-1",
+          "name": "Transfer Conveyor",
+          "kind": "Conveyor",
+          "transform": { "x": 190, "y": 250, "rotationDegrees": 0 },
+          "size": { "width": 360, "height": 80 },
+          "zIndex": 10,
+          "behaviorBindingId": "device.conveyor-1"
+        },
+        {
+          "id": "workpiece-1",
+          "name": "Transfer Workpiece",
+          "kind": "Workpiece",
+          "transform": { "x": 40, "y": 250, "rotationDegrees": 0 },
+          "size": { "width": 40, "height": 40 },
+          "zIndex": 20,
+          "behaviorBindingId": "device.workpiece-1"
+        },
+        {
+          "id": "sensor-home",
+          "name": "Conveyor Home Sensor",
+          "kind": "DigitalSensor",
+          "transform": { "x": 15, "y": 250, "rotationDegrees": 0 },
+          "size": { "width": 18, "height": 70 },
+          "zIndex": 30,
+          "behaviorBindingId": "device.sensor-home"
+        }
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "id": "x",
+      "name": "Transfer X Axis",
+      "kind": "Linear",
+      "unit": "mm",
+      "homePosition": 0,
+      "softLimitMin": 0,
+      "softLimitMax": 300,
+      "maxVelocity": 180,
+      "maxAcceleration": 600,
+      "maxDeceleration": 600,
+      "followingErrorLimit": 0.05,
+      "position": { "x": 40, "y": 200, "z": 0 }
+    }
+  ],
+  "devices": [
+    {
+      "id": "device.sensor-1",
+      "name": "Station Sensor",
+      "kind": "Sensor",
+      "mountPosition": { "x": 300, "y": 250, "z": 0 },
+      "channelIds": ["di.station-present"],
+      "sensor": {
+        "outputChannelId": "di.station-present",
+        "targetComponentId": "workpiece-1",
+        "onDelayMilliseconds": 10,
+        "offDelayMilliseconds": 10
+      },
+      "properties": {}
+    },
+    {
+      "id": "device.sensor-home",
+      "name": "Conveyor Home Sensor",
+      "kind": "Sensor",
+      "mountPosition": { "x": 15, "y": 250, "z": 0 },
+      "channelIds": ["di.conveyor-home"],
+      "sensor": {
+        "outputChannelId": "di.conveyor-home",
+        "targetComponentId": "workpiece-1",
+        "onDelayMilliseconds": 10,
+        "offDelayMilliseconds": 10
+      },
+      "properties": {}
+    },
+    {
+      "id": "device.conveyor-1",
+      "name": "Transfer Conveyor",
+      "kind": "Conveyor",
+      "mountPosition": { "x": 190, "y": 250, "z": 0 },
+      "channelIds": ["do.conveyor-1.run", "do.conveyor-1.reverse"],
+      "conveyor": {
+        "runCommandChannelId": "do.conveyor-1.run",
+        "reverseCommandChannelId": "do.conveyor-1.reverse",
+        "speedUnitsPerSecond": 400
+      },
+      "properties": {}
+    },
+    {
+      "id": "device.workpiece-1",
+      "name": "Transfer Workpiece",
+      "kind": "Workpiece",
+      "mountPosition": { "x": 40, "y": 250, "z": 0 },
+      "channelIds": [],
+      "workpiece": {
+        "type": "Inspection Carrier",
+        "conveyorComponentId": "conveyor-1",
+        "inspectionState": "Pending"
+      },
+      "properties": {}
+    },
+    {
+      "id": "device.cylinder-1",
+      "name": "Station Stopper Cylinder",
+      "kind": "Cylinder",
+      "mountPosition": { "x": 310, "y": 120, "z": 0 },
+      "channelIds": [
+        "do.cylinder-1.extend",
+        "di.cylinder-1.extended",
+        "di.cylinder-1.retracted"
+      ],
+      "cylinder": {
+        "extendCommandChannelId": "do.cylinder-1.extend",
+        "extendedSensorChannelId": "di.cylinder-1.extended",
+        "retractedSensorChannelId": "di.cylinder-1.retracted",
+        "extendDurationMilliseconds": 100,
+        "retractDurationMilliseconds": 100,
+        "extendedSensorDelayMilliseconds": 10,
+        "retractedSensorDelayMilliseconds": 10,
+        "stroke": 60
+      },
+      "properties": {}
+    }
+  ],
+  "channels": [
+    {
+      "id": "di.station-present",
+      "name": "Station Present",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-active",
+      "name": "Cycle Active",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.station-ready",
+      "name": "Station Ready",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cylinder-1.extend",
+      "name": "Stopper Extend Command",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder-1.extended",
+      "name": "Stopper Extended",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder-1.retracted",
+      "name": "Stopper Retracted",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "do.conveyor-1.run",
+      "name": "Transfer Conveyor Run",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.conveyor-1.reverse",
+      "name": "Transfer Conveyor Reverse",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.conveyor-home",
+      "name": "Conveyor Home Present",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    }
+  ],
+  "sequences": [
+    {
+      "id": "auto-transfer-cycle",
+      "name": "Automatic Transfer Cycle",
+      "steps": [
+        {
+          "id": "cycle-active-on",
+          "name": "Cycle Active On",
+          "action": "SetSignal",
+          "targetId": "do.cycle-active",
+          "parameter": "true",
+          "nextStepId": "extend-stopper"
+        },
+        {
+          "id": "extend-stopper",
+          "name": "Extend Station Stopper",
+          "action": "SetSignal",
+          "targetId": "do.cylinder-1.extend",
+          "parameter": "true",
+          "nextStepId": "wait-stopper-extended"
+        },
+        {
+          "id": "wait-stopper-extended",
+          "name": "Wait Stopper Extended",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder-1.extended",
+          "parameter": "true",
+          "timeoutMs": 500,
+          "nextStepId": "conveyor-forward"
+        },
+        {
+          "id": "conveyor-forward",
+          "name": "Select Conveyor Forward",
+          "action": "SetSignal",
+          "targetId": "do.conveyor-1.reverse",
+          "parameter": "false",
+          "nextStepId": "conveyor-run-forward"
+        },
+        {
+          "id": "conveyor-run-forward",
+          "name": "Run Conveyor Forward",
+          "action": "SetSignal",
+          "targetId": "do.conveyor-1.run",
+          "parameter": "true",
+          "nextStepId": "wait-station-sensor"
+        },
+        {
+          "id": "move-station",
+          "name": "Move Stage to Station",
+          "action": "MoveAxis",
+          "targetId": "x",
+          "parameter": "210",
+          "nextStepId": "wait-station-position"
+        },
+        {
+          "id": "wait-station-position",
+          "name": "Wait Stage at Station",
+          "action": "WaitAxisDone",
+          "targetId": "x",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "nextStepId": "station-ready-on"
+        },
+        {
+          "id": "wait-station-sensor",
+          "name": "Wait Station Sensor",
+          "action": "WaitSignal",
+          "targetId": "di.station-present",
+          "parameter": "true",
+          "timeoutMs": 1000,
+          "nextStepId": "conveyor-stop-at-station"
+        },
+        {
+          "id": "conveyor-stop-at-station",
+          "name": "Stop Conveyor at Station",
+          "action": "SetSignal",
+          "targetId": "do.conveyor-1.run",
+          "parameter": "false",
+          "nextStepId": "move-station"
+        },
+        {
+          "id": "station-ready-on",
+          "name": "Station Ready On",
+          "action": "SetSignal",
+          "targetId": "do.station-ready",
+          "parameter": "true",
+          "nextStepId": "move-home"
+        },
+        {
+          "id": "move-home",
+          "name": "Return Stage Home",
+          "action": "MoveAxis",
+          "targetId": "x",
+          "parameter": "0",
+          "nextStepId": "wait-home"
+        },
+        {
+          "id": "wait-home",
+          "name": "Wait Stage Home",
+          "action": "WaitAxisDone",
+          "targetId": "x",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "nextStepId": "station-ready-off"
+        },
+        {
+          "id": "station-ready-off",
+          "name": "Station Ready Off",
+          "action": "SetSignal",
+          "targetId": "do.station-ready",
+          "parameter": "false",
+          "nextStepId": "retract-stopper"
+        },
+        {
+          "id": "retract-stopper",
+          "name": "Retract Station Stopper",
+          "action": "SetSignal",
+          "targetId": "do.cylinder-1.extend",
+          "parameter": "false",
+          "nextStepId": "wait-stopper-retracted"
+        },
+        {
+          "id": "wait-stopper-retracted",
+          "name": "Wait Stopper Retracted",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder-1.retracted",
+          "parameter": "true",
+          "timeoutMs": 500,
+          "nextStepId": "conveyor-reverse"
+        },
+        {
+          "id": "conveyor-reverse",
+          "name": "Select Conveyor Reverse",
+          "action": "SetSignal",
+          "targetId": "do.conveyor-1.reverse",
+          "parameter": "true",
+          "nextStepId": "conveyor-run-reverse"
+        },
+        {
+          "id": "conveyor-run-reverse",
+          "name": "Run Conveyor Reverse",
+          "action": "SetSignal",
+          "targetId": "do.conveyor-1.run",
+          "parameter": "true",
+          "nextStepId": "wait-conveyor-home"
+        },
+        {
+          "id": "wait-conveyor-home",
+          "name": "Wait Workpiece at Conveyor Home",
+          "action": "WaitSignal",
+          "targetId": "di.conveyor-home",
+          "parameter": "true",
+          "timeoutMs": 2000,
+          "nextStepId": "conveyor-stop-home"
+        },
+        {
+          "id": "conveyor-stop-home",
+          "name": "Stop Conveyor at Home",
+          "action": "SetSignal",
+          "targetId": "do.conveyor-1.run",
+          "parameter": "false",
+          "nextStepId": "conveyor-direction-home"
+        },
+        {
+          "id": "conveyor-direction-home",
+          "name": "Restore Conveyor Forward Direction",
+          "action": "SetSignal",
+          "targetId": "do.conveyor-1.reverse",
+          "parameter": "false",
+          "nextStepId": "cycle-active-off"
+        },
+        {
+          "id": "cycle-active-off",
+          "name": "Cycle Active Off",
+          "action": "SetSignal",
+          "targetId": "do.cycle-active",
+          "parameter": "false",
+          "nextStepId": "complete"
+        },
+        {
+          "id": "complete",
+          "name": "Complete",
+          "action": "Complete",
+          "targetId": "",
+          "parameter": ""
+        }
+      ]
+    }
+  ]
+}

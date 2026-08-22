@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>OpenVisionLab.Logging.Controls</RootNamespace>
+    <AssemblyName>OpenVisionLab.Logging.Controls</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenVisionLab.Logging\OpenVisionLab.Logging.csproj" />
+  </ItemGroup>
+
+</Project>

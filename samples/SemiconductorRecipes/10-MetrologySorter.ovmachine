@@ -1,0 +1,722 @@
+{
+  "schema": "1.8",
+  "id": "semi-metrology-sorter-010",
+  "name": "Semiconductor 10 - Metrology Sorter",
+  "createdAt": "2026-08-15T00:00:00+00:00",
+  "modifiedAt": "2026-08-18T00:00:00+00:00",
+  "simulation": {
+    "fixedStepMilliseconds": 5,
+    "defaultTimeScale": 1,
+    "seed": 2110,
+    "activeLayoutId": "main-layout",
+    "automaticRun": {
+      "sequenceId": "automatic-cycle",
+      "startInputId": null,
+      "startInputValue": true,
+      "repeat": false,
+      "repeatDelayMilliseconds": 0
+    }
+  },
+  "layouts": [
+    {
+      "id": "main-layout",
+      "name": "metrology sorting layout",
+      "gridSize": 10,
+      "snapToGrid": true,
+      "components": [
+        {
+          "id": "frame",
+          "name": "Metrology Sorter Frame",
+          "kind": "MachineFrame",
+          "transform": {
+            "x": 360,
+            "y": 250,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 680,
+            "height": 360
+          },
+          "zIndex": -100
+        },
+        {
+          "id": "transport",
+          "name": "metrology sorting transport",
+          "kind": "Conveyor",
+          "transform": {
+            "x": 340,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 560,
+            "height": 70
+          },
+          "zIndex": 10,
+          "behaviorBindingId": "device.transport"
+        },
+        {
+          "id": "sensor-entry",
+          "name": "Metrology Entry Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 200,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-entry"
+        },
+        {
+          "id": "sensor-process",
+          "name": "Measurement Position Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 520,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-process"
+        },
+        {
+          "id": "process-stage",
+          "name": "Metrology Scan Servo Stage",
+          "kind": "LinearStage",
+          "transform": {
+            "x": 100,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 90,
+            "height": 50
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "axis.process"
+        },
+        {
+          "id": "process-cylinder",
+          "name": "Sort Gate Cylinder",
+          "kind": "PneumaticCylinder",
+          "transform": {
+            "x": 520,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 100,
+            "height": 38
+          },
+          "zIndex": 30,
+          "behaviorBindingId": "device.process-cylinder"
+        },
+        {
+          "id": "wafer",
+          "name": "Metrology Wafer",
+          "kind": "Workpiece",
+          "transform": {
+            "x": 97,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 34,
+            "height": 34
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "device.wafer"
+        },
+        {
+          "id": "sort-transport",
+          "name": "Metrology Sort Output Conveyor",
+          "kind": "Conveyor",
+          "transform": {
+            "x": 360,
+            "y": 520,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 560,
+            "height": 70
+          },
+          "zIndex": 10,
+          "behaviorBindingId": "device.sort-transport"
+        },
+        {
+          "id": "sensor-sort-confirm",
+          "name": "Sort Output Confirmation Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 360,
+            "y": 520,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-sort-confirm"
+        },
+        {
+          "id": "reference-wafer",
+          "name": "Metrology Reference Wafer",
+          "kind": "Workpiece",
+          "transform": {
+            "x": 100,
+            "y": 520,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 34,
+            "height": 34
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "device.reference-wafer"
+        }
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "id": "axis.process",
+      "name": "Metrology Scan Servo Axis",
+      "kind": "Linear",
+      "unit": "mm",
+      "homePosition": 0,
+      "softLimitMin": 0,
+      "softLimitMax": 320,
+      "maxVelocity": 180,
+      "maxAcceleration": 700,
+      "maxDeceleration": 650,
+      "followingErrorLimit": 0.05,
+      "position": {
+        "x": 100,
+        "y": 230,
+        "z": 0
+      }
+    }
+  ],
+  "devices": [
+    {
+      "id": "device.transport",
+      "name": "metrology sorting transport",
+      "kind": "Conveyor",
+      "mountPosition": {
+        "x": 340,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "do.transport.run",
+        "do.transport.reverse"
+      ],
+      "conveyor": {
+        "runCommandChannelId": "do.transport.run",
+        "reverseCommandChannelId": "do.transport.reverse",
+        "speedUnitsPerSecond": 270
+      },
+      "properties": {
+        "semiconductorProcess": "metrology sorting",
+        "connectionRole": "material transport"
+      }
+    },
+    {
+      "id": "device.sensor-entry",
+      "name": "Metrology Entry Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 200,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-entry"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-entry",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 20,
+        "offDelayMilliseconds": 20
+      },
+      "properties": {
+        "semiconductorProcess": "metrology sorting",
+        "connectionRole": "entry detection"
+      }
+    },
+    {
+      "id": "device.sensor-process",
+      "name": "Measurement Position Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 520,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-process"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-process",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 20,
+        "offDelayMilliseconds": 20
+      },
+      "properties": {
+        "semiconductorProcess": "metrology sorting",
+        "connectionRole": "process-position detection"
+      }
+    },
+    {
+      "id": "device.process-cylinder",
+      "name": "Sort Gate Cylinder",
+      "kind": "Cylinder",
+      "mountPosition": {
+        "x": 520,
+        "y": 230,
+        "z": 0
+      },
+      "channelIds": [
+        "do.cylinder.extend",
+        "di.cylinder.extended",
+        "di.cylinder.retracted"
+      ],
+      "cylinder": {
+        "extendCommandChannelId": "do.cylinder.extend",
+        "extendedSensorChannelId": "di.cylinder.extended",
+        "retractedSensorChannelId": "di.cylinder.retracted",
+        "extendDurationMilliseconds": 130,
+        "retractDurationMilliseconds": 130,
+        "extendedSensorDelayMilliseconds": 10,
+        "retractedSensorDelayMilliseconds": 10,
+        "stroke": 60
+      },
+      "properties": {
+        "semiconductorProcess": "metrology sorting",
+        "connectionRole": "station interlock"
+      }
+    },
+    {
+      "id": "device.wafer",
+      "name": "Metrology Wafer",
+      "kind": "Workpiece",
+      "mountPosition": {
+        "x": 97,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [],
+      "workpiece": {
+        "type": "Metrology Wafer",
+        "conveyorComponentId": "transport",
+        "inspectionState": "Pending"
+      },
+      "properties": {
+        "semiconductorProcess": "metrology sorting",
+        "connectionRole": "process material"
+      }
+    },
+    {
+      "id": "device.sort-transport",
+      "name": "Metrology Sort Output Conveyor",
+      "kind": "Conveyor",
+      "mountPosition": {
+        "x": 360,
+        "y": 520,
+        "z": 0
+      },
+      "channelIds": [
+        "do.sort-transport.run",
+        "do.sort-transport.reverse"
+      ],
+      "conveyor": {
+        "runCommandChannelId": "do.sort-transport.run",
+        "reverseCommandChannelId": "do.sort-transport.reverse",
+        "speedUnitsPerSecond": 220
+      },
+      "properties": {
+        "semiconductorProcess": "metrology sorting",
+        "connectionRole": "sorted wafer transport"
+      }
+    },
+    {
+      "id": "device.sensor-sort-confirm",
+      "name": "Sort Output Confirmation Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 360,
+        "y": 520,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-sort-confirm"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-sort-confirm",
+        "targetComponentId": "reference-wafer",
+        "onDelayMilliseconds": 10,
+        "offDelayMilliseconds": 10
+      },
+      "properties": {
+        "semiconductorProcess": "metrology sorting",
+        "connectionRole": "sort output confirmation"
+      }
+    },
+    {
+      "id": "device.reference-wafer",
+      "name": "Metrology Reference Wafer",
+      "kind": "Workpiece",
+      "mountPosition": {
+        "x": 100,
+        "y": 520,
+        "z": 0
+      },
+      "channelIds": [],
+      "workpiece": {
+        "type": "Metrology Reference Wafer",
+        "conveyorComponentId": "sort-transport",
+        "inspectionState": "Pending"
+      },
+      "properties": {
+        "semiconductorProcess": "metrology sorting",
+        "connectionRole": "reference material"
+      }
+    },
+    {
+      "id": "camera.metrology",
+      "name": "Metrology Inspection Camera",
+      "kind": "Camera",
+      "mountPosition": {
+        "x": 520,
+        "y": 300,
+        "z": 220
+      },
+      "channelIds": [],
+      "camera": {
+        "exposureDelayMilliseconds": 20,
+        "transferDelayMilliseconds": 30,
+        "placeholderDecision": "Fail"
+      },
+      "properties": {
+        "semiconductorProcess": "metrology sorting",
+        "connectionRole": "vendor-neutral inspection disposition"
+      }
+    },
+    {
+      "id": "device.inspection-sorter",
+      "name": "Inspection Disposition Router",
+      "kind": "Sorter",
+      "mountPosition": {
+        "x": 520,
+        "y": 450,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sort.pass-routed",
+        "di.sort.ng-routed"
+      ],
+      "inspectionSortRouter": {
+        "cameraId": "camera.metrology",
+        "passConveyorComponentId": "transport",
+        "ngConveyorComponentId": "sort-transport",
+        "passRoutedFeedbackChannelId": "di.sort.pass-routed",
+        "ngRoutedFeedbackChannelId": "di.sort.ng-routed"
+      },
+      "properties": {
+        "semiconductorProcess": "metrology sorting",
+        "connectionRole": "mutually exclusive sort routing"
+      }
+    }
+  ],
+  "channels": [
+    {
+      "id": "di.sensor-entry",
+      "name": "Metrology Entry Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.sensor-process",
+      "name": "Measurement Position Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.extended",
+      "name": "Sort Gate Cylinder Extended",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.retracted",
+      "name": "Sort Gate Cylinder Retracted",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "do.transport.run",
+      "name": "Transport Run",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.transport.reverse",
+      "name": "Transport Reverse",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cylinder.extend",
+      "name": "Sort Gate Cylinder Extend",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-active",
+      "name": "Cycle Active",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-done",
+      "name": "Cycle Done",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.sensor-sort-confirm",
+      "name": "Sort Output Confirmation Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.sort-transport.run",
+      "name": "Sort Output Conveyor Run",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.sort-transport.reverse",
+      "name": "Sort Output Conveyor Reverse",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.sort.pass-routed",
+      "name": "Pass Route Selected",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.sort.ng-routed",
+      "name": "NG Route Selected",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    }
+  ],
+  "sequences": [
+    {
+      "id": "automatic-cycle",
+      "name": "metrology sorting automatic cycle",
+      "steps": [
+        {
+          "id": "cycle-active",
+          "name": "Cycle Active",
+          "action": "SetSignal",
+          "targetId": "do.cycle-active",
+          "parameter": "true",
+          "nextStepId": "extend-cylinder"
+        },
+        {
+          "id": "extend-cylinder",
+          "name": "Extend Sort Gate Cylinder",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "true",
+          "nextStepId": "wait-cylinder-extended"
+        },
+        {
+          "id": "wait-cylinder-extended",
+          "name": "Wait Sort Gate Cylinder Extended",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.extended",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "start-transport",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Extended"
+        },
+        {
+          "id": "start-transport",
+          "name": "Start Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "true",
+          "nextStepId": "wait-process-position"
+        },
+        {
+          "id": "wait-process-position",
+          "name": "Wait Measurement Position Sensor",
+          "action": "WaitSignal",
+          "targetId": "di.sensor-process",
+          "parameter": "true",
+          "timeoutMs": 5000,
+          "nextStepId": "stop-transport",
+          "expectedTargetId": "sensor-process",
+          "expectedState": "Detected"
+        },
+        {
+          "id": "stop-transport",
+          "name": "Stop Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "false",
+          "nextStepId": "move-process-axis"
+        },
+        {
+          "id": "move-process-axis",
+          "name": "Move Metrology Scan Servo Axis",
+          "action": "MoveAxis",
+          "targetId": "axis.process",
+          "parameter": "280",
+          "nextStepId": "wait-process-axis"
+        },
+        {
+          "id": "wait-process-axis",
+          "name": "Wait Metrology Scan Servo Axis",
+          "action": "WaitAxisDone",
+          "targetId": "axis.process",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "nextStepId": "retract-cylinder",
+          "expectedTargetId": "axis.process",
+          "expectedState": "Idle"
+        },
+        {
+          "id": "retract-cylinder",
+          "name": "Retract Sort Gate Cylinder",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "false",
+          "nextStepId": "wait-cylinder-retracted"
+        },
+        {
+          "id": "wait-cylinder-retracted",
+          "name": "Wait Sort Gate Cylinder Retracted",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.retracted",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "trigger-metrology-camera",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Retracted"
+        },
+        {
+          "id": "trigger-metrology-camera",
+          "name": "Trigger Metrology Inspection",
+          "action": "TriggerCamera",
+          "targetId": "camera.metrology",
+          "parameter": "metrology-disposition",
+          "nextStepId": "wait-metrology-result"
+        },
+        {
+          "id": "wait-metrology-result",
+          "name": "Wait Metrology Disposition",
+          "action": "WaitVisionResult",
+          "targetId": "camera.metrology",
+          "parameter": "",
+          "timeoutMs": 2000,
+          "nextStepId": "start-pass-transport",
+          "failureStepId": "start-sort-transport"
+        },
+        {
+          "id": "start-pass-transport",
+          "name": "Start Pass Route Conveyor",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "true",
+          "nextStepId": "wait-pass-routed"
+        },
+        {
+          "id": "wait-pass-routed",
+          "name": "Wait Pass Route Selection",
+          "action": "WaitSignal",
+          "targetId": "di.sort.pass-routed",
+          "parameter": "true",
+          "timeoutMs": 2000,
+          "nextStepId": "stop-pass-transport"
+        },
+        {
+          "id": "stop-pass-transport",
+          "name": "Stop Pass Route Conveyor",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "false",
+          "nextStepId": "cycle-done"
+        },
+        {
+          "id": "start-sort-transport",
+          "name": "Start NG Route Conveyor",
+          "action": "SetSignal",
+          "targetId": "do.sort-transport.run",
+          "parameter": "true",
+          "nextStepId": "wait-ng-routed"
+        },
+        {
+          "id": "wait-ng-routed",
+          "name": "Wait NG Route Selection",
+          "action": "WaitSignal",
+          "targetId": "di.sort.ng-routed",
+          "parameter": "true",
+          "timeoutMs": 2000,
+          "nextStepId": "wait-sort-confirm"
+        },
+        {
+          "id": "wait-sort-confirm",
+          "name": "Wait NG Output Confirmation",
+          "action": "WaitSignal",
+          "targetId": "di.sensor-sort-confirm",
+          "parameter": "true",
+          "timeoutMs": 5000,
+          "expectedTargetId": "sensor-sort-confirm",
+          "expectedState": "Detected",
+          "nextStepId": "stop-sort-transport"
+        },
+        {
+          "id": "stop-sort-transport",
+          "name": "Stop NG Route Conveyor",
+          "action": "SetSignal",
+          "targetId": "do.sort-transport.run",
+          "parameter": "false",
+          "nextStepId": "cycle-done"
+        },
+        {
+          "id": "cycle-done",
+          "name": "Cycle Done",
+          "action": "SetSignal",
+          "targetId": "do.cycle-done",
+          "parameter": "true",
+          "nextStepId": "complete",
+          "expectedTargetId": "transport",
+          "expectedState": "Stopped"
+        },
+        {
+          "id": "complete",
+          "name": "Complete",
+          "action": "Complete",
+          "targetId": "",
+          "parameter": ""
+        }
+      ]
+    }
+  ]
+}

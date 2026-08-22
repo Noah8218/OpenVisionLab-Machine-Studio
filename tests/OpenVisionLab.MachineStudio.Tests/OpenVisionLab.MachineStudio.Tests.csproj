@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>OpenVisionLab.MachineStudio.Tests</RootNamespace>
+    <AssemblyName>OpenVisionLab.MachineStudio.Tests</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageReference Include="xunit" Version="2.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OpenVisionLab.MachineStudio\OpenVisionLab.MachineStudio.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\samples\AutomaticTransferCell\AutomaticTransferCell.ovmachine"
+          Link="Samples\AutomaticTransferCell.ovmachine"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\SemiconductorRecipes\01-FoupLoadPort.ovmachine"
+          Link="SemiconductorRecipes\01-FoupLoadPort.ovmachine"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\SemiconductorRecipes\03-WaferPrealigner.ovmachine"
+          Link="SemiconductorRecipes\03-WaferPrealigner.ovmachine"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\SemiconductorRecipes\04-WaferOcrInspection.ovmachine"
+          Link="SemiconductorRecipes\04-WaferOcrInspection.ovmachine"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\SemiconductorRecipes\05-LoadLockEntry.ovmachine"
+          Link="SemiconductorRecipes\05-LoadLockEntry.ovmachine"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\SemiconductorRecipes\08-DryEtchTransfer.ovmachine"
+          Link="SemiconductorRecipes\08-DryEtchTransfer.ovmachine"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\SemiconductorRecipes\10-MetrologySorter.ovmachine"
+          Link="SemiconductorRecipes\10-MetrologySorter.ovmachine"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

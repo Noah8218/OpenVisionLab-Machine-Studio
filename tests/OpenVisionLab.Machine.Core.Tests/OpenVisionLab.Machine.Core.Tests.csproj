@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>OpenVisionLab.Machine.Core.Tests</RootNamespace>
+    <AssemblyName>OpenVisionLab.Machine.Core.Tests</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageReference Include="xunit" Version="2.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OpenVisionLab.Machine.Core\OpenVisionLab.Machine.Core.csproj" />
+    <ProjectReference Include="..\..\src\OpenVisionLab.Localization\OpenVisionLab.Localization.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\samples\sample-pick-and-place.ovmachine" Link="sample-pick-and-place.ovmachine">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\samples\VisionInspectionCell\VisionInspectionCell.ovmachine" Link="VisionInspectionCell.ovmachine">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\samples\AutomaticTransferCell\AutomaticTransferCell.ovmachine" Link="AutomaticTransferCell.ovmachine">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

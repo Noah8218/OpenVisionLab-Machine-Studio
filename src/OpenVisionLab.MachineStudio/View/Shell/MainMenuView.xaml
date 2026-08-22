@@ -1,0 +1,31 @@
+<UserControl x:Class="OpenVisionLab.MachineStudio.View.Shell.MainMenuView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
+    <Menu Background="{DynamicResource Surface.Root}">
+        <MenuItem Header="{loc:Loc Key=Shell.File}" Style="{StaticResource MachineTopMenuItemStyle}">
+            <MenuItem Header="{loc:Loc Key=Shell.New}" Command="{Binding NewProjectCommand}" InputGestureText="Ctrl+N" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <MenuItem Header="{loc:Loc Key=Gallery.Open}" Command="{Binding SemiconductorRecipes.OpenCommand}" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <MenuItem Header="{loc:Loc Key=Shell.Open}" Command="{Binding OpenProjectCommand}" InputGestureText="Ctrl+O" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <MenuItem Header="{loc:Loc Key=Shell.Save}" Command="{Binding SaveProjectCommand}" InputGestureText="Ctrl+S" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <MenuItem Header="{loc:Loc Key=Shell.SaveAs}" Command="{Binding SaveProjectAsCommand}" InputGestureText="Ctrl+Shift+S" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <Separator Margin="8,3" Background="{DynamicResource Border.Default}" />
+            <MenuItem Header="{loc:Loc Key=Shell.Exit}" Command="{Binding ExitCommand}" Style="{StaticResource MachineSubmenuItemStyle}" />
+        </MenuItem>
+        <MenuItem x:Name="EditMenuItem" Header="{loc:Loc Key=Shell.Edit}" Style="{StaticResource MachineTopMenuItemStyle}">
+            <MenuItem Header="{loc:Loc Key=Shell.Undo}" Command="{Binding UndoLayoutEditCommand}" InputGestureText="Ctrl+Z" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <MenuItem Header="{loc:Loc Key=Shell.Redo}" Command="{Binding RedoLayoutEditCommand}" InputGestureText="Ctrl+Y" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <Separator Margin="8,3" Background="{DynamicResource Border.Default}" />
+            <MenuItem Header="{loc:Loc Key=Shell.Copy}" Command="{Binding CopyLayoutSelectionCommand}" InputGestureText="Ctrl+C" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <MenuItem Header="{loc:Loc Key=Shell.Duplicate}" Command="{Binding DuplicateLayoutSelectionCommand}" InputGestureText="Ctrl+D" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <MenuItem Header="{loc:Loc Key=Shell.Paste}" Command="{Binding PasteLayoutSelectionCommand}" InputGestureText="Ctrl+V" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <MenuItem Header="{loc:Loc Key=Shell.Delete}" Command="{Binding DeleteLayoutComponentCommand}" InputGestureText="Delete" Style="{StaticResource MachineSubmenuItemStyle}" />
+        </MenuItem>
+        <MenuItem Header="{loc:Loc Key=Shell.Simulation}" Style="{StaticResource MachineTopMenuItemStyle}">
+            <MenuItem Header="{loc:Loc Key=Shell.Run}" Command="{Binding RunCommand}" InputGestureText="F5" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <MenuItem Header="{loc:Loc Key=Shell.Pause}" Command="{Binding PauseCommand}" InputGestureText="F6" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <MenuItem Header="{loc:Loc Key=Shell.Reset}" Command="{Binding ResetCommand}" InputGestureText="Ctrl+Shift+R" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <MenuItem Header="{loc:Loc Key=Shell.Step}" Command="{Binding StepCommand}" InputGestureText="F10" Style="{StaticResource MachineSubmenuItemStyle}" />
+        </MenuItem>
+    </Menu>
+</UserControl>

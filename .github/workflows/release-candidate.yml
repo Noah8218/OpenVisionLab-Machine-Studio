@@ -1,0 +1,44 @@
+name: Windows Release Candidate
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-candidate:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          global-json-file: global.json
+
+      - name: Build and verify release candidate
+        shell: pwsh
+        run: >-
+          .\scripts\build-release-candidate.ps1
+          -ArtifactDirectory artifacts\release-candidate
+
+      - name: Upload release candidate evidence
+        if: always() && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: machine-studio-release-candidate-${{ github.sha }}
+          path: artifacts/release-candidate
+          if-no-files-found: error
+          retention-days: 3

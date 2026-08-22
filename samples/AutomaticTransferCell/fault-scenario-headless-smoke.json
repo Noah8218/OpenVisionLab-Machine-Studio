@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "atc-headless-smoke",
+  "name": "ATC headless smoke",
+  "description": "A short deterministic fault sweep for headless CI smoke runs.",
+  "durationTicks": 16,
+  "actions": [
+    {
+      "tick": 1,
+      "action": "InjectFault",
+      "faultKind": "StuckDigitalInput",
+      "targetId": "di.station-present",
+      "forcedValue": false
+    },
+    {
+      "tick": 4,
+      "action": "ClearFault",
+      "faultKind": "StuckDigitalInput",
+      "targetId": "di.station-present"
+    },
+    {
+      "tick": 7,
+      "action": "InjectFault",
+      "faultKind": "CylinderTravelBlocked",
+      "targetId": "cylinder-1"
+    },
+    {
+      "tick": 13,
+      "action": "ClearFault",
+      "faultKind": "CylinderTravelBlocked",
+      "targetId": "cylinder-1"
+    }
+  ]
+}

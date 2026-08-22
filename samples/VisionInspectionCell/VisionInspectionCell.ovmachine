@@ -1,0 +1,162 @@
+﻿{
+  "schema": "1.5",
+  "id": "vision-inspection-cell-001",
+  "name": "Vision Inspection Cell",
+  "createdAt": "2026-08-05T00:00:00+00:00",
+  "modifiedAt": "2026-08-06T00:00:00+00:00",
+  "units": {
+    "linear": "mm",
+    "angular": "degree"
+  },
+  "simulation": {
+    "fixedStepMilliseconds": 5,
+    "defaultTimeScale": 1.0,
+    "seed": 1001
+  },
+  "axes": [
+    {
+      "id": "x",
+      "name": "Inspection X Axis",
+      "kind": "Linear",
+      "unit": "mm",
+      "homePosition": 0,
+      "softLimitMin": 0,
+      "softLimitMax": 300,
+      "maxVelocity": 200,
+      "maxAcceleration": 500,
+      "position": { "x": 0, "y": 200, "z": 0 }
+    }
+  ],
+  "devices": [
+    {
+      "id": "cam1",
+      "name": "Top Camera",
+      "kind": "Camera",
+      "mountPosition": { "x": 100, "y": 200, "z": 100 },
+      "channelIds": [],
+      "camera": {
+        "exposureDelayMilliseconds": 20,
+        "transferDelayMilliseconds": 30,
+        "placeholderDecision": "Pass",
+        "singleImageSource": {
+          "sourceRelativePath": "assets/presence-check.pgm",
+          "width": 16,
+          "height": 12,
+          "pixelFormat": "Mono8"
+        }
+      },
+      "properties": {}
+    }
+  ],
+  "channels": [
+    {
+      "id": "di.cycle-start",
+      "name": "Cycle Start",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-active",
+      "name": "Cycle Active",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-done",
+      "name": "Cycle Done",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    }
+  ],
+  "sequences": [
+    {
+      "id": "inspection-cycle",
+      "name": "Inspection Cycle",
+      "steps": [
+        {
+          "id": "wait-cycle-start",
+          "name": "Wait Cycle Start",
+          "action": "WaitSignal",
+          "targetId": "di.cycle-start",
+          "parameter": "true",
+          "timeoutMs": 0,
+          "nextStepId": "active-on"
+        },
+        {
+          "id": "active-on",
+          "name": "Cycle Active On",
+          "action": "SetSignal",
+          "targetId": "do.cycle-active",
+          "parameter": "true",
+          "nextStepId": "move-inspection"
+        },
+        {
+          "id": "move-inspection",
+          "name": "Move X to Inspection",
+          "action": "MoveAxis",
+          "targetId": "x",
+          "parameter": "100",
+          "nextStepId": "wait-axis-done"
+        },
+        {
+          "id": "wait-axis-done",
+          "name": "Wait X Done",
+          "action": "WaitAxisDone",
+          "targetId": "x",
+          "parameter": "",
+          "timeoutMs": 2000,
+          "nextStepId": "trigger-camera"
+        },
+        {
+          "id": "trigger-camera",
+          "name": "Trigger Top Camera",
+          "action": "TriggerCamera",
+          "targetId": "cam1",
+          "parameter": "presence-check",
+          "nextStepId": "wait-vision-result"
+        },
+        {
+          "id": "wait-vision-result",
+          "name": "Wait Vision Result",
+          "action": "WaitVisionResult",
+          "targetId": "cam1",
+          "parameter": "",
+          "timeoutMs": 500,
+          "nextStepId": "active-off",
+          "failureStepId": "active-off-failed"
+        },
+        {
+          "id": "active-off",
+          "name": "Cycle Active Off",
+          "action": "SetSignal",
+          "targetId": "do.cycle-active",
+          "parameter": "false",
+          "nextStepId": "done-on"
+        },
+        {
+          "id": "active-off-failed",
+          "name": "Cycle Active Off (Failed Inspection)",
+          "action": "SetSignal",
+          "targetId": "do.cycle-active",
+          "parameter": "false",
+          "nextStepId": "done-on"
+        },
+        {
+          "id": "done-on",
+          "name": "Cycle Done On",
+          "action": "SetSignal",
+          "targetId": "do.cycle-done",
+          "parameter": "true",
+          "nextStepId": "complete"
+        },
+        {
+          "id": "complete",
+          "name": "Complete",
+          "action": "Complete",
+          "targetId": "",
+          "parameter": ""
+        }
+      ]
+    }
+  ]
+}

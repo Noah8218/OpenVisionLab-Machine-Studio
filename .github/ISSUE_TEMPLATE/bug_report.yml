@@ -1,0 +1,51 @@
+name: Bug report
+description: Report a reproducible defect in a supported Machine Studio workflow.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Do not report security vulnerabilities here. Follow SECURITY.md instead.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Application version and source identity shown by the application.
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows environment
+      description: Windows version, display resolution, and DPI scaling when relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest deterministic sequence that reproduces the defect.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Submission checks
+      options:
+        - label: I removed credentials, private data, customer files, and proprietary vendor material.
+          required: true
+        - label: This is not a security vulnerability or production equipment incident.
+          required: true

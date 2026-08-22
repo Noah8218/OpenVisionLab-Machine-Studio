@@ -1,0 +1,661 @@
+{
+  "schema": "1.5",
+  "id": "semi-cmp-transfer-009",
+  "name": "Semiconductor 09 - CMP Transfer",
+  "createdAt": "2026-08-15T00:00:00+00:00",
+  "modifiedAt": "2026-08-18T00:00:00+00:00",
+  "simulation": {
+    "fixedStepMilliseconds": 5,
+    "defaultTimeScale": 1,
+    "seed": 2109,
+    "activeLayoutId": "main-layout",
+    "automaticRun": {
+      "sequenceId": "automatic-cycle",
+      "startInputId": null,
+      "startInputValue": true,
+      "repeat": false,
+      "repeatDelayMilliseconds": 0
+    }
+  },
+  "layouts": [
+    {
+      "id": "main-layout",
+      "name": "CMP transfer layout",
+      "gridSize": 10,
+      "snapToGrid": true,
+      "components": [
+        {
+          "id": "frame",
+          "name": "CMP Transfer Frame",
+          "kind": "MachineFrame",
+          "transform": {
+            "x": 360,
+            "y": 250,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 680,
+            "height": 360
+          },
+          "zIndex": -100
+        },
+        {
+          "id": "transport",
+          "name": "CMP transfer transport",
+          "kind": "Conveyor",
+          "transform": {
+            "x": 340,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 560,
+            "height": 70
+          },
+          "zIndex": 10,
+          "behaviorBindingId": "device.transport"
+        },
+        {
+          "id": "sensor-entry",
+          "name": "CMP Entry Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 200,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-entry"
+        },
+        {
+          "id": "sensor-process",
+          "name": "Polisher Handoff Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 480,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-process"
+        },
+    {
+      "id": "process-stage",
+          "name": "CMP Loader Servo Stage",
+      "kind": "LinearStage",
+          "transform": {
+            "x": 100,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 90,
+            "height": 50
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "axis.process"
+        },
+        {
+          "id": "process-cylinder",
+          "name": "Carrier Clamp Cylinder",
+          "kind": "PneumaticCylinder",
+          "transform": {
+            "x": 480,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 100,
+            "height": 38
+          },
+          "zIndex": 30,
+          "behaviorBindingId": "device.process-cylinder"
+        },
+        {
+          "id": "wafer",
+          "name": "CMP Wafer",
+          "kind": "Workpiece",
+          "transform": {
+            "x": 97,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 34,
+            "height": 34
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "device.wafer"
+        },
+    {
+      "id": "cmp-platen-stage",
+          "name": "CMP Platen",
+      "kind": "RotaryStage",
+          "transform": {
+            "x": 140,
+            "y": 140,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 120,
+            "height": 60
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "axis.cmp-platen"
+        },
+        {
+          "id": "cmp-head-stage",
+          "name": "CMP Head",
+          "kind": "LinearStage",
+          "transform": {
+            "x": 470,
+            "y": 140,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 90,
+            "height": 50
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "axis.cmp-head"
+        },
+        {
+          "id": "cmp-head-load",
+          "name": "CMP Head Load Cylinder",
+          "kind": "PneumaticCylinder",
+          "transform": {
+            "x": 620,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 100,
+            "height": 38
+          },
+          "zIndex": 30,
+          "behaviorBindingId": "device.cmp-head-load"
+        }
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "id": "axis.process",
+      "name": "CMP Loader Servo Axis",
+      "kind": "Linear",
+      "unit": "mm",
+      "homePosition": 0,
+      "softLimitMin": 0,
+      "softLimitMax": 320,
+      "maxVelocity": 180,
+      "maxAcceleration": 700,
+      "maxDeceleration": 650,
+      "followingErrorLimit": 0.05,
+      "position": {
+        "x": 100,
+        "y": 230,
+        "z": 0
+      }
+    },
+    {
+      "id": "axis.cmp-platen",
+      "name": "CMP Platen Rotation Axis",
+      "kind": "Rotary",
+      "unit": "deg",
+      "homePosition": 0,
+      "softLimitMin": 0,
+      "softLimitMax": 720,
+      "maxVelocity": 300,
+      "maxAcceleration": 1000,
+      "maxDeceleration": 1000,
+      "followingErrorLimit": 0.05,
+      "position": {
+        "x": 140,
+        "y": 140,
+        "z": 0
+      }
+    },
+    {
+      "id": "axis.cmp-head",
+      "name": "CMP Head Lift Axis",
+      "kind": "Linear",
+      "unit": "mm",
+      "homePosition": 0,
+      "softLimitMin": 0,
+      "softLimitMax": 140,
+      "maxVelocity": 100,
+      "maxAcceleration": 500,
+      "maxDeceleration": 500,
+      "followingErrorLimit": 0.05,
+      "position": {
+        "x": 470,
+        "y": 140,
+        "z": 0
+      }
+    }
+  ],
+  "devices": [
+    {
+      "id": "device.transport",
+      "name": "CMP transfer transport",
+      "kind": "Conveyor",
+      "mountPosition": {
+        "x": 340,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "do.transport.run",
+        "do.transport.reverse"
+      ],
+      "conveyor": {
+        "runCommandChannelId": "do.transport.run",
+        "reverseCommandChannelId": "do.transport.reverse",
+        "speedUnitsPerSecond": 190
+      },
+      "properties": {
+        "semiconductorProcess": "CMP transfer",
+        "connectionRole": "material transport"
+      }
+    },
+    {
+      "id": "device.sensor-entry",
+      "name": "CMP Entry Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 200,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-entry"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-entry",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 10,
+        "offDelayMilliseconds": 10
+      },
+      "properties": {
+        "semiconductorProcess": "CMP transfer",
+        "connectionRole": "entry detection"
+      }
+    },
+    {
+      "id": "device.sensor-process",
+      "name": "Polisher Handoff Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 480,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-process"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-process",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 10,
+        "offDelayMilliseconds": 10
+      },
+      "properties": {
+        "semiconductorProcess": "CMP transfer",
+        "connectionRole": "process-position detection"
+      }
+    },
+    {
+      "id": "device.process-cylinder",
+      "name": "Carrier Clamp Cylinder",
+      "kind": "Cylinder",
+      "mountPosition": {
+        "x": 480,
+        "y": 230,
+        "z": 0
+      },
+      "channelIds": [
+        "do.cylinder.extend",
+        "di.cylinder.extended",
+        "di.cylinder.retracted"
+      ],
+      "cylinder": {
+        "extendCommandChannelId": "do.cylinder.extend",
+        "extendedSensorChannelId": "di.cylinder.extended",
+        "retractedSensorChannelId": "di.cylinder.retracted",
+        "extendDurationMilliseconds": 170,
+        "retractDurationMilliseconds": 170,
+        "extendedSensorDelayMilliseconds": 10,
+        "retractedSensorDelayMilliseconds": 10,
+        "stroke": 60
+      },
+      "properties": {
+        "semiconductorProcess": "CMP transfer",
+        "connectionRole": "station interlock"
+      }
+    },
+    {
+      "id": "device.wafer",
+      "name": "CMP Wafer",
+      "kind": "Workpiece",
+      "mountPosition": {
+        "x": 97,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [],
+      "workpiece": {
+        "type": "CMP Wafer",
+        "conveyorComponentId": "transport",
+        "inspectionState": "Pending"
+      },
+      "properties": {
+        "semiconductorProcess": "CMP transfer",
+        "connectionRole": "process material"
+      }
+    },
+    {
+      "id": "device.cmp-head-load",
+      "name": "CMP Head Load Cylinder",
+      "kind": "Cylinder",
+      "mountPosition": {
+        "x": 620,
+        "y": 230,
+        "z": 0
+      },
+      "channelIds": [
+        "do.cmp-head-load.extend",
+        "di.cmp-head-load.extended",
+        "di.cmp-head-load.retracted"
+      ],
+      "cylinder": {
+        "extendCommandChannelId": "do.cmp-head-load.extend",
+        "extendedSensorChannelId": "di.cmp-head-load.extended",
+        "retractedSensorChannelId": "di.cmp-head-load.retracted",
+        "extendDurationMilliseconds": 140,
+        "retractDurationMilliseconds": 140,
+        "extendedSensorDelayMilliseconds": 10,
+        "retractedSensorDelayMilliseconds": 10,
+        "stroke": 55
+      },
+      "properties": {
+        "semiconductorProcess": "CMP transfer",
+        "connectionRole": "CMP Head Load Cylinder"
+      }
+    }
+  ],
+  "channels": [
+    {
+      "id": "di.sensor-entry",
+      "name": "CMP Entry Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.sensor-process",
+      "name": "Polisher Handoff Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.extended",
+      "name": "Carrier Clamp Cylinder Extended",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.retracted",
+      "name": "Carrier Clamp Cylinder Retracted",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "do.transport.run",
+      "name": "Transport Run",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.transport.reverse",
+      "name": "Transport Reverse",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cylinder.extend",
+      "name": "Carrier Clamp Cylinder Extend",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-active",
+      "name": "Cycle Active",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-done",
+      "name": "Cycle Done",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cmp-head-load.extended",
+      "name": "CMP Head Load Cylinder Extended",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cmp-head-load.retracted",
+      "name": "CMP Head Load Cylinder Retracted",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "do.cmp-head-load.extend",
+      "name": "CMP Head Load Cylinder Extend",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    }
+  ],
+  "sequences": [
+    {
+      "id": "automatic-cycle",
+      "name": "CMP transfer automatic cycle",
+      "steps": [
+        {
+          "id": "cycle-active",
+          "name": "Cycle Active",
+          "action": "SetSignal",
+          "targetId": "do.cycle-active",
+          "parameter": "true",
+          "nextStepId": "extend-cylinder"
+        },
+        {
+          "id": "extend-cylinder",
+          "name": "Extend Carrier Clamp Cylinder",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "true",
+          "nextStepId": "wait-cylinder-extended"
+        },
+        {
+          "id": "wait-cylinder-extended",
+          "name": "Wait Carrier Clamp Cylinder Extended",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.extended",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "start-transport",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Extended"
+        },
+        {
+          "id": "start-transport",
+          "name": "Start Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "true",
+          "nextStepId": "wait-process-position"
+        },
+        {
+          "id": "wait-process-position",
+          "name": "Wait Polisher Handoff Sensor",
+          "action": "WaitSignal",
+          "targetId": "di.sensor-process",
+          "parameter": "true",
+          "timeoutMs": 5000,
+          "nextStepId": "stop-transport",
+          "expectedTargetId": "sensor-process",
+          "expectedState": "Detected"
+        },
+        {
+          "id": "stop-transport",
+          "name": "Stop Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "false",
+          "nextStepId": "move-process-axis"
+        },
+        {
+          "id": "move-process-axis",
+          "name": "Move CMP Loader Servo Axis",
+          "action": "MoveAxis",
+          "targetId": "axis.process",
+          "parameter": "220",
+          "nextStepId": "wait-process-axis"
+        },
+        {
+          "id": "wait-process-axis",
+          "name": "Wait CMP Loader Servo Axis",
+          "action": "WaitAxisDone",
+          "targetId": "axis.process",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "nextStepId": "move-cmp-head",
+          "expectedTargetId": "axis.process",
+          "expectedState": "Idle"
+        },
+        {
+          "id": "move-cmp-head",
+          "name": "Lower CMP Head",
+          "action": "MoveAxis",
+          "targetId": "axis.cmp-head",
+          "parameter": "100",
+          "nextStepId": "wait-cmp-head"
+        },
+        {
+          "id": "wait-cmp-head",
+          "name": "Wait CMP Head Lift",
+          "action": "WaitAxisDone",
+          "targetId": "axis.cmp-head",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "expectedTargetId": "axis.cmp-head",
+          "expectedState": "Idle",
+          "nextStepId": "rotate-cmp-platen"
+        },
+        {
+          "id": "rotate-cmp-platen",
+          "name": "Rotate CMP Platen",
+          "action": "MoveAxis",
+          "targetId": "axis.cmp-platen",
+          "parameter": "360",
+          "nextStepId": "wait-cmp-platen"
+        },
+        {
+          "id": "wait-cmp-platen",
+          "name": "Wait CMP Platen Rotation",
+          "action": "WaitAxisDone",
+          "targetId": "axis.cmp-platen",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "expectedTargetId": "axis.cmp-platen",
+          "expectedState": "Idle",
+          "nextStepId": "extend-cmp-load"
+        },
+        {
+          "id": "extend-cmp-load",
+          "name": "Apply CMP Head Load",
+          "action": "SetSignal",
+          "targetId": "do.cmp-head-load.extend",
+          "parameter": "true",
+          "nextStepId": "wait-cmp-load"
+        },
+        {
+          "id": "wait-cmp-load",
+          "name": "Wait CMP Head Load",
+          "action": "WaitSignal",
+          "targetId": "di.cmp-head-load.extended",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "expectedTargetId": "cmp-head-load",
+          "expectedState": "Extended",
+          "nextStepId": "retract-cmp-load"
+        },
+        {
+          "id": "retract-cmp-load",
+          "name": "Release CMP Head Load",
+          "action": "SetSignal",
+          "targetId": "do.cmp-head-load.extend",
+          "parameter": "false",
+          "nextStepId": "wait-cmp-load-release"
+        },
+        {
+          "id": "wait-cmp-load-release",
+          "name": "Wait CMP Head Load Release",
+          "action": "WaitSignal",
+          "targetId": "di.cmp-head-load.retracted",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "expectedTargetId": "cmp-head-load",
+          "expectedState": "Retracted",
+          "nextStepId": "retract-cylinder"
+        },
+        {
+          "id": "retract-cylinder",
+          "name": "Retract Carrier Clamp Cylinder",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "false",
+          "nextStepId": "wait-cylinder-retracted"
+        },
+        {
+          "id": "wait-cylinder-retracted",
+          "name": "Wait Carrier Clamp Cylinder Retracted",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.retracted",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "cycle-done",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Retracted"
+        },
+        {
+          "id": "cycle-done",
+          "name": "Cycle Done",
+          "action": "SetSignal",
+          "targetId": "do.cycle-done",
+          "parameter": "true",
+          "nextStepId": "complete",
+          "expectedTargetId": "transport",
+          "expectedState": "Stopped"
+        },
+        {
+          "id": "complete",
+          "name": "Complete",
+          "action": "Complete",
+          "targetId": "",
+          "parameter": ""
+        }
+      ]
+    }
+  ]
+}

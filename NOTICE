@@ -1,0 +1,11 @@
+﻿OpenVisionLab Machine Studio
+Copyright (c) OpenVisionLab contributors
+
+This project distributes WPF-UI 4.3.0, WPF-UI.Abstractions 4.3.0, and
+Microsoft.Xaml.Behaviors.Wpf 1.1.122. Their license and attribution details are
+recorded in THIRD-PARTY-NOTICES.md. The WPF-UI license and its upstream
+third-party notices are also included in published application output.
+
+Self-contained Windows packages also distribute Microsoft .NET and Windows
+Desktop runtime files. Their licenses and notices are included under the
+package's THIRD-PARTY-NOTICES directory.

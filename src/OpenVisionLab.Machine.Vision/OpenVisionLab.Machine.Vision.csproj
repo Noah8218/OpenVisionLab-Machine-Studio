@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>OpenVisionLab.Machine.Vision</RootNamespace>
+    <AssemblyName>OpenVisionLab.Machine.Vision</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenVisionLab.Machine.Core\OpenVisionLab.Machine.Core.csproj" />
+  </ItemGroup>
+
+</Project>

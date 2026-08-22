@@ -1,0 +1,9 @@
+﻿<Project>
+  <PropertyGroup>
+    <Version>0.1.0-rc.3</Version>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+</Project>

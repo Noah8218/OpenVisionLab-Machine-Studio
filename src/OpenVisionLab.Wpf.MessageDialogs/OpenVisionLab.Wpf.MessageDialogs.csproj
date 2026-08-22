@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>OpenVisionLab.Wpf.MessageDialogs</RootNamespace>
+    <AssemblyName>OpenVisionLab.Wpf.MessageDialogs</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenVisionLab.Localization\OpenVisionLab.Localization.csproj" />
+  </ItemGroup>
+
+</Project>

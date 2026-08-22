@@ -1,0 +1,248 @@
+﻿{
+    "schema":  "1.5",
+    "id":  "sample-pick-and-place-001",
+    "name":  "Sample Pick-and-Place Cell",
+    "createdAt":  "2026-08-05T00:00:00+00:00",
+    "modifiedAt":  "2026-08-05T00:00:00+00:00",
+    "simulation":  {
+                       "fixedStepMilliseconds":  5,
+                       "defaultTimeScale":  1,
+                       "seed":  1001,
+                       "testScenarioProfileId":  "normal",
+                       "testScenarioSeed":  1001,
+                       "testScenarioDurationCycles":  2000,
+                       "testScenarioTargetId":  "x",
+                       "testScenarioBatchRepetitions":  3,
+                       "testScenarioFault":  {
+                                                  "enabled":  true,
+                                                  "kind":  "AxisMotionBlocked",
+                                                  "targetId":  "x",
+                                                  "injectTick":  403,
+                                                  "holdTicks":  3,
+                                                  "restartSequenceId":  "main"
+                                              },
+                       "pickPlaceWorkpiece":  {
+                                                  "id":  "part-1",
+                                                  "name":  "Pick-and-Place Part",
+                                                  "xAxisId":  "x",
+                                                  "yAxisId":  "y",
+                                                  "gripperSignalId":  "do.gripper",
+                                                  "pickX":  240,
+                                                  "pickY":  120
+                                              }
+                   },
+    "axes":  [
+                 {
+                     "id":  "x",
+                     "name":  "X Stage",
+                     "kind":  "Linear",
+                     "unit":  "mm",
+                     "homePosition":  0,
+                     "softLimitMin":  0,
+                     "softLimitMax":  500,
+                     "maxVelocity":  200,
+                     "maxAcceleration":  2000,
+                     "position":  {
+                                      "y":  200,
+                                      "z":  0,
+                                      "x":  100
+                                  }
+                 },
+                 {
+                     "id":  "y",
+                     "name":  "Y Stage",
+                     "kind":  "Linear",
+                     "unit":  "mm",
+                     "homePosition":  0,
+                     "softLimitMin":  0,
+                     "softLimitMax":  300,
+                     "maxVelocity":  200,
+                     "maxAcceleration":  2000,
+                     "position":  {
+                                      "y":  400,
+                                      "z":  0,
+                                      "x":  100
+                                  }
+                 }
+             ],
+    "channels":  [
+                     {
+                         "id":  "di.start",
+                         "name":  "Start Button",
+                         "kind":  "DigitalInput",
+                         "initialValue":  0
+                     },
+                     {
+                         "id":  "do.gripper",
+                         "name":  "Gripper Output",
+                         "kind":  "DigitalOutput",
+                         "initialValue":  0
+                     }
+                 ],
+    "multiAxisCommissioningRecipe":  {
+                                             "id":  "pick-position",
+                                             "name":  "Pick position",
+                                             "targets":  [
+                                                             {
+                                                                 "axisId":  "y",
+                                                                 "targetPosition":  120
+                                                             },
+                                                             {
+                                                                 "axisId":  "x",
+                                                                 "targetPosition":  240
+                                                             }
+                                                         ],
+                                             "validationRepetitions":  3
+                                         },
+    "devices":  [
+                    {
+                        "id":  "cam1",
+                        "name":  "Top Camera",
+                        "kind":  "Camera",
+                        "mountPosition":  {
+                                              "y":  300,
+                                              "z":  100,
+                                              "x":  300
+                                          },
+                        "channelIds":  [
+                                           "di.trigger"
+                                       ],
+                        "properties":  {
+                                           "resolution":  "1920x1080"
+                                       }
+                    }
+                ],
+    "sequences":  [
+                      {
+                          "id":  "main",
+                          "name":  "Main Cycle",
+                          "steps":  [
+                                        {
+                                            "id":  "move-y-pick",
+                                            "name":  "Move Y to Pick",
+                                            "action":  "MoveAxis",
+                                            "targetId":  "y",
+                                            "parameter":  "120",
+                                            "nextStepId":  "wait-y-pick"
+                                        },
+                                        {
+                                            "id":  "wait-y-pick",
+                                            "name":  "Wait Y at Pick",
+                                            "action":  "WaitAxisDone",
+                                            "targetId":  "y",
+                                            "parameter":  "",
+                                            "timeoutMs":  2000,
+                                            "nextStepId":  "move-x-pick"
+                                        },
+                                        {
+                                            "id":  "move-x-pick",
+                                            "name":  "Move X to Pick",
+                                            "action":  "MoveAxis",
+                                            "targetId":  "x",
+                                            "parameter":  "240",
+                                            "nextStepId":  "wait-x-pick"
+                                        },
+                                        {
+                                            "id":  "wait-x-pick",
+                                            "name":  "Wait X at Pick",
+                                            "action":  "WaitAxisDone",
+                                            "targetId":  "x",
+                                            "parameter":  "",
+                                            "timeoutMs":  2500,
+                                            "nextStepId":  "grip-on"
+                                        },
+                                        {
+                                            "id":  "grip-on",
+                                            "name":  "Grip Part",
+                                            "action":  "SetSignal",
+                                            "targetId":  "do.gripper",
+                                            "parameter":  "true",
+                                            "nextStepId":  "move-x-place"
+                                        },
+                                        {
+                                            "id":  "move-x-place",
+                                            "name":  "Move X to Place",
+                                            "action":  "MoveAxis",
+                                            "targetId":  "x",
+                                            "parameter":  "400",
+                                            "nextStepId":  "wait-x-place"
+                                        },
+                                        {
+                                            "id":  "wait-x-place",
+                                            "name":  "Wait X at Place",
+                                            "action":  "WaitAxisDone",
+                                            "targetId":  "x",
+                                            "parameter":  "",
+                                            "timeoutMs":  2000,
+                                            "nextStepId":  "move-y-place"
+                                        },
+                                        {
+                                            "id":  "move-y-place",
+                                            "name":  "Move Y to Place",
+                                            "action":  "MoveAxis",
+                                            "targetId":  "y",
+                                            "parameter":  "240",
+                                            "nextStepId":  "wait-y-place"
+                                        },
+                                        {
+                                            "id":  "wait-y-place",
+                                            "name":  "Wait Y at Place",
+                                            "action":  "WaitAxisDone",
+                                            "targetId":  "y",
+                                            "parameter":  "",
+                                            "timeoutMs":  2000,
+                                            "nextStepId":  "grip-off"
+                                        },
+                                        {
+                                            "id":  "grip-off",
+                                            "name":  "Release Part",
+                                            "action":  "SetSignal",
+                                            "targetId":  "do.gripper",
+                                            "parameter":  "false",
+                                            "nextStepId":  "move-y-home"
+                                        },
+                                        {
+                                            "id":  "move-y-home",
+                                            "name":  "Return Y Home",
+                                            "action":  "MoveAxis",
+                                            "targetId":  "y",
+                                            "parameter":  "0",
+                                            "nextStepId":  "wait-y-home"
+                                        },
+                                        {
+                                            "id":  "wait-y-home",
+                                            "name":  "Wait Y at Home",
+                                            "action":  "WaitAxisDone",
+                                            "targetId":  "y",
+                                            "parameter":  "",
+                                            "timeoutMs":  2000,
+                                            "nextStepId":  "move-x-home"
+                                        },
+                                        {
+                                            "id":  "move-x-home",
+                                            "name":  "Return X Home",
+                                            "action":  "MoveAxis",
+                                            "targetId":  "x",
+                                            "parameter":  "0",
+                                            "nextStepId":  "wait-x-home"
+                                        },
+                                        {
+                                            "id":  "wait-x-home",
+                                            "name":  "Wait X at Home",
+                                            "action":  "WaitAxisDone",
+                                            "targetId":  "x",
+                                            "parameter":  "",
+                                            "timeoutMs":  3000,
+                                            "nextStepId":  "complete"
+                                        },
+                                        {
+                                            "id":  "complete",
+                                            "name":  "Complete",
+                                            "action":  "Complete",
+                                            "targetId":  "",
+                                            "parameter":  ""
+                                        }
+                                    ]
+                      }
+                  ]
+}

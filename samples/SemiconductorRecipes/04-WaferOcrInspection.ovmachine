@@ -1,0 +1,680 @@
+{
+  "schema": "1.10",
+  "id": "semi-wafer-ocr-004",
+  "name": "Semiconductor 04 - Wafer OCR Inspection",
+  "createdAt": "2026-08-15T00:00:00+00:00",
+  "modifiedAt": "2026-08-18T00:00:00+00:00",
+  "simulation": {
+    "fixedStepMilliseconds": 5,
+    "defaultTimeScale": 1,
+    "seed": 2104,
+    "activeLayoutId": "main-layout",
+    "automaticRun": {
+      "sequenceId": "automatic-cycle",
+      "startInputId": null,
+      "startInputValue": true,
+      "repeat": false,
+      "repeatDelayMilliseconds": 0
+    }
+  },
+  "layouts": [
+    {
+      "id": "main-layout",
+      "name": "wafer OCR inspection layout",
+      "gridSize": 10,
+      "snapToGrid": true,
+      "components": [
+        {
+          "id": "frame",
+          "name": "OCR Inspection Frame",
+          "kind": "MachineFrame",
+          "transform": {
+            "x": 360,
+            "y": 250,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 680,
+            "height": 360
+          },
+          "zIndex": -100
+        },
+        {
+          "id": "transport",
+          "name": "wafer OCR inspection transport",
+          "kind": "Conveyor",
+          "transform": {
+            "x": 340,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 560,
+            "height": 70
+          },
+          "zIndex": 10,
+          "behaviorBindingId": "device.transport"
+        },
+        {
+          "id": "sensor-entry",
+          "name": "Wafer Entry Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 200,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-entry"
+        },
+        {
+          "id": "sensor-process",
+          "name": "OCR Trigger Zone Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 490,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-process"
+        },
+        {
+          "id": "process-stage",
+          "name": "OCR Scan Servo Stage",
+          "kind": "LinearStage",
+          "transform": {
+            "x": 100,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 90,
+            "height": 50
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "axis.process"
+        },
+        {
+          "id": "process-cylinder",
+          "name": "Inspection Shutter Cylinder",
+          "kind": "PneumaticCylinder",
+          "transform": {
+            "x": 490,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 100,
+            "height": 38
+          },
+          "zIndex": 30,
+          "behaviorBindingId": "device.process-cylinder"
+        },
+        {
+          "id": "wafer",
+          "name": "OCR Test Wafer",
+          "kind": "Workpiece",
+          "transform": {
+            "x": 97,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 34,
+            "height": 34
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "device.wafer"
+        },
+        {
+          "id": "ocr-focus-stage",
+          "name": "OCR Focus Stage",
+          "kind": "LinearStage",
+          "transform": {
+            "x": 350,
+            "y": 150,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 80,
+            "height": 45
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "axis.ocr-focus"
+        },
+        {
+          "id": "sensor-ocr-trigger",
+          "name": "OCR Trigger Zone Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 340,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-ocr-trigger"
+        }
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "id": "axis.process",
+      "name": "OCR Scan Servo Axis",
+      "kind": "Linear",
+      "unit": "mm",
+      "homePosition": 0,
+      "softLimitMin": 0,
+      "softLimitMax": 320,
+      "maxVelocity": 180,
+      "maxAcceleration": 700,
+      "maxDeceleration": 650,
+      "followingErrorLimit": 0.05,
+      "position": {
+        "x": 100,
+        "y": 230,
+        "z": 0
+      }
+    },
+    {
+      "id": "axis.ocr-focus",
+      "name": "OCR Focus Axis",
+      "kind": "Linear",
+      "unit": "mm",
+      "homePosition": 0,
+      "softLimitMin": 0,
+      "softLimitMax": 120,
+      "maxVelocity": 80,
+      "maxAcceleration": 400,
+      "maxDeceleration": 400,
+      "followingErrorLimit": 0.05,
+      "position": {
+        "x": 350,
+        "y": 150,
+        "z": 0
+      }
+    }
+  ],
+  "devices": [
+    {
+      "id": "device.transport",
+      "name": "wafer OCR inspection transport",
+      "kind": "Conveyor",
+      "mountPosition": {
+        "x": 340,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "do.transport.run",
+        "do.transport.reverse"
+      ],
+      "conveyor": {
+        "runCommandChannelId": "do.transport.run",
+        "reverseCommandChannelId": "do.transport.reverse",
+        "speedUnitsPerSecond": 180
+      },
+      "properties": {
+        "semiconductorProcess": "wafer OCR inspection",
+        "connectionRole": "material transport"
+      }
+    },
+    {
+      "id": "device.sensor-entry",
+      "name": "Wafer Entry Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 200,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-entry"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-entry",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 20,
+        "offDelayMilliseconds": 20
+      },
+      "properties": {
+        "semiconductorProcess": "wafer OCR inspection",
+        "connectionRole": "entry detection"
+      }
+    },
+    {
+      "id": "device.sensor-process",
+      "name": "OCR Trigger Zone Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 490,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-process"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-process",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 20,
+        "offDelayMilliseconds": 20
+      },
+      "properties": {
+        "semiconductorProcess": "wafer OCR inspection",
+        "connectionRole": "process-position detection"
+      }
+    },
+    {
+      "id": "device.process-cylinder",
+      "name": "Inspection Shutter Cylinder",
+      "kind": "Cylinder",
+      "mountPosition": {
+        "x": 490,
+        "y": 230,
+        "z": 0
+      },
+      "channelIds": [
+        "do.cylinder.extend",
+        "di.cylinder.extended",
+        "di.cylinder.retracted"
+      ],
+      "cylinder": {
+        "extendCommandChannelId": "do.cylinder.extend",
+        "extendedSensorChannelId": "di.cylinder.extended",
+        "retractedSensorChannelId": "di.cylinder.retracted",
+        "extendDurationMilliseconds": 100,
+        "retractDurationMilliseconds": 100,
+        "extendedSensorDelayMilliseconds": 10,
+        "retractedSensorDelayMilliseconds": 10,
+        "stroke": 60
+      },
+      "properties": {
+        "semiconductorProcess": "wafer OCR inspection",
+        "connectionRole": "station interlock"
+      }
+    },
+    {
+      "id": "device.wafer",
+      "name": "OCR Test Wafer",
+      "kind": "Workpiece",
+      "mountPosition": {
+        "x": 97,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [],
+      "workpiece": {
+        "type": "OCR Test Wafer",
+        "conveyorComponentId": "transport",
+        "inspectionState": "Pending"
+      },
+      "properties": {
+        "semiconductorProcess": "wafer OCR inspection",
+        "connectionRole": "process material"
+      }
+    },
+    {
+      "id": "device.sensor-ocr-trigger",
+      "name": "OCR Trigger Zone Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 340,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-ocr-trigger"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-ocr-trigger",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 10,
+        "offDelayMilliseconds": 10
+      },
+      "properties": {
+        "semiconductorProcess": "wafer OCR inspection",
+        "connectionRole": "OCR Trigger Zone Sensor"
+      }
+    },
+    {
+      "id": "camera.ocr",
+      "name": "Wafer OCR Inspection Camera",
+      "kind": "Camera",
+      "mountPosition": {
+        "x": 490,
+        "y": 230,
+        "z": 180
+      },
+      "channelIds": [],
+      "camera": {
+        "exposureDelayMilliseconds": 20,
+        "transferDelayMilliseconds": 30,
+        "placeholderDecision": "Pass"
+      },
+      "properties": {
+        "semiconductorProcess": "wafer OCR inspection",
+        "connectionRole": "optional source-neutral inspection acquisition"
+      }
+    },
+    {
+      "id": "device.inspection-handoff",
+      "name": "OCR Inspection Handoff",
+      "kind": "Inspection",
+      "mountPosition": {
+        "x": 490,
+        "y": 300,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-process",
+        "do.inspection-result-accepted",
+        "di.inspection-ready",
+        "di.inspection-complete"
+      ],
+      "inspectionHandoff": {
+        "cameraId": "camera.ocr",
+        "inspectionPositionSensorChannelId": "di.sensor-process",
+        "resultAcceptedCommandChannelId": "do.inspection-result-accepted",
+        "inspectionReadyFeedbackChannelId": "di.inspection-ready",
+        "inspectionCompleteFeedbackChannelId": "di.inspection-complete"
+      },
+      "properties": {
+        "semiconductorProcess": "wafer OCR inspection",
+        "connectionRole": "inspection request, result, and acceptance handoff"
+      }
+    }
+  ],
+  "channels": [
+    {
+      "id": "di.sensor-entry",
+      "name": "Wafer Entry Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.sensor-process",
+      "name": "OCR Trigger Zone Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.extended",
+      "name": "Inspection Shutter Cylinder Extended",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.retracted",
+      "name": "Inspection Shutter Cylinder Retracted",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "do.transport.run",
+      "name": "Transport Run",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.transport.reverse",
+      "name": "Transport Reverse",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cylinder.extend",
+      "name": "Inspection Shutter Cylinder Extend",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-active",
+      "name": "Cycle Active",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-done",
+      "name": "Cycle Done",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.sensor-ocr-trigger",
+      "name": "OCR Trigger Zone Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.inspection-result-accepted",
+      "name": "Inspection Result Accepted",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.inspection-ready",
+      "name": "Inspection Ready",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.inspection-complete",
+      "name": "Inspection Handoff Complete",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    }
+  ],
+  "sequences": [
+    {
+      "id": "automatic-cycle",
+      "name": "wafer OCR inspection automatic cycle",
+      "steps": [
+        {
+          "id": "cycle-active",
+          "name": "Cycle Active",
+          "action": "SetSignal",
+          "targetId": "do.cycle-active",
+          "parameter": "true",
+          "nextStepId": "extend-cylinder"
+        },
+        {
+          "id": "extend-cylinder",
+          "name": "Extend Inspection Shutter Cylinder",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "true",
+          "nextStepId": "wait-cylinder-extended"
+        },
+        {
+          "id": "wait-cylinder-extended",
+          "name": "Wait Inspection Shutter Cylinder Extended",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.extended",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "start-transport",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Extended"
+        },
+        {
+          "id": "start-transport",
+          "name": "Start Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "true",
+          "nextStepId": "wait-ocr-trigger"
+        },
+        {
+          "id": "wait-ocr-trigger",
+          "name": "Wait OCR Trigger Zone",
+          "action": "WaitSignal",
+          "targetId": "di.sensor-ocr-trigger",
+          "parameter": "true",
+          "timeoutMs": 5000,
+          "expectedTargetId": "sensor-ocr-trigger",
+          "expectedState": "Detected",
+          "nextStepId": "wait-process-position"
+        },
+        {
+          "id": "wait-process-position",
+          "name": "Wait OCR Trigger Zone Sensor",
+          "action": "WaitSignal",
+          "targetId": "di.sensor-process",
+          "parameter": "true",
+          "timeoutMs": 5000,
+          "nextStepId": "stop-transport",
+          "expectedTargetId": "sensor-process",
+          "expectedState": "Detected"
+        },
+        {
+          "id": "stop-transport",
+          "name": "Stop Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "false",
+          "nextStepId": "move-process-axis"
+        },
+        {
+          "id": "move-process-axis",
+          "name": "Move OCR Scan Servo Axis",
+          "action": "MoveAxis",
+          "targetId": "axis.process",
+          "parameter": "230",
+          "nextStepId": "wait-process-axis"
+        },
+        {
+          "id": "wait-process-axis",
+          "name": "Wait OCR Scan Servo Axis",
+          "action": "WaitAxisDone",
+          "targetId": "axis.process",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "nextStepId": "move-ocr-focus",
+          "expectedTargetId": "axis.process",
+          "expectedState": "Idle"
+        },
+        {
+          "id": "move-ocr-focus",
+          "name": "Move OCR Focus Axis",
+          "action": "MoveAxis",
+          "targetId": "axis.ocr-focus",
+          "parameter": "80",
+          "nextStepId": "wait-ocr-focus"
+        },
+        {
+          "id": "wait-ocr-focus",
+          "name": "Wait OCR Focus Axis",
+          "action": "WaitAxisDone",
+          "targetId": "axis.ocr-focus",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "expectedTargetId": "axis.ocr-focus",
+          "expectedState": "Idle",
+          "nextStepId": "wait-inspection-ready"
+        },
+        {
+          "id": "wait-inspection-ready",
+          "name": "Wait Inspection Ready",
+          "action": "WaitSignal",
+          "targetId": "di.inspection-ready",
+          "parameter": "true",
+          "timeoutMs": 2000,
+          "nextStepId": "trigger-ocr-camera"
+        },
+        {
+          "id": "trigger-ocr-camera",
+          "name": "Trigger Wafer OCR Inspection",
+          "action": "TriggerCamera",
+          "targetId": "camera.ocr",
+          "parameter": "wafer-ocr-handoff",
+          "nextStepId": "wait-ocr-result"
+        },
+        {
+          "id": "wait-ocr-result",
+          "name": "Wait Wafer OCR Result",
+          "action": "WaitVisionResult",
+          "targetId": "camera.ocr",
+          "parameter": "",
+          "timeoutMs": 2000,
+          "nextStepId": "accept-ocr-result",
+          "failureStepId": "accept-ocr-result"
+        },
+        {
+          "id": "accept-ocr-result",
+          "name": "Accept Wafer OCR Result",
+          "action": "SetSignal",
+          "targetId": "do.inspection-result-accepted",
+          "parameter": "true",
+          "nextStepId": "wait-inspection-complete"
+        },
+        {
+          "id": "wait-inspection-complete",
+          "name": "Wait Inspection Handoff Complete",
+          "action": "WaitSignal",
+          "targetId": "di.inspection-complete",
+          "parameter": "true",
+          "timeoutMs": 2000,
+          "nextStepId": "clear-ocr-result-accept"
+        },
+        {
+          "id": "clear-ocr-result-accept",
+          "name": "Clear Wafer OCR Result Acceptance",
+          "action": "SetSignal",
+          "targetId": "do.inspection-result-accepted",
+          "parameter": "false",
+          "nextStepId": "retract-cylinder"
+        },
+        {
+          "id": "retract-cylinder",
+          "name": "Retract Inspection Shutter Cylinder",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "false",
+          "nextStepId": "wait-cylinder-retracted"
+        },
+        {
+          "id": "wait-cylinder-retracted",
+          "name": "Wait Inspection Shutter Cylinder Retracted",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.retracted",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "cycle-done",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Retracted"
+        },
+        {
+          "id": "cycle-done",
+          "name": "Cycle Done",
+          "action": "SetSignal",
+          "targetId": "do.cycle-done",
+          "parameter": "true",
+          "nextStepId": "complete",
+          "expectedTargetId": "transport",
+          "expectedState": "Stopped"
+        },
+        {
+          "id": "complete",
+          "name": "Complete",
+          "action": "Complete",
+          "targetId": "",
+          "parameter": ""
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,611 @@
+{
+  "schema": "1.5",
+  "id": "semi-develop-track-007",
+  "name": "Semiconductor 07 - Develop Track",
+  "createdAt": "2026-08-15T00:00:00+00:00",
+  "modifiedAt": "2026-08-18T00:00:00+00:00",
+  "simulation": {
+    "fixedStepMilliseconds": 5,
+    "defaultTimeScale": 1,
+    "seed": 2107,
+    "activeLayoutId": "main-layout",
+    "automaticRun": {
+      "sequenceId": "automatic-cycle",
+      "startInputId": null,
+      "startInputValue": true,
+      "repeat": false,
+      "repeatDelayMilliseconds": 0
+    }
+  },
+  "layouts": [
+    {
+      "id": "main-layout",
+      "name": "developer track layout",
+      "gridSize": 10,
+      "snapToGrid": true,
+      "components": [
+        {
+          "id": "frame",
+          "name": "Developer Track Frame",
+          "kind": "MachineFrame",
+          "transform": {
+            "x": 360,
+            "y": 250,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 680,
+            "height": 360
+          },
+          "zIndex": -100
+        },
+        {
+          "id": "transport",
+          "name": "developer track transport",
+          "kind": "Conveyor",
+          "transform": {
+            "x": 340,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 560,
+            "height": 70
+          },
+          "zIndex": 10,
+          "behaviorBindingId": "device.transport"
+        },
+        {
+          "id": "sensor-entry",
+          "name": "Developer Entry Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 200,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-entry"
+        },
+        {
+          "id": "sensor-process",
+          "name": "Develop Position Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 460,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-process"
+        },
+        {
+          "id": "process-stage",
+          "name": "Developer Shuttle Servo Stage",
+          "kind": "LinearStage",
+          "transform": {
+            "x": 100,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 90,
+            "height": 50
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "axis.process"
+        },
+        {
+          "id": "process-cylinder",
+          "name": "Nozzle Guard Cylinder",
+          "kind": "PneumaticCylinder",
+          "transform": {
+            "x": 460,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 100,
+            "height": 38
+          },
+          "zIndex": 30,
+          "behaviorBindingId": "device.process-cylinder"
+        },
+        {
+          "id": "wafer",
+          "name": "Developing Wafer",
+          "kind": "Workpiece",
+          "transform": {
+            "x": 97,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 34,
+            "height": 34
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "device.wafer"
+        },
+        {
+          "id": "sensor-dispense-zone",
+          "name": "Developer Dispense Zone Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 340,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-dispense-zone"
+        },
+        {
+          "id": "nozzle-guard",
+          "name": "Developer Nozzle Guard Cylinder",
+          "kind": "PneumaticCylinder",
+          "transform": {
+            "x": 610,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 100,
+            "height": 38
+          },
+          "zIndex": 30,
+          "behaviorBindingId": "device.nozzle-guard"
+        }
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "id": "axis.process",
+      "name": "Developer Shuttle Servo Axis",
+      "kind": "Linear",
+      "unit": "mm",
+      "homePosition": 0,
+      "softLimitMin": 0,
+      "softLimitMax": 320,
+      "maxVelocity": 180,
+      "maxAcceleration": 700,
+      "maxDeceleration": 650,
+      "followingErrorLimit": 0.05,
+      "position": {
+        "x": 100,
+        "y": 230,
+        "z": 0
+      }
+    }
+  ],
+  "devices": [
+    {
+      "id": "device.transport",
+      "name": "developer track transport",
+      "kind": "Conveyor",
+      "mountPosition": {
+        "x": 340,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "do.transport.run",
+        "do.transport.reverse"
+      ],
+      "conveyor": {
+        "runCommandChannelId": "do.transport.run",
+        "reverseCommandChannelId": "do.transport.reverse",
+        "speedUnitsPerSecond": 230
+      },
+      "properties": {
+        "semiconductorProcess": "developer track",
+        "connectionRole": "material transport"
+      }
+    },
+    {
+      "id": "device.sensor-entry",
+      "name": "Developer Entry Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 200,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-entry"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-entry",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 20,
+        "offDelayMilliseconds": 20
+      },
+      "properties": {
+        "semiconductorProcess": "developer track",
+        "connectionRole": "entry detection"
+      }
+    },
+    {
+      "id": "device.sensor-process",
+      "name": "Develop Position Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 460,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-process"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-process",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 20,
+        "offDelayMilliseconds": 20
+      },
+      "properties": {
+        "semiconductorProcess": "developer track",
+        "connectionRole": "process-position detection"
+      }
+    },
+    {
+      "id": "device.process-cylinder",
+      "name": "Nozzle Guard Cylinder",
+      "kind": "Cylinder",
+      "mountPosition": {
+        "x": 460,
+        "y": 230,
+        "z": 0
+      },
+      "channelIds": [
+        "do.cylinder.extend",
+        "di.cylinder.extended",
+        "di.cylinder.retracted"
+      ],
+      "cylinder": {
+        "extendCommandChannelId": "do.cylinder.extend",
+        "extendedSensorChannelId": "di.cylinder.extended",
+        "retractedSensorChannelId": "di.cylinder.retracted",
+        "extendDurationMilliseconds": 150,
+        "retractDurationMilliseconds": 150,
+        "extendedSensorDelayMilliseconds": 10,
+        "retractedSensorDelayMilliseconds": 10,
+        "stroke": 60
+      },
+      "properties": {
+        "semiconductorProcess": "developer track",
+        "connectionRole": "station interlock"
+      }
+    },
+    {
+      "id": "device.wafer",
+      "name": "Developing Wafer",
+      "kind": "Workpiece",
+      "mountPosition": {
+        "x": 97,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [],
+      "workpiece": {
+        "type": "Developing Wafer",
+        "conveyorComponentId": "transport",
+        "inspectionState": "Pending"
+      },
+      "properties": {
+        "semiconductorProcess": "developer track",
+        "connectionRole": "process material"
+      }
+    },
+    {
+      "id": "device.sensor-dispense-zone",
+      "name": "Developer Dispense Zone Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 340,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-dispense-zone"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-dispense-zone",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 10,
+        "offDelayMilliseconds": 10
+      },
+      "properties": {
+        "semiconductorProcess": "developer track",
+        "connectionRole": "Developer Dispense Zone Sensor"
+      }
+    },
+    {
+      "id": "device.nozzle-guard",
+      "name": "Developer Nozzle Guard Cylinder",
+      "kind": "Cylinder",
+      "mountPosition": {
+        "x": 610,
+        "y": 230,
+        "z": 0
+      },
+      "channelIds": [
+        "do.nozzle-guard.extend",
+        "di.nozzle-guard.extended",
+        "di.nozzle-guard.retracted"
+      ],
+      "cylinder": {
+        "extendCommandChannelId": "do.nozzle-guard.extend",
+        "extendedSensorChannelId": "di.nozzle-guard.extended",
+        "retractedSensorChannelId": "di.nozzle-guard.retracted",
+        "extendDurationMilliseconds": 100,
+        "retractDurationMilliseconds": 100,
+        "extendedSensorDelayMilliseconds": 10,
+        "retractedSensorDelayMilliseconds": 10,
+        "stroke": 45
+      },
+      "properties": {
+        "semiconductorProcess": "developer track",
+        "connectionRole": "Developer Nozzle Guard Cylinder"
+      }
+    }
+  ],
+  "channels": [
+    {
+      "id": "di.sensor-entry",
+      "name": "Developer Entry Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.sensor-process",
+      "name": "Develop Position Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.extended",
+      "name": "Nozzle Guard Cylinder Extended",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.retracted",
+      "name": "Nozzle Guard Cylinder Retracted",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "do.transport.run",
+      "name": "Transport Run",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.transport.reverse",
+      "name": "Transport Reverse",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cylinder.extend",
+      "name": "Nozzle Guard Cylinder Extend",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-active",
+      "name": "Cycle Active",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-done",
+      "name": "Cycle Done",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.sensor-dispense-zone",
+      "name": "Developer Dispense Zone Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.nozzle-guard.extended",
+      "name": "Developer Nozzle Guard Cylinder Extended",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.nozzle-guard.retracted",
+      "name": "Developer Nozzle Guard Cylinder Retracted",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "do.nozzle-guard.extend",
+      "name": "Developer Nozzle Guard Cylinder Extend",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    }
+  ],
+  "sequences": [
+    {
+      "id": "automatic-cycle",
+      "name": "developer track automatic cycle",
+      "steps": [
+        {
+          "id": "cycle-active",
+          "name": "Cycle Active",
+          "action": "SetSignal",
+          "targetId": "do.cycle-active",
+          "parameter": "true",
+          "nextStepId": "extend-cylinder"
+        },
+        {
+          "id": "extend-cylinder",
+          "name": "Extend Nozzle Guard Cylinder",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "true",
+          "nextStepId": "wait-cylinder-extended"
+        },
+        {
+          "id": "wait-cylinder-extended",
+          "name": "Wait Nozzle Guard Cylinder Extended",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.extended",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "start-transport",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Extended"
+        },
+        {
+          "id": "start-transport",
+          "name": "Start Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "true",
+          "nextStepId": "wait-dispense-zone"
+        },
+        {
+          "id": "wait-dispense-zone",
+          "name": "Wait Developer Dispense Zone",
+          "action": "WaitSignal",
+          "targetId": "di.sensor-dispense-zone",
+          "parameter": "true",
+          "timeoutMs": 5000,
+          "expectedTargetId": "sensor-dispense-zone",
+          "expectedState": "Detected",
+          "nextStepId": "wait-process-position"
+        },
+        {
+          "id": "wait-process-position",
+          "name": "Wait Develop Position Sensor",
+          "action": "WaitSignal",
+          "targetId": "di.sensor-process",
+          "parameter": "true",
+          "timeoutMs": 5000,
+          "nextStepId": "stop-transport",
+          "expectedTargetId": "sensor-process",
+          "expectedState": "Detected"
+        },
+        {
+          "id": "stop-transport",
+          "name": "Stop Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "false",
+          "nextStepId": "move-process-axis"
+        },
+        {
+          "id": "move-process-axis",
+          "name": "Move Developer Shuttle Servo Axis",
+          "action": "MoveAxis",
+          "targetId": "axis.process",
+          "parameter": "200",
+          "nextStepId": "wait-process-axis"
+        },
+        {
+          "id": "wait-process-axis",
+          "name": "Wait Developer Shuttle Servo Axis",
+          "action": "WaitAxisDone",
+          "targetId": "axis.process",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "nextStepId": "extend-nozzle-guard",
+          "expectedTargetId": "axis.process",
+          "expectedState": "Idle"
+        },
+        {
+          "id": "extend-nozzle-guard",
+          "name": "Open Developer Nozzle Guard",
+          "action": "SetSignal",
+          "targetId": "do.nozzle-guard.extend",
+          "parameter": "true",
+          "nextStepId": "wait-nozzle-guard-open"
+        },
+        {
+          "id": "wait-nozzle-guard-open",
+          "name": "Wait Nozzle Guard Open",
+          "action": "WaitSignal",
+          "targetId": "di.nozzle-guard.extended",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "expectedTargetId": "nozzle-guard",
+          "expectedState": "Extended",
+          "nextStepId": "retract-nozzle-guard"
+        },
+        {
+          "id": "retract-nozzle-guard",
+          "name": "Close Developer Nozzle Guard",
+          "action": "SetSignal",
+          "targetId": "do.nozzle-guard.extend",
+          "parameter": "false",
+          "nextStepId": "wait-nozzle-guard-closed"
+        },
+        {
+          "id": "wait-nozzle-guard-closed",
+          "name": "Wait Nozzle Guard Closed",
+          "action": "WaitSignal",
+          "targetId": "di.nozzle-guard.retracted",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "expectedTargetId": "nozzle-guard",
+          "expectedState": "Retracted",
+          "nextStepId": "retract-cylinder"
+        },
+        {
+          "id": "retract-cylinder",
+          "name": "Retract Nozzle Guard Cylinder",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "false",
+          "nextStepId": "wait-cylinder-retracted"
+        },
+        {
+          "id": "wait-cylinder-retracted",
+          "name": "Wait Nozzle Guard Cylinder Retracted",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.retracted",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "cycle-done",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Retracted"
+        },
+        {
+          "id": "cycle-done",
+          "name": "Cycle Done",
+          "action": "SetSignal",
+          "targetId": "do.cycle-done",
+          "parameter": "true",
+          "nextStepId": "complete",
+          "expectedTargetId": "transport",
+          "expectedState": "Stopped"
+        },
+        {
+          "id": "complete",
+          "name": "Complete",
+          "action": "Complete",
+          "targetId": "",
+          "parameter": ""
+        }
+      ]
+    }
+  ]
+}

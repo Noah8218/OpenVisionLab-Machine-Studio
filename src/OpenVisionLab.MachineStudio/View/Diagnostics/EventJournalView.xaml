@@ -1,0 +1,133 @@
+<UserControl x:Class="OpenVisionLab.MachineStudio.View.Diagnostics.EventJournalView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:logging="clr-namespace:OpenVisionLab.Logging.Controls;assembly=OpenVisionLab.Logging.Controls"
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
+    <Border Background="{DynamicResource Surface.Panel}"
+            BorderBrush="{DynamicResource Border.Default}"
+            BorderThickness="0,1,0,0">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <ToggleButton x:Name="EvidenceDrawerToggle"
+                          Grid.Row="1"
+                          Height="34"
+                          Padding="10,0"
+                          HorizontalContentAlignment="Stretch"
+                          AutomationProperties.Name="{loc:Loc Key=Shell.EvidenceDrawer}"
+                          ToolTip="{loc:Loc Key=Shell.EvidenceDrawerHint}">
+                <ToggleButton.Template>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="DrawerHeader"
+                                Padding="{TemplateBinding Padding}"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="DrawerHeader" Property="Background" Value="{DynamicResource Surface.Hover}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="DrawerHeader" Property="Background" Value="{DynamicResource Accent.Soft}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="DrawerHeader" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </ToggleButton.Template>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid Grid.Column="0" Margin="0,0,7,0">
+                        <ui:SymbolIcon Symbol="ChevronDown24"
+                                       Foreground="{DynamicResource Text.Secondary}">
+                            <ui:SymbolIcon.Style>
+                                <Style TargetType="FrameworkElement">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=EvidenceDrawerToggle}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:SymbolIcon.Style>
+                        </ui:SymbolIcon>
+                        <ui:SymbolIcon Symbol="ChevronUp24"
+                                       Foreground="{DynamicResource Text.Secondary}">
+                            <ui:SymbolIcon.Style>
+                                <Style TargetType="FrameworkElement">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=EvidenceDrawerToggle}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:SymbolIcon.Style>
+                        </ui:SymbolIcon>
+                    </Grid>
+                    <TextBlock Grid.Column="1"
+                               VerticalAlignment="Center"
+                               FontWeight="SemiBold"
+                               Text="{loc:Loc Key=Shell.Evidence}" />
+                    <Border Grid.Column="2"
+                            Margin="8,0,0,0"
+                            Padding="7,1"
+                            VerticalAlignment="Center"
+                            Background="{DynamicResource Surface.Raised}"
+                            CornerRadius="8">
+                        <TextBlock FontFamily="{StaticResource Typography.Telemetry}"
+                                   FontSize="10"
+                                   Text="{Binding LogMessages.Count}" />
+                    </Border>
+                    <TextBlock Grid.Column="4"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="{loc:Loc Key=Shell.SimulationJournal}" />
+                </Grid>
+            </ToggleButton>
+            <Border x:Name="EvidenceDrawerContent"
+                    Grid.Row="0"
+                    Height="210"
+                    BorderBrush="{DynamicResource Border.Subtle}"
+                    BorderThickness="0,1,0,0">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsChecked, ElementName=EvidenceDrawerToggle}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <ListBox Margin="4"
+                         ItemsSource="{Binding LogMessages}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <logging:LogView Margin="6,2"
+                                             FontFamily="{StaticResource Typography.Telemetry}"
+                                             FontSize="11"
+                                             Foreground="{DynamicResource Text.Primary}"
+                                             Text="{Binding}"
+                                             TextWrapping="Wrap" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>

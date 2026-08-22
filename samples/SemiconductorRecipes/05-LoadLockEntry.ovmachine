@@ -1,0 +1,663 @@
+{
+  "schema": "1.6",
+  "id": "semi-load-lock-entry-005",
+  "name": "Semiconductor 05 - Load Lock Entry",
+  "createdAt": "2026-08-15T00:00:00+00:00",
+  "modifiedAt": "2026-08-18T00:00:00+00:00",
+  "simulation": {
+    "fixedStepMilliseconds": 5,
+    "defaultTimeScale": 1,
+    "seed": 2105,
+    "activeLayoutId": "main-layout",
+    "automaticRun": {
+      "sequenceId": "automatic-cycle",
+      "startInputId": null,
+      "startInputValue": true,
+      "repeat": false,
+      "repeatDelayMilliseconds": 0
+    }
+  },
+  "layouts": [
+    {
+      "id": "main-layout",
+      "name": "load-lock entry layout",
+      "gridSize": 10,
+      "snapToGrid": true,
+      "components": [
+        {
+          "id": "frame",
+          "name": "Load Lock Entry Frame",
+          "kind": "MachineFrame",
+          "transform": {
+            "x": 360,
+            "y": 250,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 680,
+            "height": 360
+          },
+          "zIndex": -100
+        },
+        {
+          "id": "transport",
+          "name": "load-lock entry transport",
+          "kind": "Conveyor",
+          "transform": {
+            "x": 340,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 560,
+            "height": 70
+          },
+          "zIndex": 10,
+          "behaviorBindingId": "device.transport"
+        },
+        {
+          "id": "sensor-entry",
+          "name": "Atmosphere Side Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 200,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-entry"
+        },
+        {
+          "id": "sensor-process",
+          "name": "Load Lock Position Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 510,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-process"
+        },
+        {
+          "id": "process-stage",
+          "name": "Load Lock Transfer Servo Stage",
+          "kind": "LinearStage",
+          "transform": {
+            "x": 100,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 90,
+            "height": 50
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "axis.process"
+        },
+        {
+          "id": "process-cylinder",
+          "name": "Slit Valve Cylinder",
+          "kind": "PneumaticCylinder",
+          "transform": {
+            "x": 510,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 100,
+            "height": 38
+          },
+          "zIndex": 30,
+          "behaviorBindingId": "device.process-cylinder"
+        },
+        {
+          "id": "wafer",
+          "name": "Load Lock Wafer",
+          "kind": "Workpiece",
+          "transform": {
+            "x": 97,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 34,
+            "height": 34
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "device.wafer"
+        },
+        {
+          "id": "outer-door",
+          "name": "Load Lock Outer Door Cylinder",
+          "kind": "PneumaticCylinder",
+          "transform": {
+            "x": 650,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 100,
+            "height": 38
+          },
+          "zIndex": 30,
+          "behaviorBindingId": "device.outer-door"
+        }
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "id": "axis.process",
+      "name": "Load Lock Transfer Servo Axis",
+      "kind": "Linear",
+      "unit": "mm",
+      "homePosition": 0,
+      "softLimitMin": 0,
+      "softLimitMax": 320,
+      "maxVelocity": 180,
+      "maxAcceleration": 700,
+      "maxDeceleration": 650,
+      "followingErrorLimit": 0.05,
+      "position": {
+        "x": 100,
+        "y": 230,
+        "z": 0
+      }
+    }
+  ],
+  "devices": [
+    {
+      "id": "device.transport",
+      "name": "load-lock entry transport",
+      "kind": "Conveyor",
+      "mountPosition": {
+        "x": 340,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "do.transport.run",
+        "do.transport.reverse"
+      ],
+      "conveyor": {
+        "runCommandChannelId": "do.transport.run",
+        "reverseCommandChannelId": "do.transport.reverse",
+        "speedUnitsPerSecond": 260
+      },
+      "properties": {
+        "semiconductorProcess": "load-lock entry",
+        "connectionRole": "material transport"
+      }
+    },
+    {
+      "id": "device.sensor-entry",
+      "name": "Atmosphere Side Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 200,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-entry"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-entry",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 15,
+        "offDelayMilliseconds": 15
+      },
+      "properties": {
+        "semiconductorProcess": "load-lock entry",
+        "connectionRole": "entry detection"
+      }
+    },
+    {
+      "id": "device.sensor-process",
+      "name": "Load Lock Position Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 510,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-process"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-process",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 15,
+        "offDelayMilliseconds": 15
+      },
+      "properties": {
+        "semiconductorProcess": "load-lock entry",
+        "connectionRole": "process-position detection"
+      }
+    },
+    {
+      "id": "device.process-cylinder",
+      "name": "Slit Valve Cylinder",
+      "kind": "Cylinder",
+      "mountPosition": {
+        "x": 510,
+        "y": 230,
+        "z": 0
+      },
+      "channelIds": [
+        "do.cylinder.extend",
+        "di.cylinder.extended",
+        "di.cylinder.retracted"
+      ],
+      "cylinder": {
+        "extendCommandChannelId": "do.cylinder.extend",
+        "extendedSensorChannelId": "di.cylinder.extended",
+        "retractedSensorChannelId": "di.cylinder.retracted",
+        "extendDurationMilliseconds": 200,
+        "retractDurationMilliseconds": 200,
+        "extendedSensorDelayMilliseconds": 10,
+        "retractedSensorDelayMilliseconds": 10,
+        "stroke": 60
+      },
+      "properties": {
+        "semiconductorProcess": "load-lock entry",
+        "connectionRole": "station interlock"
+      }
+    },
+    {
+      "id": "device.wafer",
+      "name": "Load Lock Wafer",
+      "kind": "Workpiece",
+      "mountPosition": {
+        "x": 97,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [],
+      "workpiece": {
+        "type": "Load Lock Wafer",
+        "conveyorComponentId": "transport",
+        "inspectionState": "Pending"
+      },
+      "properties": {
+        "semiconductorProcess": "load-lock entry",
+        "connectionRole": "process material"
+      }
+    },
+    {
+      "id": "device.outer-door",
+      "name": "Load Lock Outer Door Cylinder",
+      "kind": "Cylinder",
+      "mountPosition": {
+        "x": 650,
+        "y": 230,
+        "z": 0
+      },
+      "channelIds": [
+        "do.outer-door.extend",
+        "di.outer-door.extended",
+        "di.outer-door.retracted"
+      ],
+      "cylinder": {
+        "extendCommandChannelId": "do.outer-door.extend",
+        "extendedSensorChannelId": "di.outer-door.extended",
+        "retractedSensorChannelId": "di.outer-door.retracted",
+        "extendDurationMilliseconds": 180,
+        "retractDurationMilliseconds": 180,
+        "extendedSensorDelayMilliseconds": 10,
+        "retractedSensorDelayMilliseconds": 10,
+        "stroke": 70
+      },
+      "properties": {
+        "semiconductorProcess": "load-lock entry",
+        "connectionRole": "Load Lock Outer Door Cylinder"
+      }
+    },
+    {
+      "id": "load-lock-1",
+      "name": "Load Lock Chamber",
+      "kind": "LoadLock",
+      "mountPosition": {
+        "x": 580,
+        "y": 300,
+        "z": 0
+      },
+      "channelIds": [
+        "do.load-lock.evacuate",
+        "do.load-lock.vent",
+        "di.load-lock.vacuum-ready",
+        "di.load-lock.atmosphere-ready"
+      ],
+      "loadLock": {
+        "outerDoorComponentId": "outer-door",
+        "innerDoorComponentId": "process-cylinder",
+        "evacuateCommandChannelId": "do.load-lock.evacuate",
+        "ventCommandChannelId": "do.load-lock.vent",
+        "vacuumReadySensorChannelId": "di.load-lock.vacuum-ready",
+        "atmosphereReadySensorChannelId": "di.load-lock.atmosphere-ready",
+        "pumpDownDurationMilliseconds": 250,
+        "ventDurationMilliseconds": 250
+      },
+      "properties": {
+        "semiconductorProcess": "load-lock entry",
+        "connectionRole": "vendor-neutral chamber interlock"
+      }
+    }
+  ],
+  "channels": [
+    {
+      "id": "di.sensor-entry",
+      "name": "Atmosphere Side Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.sensor-process",
+      "name": "Load Lock Position Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.extended",
+      "name": "Slit Valve Cylinder Extended",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.retracted",
+      "name": "Slit Valve Cylinder Retracted",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "do.transport.run",
+      "name": "Transport Run",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.transport.reverse",
+      "name": "Transport Reverse",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cylinder.extend",
+      "name": "Slit Valve Cylinder Extend",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-active",
+      "name": "Cycle Active",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-done",
+      "name": "Cycle Done",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.outer-door.extended",
+      "name": "Load Lock Outer Door Cylinder Extended",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.outer-door.retracted",
+      "name": "Load Lock Outer Door Cylinder Retracted",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "do.outer-door.extend",
+      "name": "Load Lock Outer Door Cylinder Extend",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.load-lock.evacuate",
+      "name": "Load Lock Evacuate",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.load-lock.vent",
+      "name": "Load Lock Vent",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.load-lock.vacuum-ready",
+      "name": "Load Lock Vacuum Ready",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.load-lock.atmosphere-ready",
+      "name": "Load Lock Atmosphere Ready",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    }
+  ],
+  "sequences": [
+    {
+      "id": "automatic-cycle",
+      "name": "load-lock entry automatic cycle",
+      "steps": [
+        {
+          "id": "cycle-active",
+          "name": "Cycle Active",
+          "action": "SetSignal",
+          "targetId": "do.cycle-active",
+          "parameter": "true",
+          "nextStepId": "extend-outer-door"
+        },
+        {
+          "id": "extend-outer-door",
+          "name": "Open Load Lock Outer Door",
+          "action": "SetSignal",
+          "targetId": "do.outer-door.extend",
+          "parameter": "true",
+          "nextStepId": "wait-outer-door-extended"
+        },
+        {
+          "id": "wait-outer-door-extended",
+          "name": "Wait Outer Door Open",
+          "action": "WaitSignal",
+          "targetId": "di.outer-door.extended",
+          "parameter": "true",
+          "timeoutMs": 4000,
+          "expectedTargetId": "outer-door",
+          "expectedState": "Extended",
+          "nextStepId": "start-transport"
+        },
+        {
+          "id": "start-transport",
+          "name": "Start Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "true",
+          "nextStepId": "wait-process-position"
+        },
+        {
+          "id": "wait-process-position",
+          "name": "Wait Load Lock Position Sensor",
+          "action": "WaitSignal",
+          "targetId": "di.sensor-process",
+          "parameter": "true",
+          "timeoutMs": 5000,
+          "nextStepId": "stop-transport",
+          "expectedTargetId": "sensor-process",
+          "expectedState": "Detected"
+        },
+        {
+          "id": "stop-transport",
+          "name": "Stop Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "false",
+          "nextStepId": "retract-outer-door"
+        },
+        {
+          "id": "retract-outer-door",
+          "name": "Close Load Lock Outer Door",
+          "action": "SetSignal",
+          "targetId": "do.outer-door.extend",
+          "parameter": "false",
+          "nextStepId": "wait-outer-door-retracted"
+        },
+        {
+          "id": "wait-outer-door-retracted",
+          "name": "Wait Outer Door Closed",
+          "action": "WaitSignal",
+          "targetId": "di.outer-door.retracted",
+          "parameter": "true",
+          "timeoutMs": 4000,
+          "expectedTargetId": "outer-door",
+          "expectedState": "Retracted",
+          "nextStepId": "start-pump-down"
+        },
+        {
+          "id": "start-pump-down",
+          "name": "Start Load Lock Pump Down",
+          "action": "SetSignal",
+          "targetId": "do.load-lock.evacuate",
+          "parameter": "true",
+          "nextStepId": "wait-vacuum-ready"
+        },
+        {
+          "id": "wait-vacuum-ready",
+          "name": "Wait Load Lock Vacuum Ready",
+          "action": "WaitSignal",
+          "targetId": "di.load-lock.vacuum-ready",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "expectedTargetId": "load-lock-1",
+          "expectedState": "Vacuum",
+          "nextStepId": "extend-cylinder"
+        },
+        {
+          "id": "extend-cylinder",
+          "name": "Open Slit Valve",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "true",
+          "nextStepId": "wait-cylinder-extended"
+        },
+        {
+          "id": "wait-cylinder-extended",
+          "name": "Wait Slit Valve Open",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.extended",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "move-process-axis",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Extended"
+        },
+        {
+          "id": "move-process-axis",
+          "name": "Move Load Lock Transfer Servo Axis",
+          "action": "MoveAxis",
+          "targetId": "axis.process",
+          "parameter": "250",
+          "nextStepId": "wait-process-axis"
+        },
+        {
+          "id": "wait-process-axis",
+          "name": "Wait Load Lock Transfer Servo Axis",
+          "action": "WaitAxisDone",
+          "targetId": "axis.process",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "nextStepId": "retract-cylinder",
+          "expectedTargetId": "axis.process",
+          "expectedState": "Idle"
+        },
+        {
+          "id": "retract-cylinder",
+          "name": "Retract Slit Valve Cylinder",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "false",
+          "nextStepId": "wait-cylinder-retracted"
+        },
+        {
+          "id": "wait-cylinder-retracted",
+          "name": "Wait Slit Valve Cylinder Retracted",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.retracted",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "stop-pump-down",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Retracted"
+        },
+        {
+          "id": "stop-pump-down",
+          "name": "Stop Load Lock Pump Down",
+          "action": "SetSignal",
+          "targetId": "do.load-lock.evacuate",
+          "parameter": "false",
+          "nextStepId": "start-vent"
+        },
+        {
+          "id": "start-vent",
+          "name": "Start Load Lock Vent",
+          "action": "SetSignal",
+          "targetId": "do.load-lock.vent",
+          "parameter": "true",
+          "nextStepId": "wait-atmosphere-ready"
+        },
+        {
+          "id": "wait-atmosphere-ready",
+          "name": "Wait Load Lock Atmosphere Ready",
+          "action": "WaitSignal",
+          "targetId": "di.load-lock.atmosphere-ready",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "expectedTargetId": "load-lock-1",
+          "expectedState": "Atmosphere",
+          "nextStepId": "stop-vent"
+        },
+        {
+          "id": "stop-vent",
+          "name": "Stop Load Lock Vent",
+          "action": "SetSignal",
+          "targetId": "do.load-lock.vent",
+          "parameter": "false",
+          "nextStepId": "cycle-done"
+        },
+        {
+          "id": "cycle-done",
+          "name": "Cycle Done",
+          "action": "SetSignal",
+          "targetId": "do.cycle-done",
+          "parameter": "true",
+          "nextStepId": "complete",
+          "expectedTargetId": "transport",
+          "expectedState": "Stopped"
+        },
+        {
+          "id": "complete",
+          "name": "Complete",
+          "action": "Complete",
+          "targetId": "",
+          "parameter": ""
+        }
+      ]
+    }
+  ]
+}

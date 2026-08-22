@@ -1,0 +1,313 @@
+<UserControl x:Class="OpenVisionLab.MachineStudio.View.Sequence.SequenceEditorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
+             MinWidth="520"
+             MinHeight="320">
+    <UserControl.Resources>
+        <loc:LocalizedSequenceNameConverter x:Key="LocalizedSequenceNameConverter" />
+        <Style x:Key="SequenceFieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,0,7,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+            <Setter Property="FontSize" Value="10.5" />
+        </Style>
+        <Style x:Key="SequenceTextBoxStyle"
+               TargetType="TextBox"
+               BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Height" Value="{StaticResource Density.InspectorFieldHeight}" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="SequenceComboBoxStyle"
+               TargetType="ComboBox"
+               BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Setter Property="Height" Value="{StaticResource Density.InspectorFieldHeight}" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource PanelSurfaceStyle}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" MinHeight="110" />
+                <RowDefinition Height="228" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Style="{StaticResource PanelHeaderStyle}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource PanelHeaderTextStyle}" Text="{loc:Loc Key=Sequence.Editor}" />
+                        <TextBlock Margin="10,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{loc:Loc Key=Sequence.Tagline}" />
+                    </StackPanel>
+                    <Border HorizontalAlignment="Right" Style="{StaticResource StatusPillStyle}">
+                        <TextBlock FontSize="10"
+                                   FontWeight="SemiBold"
+                                   Text="{Binding ValidationSummary}" />
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1" Margin="10,8,10,7">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Margin="0,0,8,0"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource Text.Secondary}"
+                               Text="{loc:Loc Key=Shell.Sequence}" />
+                <ComboBox Grid.Column="1"
+                          MinWidth="220"
+                          HorizontalAlignment="Left"
+                          ItemsSource="{Binding Sequences}"
+                          SelectedItem="{Binding SelectedSequence, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Converter={StaticResource LocalizedSequenceNameConverter}}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <WrapPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,7,0,0">
+                    <TextBlock Margin="0,0,7,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="{loc:Loc Key=Sequence.NewStep}" />
+                    <ComboBox Width="175"
+                              Margin="0,0,6,0"
+                              DisplayMemberPath="Name"
+                              ItemsSource="{Binding Templates}"
+                              SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}" />
+                    <Button Margin="0,0,6,0"
+                            Command="{Binding AddStepCommand}"
+                            Content="{loc:Loc Key=Sequence.Add}"
+                            Style="{StaticResource PrimaryCommandButtonStyle}"
+                            ToolTip="Insert a new step before the final Complete step" />
+                    <Button Margin="0,0,6,0"
+                            Command="{Binding DeleteStepCommand}"
+                            Content="{loc:Loc Key=Sequence.Delete}"
+                            Style="{StaticResource GlobalCommandButtonStyle}"
+                            ToolTip="Delete the selected non-terminal step" />
+                    <Button Margin="0,0,6,0"
+                            Command="{Binding MoveStepUpCommand}"
+                            Content="{loc:Loc Key=Sequence.MoveUp}"
+                            Style="{StaticResource GlobalCommandButtonStyle}" />
+                    <Button Command="{Binding MoveStepDownCommand}"
+                            Content="{loc:Loc Key=Sequence.MoveDown}"
+                            Style="{StaticResource GlobalCommandButtonStyle}" />
+                    <TextBlock Margin="12,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="{Binding StructuralEditStatus}"
+                               TextWrapping="Wrap" />
+                </WrapPanel>
+            </Grid>
+
+            <DataGrid Grid.Row="2"
+                      Margin="10,0,10,8"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      CanUserReorderColumns="False"
+                      CanUserResizeRows="False"
+                      HeadersVisibility="Column"
+                      IsReadOnly="True"
+                      ItemsSource="{Binding Steps}"
+                      SelectedItem="{Binding SelectedStep, Mode=TwoWay}"
+                      SelectionMode="Single"
+                      SelectionUnit="FullRow">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Width="42" Binding="{Binding Order}" Header="#" />
+                    <DataGridTextColumn Width="2*" Binding="{Binding DisplayName}" Header="Step" />
+                    <DataGridTextColumn Width="130" Binding="{Binding Action}" Header="Action" />
+                    <DataGridTextColumn Width="*" Binding="{Binding TargetId}" Header="Target" />
+                    <DataGridTemplateColumn Width="1.5*" Header="Validation">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{Binding ValidationText}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding ValidationText}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <Grid Grid.Row="3" Margin="10,0,10,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*" MinWidth="330" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="*" MinWidth="180" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Padding="10,8" Style="{StaticResource InspectorCardStyle}">
+                    <Grid IsEnabled="{Binding IsEditable}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="58" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="58" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Row="0" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Name}" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="3"
+                                 Style="{StaticResource SequenceTextBoxStyle}"
+                                 Text="{Binding SelectedStep.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Grid.Row="1" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Action}" />
+                        <ComboBox Grid.Row="1" Grid.Column="1"
+                                  ItemsSource="{Binding SelectedStep.AvailableActions}"
+                                  SelectedItem="{Binding SelectedStep.Action, Mode=TwoWay}"
+                                  Style="{StaticResource SequenceComboBoxStyle}" />
+                        <TextBlock Grid.Row="1" Grid.Column="2" Margin="8,0,7,0"
+                                   Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Target}" />
+                        <ComboBox Grid.Row="1" Grid.Column="3"
+                                  DisplayMemberPath="Name"
+                                  IsEnabled="{Binding SelectedStep.HasTargetOptions}"
+                                  ItemsSource="{Binding SelectedStep.AvailableTargets}"
+                                  SelectedValue="{Binding SelectedStep.TargetId, Mode=TwoWay}"
+                                  SelectedValuePath="Id"
+                                  Style="{StaticResource SequenceComboBoxStyle}" />
+
+                        <TextBlock Grid.Row="2" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Value}" />
+                        <Grid Grid.Row="2" Grid.Column="1">
+                            <TextBox IsEnabled="{Binding SelectedStep.IsParameterEditable}"
+                                     Text="{Binding SelectedStep.Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox" BasedOn="{StaticResource SequenceTextBoxStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedStep.UsesParameterChoices}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
+                            <ComboBox ItemsSource="{Binding SelectedStep.AvailableParameterOptions}"
+                                      SelectedItem="{Binding SelectedStep.Parameter, Mode=TwoWay}">
+                                <ComboBox.Style>
+                                    <Style TargetType="ComboBox" BasedOn="{StaticResource SequenceComboBoxStyle}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedStep.UsesParameterChoices}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ComboBox.Style>
+                            </ComboBox>
+                        </Grid>
+                        <TextBlock Grid.Row="2" Grid.Column="2" Margin="8,0,7,0"
+                                   Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Timeout}" />
+                        <TextBox Grid.Row="2" Grid.Column="3"
+                                 IsEnabled="{Binding SelectedStep.IsTimeoutEditable}"
+                                 Style="{StaticResource SequenceTextBoxStyle}"
+                                 Text="{Binding SelectedStep.TimeoutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Grid.Row="3" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Next}" />
+                        <TextBox Grid.Row="3" Grid.Column="1"
+                                 Style="{StaticResource SequenceTextBoxStyle}"
+                                 Text="{Binding SelectedStep.NextStepId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Grid.Row="3" Grid.Column="2" Margin="8,0,7,0"
+                                   Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Error}" />
+                        <TextBox Grid.Row="3" Grid.Column="3"
+                                 Style="{StaticResource SequenceTextBoxStyle}"
+                                 Text="{Binding SelectedStep.ErrorStepId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Grid.Row="4" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Failure}" />
+                        <TextBox Grid.Row="4" Grid.Column="1"
+                                 Style="{StaticResource SequenceTextBoxStyle}"
+                                 Text="{Binding SelectedStep.FailureStepId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Grid.Row="4" Grid.Column="2" Margin="8,0,7,0"
+                                   Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.StepId}" />
+                        <TextBox Grid.Row="4" Grid.Column="3"
+                                 IsReadOnly="True"
+                                 Style="{StaticResource SequenceTextBoxStyle}"
+                                 Text="{Binding SelectedStep.Id, Mode=OneWay}" />
+
+                        <Grid Grid.Row="5" Grid.ColumnSpan="4" Margin="0,3,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox VerticalAlignment="Center"
+                                      AutomationProperties.Name="{loc:Loc Key=Sequence.ExpectedCheckpoint}"
+                                      Content="{loc:Loc Key=Sequence.ExpectedCheckpoint}"
+                                      IsChecked="{Binding SelectedStep.HasExpectedState, Mode=TwoWay}"
+                                      IsEnabled="{Binding SelectedStep.CanSetExpectedState}"
+                                      ToolTip="{loc:Loc Key=Sequence.ExpectedCheckpointTooltip}" />
+                            <ComboBox Grid.Column="2"
+                                      DisplayMemberPath="Name"
+                                      IsEnabled="{Binding SelectedStep.HasExpectedState}"
+                                      ItemsSource="{Binding SelectedStep.AvailableExpectedStateTargets}"
+                                      SelectedValue="{Binding SelectedStep.ExpectedTargetId, Mode=TwoWay}"
+                                      SelectedValuePath="Id"
+                                      Style="{StaticResource SequenceComboBoxStyle}" />
+                            <TextBlock Grid.Column="4"
+                                       Style="{StaticResource SequenceFieldLabelStyle}"
+                                       Text="{loc:Loc Key=Sequence.ExpectedState}" />
+                            <ComboBox Grid.Column="6"
+                                      IsEnabled="{Binding SelectedStep.HasExpectedState}"
+                                      ItemsSource="{Binding SelectedStep.AvailableExpectedStates}"
+                                      SelectedItem="{Binding SelectedStep.ExpectedState, Mode=TwoWay}"
+                                      Style="{StaticResource SequenceComboBoxStyle}" />
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2" Padding="10,8" Style="{StaticResource InspectorCardStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Sequence.Validation}" />
+                        <ListBox Grid.Row="1"
+                                 Margin="0,5,0,0"
+                                 BorderThickness="0"
+                                 ItemsSource="{Binding ValidationMessages}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Margin="0,2"
+                                               FontSize="10.5"
+                                               Foreground="{DynamicResource State.Fault}"
+                                               Text="{Binding}"
+                                               TextWrapping="Wrap" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

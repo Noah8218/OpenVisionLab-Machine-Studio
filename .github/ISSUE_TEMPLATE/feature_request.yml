@@ -1,0 +1,36 @@
+name: Feature request
+description: Propose a focused vendor-neutral virtual-commissioning improvement.
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Describe the workflow problem without prescribing an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Shortest safe workflow
+      description: Describe the expected operator workflow and explicit action boundaries.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and exclusions
+      description: State what the proposal must and must not include.
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Product boundaries
+      options:
+        - label: The proposal is vendor-neutral and uses no private protocol, copied design, logo, or unlicensed asset.
+          required: true
+        - label: The proposal does not claim current production PLC, robot, MES, cloud, or safety-control support.
+          required: true

@@ -1,0 +1,581 @@
+{
+  "schema": "1.11",
+  "id": "semi-wafer-prealigner-003",
+  "name": "Semiconductor 03 - Wafer Prealigner",
+  "createdAt": "2026-08-15T00:00:00+00:00",
+  "modifiedAt": "2026-08-18T00:00:00+00:00",
+  "simulation": {
+    "fixedStepMilliseconds": 5,
+    "defaultTimeScale": 1,
+    "seed": 2103,
+    "activeLayoutId": "main-layout",
+    "automaticRun": {
+      "sequenceId": "automatic-cycle",
+      "startInputId": null,
+      "startInputValue": true,
+      "repeat": false,
+      "repeatDelayMilliseconds": 0
+    }
+  },
+  "layouts": [
+    {
+      "id": "main-layout",
+      "name": "wafer prealignment layout",
+      "gridSize": 10,
+      "snapToGrid": true,
+      "components": [
+        {
+          "id": "frame",
+          "name": "Prealigner Frame",
+          "kind": "MachineFrame",
+          "transform": {
+            "x": 360,
+            "y": 250,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 680,
+            "height": 360
+          },
+          "zIndex": -100
+        },
+        {
+          "id": "transport",
+          "name": "wafer prealignment transport",
+          "kind": "Conveyor",
+          "transform": {
+            "x": 340,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 560,
+            "height": 70
+          },
+          "zIndex": 10,
+          "behaviorBindingId": "device.transport"
+        },
+        {
+          "id": "sensor-entry",
+          "name": "Wafer Arrival Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 200,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-entry"
+        },
+        {
+          "id": "sensor-process",
+          "name": "Alignment Position Sensor",
+          "kind": "DigitalSensor",
+          "transform": {
+            "x": 470,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 76
+          },
+          "zIndex": 20,
+          "behaviorBindingId": "device.sensor-process"
+        },
+    {
+      "id": "process-stage",
+          "name": "Prealign Stage Servo Stage",
+      "kind": "LinearStage",
+          "transform": {
+            "x": 100,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 90,
+            "height": 50
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "axis.process"
+        },
+        {
+          "id": "process-cylinder",
+          "name": "Wafer Clamp Cylinder",
+          "kind": "PneumaticCylinder",
+          "transform": {
+            "x": 470,
+            "y": 230,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 100,
+            "height": 38
+          },
+          "zIndex": 30,
+          "behaviorBindingId": "device.process-cylinder"
+        },
+        {
+          "id": "wafer",
+          "name": "300 mm Wafer",
+          "kind": "Workpiece",
+          "transform": {
+            "x": 97,
+            "y": 380,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 34,
+            "height": 34
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "device.wafer"
+        },
+    {
+      "id": "alignment-table",
+          "name": "Wafer Alignment Table",
+      "kind": "RotaryStage",
+          "transform": {
+            "x": 250,
+            "y": 150,
+            "rotationDegrees": 0
+          },
+          "size": {
+            "width": 110,
+            "height": 60
+          },
+          "zIndex": 25,
+          "behaviorBindingId": "axis.alignment-rotation"
+        }
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "id": "axis.process",
+      "name": "Prealign Stage Servo Axis",
+      "kind": "Linear",
+      "unit": "mm",
+      "homePosition": 0,
+      "softLimitMin": 0,
+      "softLimitMax": 320,
+      "maxVelocity": 180,
+      "maxAcceleration": 700,
+      "maxDeceleration": 650,
+      "followingErrorLimit": 0.05,
+      "position": {
+        "x": 100,
+        "y": 230,
+        "z": 0
+      }
+    },
+    {
+      "id": "axis.alignment-rotation",
+      "name": "Wafer Alignment Rotation Axis",
+      "kind": "Rotary",
+      "unit": "deg",
+      "homePosition": 0,
+      "softLimitMin": -360,
+      "softLimitMax": 360,
+      "maxVelocity": 240,
+      "maxAcceleration": 900,
+      "maxDeceleration": 900,
+      "followingErrorLimit": 0.05,
+      "position": {
+        "x": 250,
+        "y": 150,
+        "z": 0
+      }
+    }
+  ],
+  "devices": [
+    {
+      "id": "device.transport",
+      "name": "wafer prealignment transport",
+      "kind": "Conveyor",
+      "mountPosition": {
+        "x": 340,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "do.transport.run",
+        "do.transport.reverse"
+      ],
+      "conveyor": {
+        "runCommandChannelId": "do.transport.run",
+        "reverseCommandChannelId": "do.transport.reverse",
+        "speedUnitsPerSecond": 200
+      },
+      "properties": {
+        "semiconductorProcess": "wafer prealignment",
+        "connectionRole": "material transport"
+      }
+    },
+    {
+      "id": "device.sensor-entry",
+      "name": "Wafer Arrival Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 200,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-entry"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-entry",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 10,
+        "offDelayMilliseconds": 10
+      },
+      "properties": {
+        "semiconductorProcess": "wafer prealignment",
+        "connectionRole": "entry detection"
+      }
+    },
+    {
+      "id": "device.sensor-process",
+      "name": "Alignment Position Sensor",
+      "kind": "Sensor",
+      "mountPosition": {
+        "x": 470,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-process"
+      ],
+      "sensor": {
+        "outputChannelId": "di.sensor-process",
+        "targetComponentId": "wafer",
+        "onDelayMilliseconds": 10,
+        "offDelayMilliseconds": 10
+      },
+      "properties": {
+        "semiconductorProcess": "wafer prealignment",
+        "connectionRole": "process-position detection"
+      }
+    },
+    {
+      "id": "device.process-cylinder",
+      "name": "Wafer Clamp Cylinder",
+      "kind": "Cylinder",
+      "mountPosition": {
+        "x": 470,
+        "y": 230,
+        "z": 0
+      },
+      "channelIds": [
+        "do.cylinder.extend",
+        "di.cylinder.extended",
+        "di.cylinder.retracted"
+      ],
+      "cylinder": {
+        "extendCommandChannelId": "do.cylinder.extend",
+        "extendedSensorChannelId": "di.cylinder.extended",
+        "retractedSensorChannelId": "di.cylinder.retracted",
+        "extendDurationMilliseconds": 160,
+        "retractDurationMilliseconds": 160,
+        "extendedSensorDelayMilliseconds": 10,
+        "retractedSensorDelayMilliseconds": 10,
+        "stroke": 60
+      },
+      "properties": {
+        "semiconductorProcess": "wafer prealignment",
+        "connectionRole": "station interlock"
+      }
+    },
+    {
+      "id": "device.wafer",
+      "name": "300 mm Wafer",
+      "kind": "Workpiece",
+      "mountPosition": {
+        "x": 97,
+        "y": 380,
+        "z": 0
+      },
+      "channelIds": [],
+      "workpiece": {
+        "type": "300 mm Wafer",
+        "conveyorComponentId": "transport",
+        "inspectionState": "Pending"
+      },
+      "properties": {
+        "semiconductorProcess": "wafer prealignment",
+        "connectionRole": "process material"
+      }
+    },
+    {
+      "id": "device.prealigner",
+      "name": "Wafer Pre-aligner",
+      "kind": "Prealigner",
+      "mountPosition": {
+        "x": 470,
+        "y": 250,
+        "z": 0
+      },
+      "channelIds": [
+        "di.sensor-process",
+        "do.alignment-accepted",
+        "di.alignment-ready",
+        "di.alignment-complete"
+      ],
+      "prealigner": {
+        "rotaryStageComponentId": "alignment-table",
+        "clampCylinderComponentId": "process-cylinder",
+        "waferPresentSensorChannelId": "di.sensor-process",
+        "alignmentAcceptedCommandChannelId": "do.alignment-accepted",
+        "alignmentReadyFeedbackChannelId": "di.alignment-ready",
+        "alignmentCompleteFeedbackChannelId": "di.alignment-complete",
+        "alignmentTargetDegrees": 180,
+        "alignmentToleranceDegrees": 0.1
+      },
+      "properties": {
+        "semiconductorProcess": "wafer prealignment",
+        "connectionRole": "clamp, rotary alignment, and acceptance interlock"
+      }
+    }
+  ],
+  "channels": [
+    {
+      "id": "di.sensor-entry",
+      "name": "Wafer Arrival Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.sensor-process",
+      "name": "Alignment Position Sensor",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.extended",
+      "name": "Wafer Clamp Cylinder Extended",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.cylinder.retracted",
+      "name": "Wafer Clamp Cylinder Retracted",
+      "kind": "DigitalInput",
+      "initialValue": 1
+    },
+    {
+      "id": "di.alignment-ready",
+      "name": "Alignment Ready",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "di.alignment-complete",
+      "name": "Alignment Complete",
+      "kind": "DigitalInput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.transport.run",
+      "name": "Transport Run",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.transport.reverse",
+      "name": "Transport Reverse",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cylinder.extend",
+      "name": "Wafer Clamp Cylinder Extend",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.alignment-accepted",
+      "name": "Alignment Accepted",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-active",
+      "name": "Cycle Active",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    },
+    {
+      "id": "do.cycle-done",
+      "name": "Cycle Done",
+      "kind": "DigitalOutput",
+      "initialValue": 0
+    }
+  ],
+  "sequences": [
+    {
+      "id": "automatic-cycle",
+      "name": "wafer prealignment automatic cycle",
+      "steps": [
+        {
+          "id": "cycle-active",
+          "name": "Cycle Active",
+          "action": "SetSignal",
+          "targetId": "do.cycle-active",
+          "parameter": "true",
+          "nextStepId": "start-transport"
+        },
+        {
+          "id": "start-transport",
+          "name": "Start Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "true",
+          "nextStepId": "wait-process-position"
+        },
+        {
+          "id": "wait-process-position",
+          "name": "Wait Alignment Position Sensor",
+          "action": "WaitSignal",
+          "targetId": "di.sensor-process",
+          "parameter": "true",
+          "timeoutMs": 5000,
+          "nextStepId": "stop-transport",
+          "expectedTargetId": "sensor-process",
+          "expectedState": "Detected"
+        },
+        {
+          "id": "stop-transport",
+          "name": "Stop Wafer Transport",
+          "action": "SetSignal",
+          "targetId": "do.transport.run",
+          "parameter": "false",
+          "nextStepId": "extend-cylinder"
+        },
+        {
+          "id": "extend-cylinder",
+          "name": "Clamp Wafer At Alignment Position",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "true",
+          "nextStepId": "wait-cylinder-extended"
+        },
+        {
+          "id": "wait-cylinder-extended",
+          "name": "Wait Wafer Clamp Extended",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.extended",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "wait-alignment-ready",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Extended"
+        },
+        {
+          "id": "wait-alignment-ready",
+          "name": "Wait Pre-aligner Ready",
+          "action": "WaitSignal",
+          "targetId": "di.alignment-ready",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "move-process-axis"
+        },
+        {
+          "id": "move-process-axis",
+          "name": "Move Prealign Stage Servo Axis",
+          "action": "MoveAxis",
+          "targetId": "axis.process",
+          "parameter": "210",
+          "nextStepId": "wait-process-axis"
+        },
+        {
+          "id": "wait-process-axis",
+          "name": "Wait Prealign Stage Servo Axis",
+          "action": "WaitAxisDone",
+          "targetId": "axis.process",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "nextStepId": "rotate-alignment-table",
+          "expectedTargetId": "axis.process",
+          "expectedState": "Idle"
+        },
+        {
+          "id": "rotate-alignment-table",
+          "name": "Rotate Wafer To Notch Reference",
+          "action": "MoveAxis",
+          "targetId": "axis.alignment-rotation",
+          "parameter": "180",
+          "nextStepId": "wait-alignment-table"
+        },
+        {
+          "id": "wait-alignment-table",
+          "name": "Wait Wafer Alignment Rotation",
+          "action": "WaitAxisDone",
+          "targetId": "axis.alignment-rotation",
+          "parameter": "",
+          "timeoutMs": 5000,
+          "expectedTargetId": "axis.alignment-rotation",
+          "expectedState": "Idle",
+          "nextStepId": "accept-alignment"
+        },
+        {
+          "id": "accept-alignment",
+          "name": "Accept Notch Alignment",
+          "action": "SetSignal",
+          "targetId": "do.alignment-accepted",
+          "parameter": "true",
+          "nextStepId": "wait-alignment-complete"
+        },
+        {
+          "id": "wait-alignment-complete",
+          "name": "Wait Alignment Complete",
+          "action": "WaitSignal",
+          "targetId": "di.alignment-complete",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "retract-cylinder"
+        },
+        {
+          "id": "retract-cylinder",
+          "name": "Retract Wafer Clamp Cylinder",
+          "action": "SetSignal",
+          "targetId": "do.cylinder.extend",
+          "parameter": "false",
+          "nextStepId": "wait-cylinder-retracted"
+        },
+        {
+          "id": "wait-cylinder-retracted",
+          "name": "Wait Wafer Clamp Cylinder Retracted",
+          "action": "WaitSignal",
+          "targetId": "di.cylinder.retracted",
+          "parameter": "true",
+          "timeoutMs": 3000,
+          "nextStepId": "cycle-done",
+          "expectedTargetId": "process-cylinder",
+          "expectedState": "Retracted"
+        },
+        {
+          "id": "cycle-done",
+          "name": "Cycle Done",
+          "action": "SetSignal",
+          "targetId": "do.cycle-done",
+          "parameter": "true",
+          "nextStepId": "complete",
+          "expectedTargetId": "transport",
+          "expectedState": "Stopped"
+        },
+        {
+          "id": "complete",
+          "name": "Complete",
+          "action": "Complete",
+          "targetId": "",
+          "parameter": ""
+        }
+      ]
+    }
+  ]
+}
