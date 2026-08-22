@@ -58,6 +58,7 @@ $tempRoot = Join-Path $scratchRoot 'temp'
 New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
 $env:TEMP = $tempRoot
 $env:TMP = $tempRoot
+$env:ArtifactsPath = $dotnetArtifactsRoot
 
 & dotnet restore $solutionPath -p:ArtifactsPath=$dotnetArtifactsRoot
 if ($LASTEXITCODE -ne 0) {

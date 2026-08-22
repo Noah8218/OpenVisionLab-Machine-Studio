@@ -6,7 +6,7 @@
 - Language version: C# 12
 - Nullable: enable
 - ImplicitUsings: enable
-- Product version: `0.1.0-rc.3`
+- Product version: `0.1.0-rc.4`
 
 The product version has one source of truth: `Version` in
 `Directory.Build.props`. Machine Studio generates runtime evidence identity as
