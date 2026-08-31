@@ -6794,6 +6794,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         SequenceEditor.DefinitionChanged -= OnSequenceDefinitionChanged;
         _runtimeCancellation.Cancel();
         _batchCancellation?.Cancel();
+        IntegrationExchange.Dispose();
         _engine.Dispose();
         SimulationWorkspace.Dispose();
         if (_runtimeTask.IsFaulted)

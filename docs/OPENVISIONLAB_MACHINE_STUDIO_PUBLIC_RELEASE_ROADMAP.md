@@ -1,6 +1,6 @@
 # OpenVisionLab Machine Studio Public Release Roadmap
 
-Updated: 2026-08-22
+Updated: 2026-08-31
 
 Status: Current authority for sequential public development and releases.
 
@@ -54,6 +54,11 @@ Acknowledgement, Result, schema, identity, error-code, and recovery fixtures.
 Release 2 publishes both independent applications, the pinned package, and an
 exact compatibility matrix.
 
+The current Machine feature branch adds the shared authenticated TCP transport
+while retaining the existing V1 file-exchange adapter for local continuity.
+The V2 domain-message migration and cross-product compatibility qualification
+are not implied by this development push and remain Release 2 gates.
+
 ## Release 3 — Repeated workflow and recovery (`v0.3.0`)
 
 Users can review project-scoped transaction history and recover waiting,
@@ -87,4 +92,7 @@ maintainer capacity, resolved release-blocking feedback, and explicit owner GO.
 4. Implement release 4 extension boundaries after release 3 usage evidence.
    | Recommended model: `gpt-5.6-sol` | Reasoning effort: `high`
 
-Only release 1 is active.
+Release 2 development is active under the explicit owner decision recorded for
+the `feat/release-2-tcp-integration` branch. Release 1 publication/readback,
+Release 2 contract qualification, clean-source packaging, pull request review,
+and any tag or GitHub Release remain separate gates.

@@ -11,6 +11,27 @@ single-step, reset, dry-run, and layout playback workflows.
 > Machine Studio is a technical-alpha virtual-commissioning tool. It is not
 > production-control or safety software.
 
+## Version
+
+Current version: `v0.2.0-dev`
+
+This project is maintained using explicit version numbers. The current branch
+is a Release 2 development candidate; it is not a release tag or downloadable
+package.
+
+### Recent version history
+
+#### `v0.2.0-dev` (2026-08-31)
+
+- Added authenticated TCP transfer for explicit Machine/consumer transaction
+  exchange, with session-only shared keys and persisted endpoint settings.
+- Preserved the existing explicit Handoff export and Result refresh workflow.
+
+#### `v0.1.0-rc.4` (2026-08-22)
+
+- Release 1 public release-candidate baseline for local deterministic
+  simulation and virtual commissioning.
+
 ## Download
 
 Download the latest Windows x64 ZIP from
@@ -102,8 +123,20 @@ accepted evidence stay beside the saved project. User language settings are
 stored under `%LOCALAPPDATA%\OpenVisionLab\MachineStudio\CONFIG`.
 
 The application does not require an account, cloud service, or network
-connection for its supported workflows. It does not automatically update,
-upload projects, or execute external equipment.
+connection for its local workflows. Release 2 adds an optional, explicit,
+authenticated TCP transfer path for a configured peer; it does not
+automatically update, upload projects, or execute external equipment.
+
+### Optional TCP integration (Release 2 development)
+
+On the **3D Exchange** tab, save the shared exchange folder and the listen and
+peer endpoints, then enter the same Base64 key (at least 32 decoded bytes) in
+each participating application. The key is session-only; it is never written
+to the settings file. The `OPENVISIONLAB_TCP_SHARED_KEY` environment variable
+can supply the key for a headless or repeatable session. Start the listener and
+use **Ping peer**, **Push latest**, or **Pull latest** explicitly. A transfer
+only copies the selected transaction files; use the existing explicit Result
+refresh action to validate and display a returned inspection result.
 
 ## Build from source
 

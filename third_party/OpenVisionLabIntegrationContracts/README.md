@@ -1,10 +1,21 @@
 # OpenVisionLab Integration Contracts
 
-- Package: `OpenVisionLab.Integration.Contracts` 0.1.0
-- Source commit: `dfff80c977a423ca00f71c655e0711847f173fb5`
-- SHA-256: `8B6906E9545CFBFC3E3AA52DC43D095EB20C223DFD2F6C2FA6C8E656D4C84FFD`
-- License: MIT; `LICENSE` and `NOTICE` are included inside the package.
+The public Release 2 development branch consumes the following exact local
+packages:
 
-This fixed local package owns the shared Handoff, Acknowledgement, Result,
-validation, correlation, error, and JSON fixture contracts. Do not replace it
-without updating both OpenVisionLab consumers to the same exact package hash.
+- `OpenVisionLab.Integration.Contracts` `0.2.0-alpha.2`
+  - SHA-256: `9F94B300D8DEBC4B69DC242B5E47018605CAA725A5DA265F32718DBDDF8A1BD5`
+- `OpenVisionLab.Integration.Transport.Tcp` `0.1.0-alpha.2`
+  - SHA-256: `67E0270C67DCE287E3DCA3D4A01557C526185719E87248FC662FBCF99BBA13A2`
+
+Both packages are development snapshots sourced from the shared integration
+workspace with repository state recorded as `working-tree-uncommitted`. They
+are suitable for the `0.2.0-dev` feature branch only, not a clean-source
+release candidate. The older `OpenVisionLab.Integration.Contracts` `0.1.0`
+package remains for historical traceability and is no longer referenced by the
+application.
+
+The packages own the shared Handoff, Acknowledgement, Result, validation,
+correlation, error, JSON fixture, and authenticated bounded TCP transport
+contracts. Do not replace either package without updating both OpenVisionLab
+consumers to the same exact package hashes.

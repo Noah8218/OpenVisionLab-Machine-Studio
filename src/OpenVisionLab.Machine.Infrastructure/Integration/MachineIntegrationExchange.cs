@@ -58,7 +58,11 @@ public static class MachineIntegrationExchange
                 .Select(source => CopyArtifact(source, artifactsDirectory))
                 .ToArray();
             var handoff = new IntegrationHandoff(
-                IntegrationContractSchema.Current,
+                // The public Release 2 branch keeps this established V1 file
+                // exchange readable while the shared package is upgraded.
+                // TCP transfers are schema-agnostic; V2 domain qualification
+                // remains a separate Release 2 gate.
+                IntegrationContractSchema.Legacy,
                 IntegrationMessageKind.Handoff,
                 Guid.NewGuid(),
                 transactionId,

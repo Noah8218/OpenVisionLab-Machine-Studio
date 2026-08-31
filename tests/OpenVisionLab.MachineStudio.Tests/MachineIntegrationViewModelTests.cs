@@ -74,10 +74,39 @@ public sealed class MachineIntegrationViewModelTests
         Assert.False(Directory.Exists(Path.Combine(fixture.ExchangeRoot, "transactions")));
     }
 
+    [Fact]
+    public void TcpEndpointSetupPersistsWithoutStartingAListener()
+    {
+        using var fixture = new IntegrationFixture();
+        var context = fixture.Context();
+        using var viewModel = fixture.CreateViewModel(() => context);
+        viewModel.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.InspectionSourcePath = fixture.SourcePath;
+        viewModel.TcpListenAddress = "127.0.0.1";
+        viewModel.TcpListenPortText = "45111";
+        viewModel.TcpPeerHost = "192.0.2.10";
+        viewModel.TcpPeerPortText = "45112";
+        var sessionKey = Convert.ToBase64String(new byte[32]);
+        viewModel.SetSessionSharedKey(sessionKey);
+
+        viewModel.SaveSetupCommand.Execute(null);
+
+        using var restored = fixture.CreateViewModel(() => context);
+        Assert.Equal("127.0.0.1", restored.TcpListenAddress);
+        Assert.Equal("45111", restored.TcpListenPortText);
+        Assert.Equal("192.0.2.10", restored.TcpPeerHost);
+        Assert.Equal("45112", restored.TcpPeerPortText);
+        Assert.False(restored.IsTcpListening);
+        var persisted = File.ReadAllText(fixture.SettingsPath);
+        Assert.Contains("TcpListenPort", persisted, StringComparison.Ordinal);
+        Assert.DoesNotContain(sessionKey, persisted, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(fixture.ExchangeRoot, "transactions")));
+    }
+
     private sealed class IntegrationFixture : IDisposable
     {
         private readonly string root = Path.Combine(
-            Path.GetTempPath(),
+            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio",
             "OpenVisionLab-Machine-Integration-UI",
             Guid.NewGuid().ToString("N"));
 

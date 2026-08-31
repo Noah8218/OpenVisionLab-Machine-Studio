@@ -19,6 +19,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <Border Padding="16"
@@ -123,6 +124,124 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="6">
+                        <StackPanel>
+                            <TextBlock FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Text="Authenticated TCP transport" />
+                            <TextBlock Margin="0,4,0,12"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="Explicitly start a listener or transfer the selected transaction. The shared key is session-only and is never saved."
+                                       TextWrapping="Wrap" />
+                            <WrapPanel>
+                                <StackPanel Width="220" Margin="0,0,12,8">
+                                    <TextBlock Margin="0,0,0,4" FontWeight="SemiBold" Text="Listen address" />
+                                    <TextBox x:Name="TcpListenAddressTextBox"
+                                             Height="32"
+                                             Padding="8,4"
+                                             VerticalContentAlignment="Center"
+                                             IsEnabled="{Binding IntegrationExchange.CanEditTcpSetup}"
+                                             Text="{Binding IntegrationExchange.TcpListenAddress, UpdateSourceTrigger=PropertyChanged}"
+                                             AutomationProperties.Name="TCP listen address" />
+                                </StackPanel>
+                                <StackPanel Width="150" Margin="0,0,12,8">
+                                    <TextBlock Margin="0,0,0,4" FontWeight="SemiBold" Text="Listen port" />
+                                    <TextBox x:Name="TcpListenPortTextBox"
+                                             Height="32"
+                                             Padding="8,4"
+                                             VerticalContentAlignment="Center"
+                                             IsEnabled="{Binding IntegrationExchange.CanEditTcpSetup}"
+                                             Text="{Binding IntegrationExchange.TcpListenPortText, UpdateSourceTrigger=PropertyChanged}"
+                                             AutomationProperties.Name="TCP listen port" />
+                                </StackPanel>
+                                <StackPanel Width="220" Margin="0,0,12,8">
+                                    <TextBlock Margin="0,0,0,4" FontWeight="SemiBold" Text="Peer host" />
+                                    <TextBox x:Name="TcpPeerHostTextBox"
+                                             Height="32"
+                                             Padding="8,4"
+                                             VerticalContentAlignment="Center"
+                                             IsEnabled="{Binding IntegrationExchange.CanEditTcpSetup}"
+                                             Text="{Binding IntegrationExchange.TcpPeerHost, UpdateSourceTrigger=PropertyChanged}"
+                                             AutomationProperties.Name="TCP peer host" />
+                                </StackPanel>
+                                <StackPanel Width="150" Margin="0,0,12,8">
+                                    <TextBlock Margin="0,0,0,4" FontWeight="SemiBold" Text="Peer port" />
+                                    <TextBox x:Name="TcpPeerPortTextBox"
+                                             Height="32"
+                                             Padding="8,4"
+                                             VerticalContentAlignment="Center"
+                                             IsEnabled="{Binding IntegrationExchange.CanEditTcpSetup}"
+                                             Text="{Binding IntegrationExchange.TcpPeerPortText, UpdateSourceTrigger=PropertyChanged}"
+                                             AutomationProperties.Name="TCP peer port" />
+                                </StackPanel>
+                                <StackPanel Width="320" Margin="0,0,12,8">
+                                    <TextBlock Margin="0,0,0,4" FontWeight="SemiBold" Text="Shared key (Base64, 32+ bytes)" />
+                                    <PasswordBox x:Name="TcpSharedKeyPasswordBox"
+                                                 Height="32"
+                                                 Padding="8,4"
+                                                 VerticalContentAlignment="Center"
+                                                 PasswordChanged="TcpSharedKeyPasswordBox_OnPasswordChanged"
+                                                 AutomationProperties.Name="TCP shared key" />
+                                </StackPanel>
+                            </WrapPanel>
+                            <TextBlock Margin="0,2,0,0"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding IntegrationExchange.SharedKeyStatusText}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,4,0,0"
+                                       Foreground="{DynamicResource State.Vision}"
+                                       Text="{Binding IntegrationExchange.TcpListenerStatusText}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,4,0,0"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding IntegrationExchange.LastTcpTransferText}"
+                                       TextWrapping="Wrap" />
+                            <WrapPanel Margin="0,12,0,0">
+                                <Button x:Name="StartTcpListenerButton"
+                                        Margin="0,0,8,8"
+                                        Command="{Binding IntegrationExchange.StartTcpListenerCommand}"
+                                        Style="{StaticResource PrimaryCommandButtonStyle}"
+                                        AutomationProperties.Name="Start TCP listener">
+                                    <TextBlock Text="Start listener" />
+                                </Button>
+                                <Button x:Name="StopTcpListenerButton"
+                                        Margin="0,0,8,8"
+                                        Command="{Binding IntegrationExchange.StopTcpListenerCommand}"
+                                        Style="{StaticResource QuietCommandButtonStyle}"
+                                        AutomationProperties.Name="Stop TCP listener">
+                                    <TextBlock Text="Stop listener" />
+                                </Button>
+                                <Button x:Name="PingTcpPeerButton"
+                                        Margin="0,0,8,8"
+                                        Command="{Binding IntegrationExchange.PingTcpPeerCommand}"
+                                        Style="{StaticResource QuietCommandButtonStyle}"
+                                        AutomationProperties.Name="Ping TCP peer">
+                                    <TextBlock Text="Ping peer" />
+                                </Button>
+                                <Button x:Name="PushLatestTransactionButton"
+                                        Margin="0,0,8,8"
+                                        Command="{Binding IntegrationExchange.PushLatestTransactionCommand}"
+                                        Style="{StaticResource GlobalCommandButtonStyle}"
+                                        AutomationProperties.Name="Push latest transaction">
+                                    <TextBlock Text="Push latest" />
+                                </Button>
+                                <Button x:Name="PullLatestTransactionButton"
+                                        Margin="0,0,8,8"
+                                        Command="{Binding IntegrationExchange.PullLatestTransactionCommand}"
+                                        Style="{StaticResource QuietCommandButtonStyle}"
+                                        AutomationProperties.Name="Pull latest transaction">
+                                    <TextBlock Text="Pull latest" />
+                                </Button>
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="2"
+                            Margin="0,14,0,0"
+                            Padding="16"
+                            Background="{DynamicResource Surface.Raised}"
+                            BorderBrush="{DynamicResource Border.Subtle}"
+                            BorderThickness="1"
+                            CornerRadius="6">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -165,7 +284,7 @@
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="2"
+                    <Border Grid.Row="3"
                             Margin="0,14,0,0"
                             Padding="12,9"
                             Background="{DynamicResource Accent.Soft}"

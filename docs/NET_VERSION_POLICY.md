@@ -6,7 +6,11 @@
 - Language version: C# 12
 - Nullable: enable
 - ImplicitUsings: enable
-- Product version: `0.1.0-rc.4`
+- Product version: `0.2.0-dev`
+
+The public repository is currently on the Release 2 development line. This is
+not a release tag or a downloadable release; the release-candidate gates below
+remain required before publication.
 
 The product version has one source of truth: `Version` in
 `Directory.Build.props`. Machine Studio generates runtime evidence identity as

@@ -10624,10 +10624,84 @@ internal static class DirectExeSmokeHost
                     !string.IsNullOrWhiteSpace(viewModel.IntegrationExchange.StatusText),
                     "3D Exchange validation error did not render a status message.");
                 break;
+            case "tcp-controls":
+                exchangeView.TcpListenAddressTextBox.Text = "127.0.0.1";
+                exchangeView.TcpListenPortTextBox.Text = "45111";
+                exchangeView.TcpPeerHostTextBox.Text = "machine-studio.example.internal";
+                exchangeView.TcpPeerPortTextBox.Text = "45112";
+                exchangeView.TcpListenAddressTextBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+                exchangeView.TcpListenPortTextBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+                exchangeView.TcpPeerHostTextBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+                exchangeView.TcpPeerPortTextBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+                var sessionKey = Convert.ToBase64String(
+                    SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("original-machine-tcp-ui-smoke-key")));
+                exchangeView.TcpSharedKeyPasswordBox.Password = sessionKey;
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.DataBind);
+                AssertSmoke(
+                    viewModel.IntegrationExchange.TcpListenPortText == "45111"
+                    && viewModel.IntegrationExchange.TcpPeerHost == "machine-studio.example.internal"
+                    && viewModel.IntegrationExchange.TcpPeerPortText == "45112"
+                    && !viewModel.IntegrationExchange.IsTcpListening
+                    && (viewModel.IntegrationExchange.SharedKeyStatusText.Contains(
+                            "Session shared key ready",
+                            StringComparison.OrdinalIgnoreCase)
+                        || viewModel.IntegrationExchange.SharedKeyStatusText.Contains(
+                            "세션 공유 키 준비됨",
+                            StringComparison.Ordinal)),
+                    "TCP endpoint inputs did not round-trip to the ViewModel or remain idle.");
+                foreach (var input in new TextBox[]
+                         {
+                             exchangeView.TcpListenAddressTextBox,
+                             exchangeView.TcpListenPortTextBox,
+                             exchangeView.TcpPeerHostTextBox,
+                             exchangeView.TcpPeerPortTextBox
+                         })
+                {
+                    input.BringIntoView();
+                    input.Focus();
+                    await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Input);
+                    AssertSmoke(input.IsKeyboardFocusWithin, "A TCP endpoint input rejected keyboard focus.");
+                }
+                foreach (var button in new Button[]
+                         {
+                             exchangeView.StartTcpListenerButton,
+                             exchangeView.StopTcpListenerButton,
+                             exchangeView.PingTcpPeerButton,
+                             exchangeView.PushLatestTransactionButton,
+                             exchangeView.PullLatestTransactionButton
+                         })
+                {
+                    AssertSmoke(button.IsVisible, $"TCP button '{button.Name}' was not visible.");
+                    AssertSmoke(
+                        button.Command is null
+                        || button.IsEnabled == button.Command.CanExecute(button.CommandParameter),
+                        $"TCP button '{button.Name}' disagreed with CanExecute.");
+                }
+                exchangeView.PullLatestTransactionButton.BringIntoView();
+                window.UpdateLayout();
+                break;
+            case "tcp-pressed":
+                exchangeView.StartTcpListenerButton.BringIntoView();
+                window.Activate();
+                window.UpdateLayout();
+                exchangeView.StartTcpListenerButton.Focus();
+                MovePointerToCenter(exchangeView.StartTcpListenerButton);
+                Mouse.Synchronize();
+                await Task.Delay(100);
+                AssertSmoke(
+                    exchangeView.StartTcpListenerButton.IsMouseOver,
+                    "TCP Start listener button did not enter pointer-hover state.");
+                mouse_event(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
+                _smokePointerHeld = true;
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                AssertSmoke(
+                    exchangeView.StartTcpListenerButton.IsPressed,
+                    "TCP Start listener button did not enter pointer-down state.");
+                break;
             default:
                 throw new ArgumentException(
                     $"Unsupported --smoke-integration-exchange-state '{state}'. " +
-                    "Expected input-focus, interaction-matrix, save-pressed, or validation-error.");
+                    "Expected input-focus, interaction-matrix, save-pressed, validation-error, tcp-controls, or tcp-pressed.");
         }
 
         Console.WriteLine($"3D Exchange visual state applied: {state}");

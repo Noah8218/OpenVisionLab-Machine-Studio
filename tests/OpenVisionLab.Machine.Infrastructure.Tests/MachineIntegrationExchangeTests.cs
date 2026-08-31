@@ -49,7 +49,7 @@ public sealed class MachineIntegrationExchangeTests
             source));
         var transaction = TransactionDirectory(directory.Path, handoff.TransactionId);
         var acknowledgement = new IntegrationAcknowledgement(
-            IntegrationContractSchema.Current,
+            IntegrationContractSchema.Legacy,
             IntegrationMessageKind.Acknowledgement,
             Guid.NewGuid(),
             handoff.TransactionId,
@@ -64,7 +64,7 @@ public sealed class MachineIntegrationExchangeTests
         var runRecordPath = directory.WriteRelative(transaction, "artifacts/run-record.json", [8, 9]);
         var runRecordBytes = File.ReadAllBytes(runRecordPath);
         var result = new IntegrationResult(
-            IntegrationContractSchema.Current,
+            IntegrationContractSchema.Legacy,
             IntegrationMessageKind.Result,
             Guid.NewGuid(),
             handoff.TransactionId,
@@ -114,7 +114,7 @@ public sealed class MachineIntegrationExchangeTests
         Assert.Null(pending.Result);
 
         var acknowledgement = new IntegrationAcknowledgement(
-            IntegrationContractSchema.Current,
+            IntegrationContractSchema.Legacy,
             IntegrationMessageKind.Acknowledgement,
             Guid.NewGuid(),
             handoff.TransactionId,
@@ -152,7 +152,7 @@ public sealed class MachineIntegrationExchangeTests
             source));
         var transaction = TransactionDirectory(directory.Path, handoff.TransactionId);
         var acknowledgement = new IntegrationAcknowledgement(
-            IntegrationContractSchema.Current,
+            IntegrationContractSchema.Legacy,
             IntegrationMessageKind.Acknowledgement,
             Guid.NewGuid(),
             handoff.TransactionId,
@@ -164,7 +164,7 @@ public sealed class MachineIntegrationExchangeTests
         File.WriteAllBytes(Path.Combine(transaction, "acknowledgement.json"), IntegrationContractJson.Serialize(acknowledgement));
         directory.WriteRelative(transaction, "artifacts/run-record.json", [3]);
         var result = new IntegrationResult(
-            IntegrationContractSchema.Current,
+            IntegrationContractSchema.Legacy,
             IntegrationMessageKind.Result,
             Guid.NewGuid(),
             handoff.TransactionId,
