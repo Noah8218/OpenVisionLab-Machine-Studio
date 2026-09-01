@@ -3,19 +3,18 @@
 The public Release 2 development branch consumes the following exact local
 packages:
 
-- `OpenVisionLab.Integration.Contracts` `0.2.0-alpha.2`
-  - SHA-256: `9F94B300D8DEBC4B69DC242B5E47018605CAA725A5DA265F32718DBDDF8A1BD5`
-- `OpenVisionLab.Integration.Transport.Tcp` `0.1.0-alpha.2`
-  - SHA-256: `67E0270C67DCE287E3DCA3D4A01557C526185719E87248FC662FBCF99BBA13A2`
+- `OpenVisionLab.Integration.Contracts` `0.2.0-alpha.3`
+  - SHA-256: `25CADF8BD6EDBC7E9C089BE6CE2286A7ADA5A335A3DEA5FBDBCCEF63343E4A24`
+- `OpenVisionLab.Integration.Transport.Tcp` `0.1.0-alpha.3`
+  - SHA-256: `5FBFE95358554D47A047305D589614832EAF775A05100B2B8E626D8DDDEC424F`
 
-Both packages are development snapshots sourced from the shared integration
-workspace with repository state recorded as `working-tree-uncommitted`. They
-are suitable for the `0.2.0-dev` feature branch only, not a clean-source
-release candidate. The older `OpenVisionLab.Integration.Contracts` `0.1.0`
-package remains for historical traceability and is no longer referenced by the
-application.
+Both packages are immutable development candidates sourced from Shared commit
+`f4743f3307d20a963b2197f2019713320b9859b9` with clean source state. They are
+used by the `v0.2.0-dev.1` Release 2 development candidate and are not a
+published release. The previous alpha.2 bytes remain beside this alpha.3 pair
+for historical traceability and are not overwritten.
 
 The packages own the shared Handoff, Acknowledgement, Result, validation,
 correlation, error, JSON fixture, and authenticated bounded TCP transport
-contracts. Do not replace either package without updating both OpenVisionLab
-consumers to the same exact package hashes.
+contracts. Do not replace either package without updating every OpenVisionLab
+consumer to the same exact package versions and hashes.

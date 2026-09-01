@@ -13,13 +13,18 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev`
+Current version: `v0.2.0-dev.1`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.1` (2026-09-01)
+
+- Aligned the Release 2 development branch with immutable Contracts `0.2.0-alpha.3` and TCP Transport `0.1.0-alpha.3` package bytes.
+- Recorded the clean shared-package source commit and preserved the previous alpha.2 package bytes for traceability.
 
 #### `v0.2.0-dev` (2026-08-31)
 

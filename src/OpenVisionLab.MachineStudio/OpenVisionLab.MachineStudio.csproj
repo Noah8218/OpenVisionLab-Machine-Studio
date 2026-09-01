@@ -21,7 +21,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.122" />
     <PackageReference Include="WPF-UI" Version="$(WpfUiVersion)" />
-    <PackageReference Include="OpenVisionLab.Integration.Transport.Tcp" Version="[0.1.0-alpha.2]" />
+    <PackageReference Include="OpenVisionLab.Integration.Transport.Tcp" Version="[0.1.0-alpha.3]" />
   </ItemGroup>
 
   <ItemGroup>
