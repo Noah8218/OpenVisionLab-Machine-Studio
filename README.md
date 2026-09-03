@@ -13,13 +13,20 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.1`
+Current version: `v0.2.0-dev.2`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.2` (2026-09-04)
+
+- Isolated real-time wall-clock accumulation, catch-up limiting, and delay
+  calculation behind the independently tested `SimulationRunLoopTiming` owner.
+- Preserved the existing deterministic fixed-step engine and Release 2 public
+  development branch contract.
 
 #### `v0.2.0-dev.1` (2026-09-01)
 

@@ -40,6 +40,12 @@ acquisition/frame/runner contracts. `Infrastructure` may perform asynchronous
 project-asset I/O, but file I/O is never executed inside a fixed simulation
 tick.
 
+The wall-clock accumulator, catch-up cap, pause/reset alignment, and real-time
+delay calculation are owned by `SimulationRunLoopTiming`. The engine retains
+run-mode policy and fixed-tick execution; it resets or aligns the timing owner
+at the same lifecycle boundaries so simulation-time behavior remains
+deterministic and independently testable.
+
 ## Authoring-to-runtime flow
 
 ```text

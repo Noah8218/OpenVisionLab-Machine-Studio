@@ -187,8 +187,8 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
     private async Task RunLoop(CancellationToken cancellationToken)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var lastWallTime = stopwatch.Elapsed;
-        var accumulator = TimeSpan.Zero;
+        var timing = new SimulationRunLoopTiming(_settings.FixedStep, _settings.MaxCatchUpTicks);
+        timing.Reset(stopwatch.Elapsed);
 
         try
         {
@@ -204,8 +204,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
 
                 if (wasPaused && _runMode != SimulationRunMode.Paused)
                 {
-                    lastWallTime = stopwatch.Elapsed;
-                    accumulator = TimeSpan.Zero;
+                    timing.Reset(stopwatch.Elapsed);
                 }
 
                 if (_runMode == SimulationRunMode.Paused)
@@ -216,8 +215,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
                     }
 
                     CompleteCommands(commandResults);
-                    lastWallTime = stopwatch.Elapsed;
-                    accumulator = TimeSpan.Zero;
+                    timing.Reset(stopwatch.Elapsed);
                     await _commandChannel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
                     continue;
                 }
@@ -228,7 +226,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
                     ticksToRun = Math.Max(1, _pendingSteps);
                     _pendingSteps = 0;
                     _runMode = SimulationRunMode.Paused;
-                    lastWallTime = stopwatch.Elapsed;
+                    timing.AlignToWallTime(stopwatch.Elapsed);
                 }
                 else if (_runMode == SimulationRunMode.FastForward)
                 {
@@ -236,13 +234,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
                 }
                 else
                 {
-                    var now = stopwatch.Elapsed;
-                    accumulator += (now - lastWallTime) * _settings.TimeScale;
-                    lastWallTime = now;
-                    ticksToRun = Math.Min(
-                        _settings.MaxCatchUpTicks,
-                        (int)(accumulator.Ticks / _settings.FixedStep.Ticks));
-                    accumulator -= _settings.FixedStep * ticksToRun;
+                    ticksToRun = timing.CalculateRealTimeTicks(stopwatch.Elapsed, _settings.TimeScale);
                 }
 
                 for (var index = 0; index < ticksToRun; index++)
@@ -258,10 +250,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
 
                 if (_runMode == SimulationRunMode.RealTime && ticksToRun == 0)
                 {
-                    var remaining = _settings.FixedStep - accumulator;
-                    var delay = remaining > TimeSpan.FromMilliseconds(1)
-                        ? remaining
-                        : TimeSpan.FromMilliseconds(1);
+                    var delay = timing.CalculateRealTimeDelay(_settings.TimeScale);
                     await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                 }
             }

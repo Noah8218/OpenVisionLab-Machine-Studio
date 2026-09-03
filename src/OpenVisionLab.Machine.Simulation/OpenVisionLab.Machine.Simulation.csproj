@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="OpenVisionLab.Machine.Simulation.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\OpenVisionLab.Machine.Core\OpenVisionLab.Machine.Core.csproj" />
     <ProjectReference Include="..\OpenVisionLab.Machine.IO\OpenVisionLab.Machine.IO.csproj" />
     <ProjectReference Include="..\OpenVisionLab.Machine.Sequence\OpenVisionLab.Machine.Sequence.csproj" />
