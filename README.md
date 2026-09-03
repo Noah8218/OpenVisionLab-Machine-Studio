@@ -13,13 +13,21 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.2`
+Current version: `v0.2.0-dev.3`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.3` (2026-09-04)
+
+- Corrected the canonical product-version source after the preceding public
+  metadata commit left `Directory.Build.props` at the previous development
+  version.
+- Retained the independently tested `SimulationRunLoopTiming` refactor with
+  no additional runtime behavior change.
 
 #### `v0.2.0-dev.2` (2026-09-04)
 
