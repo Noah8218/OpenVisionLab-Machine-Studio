@@ -13,13 +13,20 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.3`
+Current version: `v0.2.0-dev.4`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.4` (2026-09-04)
+
+- Aligned the release-candidate validation script with the active `-dev.N`
+  development-candidate version convention.
+- Kept the release-candidate workflow limited to build, test, audit, and package
+  verification; no release or download was published.
 
 #### `v0.2.0-dev.3` (2026-09-04)
 

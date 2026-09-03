@@ -6,7 +6,7 @@
 - Language version: C# 12
 - Nullable: enable
 - ImplicitUsings: enable
-- Product version: `0.2.0-dev.3`
+- Product version: `0.2.0-dev.4`
 
 The public repository is currently on the Release 2 development line. This is
 not a release tag or a downloadable release; the release-candidate gates below

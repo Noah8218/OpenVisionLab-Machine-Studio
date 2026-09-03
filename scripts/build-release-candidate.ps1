@@ -34,8 +34,8 @@ $sourceBranch = if ($null -eq $sourceBranch) { '' } else { $sourceBranch.Trim() 
 $releaseTag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { $null }
 [xml] $buildProperties = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'Directory.Build.props')
 $productVersion = [string] $buildProperties.Project.PropertyGroup.Version
-if ($productVersion -notmatch '^\d+\.\d+\.\d+(?:-rc\.\d+)?$') {
-    throw "Product version is not a supported release version: $productVersion"
+if ($productVersion -notmatch '^\d+\.\d+\.\d+(?:-(?:dev|rc)\.\d+)?$') {
+    throw "Product version is not a supported SemVer prerelease: $productVersion"
 }
 
 $runtimeIdentifier = 'win-x64'
