@@ -34,11 +34,16 @@ public enum SimulationCommandErrorCode
     ConditionScenarioNotActive,
     SequenceNotFound,
     SequenceStartRejected,
+    SequenceAbortRejected,
+    SequenceRetryRejected,
+    SequenceStepRejected,
+    SequenceBreakpointRejected,
     AutomaticRunNotConfigured,
     AutomaticRunStartRejected,
     InvalidRunMode,
     UnsupportedCommand,
     EngineNotStarted,
+    EngineFaulted,
     EngineStopped
 }
 

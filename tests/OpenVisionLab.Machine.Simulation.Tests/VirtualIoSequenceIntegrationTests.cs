@@ -6,6 +6,7 @@ using OpenVisionLab.Machine.Simulation.Axis;
 using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Events;
+using OpenVisionLab.Machine.Simulation.Faults;
 using OpenVisionLab.Machine.Simulation.Snapshots;
 using Xunit;
 
@@ -81,6 +82,237 @@ public sealed class VirtualIoSequenceIntegrationTests
     }
 
     [Fact]
+    public async Task SequenceWatchdog_FaultsThroughSnapshotAndOrderedEventPath()
+    {
+        var definition = new SequenceDefinition
+        {
+            Id = "watchdog-sequence",
+            WatchdogTimeoutMs = 10,
+            Steps =
+            {
+                SequenceCompilerTests.Step(
+                    "wait",
+                    SequenceStepAction.WaitSignal,
+                    "di.never",
+                    "true",
+                    "complete"),
+                SequenceCompilerTests.Step(
+                    "complete",
+                    SequenceStepAction.Complete,
+                    string.Empty,
+                    string.Empty)
+            }
+        };
+        var targets = new SequenceCompilationTargets(
+            new Dictionary<string, ChannelKind>(StringComparer.Ordinal)
+            {
+                ["di.never"] = ChannelKind.DigitalInput
+            },
+            Array.Empty<string>());
+        CompiledSequence sequence = new SequenceCompiler().Compile(definition, targets).Sequence!;
+        using var engine = new FixedStepSimulationEngine(new SimulationSettings());
+        await engine.StartAsync();
+        Assert.True((await engine.EnqueueCommandAsync(new ConfigureRuntimeCommand(
+            new SimulationRuntimeConfiguration(
+                Array.Empty<AxisConfiguration>(),
+                new[]
+                {
+                    new ChannelDefinition
+                    {
+                        Id = "di.never",
+                        Name = "Never",
+                        Kind = ChannelKind.DigitalInput
+                    }
+                },
+                new[] { sequence })))).IsAccepted);
+        Assert.True((await engine.EnqueueCommandAsync(
+            new StartSequenceCommand("watchdog-sequence"))).IsAccepted);
+
+        await engine.EnqueueCommandAsync(new StepCommand());
+        Assert.Equal(
+            SequenceExecutionStatus.Running,
+            Assert.Single(engine.CurrentSnapshot.Sequences).Status);
+        await engine.EnqueueCommandAsync(new StepCommand());
+        SequenceExecutionSnapshot faulted = Assert.Single(engine.CurrentSnapshot.Sequences);
+
+        Assert.Equal(SequenceExecutionStatus.Faulted, faulted.Status);
+        Assert.Equal(SequenceExecutionErrorCode.SequenceWatchdogTimedOut, faulted.LastError!.Code);
+        Assert.Equal(TimeSpan.FromMilliseconds(10), faulted.WatchdogTimeout);
+        Assert.Equal(TimeSpan.FromMilliseconds(10), faulted.TotalElapsed);
+
+        var injected = await engine.EnqueueCommandAsync(
+            new InjectSimulationFaultCommand(
+                SimulationFaultKind.StuckDigitalInput,
+                "di.never",
+                false));
+        Assert.True(injected.IsAccepted, injected.Detail);
+        var blockedRetry = await engine.EnqueueCommandAsync(
+            new RetrySequenceCommand("watchdog-sequence"));
+        Assert.False(blockedRetry.IsAccepted);
+        Assert.Equal(SimulationCommandErrorCode.SequenceRetryRejected, blockedRetry.ErrorCode);
+
+        var cleared = await engine.EnqueueCommandAsync(
+            new ClearSimulationFaultCommand(
+                SimulationFaultKind.StuckDigitalInput,
+                "di.never"));
+        Assert.True(cleared.IsAccepted, cleared.Detail);
+        var tickBeforeRetry = engine.CurrentSnapshot.TickIndex;
+        var timeBeforeRetry = engine.CurrentSnapshot.SimulationTime;
+        var retried = await engine.EnqueueCommandAsync(
+            new RetrySequenceCommand("watchdog-sequence"));
+        var restarted = engine.CurrentSnapshot;
+        var startWithoutExplicitRetry = await engine.EnqueueCommandAsync(
+            new StartSequenceCommand("watchdog-sequence"));
+
+        Assert.True(retried.IsAccepted, retried.Detail);
+        Assert.Equal(SimulationRunMode.Paused, restarted.RunMode);
+        Assert.Equal(SimulationControlOwner.EmbeddedSequence, restarted.ControlOwner);
+        Assert.Equal(tickBeforeRetry, restarted.TickIndex);
+        Assert.Equal(timeBeforeRetry, restarted.SimulationTime);
+        Assert.Equal(SequenceExecutionStatus.Running, Assert.Single(restarted.Sequences).Status);
+        Assert.Equal("wait", Assert.Single(restarted.Sequences).CurrentStepId);
+        Assert.Equal(TimeSpan.Zero, Assert.Single(restarted.Sequences).TotalElapsed);
+        Assert.Equal(0, Assert.Single(restarted.Sequences).TickCount);
+        Assert.Null(Assert.Single(restarted.Sequences).LastError);
+        Assert.False(restarted.AutomaticRun.IsActive);
+        Assert.False(startWithoutExplicitRetry.IsAccepted);
+        Assert.Equal(SimulationCommandErrorCode.SequenceStartRejected, startWithoutExplicitRetry.ErrorCode);
+
+        await engine.StopAsync();
+        var events = await ReadAllEventsAsync(engine);
+        SimulationEvent faultEvent = Assert.Single(events, item => item.Code == "SequenceFaulted");
+        Assert.Equal(2, faultEvent.TickIndex);
+        Assert.Contains("watchdog timed out after 10 ms", faultEvent.Message, StringComparison.Ordinal);
+        Assert.Contains(events, item => item.Code == "SequenceRetried");
+    }
+
+    [Fact]
+    public async Task SemanticSequenceStep_PausesAtExactlyOneTransitionBoundary()
+    {
+        using var engine = await CreateConfiguredEngineAsync();
+        Assert.True((await engine.EnqueueCommandAsync(
+            new StartSequenceCommand("inspection-cycle"))).IsAccepted);
+        Assert.True((await engine.EnqueueCommandAsync(
+            new SetVirtualInputCommand("di.cycle-start", true))).IsAccepted);
+
+        var stepped = await engine.EnqueueCommandAsync(new StepSequenceCommand("inspection-cycle"));
+        await WaitUntilAsync(() => engine.CurrentSnapshot.RunMode == SimulationRunMode.Paused);
+        var snapshot = engine.CurrentSnapshot;
+
+        Assert.True(stepped.IsAccepted, stepped.Detail);
+        Assert.Equal(1, snapshot.TickIndex);
+        Assert.Equal(TimeSpan.FromMilliseconds(5), snapshot.SimulationTime);
+        Assert.Equal("active-on", Assert.Single(snapshot.Sequences).CurrentStepId);
+        Assert.False(Signal(snapshot, "do.cycle-active"));
+        Assert.False(snapshot.SequenceDebug.IsSemanticStepActive);
+        Assert.Equal(SequenceDebugPauseReason.SemanticStep, snapshot.SequenceDebug.PauseReason);
+        Assert.Equal("active-on", snapshot.SequenceDebug.PausedStepId);
+
+        Assert.True((await engine.EnqueueCommandAsync(new PlayCommand())).IsAccepted);
+        var rejected = await engine.EnqueueCommandAsync(new StepSequenceCommand("inspection-cycle"));
+        Assert.False(rejected.IsAccepted);
+        Assert.Equal(SimulationCommandErrorCode.InvalidRunMode, rejected.ErrorCode);
+    }
+
+    [Fact]
+    public async Task AbortSequence_PausesWithoutResettingRuntime_AndRequiresResetBeforeRestart()
+    {
+        using var engine = await CreateConfiguredEngineAsync();
+        Assert.True((await engine.EnqueueCommandAsync(
+            new StartSequenceCommand("inspection-cycle"))).IsAccepted);
+
+        var beforeAbort = engine.CurrentSnapshot;
+        var aborted = await engine.EnqueueCommandAsync(
+            new AbortSequenceCommand("inspection-cycle"));
+        var afterAbort = engine.CurrentSnapshot;
+
+        Assert.True(aborted.IsAccepted, aborted.Detail);
+        Assert.Equal(SimulationRunMode.Paused, afterAbort.RunMode);
+        Assert.Equal(SimulationControlOwner.Definition, afterAbort.ControlOwner);
+        Assert.Equal(beforeAbort.TickIndex, afterAbort.TickIndex);
+        Assert.Equal(
+            SequenceExecutionStatus.Aborted,
+            Assert.Single(afterAbort.Sequences).Status);
+        Assert.Equal(
+            SequenceDebugPauseReason.SequenceAborted,
+            afterAbort.SequenceDebug.PauseReason);
+
+        var duplicateAbort = await engine.EnqueueCommandAsync(
+            new AbortSequenceCommand("inspection-cycle"));
+        var restartWithoutReset = await engine.EnqueueCommandAsync(
+            new StartSequenceCommand("inspection-cycle"));
+        Assert.False(duplicateAbort.IsAccepted);
+        Assert.Equal(SimulationCommandErrorCode.SequenceAbortRejected, duplicateAbort.ErrorCode);
+        Assert.False(restartWithoutReset.IsAccepted);
+        Assert.Equal(SimulationCommandErrorCode.SequenceStartRejected, restartWithoutReset.ErrorCode);
+
+        Assert.True((await engine.EnqueueCommandAsync(new ResetCommand())).IsAccepted);
+        Assert.Equal(SequenceExecutionStatus.Ready, Assert.Single(engine.CurrentSnapshot.Sequences).Status);
+        Assert.True((await engine.EnqueueCommandAsync(
+            new StartSequenceCommand("inspection-cycle"))).IsAccepted);
+        Assert.Equal(SequenceExecutionStatus.Running, Assert.Single(engine.CurrentSnapshot.Sequences).Status);
+
+        await engine.StopAsync();
+        var events = await ReadAllEventsAsync(engine);
+        Assert.Contains(events, item => item.Code == "SequenceAborted");
+    }
+
+    [Fact]
+    public async Task SequenceBreakpoint_PausesBeforeStepExecution_AndUsesSessionLifetime()
+    {
+        using var engine = await CreateConfiguredEngineAsync();
+        Assert.True((await engine.EnqueueCommandAsync(
+            new StartSequenceCommand("inspection-cycle"))).IsAccepted);
+        var enabled = await engine.EnqueueCommandAsync(
+            new SetSequenceBreakpointCommand("inspection-cycle", "active-on", true));
+        Assert.True((await engine.EnqueueCommandAsync(
+            new SetVirtualInputCommand("di.cycle-start", true))).IsAccepted);
+
+        Assert.True((await engine.EnqueueCommandAsync(new PlayCommand())).IsAccepted);
+        await WaitUntilAsync(() =>
+            engine.CurrentSnapshot.SequenceDebug.PauseReason == SequenceDebugPauseReason.Breakpoint);
+        var paused = engine.CurrentSnapshot;
+
+        Assert.True(enabled.IsAccepted, enabled.Detail);
+        Assert.Equal(SimulationRunMode.Paused, paused.RunMode);
+        Assert.Equal("active-on", Assert.Single(paused.Sequences).CurrentStepId);
+        Assert.False(Signal(paused, "do.cycle-active"));
+        Assert.Equal("active-on", paused.SequenceDebug.PausedStepId);
+        var breakpoint = Assert.Single(paused.SequenceDebug.Breakpoints);
+        Assert.Equal("inspection-cycle", breakpoint.SequenceId);
+        Assert.Equal("active-on", breakpoint.StepId);
+
+        Assert.True((await engine.EnqueueCommandAsync(new ResetCommand())).IsAccepted);
+        Assert.Single(engine.CurrentSnapshot.SequenceDebug.Breakpoints);
+        Assert.Equal(SequenceDebugPauseReason.None, engine.CurrentSnapshot.SequenceDebug.PauseReason);
+
+        Assert.True((await engine.EnqueueCommandAsync(
+            new ConfigureRuntimeCommand(CreateRuntimeConfiguration()))).IsAccepted);
+        Assert.Empty(engine.CurrentSnapshot.SequenceDebug.Breakpoints);
+
+        await engine.StopAsync();
+        var events = await ReadAllEventsAsync(engine);
+        Assert.Contains(events, item => item.Code == "SequenceBreakpointChanged");
+        Assert.Contains(events, item => item.Code == "SequenceBreakpointHit");
+    }
+
+    [Fact]
+    public async Task SequenceDebugCommands_RejectUnknownTargetsWithTypedErrors()
+    {
+        using var engine = await CreateConfiguredEngineAsync();
+
+        var missingSequence = await engine.EnqueueCommandAsync(
+            new StepSequenceCommand("missing"));
+        var missingStep = await engine.EnqueueCommandAsync(
+            new SetSequenceBreakpointCommand("inspection-cycle", "missing", true));
+
+        Assert.False(missingSequence.IsAccepted);
+        Assert.Equal(SimulationCommandErrorCode.SequenceNotFound, missingSequence.ErrorCode);
+        Assert.False(missingStep.IsAccepted);
+        Assert.Equal(SimulationCommandErrorCode.SequenceBreakpointRejected, missingStep.ErrorCode);
+    }
+
+    [Fact]
     public async Task SameStepStream_ProducesIdenticalSnapshotAndNonDroppingEventTrace()
     {
         var first = await RunDeterministicCycleAsync();
@@ -110,6 +342,42 @@ public sealed class VirtualIoSequenceIntegrationTests
         Assert.False(move.IsAccepted);
         Assert.Equal(SimulationCommandErrorCode.ControlOwnerNotAllowed, move.ErrorCode);
         Assert.Equal(0, engine.CurrentSnapshot.Axes[0].Position);
+    }
+
+    [Fact]
+    public async Task SequenceOutputInterlock_FaultsClosedUntilGuardInputIsTrue()
+    {
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings { FixedStep = TimeSpan.FromMilliseconds(5) });
+        await engine.StartAsync();
+        SimulationCommandResult configured = await engine.EnqueueCommandAsync(
+            new ConfigureRuntimeCommand(CreateRuntimeConfiguration(withActiveInterlock: true)));
+        Assert.True(configured.IsAccepted, configured.Detail);
+        await engine.EnqueueCommandAsync(new StartSequenceCommand("inspection-cycle"));
+        await engine.EnqueueCommandAsync(new SetVirtualInputCommand("di.cycle-start", true));
+
+        await engine.EnqueueCommandAsync(new StepCommand());
+        await engine.EnqueueCommandAsync(new StepCommand());
+
+        SequenceExecutionSnapshot blocked = Assert.Single(engine.CurrentSnapshot.Sequences);
+        Assert.Equal(SequenceExecutionStatus.Faulted, blocked.Status);
+        Assert.Contains(
+            "InterlockNotSatisfied",
+            blocked.LastError!.ContextError!.Message,
+            StringComparison.Ordinal);
+        Assert.False(Signal(engine.CurrentSnapshot, "do.cycle-active"));
+
+        await engine.EnqueueCommandAsync(new SetVirtualInputCommand("di.guard", true));
+        var retry = await engine.EnqueueCommandAsync(
+            new RetrySequenceCommand("inspection-cycle"));
+        Assert.True(retry.IsAccepted, retry.Detail);
+        await engine.EnqueueCommandAsync(new StepCommand());
+        await engine.EnqueueCommandAsync(new StepCommand());
+
+        Assert.True(Signal(engine.CurrentSnapshot, "do.cycle-active"));
+        Assert.Equal(
+            SequenceExecutionStatus.Running,
+            Assert.Single(engine.CurrentSnapshot.Sequences).Status);
     }
 
     [Fact]
@@ -170,12 +438,17 @@ public sealed class VirtualIoSequenceIntegrationTests
         return engine;
     }
 
-    private static SimulationRuntimeConfiguration CreateRuntimeConfiguration()
+    private static SimulationRuntimeConfiguration CreateRuntimeConfiguration(
+        bool withActiveInterlock = false)
     {
         var channels = new[]
         {
             Channel("di.cycle-start", ChannelKind.DigitalInput),
-            Channel("do.cycle-active", ChannelKind.DigitalOutput),
+            Channel("di.guard", ChannelKind.DigitalInput),
+            Channel(
+                "do.cycle-active",
+                ChannelKind.DigitalOutput,
+                withActiveInterlock ? ["di.guard"] : []),
             Channel("do.cycle-done", ChannelKind.DigitalOutput)
         };
         var definition = new SequenceDefinition
@@ -258,6 +531,20 @@ public sealed class VirtualIoSequenceIntegrationTests
         return events;
     }
 
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+        while (!condition())
+        {
+            if (DateTime.UtcNow >= deadline)
+            {
+                throw new TimeoutException("The expected runtime state was not reached.");
+            }
+
+            await Task.Delay(5);
+        }
+    }
+
     private static bool Signal(SimulationSnapshot snapshot, string id) =>
         snapshot.Signals.Single(signal => signal.Id == id).Value;
 
@@ -266,8 +553,18 @@ public sealed class VirtualIoSequenceIntegrationTests
         string id) =>
         snapshot.Signals.Single(signal => signal.Id == id);
 
-    private static ChannelDefinition Channel(string id, ChannelKind kind) =>
-        new() { Id = id, Name = id, Kind = kind, InitialValue = 0 };
+    private static ChannelDefinition Channel(
+        string id,
+        ChannelKind kind,
+        params string[] interlockIds) =>
+        new()
+        {
+            Id = id,
+            Name = id,
+            Kind = kind,
+            InitialValue = 0,
+            InterlockIds = interlockIds.ToList()
+        };
 
     private static AxisConfiguration CreateAxisConfig() =>
         new()

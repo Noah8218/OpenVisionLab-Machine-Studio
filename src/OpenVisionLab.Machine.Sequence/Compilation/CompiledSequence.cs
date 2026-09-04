@@ -8,6 +8,7 @@ public enum CompiledSequenceStepKind
     WaitAxisDone,
     TriggerCamera,
     WaitVisionResult,
+    CallSubsequence,
     Complete
 }
 
@@ -95,6 +96,17 @@ public sealed record WaitVisionResultStep(
     public override CompiledSequenceStepKind Kind => CompiledSequenceStepKind.WaitVisionResult;
 }
 
+public sealed record CallSubsequenceStep(
+    string Id,
+    string Name,
+    string SequenceId,
+    string? NextStepId,
+    string? ErrorStepId)
+    : CompiledSequenceStep(Id, Name, NextStepId, ErrorStepId, TimeSpan.Zero)
+{
+    public override CompiledSequenceStepKind Kind => CompiledSequenceStepKind.CallSubsequence;
+}
+
 public sealed record CompleteStep(string Id, string Name)
     : CompiledSequenceStep(Id, Name, null, null, TimeSpan.Zero)
 {
@@ -105,10 +117,15 @@ public sealed class CompiledSequence
 {
     private readonly IReadOnlyDictionary<string, CompiledSequenceStep> _stepsById;
 
-    internal CompiledSequence(string id, string name, IReadOnlyList<CompiledSequenceStep> steps)
+    internal CompiledSequence(
+        string id,
+        string name,
+        TimeSpan watchdogTimeout,
+        IReadOnlyList<CompiledSequenceStep> steps)
     {
         Id = id;
         Name = name;
+        WatchdogTimeout = watchdogTimeout;
         Steps = steps;
         EntryStepId = steps[0].Id;
         _stepsById = steps.ToDictionary(step => step.Id, StringComparer.Ordinal);
@@ -117,6 +134,8 @@ public sealed class CompiledSequence
     public string Id { get; }
 
     public string Name { get; }
+
+    public TimeSpan WatchdogTimeout { get; }
 
     public string EntryStepId { get; }
 

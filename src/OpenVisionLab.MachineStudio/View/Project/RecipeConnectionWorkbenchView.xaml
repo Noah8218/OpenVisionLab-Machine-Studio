@@ -5,7 +5,8 @@
              xmlns:behavior="clr-namespace:OpenVisionLab.MachineStudio.Behavior"
              xmlns:layouts="clr-namespace:OpenVisionLab.Machine.Core.Layouts;assembly=OpenVisionLab.Machine.Core"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
-             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:local="clr-namespace:OpenVisionLab.MachineStudio.View.Project">
     <UserControl.Resources>
         <Style x:Key="StationSetupTextBoxStyle"
                TargetType="TextBox"
@@ -66,13 +67,16 @@
                            Text="{loc:Loc Key=Connections.Title}" />
             </Border>
 
-            <Border Grid.Row="1"
-                    Margin="10,8,10,4"
-                    Padding="12,10"
-                    Background="{DynamicResource Surface.Raised}"
-                    BorderBrush="{DynamicResource Border.Subtle}"
-                    BorderThickness="1"
-                    CornerRadius="6">
+            <ScrollViewer Grid.Row="1"
+                          MaxHeight="500"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <Border Margin="10,8,10,4"
+                        Padding="12,10"
+                        Background="{DynamicResource Surface.Raised}"
+                        BorderBrush="{DynamicResource Border.Subtle}"
+                        BorderThickness="1"
+                        CornerRadius="6">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -84,317 +88,7 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <StackPanel>
-                        <TextBlock FontSize="16"
-                                   FontWeight="SemiBold"
-                                   Text="{loc:Loc Key=Connections.QuickAddTitle}" />
-                        <TextBlock Margin="0,3,0,0"
-                                   Foreground="{DynamicResource Text.Secondary}"
-                                   Text="{loc:Loc Key=Connections.QuickAddHint}"
-                                   TextWrapping="Wrap">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                    <Style.Triggers>
-                                        <MultiDataTrigger>
-                                            <MultiDataTrigger.Conditions>
-                                                <Condition Binding="{Binding IsCompactLayout}" Value="True" />
-                                                <Condition Binding="{Binding RecipeConnections.IsProcessBlockTimeoutPreviewVisible}" Value="True" />
-                                            </MultiDataTrigger.Conditions>
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </MultiDataTrigger>
-                                        <MultiDataTrigger>
-                                            <MultiDataTrigger.Conditions>
-                                                <Condition Binding="{Binding IsCompactLayout}" Value="True" />
-                                                <Condition Binding="{Binding RecipeConnections.IsLoadLockSetupVisible}" Value="True" />
-                                            </MultiDataTrigger.Conditions>
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </MultiDataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </StackPanel>
-
-                    <WrapPanel Grid.Row="1" Margin="0,10,0,0">
-                        <Button x:Name="AddConnectionStageButton"
-                                Margin="0,0,6,5"
-                                Command="{Binding AddLayoutComponentCommand}"
-                                CommandParameter="{x:Static layouts:LayoutComponentKind.LinearStage}"
-                                AutomationProperties.Name="{loc:Loc Key=Connections.AddStage}"
-                                Style="{StaticResource PrimaryCommandButtonStyle}"
-                                ToolTip="{loc:Loc Key=Connections.AddStageTooltip}">
-                            <StackPanel Orientation="Horizontal">
-                                <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
-                                <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.AddStage}" />
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="AddConnectionRotaryStageButton"
-                                Margin="0,0,6,5"
-                                Command="{Binding AddLayoutComponentCommand}"
-                                CommandParameter="{x:Static layouts:LayoutComponentKind.RotaryStage}"
-                                AutomationProperties.Name="{loc:Loc Key=Connections.AddRotaryStage}"
-                                Style="{StaticResource QuietCommandButtonStyle}"
-                                ToolTip="{loc:Loc Key=Connections.AddRotaryStageTooltip}">
-                            <StackPanel Orientation="Horizontal">
-                                <ui:SymbolIcon Symbol="ArrowRotateClockwise24" Foreground="{DynamicResource Accent.Primary}" />
-                                <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.AddRotaryStage}" />
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="AddConnectionSensorButton"
-                                Margin="0,0,6,5"
-                                Command="{Binding AddLayoutComponentCommand}"
-                                CommandParameter="{x:Static layouts:LayoutComponentKind.DigitalSensor}"
-                                AutomationProperties.Name="{loc:Loc Key=Connections.AddSensor}"
-                                Style="{StaticResource QuietCommandButtonStyle}"
-                                ToolTip="{loc:Loc Key=Connections.AddSensorTooltip}">
-                            <StackPanel Orientation="Horizontal">
-                                <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
-                                <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.AddSensor}" />
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="AddConnectionCylinderButton"
-                                Margin="0,0,6,5"
-                                Command="{Binding AddLayoutComponentCommand}"
-                                CommandParameter="{x:Static layouts:LayoutComponentKind.PneumaticCylinder}"
-                                AutomationProperties.Name="{loc:Loc Key=Connections.AddCylinder}"
-                                Style="{StaticResource QuietCommandButtonStyle}"
-                                ToolTip="{loc:Loc Key=Connections.AddCylinderTooltip}">
-                            <StackPanel Orientation="Horizontal">
-                                <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
-                                <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.AddCylinder}" />
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="AddConnectionConveyorButton"
-                                Margin="0,0,6,5"
-                                Command="{Binding AddLayoutComponentCommand}"
-                                CommandParameter="{x:Static layouts:LayoutComponentKind.Conveyor}"
-                                AutomationProperties.Name="{loc:Loc Key=Connections.AddConveyor}"
-                                Style="{StaticResource QuietCommandButtonStyle}"
-                                ToolTip="{loc:Loc Key=Connections.AddConveyorTooltip}">
-                            <StackPanel Orientation="Horizontal">
-                                <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
-                                <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.AddConveyor}" />
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="AddConnectionWorkpieceButton"
-                                Margin="0,0,0,5"
-                                Command="{Binding AddLayoutComponentCommand}"
-                                CommandParameter="{x:Static layouts:LayoutComponentKind.Workpiece}"
-                                AutomationProperties.Name="{loc:Loc Key=Connections.AddWorkpiece}"
-                                Style="{StaticResource QuietCommandButtonStyle}"
-                                ToolTip="{loc:Loc Key=Connections.AddWorkpieceTooltip}">
-                            <StackPanel Orientation="Horizontal">
-                                <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
-                                <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.AddWorkpiece}" />
-                            </StackPanel>
-                        </Button>
-                    </WrapPanel>
-
-                    <Grid Grid.Row="2" Margin="0,5,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center">
-                            <WrapPanel>
-                                <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                           Text="{Binding RecipeConnections.SummaryText}" />
-                                <TextBlock x:Name="RecipeCheckpointCoverageText"
-                                           Margin="10,0,0,0"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource State.Vision}"
-                                           Text="{Binding RecipeConnections.CheckpointCoverageText}"
-                                           ToolTip="{loc:Loc Key=Connections.CheckpointCoverageTooltip}" />
-                            </WrapPanel>
-                            <WrapPanel Margin="0,4,0,0">
-                                <Border Padding="7,2"
-                                        VerticalAlignment="Center"
-                                        Background="{DynamicResource Accent.Soft}"
-                                        BorderBrush="{DynamicResource Accent.Primary}"
-                                        BorderThickness="1"
-                                        CornerRadius="8">
-                                    <TextBlock Text="{Binding RecipeConnections.ValidationSummaryText}" />
-                                </Border>
-                                <Button x:Name="PreviewSemiconductorStationButton"
-                                        Margin="7,0,0,0"
-                                        Command="{Binding RecipeConnections.PreviewStationSkeletonCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.StationSkeletonPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
-                                        ToolTip="{loc:Loc Key=Connections.StationSkeletonPreviewTooltip}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
-                                        <TextBlock Margin="5,0,0,0"
-                                                   Text="{loc:Loc Key=Connections.StationSkeletonPreview}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="PreviewProcessBlockComposerButton"
-                                        Margin="7,0,0,0"
-                                        Command="{Binding RecipeConnections.PreviewProcessBlockCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlockPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
-                                ToolTip="{loc:Loc Key=Connections.ProcessBlockEditPreviewTooltip}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
-                                        <TextBlock Margin="5,0,0,0"
-                                                   Text="{loc:Loc Key=Connections.ProcessBlockPreview}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="PreviewLoadLockSetupButton"
-                                        Margin="7,0,0,0"
-                                        Command="{Binding RecipeConnections.PreviewLoadLockSetupCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.LoadLockSetupPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
-                                        ToolTip="{loc:Loc Key=Connections.LoadLockSetupPreviewTooltip}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
-                                        <TextBlock Margin="5,0,0,0"
-                                                   Text="{loc:Loc Key=Connections.LoadLockSetupPreview}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="PreviewWaferHandlerSetupButton"
-                                        Margin="7,0,0,0"
-                                        Command="{Binding RecipeConnections.PreviewWaferHandlerSetupCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.WaferHandlerSetupPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
-                                        ToolTip="{loc:Loc Key=Connections.WaferHandlerSetupPreviewTooltip}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="Next24" Foreground="{DynamicResource Accent.Primary}" />
-                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.WaferHandlerSetupPreview}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="PreviewPrealignerSetupButton"
-                                        Margin="7,0,0,0"
-                                        Command="{Binding RecipeConnections.PreviewPrealignerSetupCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.PrealignerSetupPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
-                                        ToolTip="{loc:Loc Key=Connections.PrealignerSetupPreviewTooltip}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="ArrowRotateClockwise24" Foreground="{DynamicResource Accent.Primary}" />
-                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.PrealignerSetupPreview}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="PreviewInspectionHandoffSetupButton"
-                                        Margin="7,0,0,0"
-                                        Command="{Binding RecipeConnections.PreviewInspectionHandoffSetupCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.InspectionHandoffSetupPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
-                                        ToolTip="{loc:Loc Key=Connections.InspectionHandoffSetupPreviewTooltip}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="Next24" Foreground="{DynamicResource Accent.Primary}" />
-                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.InspectionHandoffSetupPreview}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="PreviewInspectionSortSetupButton"
-                                        Margin="7,0,0,0"
-                                        Command="{Binding RecipeConnections.PreviewInspectionSortRouterSetupCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.InspectionSortSetupPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
-                                        ToolTip="{loc:Loc Key=Connections.InspectionSortSetupPreviewTooltip}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="Next24" Foreground="{DynamicResource Accent.Primary}" />
-                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.InspectionSortSetupPreview}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="PreviewOhtSetupButton"
-                                        Margin="7,0,0,0"
-                                        Command="{Binding RecipeConnections.PreviewOhtHandoffSetupCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.OhtSetupPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
-                                        ToolTip="{loc:Loc Key=Connections.OhtSetupPreviewTooltip}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="Next24" Foreground="{DynamicResource Accent.Primary}" />
-                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.OhtSetupPreview}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="PreviewRecipeCheckpointTemplateButton"
-                                        Margin="7,0,0,0"
-                                        Command="{Binding RecipeConnections.PreviewCheckpointTemplateCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.CheckpointTemplatePreview}"
-                                        Style="{StaticResource QuietCommandButtonStyle}"
-                                        ToolTip="{loc:Loc Key=Connections.CheckpointTemplatePreviewTooltip}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
-                                        <TextBlock Margin="5,0,0,0"
-                                                   Text="{loc:Loc Key=Connections.CheckpointTemplatePreview}" />
-                                    </StackPanel>
-                                </Button>
-                            </WrapPanel>
-                        </StackPanel>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Button x:Name="ValidateSimulationReadinessButton"
-                                    Command="{Binding RecipeConnections.ValidateSimulationReadinessCommand}"
-                                    AutomationProperties.Name="{loc:Loc Key=Connections.CheckReadiness}"
-                                    Style="{StaticResource QuietCommandButtonStyle}"
-                                    ToolTip="{loc:Loc Key=Connections.CheckReadinessTooltip}">
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:SymbolIcon Symbol="Next24" Foreground="{DynamicResource Accent.Primary}" />
-                                    <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.CheckReadiness}" />
-                                </StackPanel>
-                            </Button>
-                            <Button x:Name="RunRecipeDryRunButton"
-                                    Margin="6,0,0,0"
-                                    Command="{Binding RecipeConnections.RunRecipeDryRunCommand}"
-                                    AutomationProperties.Name="{loc:Loc Key=Connections.DryRun}"
-                                    Style="{StaticResource PrimaryCommandButtonStyle}"
-                                    ToolTip="{loc:Loc Key=Connections.DryRunTooltip}">
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:SymbolIcon Symbol="Play24" Foreground="{DynamicResource Accent.Primary}" />
-                                    <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.DryRun}" />
-                                </StackPanel>
-                            </Button>
-                            <Border Margin="7,0,0,0"
-                                    Padding="8,3"
-                                    VerticalAlignment="Center"
-                                    Background="{DynamicResource Surface.Panel}"
-                                    CornerRadius="8">
-                                <TextBlock Text="{Binding RecipeConnections.ReadinessStatusText}">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding RecipeConnections.ReadinessPassed}" Value="True">
-                                                    <Setter Property="Foreground" Value="{DynamicResource State.Running}" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding RecipeConnections.ReadinessPassed}" Value="False">
-                                                    <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Border>
-                        </StackPanel>
-                    </Grid>
-
-                    <TextBlock Grid.Row="3"
-                               Margin="0,6,0,0"
-                               Foreground="{DynamicResource Text.Secondary}"
-                               Text="{Binding RecipeConnections.ReadinessDetailText}"
-                               TextWrapping="Wrap">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Visibility" Value="Visible" />
-                                <Style.Triggers>
-                                        <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsCompactLayout}" Value="True" />
-                                            <Condition Binding="{Binding RecipeConnections.IsProcessBlockTimeoutPreviewVisible}" Value="True" />
-                                        </MultiDataTrigger.Conditions>
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </MultiDataTrigger>
-                                        <MultiDataTrigger>
-                                            <MultiDataTrigger.Conditions>
-                                                <Condition Binding="{Binding IsCompactLayout}" Value="True" />
-                                                <Condition Binding="{Binding RecipeConnections.IsLoadLockSetupVisible}" Value="True" />
-                                            </MultiDataTrigger.Conditions>
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </MultiDataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-
+                    <local:RecipeConnectionQuickAddView Grid.RowSpan="4" />
                     <Border x:Name="SemiconductorProcessBlockPreview"
                             Grid.Row="4"
                             Margin="0,10,0,0"
@@ -403,22 +97,22 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Visibility="{Binding RecipeConnections.IsProcessBlockPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
                             <DockPanel LastChildFill="True">
                                 <StackPanel DockPanel.Dock="Right"
                                             Margin="10,0,0,0"
                                             Orientation="Horizontal">
                                     <Button x:Name="ApplySemiconductorProcessBlockButton"
-                                            Command="{Binding RecipeConnections.ApplyProcessBlockCommand}"
+                                            Command="{Binding RecipeConnections.ProcessBlocks.ApplyProcessBlockCommand}"
                                             AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlockApply}"
                                             Style="{StaticResource PrimaryCommandButtonStyle}"
                                             ToolTip="{loc:Loc Key=Connections.ProcessBlockEditApplyTooltip}">
-                                        <TextBlock Text="{Binding RecipeConnections.ProcessBlockApplyText}" />
+                                        <TextBlock Text="{Binding RecipeConnections.ProcessBlocks.ProcessBlockApplyText}" />
                                     </Button>
                                     <Button x:Name="CancelSemiconductorProcessBlockButton"
                                             Margin="6,0,0,0"
-                                            Command="{Binding RecipeConnections.CancelProcessBlockCommand}"
+                                            Command="{Binding RecipeConnections.ProcessBlocks.CancelProcessBlockCommand}"
                                             AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlockClose}"
                                             Style="{StaticResource QuietCommandButtonStyle}"
                                             ToolTip="{loc:Loc Key=Connections.ProcessBlockCloseTooltip}">
@@ -429,11 +123,11 @@
                                     <TextBlock FontWeight="SemiBold">
                                         <Run Text="{loc:Loc Key=Connections.ProcessBlockTitle}" />
                                         <Run Text=" · " />
-                                        <Run Text="{Binding RecipeConnections.ProcessBlockKindText, Mode=OneWay}" />
+                                        <Run Text="{Binding RecipeConnections.ProcessBlocks.ProcessBlockKindText, Mode=OneWay}" />
                                     </TextBlock>
                                     <TextBlock Margin="0,2,0,0"
                                                Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{Binding RecipeConnections.ProcessBlockSummaryText}" />
+                                               Text="{Binding RecipeConnections.ProcessBlocks.ProcessBlockSummaryText}" />
                                 </StackPanel>
                             </DockPanel>
                             <TextBlock Margin="0,5,0,0"
@@ -447,7 +141,7 @@
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>
                                                     <Condition Binding="{Binding IsCompactLayout}" Value="True" />
-                                                    <Condition Binding="{Binding RecipeConnections.IsProcessBlockTimeoutPreviewVisible}" Value="True" />
+                                                    <Condition Binding="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockTimeoutPreviewVisible}" Value="True" />
                                                 </MultiDataTrigger.Conditions>
                                                 <Setter Property="Visibility" Value="Collapsed" />
                                             </MultiDataTrigger>
@@ -461,43 +155,43 @@
                                           Margin="0,0,14,5"
                                           AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlock.Load}"
                                           Content="{loc:Loc Key=Connections.ProcessBlock.Load}"
-                                          IsChecked="{Binding RecipeConnections.IsLoadBlockSelected, Mode=TwoWay}" />
+                                          IsChecked="{Binding RecipeConnections.ProcessBlocks.IsLoadBlockSelected, Mode=TwoWay}" />
                                 <CheckBox x:Name="ProcessBlockAlignCheckBox"
                                           Margin="0,0,14,5"
                                           AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlock.Align}"
                                           Content="{loc:Loc Key=Connections.ProcessBlock.Align}"
-                                          IsChecked="{Binding RecipeConnections.IsAlignBlockSelected, Mode=TwoWay}" />
+                                          IsChecked="{Binding RecipeConnections.ProcessBlocks.IsAlignBlockSelected, Mode=TwoWay}" />
                                 <CheckBox x:Name="ProcessBlockProcessCheckBox"
                                           Margin="0,0,14,5"
                                           AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlock.Process}"
                                           Content="{loc:Loc Key=Connections.ProcessBlock.Process}"
-                                          IsChecked="{Binding RecipeConnections.IsProcessBlockSelected, Mode=TwoWay}" />
+                                          IsChecked="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockSelected, Mode=TwoWay}" />
                                 <CheckBox x:Name="ProcessBlockInspectCheckBox"
                                           Margin="0,0,14,5"
                                           AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlock.Inspect}"
                                           Content="{loc:Loc Key=Connections.ProcessBlock.Inspect}"
-                                          IsChecked="{Binding RecipeConnections.IsInspectBlockSelected, Mode=TwoWay}" />
+                                          IsChecked="{Binding RecipeConnections.ProcessBlocks.IsInspectBlockSelected, Mode=TwoWay}" />
                                 <CheckBox x:Name="ProcessBlockUnloadCheckBox"
                                           Margin="0,0,0,5"
                                           AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlock.Unload}"
                                           Content="{loc:Loc Key=Connections.ProcessBlock.Unload}"
-                                          IsChecked="{Binding RecipeConnections.IsUnloadBlockSelected, Mode=TwoWay}" />
+                                          IsChecked="{Binding RecipeConnections.ProcessBlocks.IsUnloadBlockSelected, Mode=TwoWay}" />
                             </WrapPanel>
                             <TextBlock Margin="0,1,0,0"
                                        FontSize="11"
-                                       Text="{Binding RecipeConnections.ProcessBlockValidationText}">
+                                       Text="{Binding RecipeConnections.ProcessBlocks.ProcessBlockValidationText}">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
                                         <Setter Property="Visibility" Value="Visible" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding RecipeConnections.HasProcessBlockPlanError}" Value="True">
+                                            <DataTrigger Binding="{Binding RecipeConnections.ProcessBlocks.HasProcessBlockPlanError}" Value="True">
                                                 <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
                                             </DataTrigger>
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>
                                                     <Condition Binding="{Binding IsCompactLayout}" Value="True" />
-                                                    <Condition Binding="{Binding RecipeConnections.IsProcessBlockTimeoutPreviewVisible}" Value="True" />
+                                                    <Condition Binding="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockTimeoutPreviewVisible}" Value="True" />
                                                 </MultiDataTrigger.Conditions>
                                                 <Setter Property="Visibility" Value="Collapsed" />
                                             </MultiDataTrigger>
@@ -506,7 +200,7 @@
                                 </TextBlock.Style>
                             </TextBlock>
                             <ItemsControl Margin="0,3,0,0"
-                                          ItemsSource="{Binding RecipeConnections.ProcessBlockConnectionItems}">
+                                          ItemsSource="{Binding RecipeConnections.ProcessBlocks.ProcessBlockConnectionItems}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <WrapPanel />
@@ -544,30 +238,30 @@
                                 <RadioButton x:Name="ProcessBlockFilterAllRadioButton"
                                              Margin="0,0,5,4"
                                              AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlockFilterAll}"
-                                             Content="{Binding RecipeConnections.ProcessBlockFilterAllText}"
+                                             Content="{Binding RecipeConnections.ProcessBlocks.ProcessBlockFilterAllText}"
                                              GroupName="ProcessBlockItemFilter"
-                                             IsChecked="{Binding RecipeConnections.IsProcessBlockFilterAll, Mode=TwoWay}"
+                                             IsChecked="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockFilterAll, Mode=TwoWay}"
                                              Style="{StaticResource WorkspaceModeRadioStyle}" />
                                 <RadioButton x:Name="ProcessBlockFilterCustomizedRadioButton"
                                              Margin="0,0,5,4"
                                              AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlockStepCustomized}"
-                                             Content="{Binding RecipeConnections.ProcessBlockFilterCustomizedText}"
+                                             Content="{Binding RecipeConnections.ProcessBlocks.ProcessBlockFilterCustomizedText}"
                                              GroupName="ProcessBlockItemFilter"
-                                             IsChecked="{Binding RecipeConnections.IsProcessBlockFilterCustomized, Mode=TwoWay}"
+                                             IsChecked="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockFilterCustomized, Mode=TwoWay}"
                                              Style="{StaticResource WorkspaceModeRadioStyle}" />
                                 <RadioButton x:Name="ProcessBlockFilterRemovalRadioButton"
                                              Margin="0,0,5,4"
                                              AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlockStepProposedRemoval}"
-                                             Content="{Binding RecipeConnections.ProcessBlockFilterRemovalText}"
+                                             Content="{Binding RecipeConnections.ProcessBlocks.ProcessBlockFilterRemovalText}"
                                              GroupName="ProcessBlockItemFilter"
-                                             IsChecked="{Binding RecipeConnections.IsProcessBlockFilterRemoval, Mode=TwoWay}"
+                                             IsChecked="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockFilterRemoval, Mode=TwoWay}"
                                              Style="{StaticResource WorkspaceModeRadioStyle}" />
                                 <RadioButton x:Name="ProcessBlockFilterConflictRadioButton"
                                              Margin="0,0,0,4"
                                              AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlockFilterConflict}"
-                                             Content="{Binding RecipeConnections.ProcessBlockFilterConflictText}"
+                                             Content="{Binding RecipeConnections.ProcessBlocks.ProcessBlockFilterConflictText}"
                                              GroupName="ProcessBlockItemFilter"
-                                             IsChecked="{Binding RecipeConnections.IsProcessBlockFilterConflict, Mode=TwoWay}"
+                                             IsChecked="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockFilterConflict, Mode=TwoWay}"
                                              Style="{StaticResource WorkspaceModeRadioStyle}" />
                             </WrapPanel>
                             <Border x:Name="ProcessBlockTimeoutAdjustmentPanel"
@@ -587,10 +281,10 @@
                                         <TextBox x:Name="ProcessBlockTimeoutTextBox"
                                                  Width="92"
                                                  Margin="0,0,5,4"
-                                                 Tag="{Binding RecipeConnections.IsProcessBlockTimeoutValid}"
+                                                 Tag="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockTimeoutValid}"
                                                  AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlockTimeoutInput}"
                                                  Style="{StaticResource StationSetupTextBoxStyle}"
-                                                 Text="{Binding RecipeConnections.ProcessBlockTimeoutText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                 Text="{Binding RecipeConnections.ProcessBlocks.ProcessBlockTimeoutText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <TextBlock Margin="0,0,7,4"
                                                    VerticalAlignment="Center"
                                                    FontFamily="{StaticResource Typography.Telemetry}"
@@ -599,42 +293,42 @@
                                                    Text="ms" />
                                         <Button x:Name="PreviewProcessBlockTimeoutButton"
                                                 Margin="0,0,5,4"
-                                                Command="{Binding RecipeConnections.PreviewProcessBlockTimeoutsCommand}"
+                                                Command="{Binding RecipeConnections.ProcessBlocks.PreviewProcessBlockTimeoutsCommand}"
                                                 AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlockTimeoutPreview}"
                                                 Content="{loc:Loc Key=Connections.ProcessBlockTimeoutPreview}"
                                                 Style="{StaticResource QuietCommandButtonStyle}"
                                                 ToolTip="{loc:Loc Key=Connections.ProcessBlockTimeoutPreviewTooltip}" />
                                         <Button x:Name="ApplyProcessBlockTimeoutButton"
                                                 Margin="0,0,5,4"
-                                                Command="{Binding RecipeConnections.ApplyProcessBlockTimeoutsCommand}"
+                                                Command="{Binding RecipeConnections.ProcessBlocks.ApplyProcessBlockTimeoutsCommand}"
                                                 AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlockTimeoutApply}"
-                                                Content="{Binding RecipeConnections.ProcessBlockTimeoutApplyText}"
+                                                Content="{Binding RecipeConnections.ProcessBlocks.ProcessBlockTimeoutApplyText}"
                                                 Style="{StaticResource PrimaryCommandButtonStyle}"
                                                 ToolTip="{loc:Loc Key=Connections.ProcessBlockTimeoutApplyTooltip}"
-                                                Visibility="{Binding RecipeConnections.IsProcessBlockTimeoutPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                Visibility="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockTimeoutPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                         <Button x:Name="CancelProcessBlockTimeoutButton"
                                                 Margin="0,0,0,4"
-                                                Command="{Binding RecipeConnections.CancelProcessBlockTimeoutsCommand}"
+                                                Command="{Binding RecipeConnections.ProcessBlocks.CancelProcessBlockTimeoutsCommand}"
                                                 AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlockTimeoutCancel}"
                                                 Content="{loc:Loc Key=Connections.ProcessBlockTimeoutCancel}"
                                                 Style="{StaticResource QuietCommandButtonStyle}"
                                                 ToolTip="{loc:Loc Key=Connections.ProcessBlockTimeoutCancelTooltip}"
-                                                Visibility="{Binding RecipeConnections.IsProcessBlockTimeoutPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                Visibility="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockTimeoutPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                     </WrapPanel>
                                     <TextBlock FontSize="10.5"
                                                Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{Binding RecipeConnections.ProcessBlockTimeoutScopeText}" />
+                                               Text="{Binding RecipeConnections.ProcessBlocks.ProcessBlockTimeoutScopeText}" />
                                     <TextBlock Margin="0,2,0,0"
                                                FontSize="10.5"
-                                               Text="{Binding RecipeConnections.ProcessBlockTimeoutValidationText}">
+                                               Text="{Binding RecipeConnections.ProcessBlocks.ProcessBlockTimeoutValidationText}">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding RecipeConnections.IsProcessBlockTimeoutValid}" Value="False">
+                                                    <DataTrigger Binding="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockTimeoutValid}" Value="False">
                                                         <Setter Property="Foreground" Value="{DynamicResource State.Fault}" />
                                                     </DataTrigger>
-                                                    <DataTrigger Binding="{Binding RecipeConnections.IsProcessBlockTimeoutPreviewVisible}" Value="True">
+                                                    <DataTrigger Binding="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockTimeoutPreviewVisible}" Value="True">
                                                         <Setter Property="Foreground" Value="{DynamicResource State.Running}" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -643,8 +337,8 @@
                                     </TextBlock>
                                     <ItemsControl x:Name="ProcessBlockTimeoutItemsControl"
                                                   Margin="0,5,0,0"
-                                                  ItemsSource="{Binding RecipeConnections.ProcessBlockTimeoutItems}"
-                                                  Visibility="{Binding RecipeConnections.IsProcessBlockTimeoutPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                  ItemsSource="{Binding RecipeConnections.ProcessBlocks.ProcessBlockTimeoutItems}"
+                                                  Visibility="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockTimeoutPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <WrapPanel />
@@ -679,8 +373,8 @@
                                      Margin="0,3,0,0"
                                      Background="Transparent"
                                      BorderThickness="0"
-                                     ItemsSource="{Binding RecipeConnections.VisibleProcessBlockItems}"
-                                     SelectedItem="{Binding RecipeConnections.SelectedProcessBlockItem, Mode=TwoWay}"
+                                     ItemsSource="{Binding RecipeConnections.ProcessBlocks.VisibleProcessBlockItems}"
+                                     SelectedItem="{Binding RecipeConnections.ProcessBlocks.SelectedProcessBlockItem, Mode=TwoWay}"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                      ScrollViewer.VerticalScrollBarVisibility="Auto">
                                 <b:Interaction.Behaviors>
@@ -803,7 +497,7 @@
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Collapsed" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding RecipeConnections.HasVisibleProcessBlockItems}" Value="False">
+                                            <DataTrigger Binding="{Binding RecipeConnections.ProcessBlocks.HasVisibleProcessBlockItems}" Value="False">
                                                 <Setter Property="Visibility" Value="Visible" />
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -821,14 +515,14 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Visibility="{Binding RecipeConnections.IsLoadLockSetupVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding RecipeConnections.LoadLocks.IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
                             <DockPanel LastChildFill="True">
                                 <StackPanel DockPanel.Dock="Right"
                                             Margin="10,0,0,0"
                                             Orientation="Horizontal">
                                     <Button x:Name="ApplyLoadLockSetupButton"
-                                            Command="{Binding RecipeConnections.ApplyLoadLockSetupCommand}"
+                                            Command="{Binding RecipeConnections.LoadLocks.ApplyCommand}"
                                             AutomationProperties.Name="{loc:Loc Key=Connections.LoadLockSetupApply}"
                                             Style="{StaticResource PrimaryCommandButtonStyle}"
                                             ToolTip="{loc:Loc Key=Connections.LoadLockSetupApplyTooltip}">
@@ -836,7 +530,7 @@
                                     </Button>
                                     <Button x:Name="CancelLoadLockSetupButton"
                                             Margin="6,0,0,0"
-                                            Command="{Binding RecipeConnections.CancelLoadLockSetupCommand}"
+                                            Command="{Binding RecipeConnections.LoadLocks.CancelCommand}"
                                             AutomationProperties.Name="{loc:Loc Key=Connections.LoadLockSetupClose}"
                                             Style="{StaticResource QuietCommandButtonStyle}"
                                             ToolTip="{loc:Loc Key=Connections.LoadLockSetupCloseTooltip}">
@@ -844,7 +538,7 @@
                                     </Button>
                                     <Button x:Name="ResetLoadLockSetupButton"
                                             Margin="6,0,0,0"
-                                            Command="{Binding RecipeConnections.ResetLoadLockSetupCommand}"
+                                            Command="{Binding RecipeConnections.LoadLocks.ResetCommand}"
                                             AutomationProperties.Name="{loc:Loc Key=Connections.LoadLockSetupReset}"
                                             Style="{StaticResource QuietCommandButtonStyle}"
                                             ToolTip="{loc:Loc Key=Connections.LoadLockSetupResetTooltip}">
@@ -869,11 +563,11 @@
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.LoadLockSetupOuterDoor}" />
                                     <ComboBox x:Name="LoadLockOuterDoorComboBox"
                                               Margin="0,3,0,0"
-                                              Tag="{Binding RecipeConnections.IsOuterDoorComponentValid}"
+                                              Tag="{Binding RecipeConnections.LoadLocks.IsOuterDoorComponentValid}"
                                               AutomationProperties.Name="{loc:Loc Key=Connections.LoadLockSetupOuterDoor}"
                                               DisplayMemberPath="DisplayName"
-                                              ItemsSource="{Binding RecipeConnections.LoadLockDoorOptions}"
-                                              SelectedValue="{Binding RecipeConnections.OuterDoorComponentId, Mode=TwoWay}"
+                                              ItemsSource="{Binding RecipeConnections.LoadLocks.DoorOptions}"
+                                              SelectedValue="{Binding RecipeConnections.LoadLocks.OuterDoorComponentId, Mode=TwoWay}"
                                               SelectedValuePath="Id"
                                               Style="{StaticResource LoadLockSetupComboBoxStyle}" />
                                 </StackPanel>
@@ -881,11 +575,11 @@
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.LoadLockSetupInnerDoor}" />
                                     <ComboBox x:Name="LoadLockInnerDoorComboBox"
                                               Margin="0,3,0,0"
-                                              Tag="{Binding RecipeConnections.IsInnerDoorComponentValid}"
+                                              Tag="{Binding RecipeConnections.LoadLocks.IsInnerDoorComponentValid}"
                                               AutomationProperties.Name="{loc:Loc Key=Connections.LoadLockSetupInnerDoor}"
                                               DisplayMemberPath="DisplayName"
-                                              ItemsSource="{Binding RecipeConnections.LoadLockDoorOptions}"
-                                              SelectedValue="{Binding RecipeConnections.InnerDoorComponentId, Mode=TwoWay}"
+                                              ItemsSource="{Binding RecipeConnections.LoadLocks.DoorOptions}"
+                                              SelectedValue="{Binding RecipeConnections.LoadLocks.InnerDoorComponentId, Mode=TwoWay}"
                                               SelectedValuePath="Id"
                                               Style="{StaticResource LoadLockSetupComboBoxStyle}" />
                                 </StackPanel>
@@ -893,11 +587,11 @@
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.LoadLockSetupEvacuate}" />
                                     <ComboBox x:Name="LoadLockEvacuateComboBox"
                                               Margin="0,3,0,0"
-                                              Tag="{Binding RecipeConnections.IsEvacuateCommandChannelValid}"
+                                              Tag="{Binding RecipeConnections.LoadLocks.IsEvacuateCommandChannelValid}"
                                               AutomationProperties.Name="{loc:Loc Key=Connections.LoadLockSetupEvacuate}"
                                               DisplayMemberPath="DisplayName"
-                                              ItemsSource="{Binding RecipeConnections.LoadLockOutputOptions}"
-                                              SelectedValue="{Binding RecipeConnections.EvacuateCommandChannelId, Mode=TwoWay}"
+                                              ItemsSource="{Binding RecipeConnections.LoadLocks.OutputOptions}"
+                                              SelectedValue="{Binding RecipeConnections.LoadLocks.EvacuateCommandChannelId, Mode=TwoWay}"
                                               SelectedValuePath="Id"
                                               Style="{StaticResource LoadLockSetupComboBoxStyle}" />
                                 </StackPanel>
@@ -905,11 +599,11 @@
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.LoadLockSetupVent}" />
                                     <ComboBox x:Name="LoadLockVentComboBox"
                                               Margin="0,3,0,0"
-                                              Tag="{Binding RecipeConnections.IsVentCommandChannelValid}"
+                                              Tag="{Binding RecipeConnections.LoadLocks.IsVentCommandChannelValid}"
                                               AutomationProperties.Name="{loc:Loc Key=Connections.LoadLockSetupVent}"
                                               DisplayMemberPath="DisplayName"
-                                              ItemsSource="{Binding RecipeConnections.LoadLockOutputOptions}"
-                                              SelectedValue="{Binding RecipeConnections.VentCommandChannelId, Mode=TwoWay}"
+                                              ItemsSource="{Binding RecipeConnections.LoadLocks.OutputOptions}"
+                                              SelectedValue="{Binding RecipeConnections.LoadLocks.VentCommandChannelId, Mode=TwoWay}"
                                               SelectedValuePath="Id"
                                               Style="{StaticResource LoadLockSetupComboBoxStyle}" />
                                 </StackPanel>
@@ -917,11 +611,11 @@
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.LoadLockSetupVacuumReady}" />
                                     <ComboBox x:Name="LoadLockVacuumReadyComboBox"
                                               Margin="0,3,0,0"
-                                              Tag="{Binding RecipeConnections.IsVacuumReadySensorChannelValid}"
+                                              Tag="{Binding RecipeConnections.LoadLocks.IsVacuumReadySensorChannelValid}"
                                               AutomationProperties.Name="{loc:Loc Key=Connections.LoadLockSetupVacuumReady}"
                                               DisplayMemberPath="DisplayName"
-                                              ItemsSource="{Binding RecipeConnections.LoadLockInputOptions}"
-                                              SelectedValue="{Binding RecipeConnections.VacuumReadySensorChannelId, Mode=TwoWay}"
+                                              ItemsSource="{Binding RecipeConnections.LoadLocks.InputOptions}"
+                                              SelectedValue="{Binding RecipeConnections.LoadLocks.VacuumReadySensorChannelId, Mode=TwoWay}"
                                               SelectedValuePath="Id"
                                               Style="{StaticResource LoadLockSetupComboBoxStyle}" />
                                 </StackPanel>
@@ -929,11 +623,11 @@
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.LoadLockSetupAtmosphereReady}" />
                                     <ComboBox x:Name="LoadLockAtmosphereReadyComboBox"
                                               Margin="0,3,0,0"
-                                              Tag="{Binding RecipeConnections.IsAtmosphereReadySensorChannelValid}"
+                                              Tag="{Binding RecipeConnections.LoadLocks.IsAtmosphereReadySensorChannelValid}"
                                               AutomationProperties.Name="{loc:Loc Key=Connections.LoadLockSetupAtmosphereReady}"
                                               DisplayMemberPath="DisplayName"
-                                              ItemsSource="{Binding RecipeConnections.LoadLockInputOptions}"
-                                              SelectedValue="{Binding RecipeConnections.AtmosphereReadySensorChannelId, Mode=TwoWay}"
+                                              ItemsSource="{Binding RecipeConnections.LoadLocks.InputOptions}"
+                                              SelectedValue="{Binding RecipeConnections.LoadLocks.AtmosphereReadySensorChannelId, Mode=TwoWay}"
                                               SelectedValuePath="Id"
                                               Style="{StaticResource LoadLockSetupComboBoxStyle}" />
                                 </StackPanel>
@@ -941,30 +635,30 @@
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.LoadLockSetupPumpDown}" />
                                     <TextBox x:Name="LoadLockPumpDownDurationTextBox"
                                              Margin="0,3,0,0"
-                                             Tag="{Binding RecipeConnections.IsPumpDownDurationValid}"
+                                             Tag="{Binding RecipeConnections.LoadLocks.IsPumpDownDurationValid}"
                                              AutomationProperties.Name="{loc:Loc Key=Connections.LoadLockSetupPumpDown}"
                                              Style="{StaticResource StationSetupTextBoxStyle}"
-                                             Text="{Binding RecipeConnections.PumpDownDurationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                             Text="{Binding RecipeConnections.LoadLocks.PumpDownDurationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource LoadLockSetupTimingFieldStyle}">
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.LoadLockSetupVentDuration}" />
                                     <TextBox x:Name="LoadLockVentDurationTextBox"
                                              Margin="0,3,0,0"
-                                             Tag="{Binding RecipeConnections.IsVentDurationValid}"
+                                             Tag="{Binding RecipeConnections.LoadLocks.IsVentDurationValid}"
                                              AutomationProperties.Name="{loc:Loc Key=Connections.LoadLockSetupVentDuration}"
                                              Style="{StaticResource StationSetupTextBoxStyle}"
-                                             Text="{Binding RecipeConnections.VentDurationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                             Text="{Binding RecipeConnections.LoadLocks.VentDurationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                             </WrapPanel>
                             <TextBlock Margin="0,0,0,2"
                                        FontSize="11"
-                                       Text="{Binding RecipeConnections.LoadLockSetupValidationText}"
+                                       Text="{Binding RecipeConnections.LoadLocks.ValidationText}"
                                        TextWrapping="Wrap">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding RecipeConnections.HasLoadLockSetupValidationError}" Value="True">
+                                            <DataTrigger Binding="{Binding RecipeConnections.LoadLocks.HasValidationError}" Value="True">
                                                 <Setter Property="Foreground" Value="{DynamicResource State.Fault}" />
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -982,22 +676,22 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Visibility="{Binding RecipeConnections.IsStationSkeletonPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding RecipeConnections.StationSetups.IsStationSkeletonPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
                             <DockPanel LastChildFill="True">
                                 <StackPanel DockPanel.Dock="Right"
                                             Margin="10,0,0,0"
                                             Orientation="Horizontal">
                                     <Button x:Name="ApplySemiconductorStationSkeletonButton"
-                                            Command="{Binding RecipeConnections.ApplyStationSkeletonCommand}"
+                                            Command="{Binding RecipeConnections.StationSetups.ApplyStationSkeletonCommand}"
                                             AutomationProperties.Name="{loc:Loc Key=Connections.StationSetupApply}"
                                             Style="{StaticResource PrimaryCommandButtonStyle}"
                                             ToolTip="{loc:Loc Key=Connections.StationSetupApplyTooltip}">
-                                        <TextBlock Text="{Binding RecipeConnections.StationSkeletonApplyText}" />
+                                        <TextBlock Text="{Binding RecipeConnections.StationSetups.StationSkeletonApplyText}" />
                                     </Button>
                                     <Button x:Name="CancelSemiconductorStationSkeletonButton"
                                             Margin="6,0,0,0"
-                                            Command="{Binding RecipeConnections.CancelStationSkeletonCommand}"
+                                            Command="{Binding RecipeConnections.StationSetups.CancelStationSkeletonCommand}"
                                             AutomationProperties.Name="{loc:Loc Key=Connections.StationSkeletonClose}"
                                             Style="{StaticResource QuietCommandButtonStyle}"
                                             ToolTip="{loc:Loc Key=Connections.StationSkeletonCloseTooltip}">
@@ -1005,7 +699,7 @@
                                     </Button>
                                     <Button x:Name="ResetSemiconductorStationSetupButton"
                                             Margin="6,0,0,0"
-                                            Command="{Binding RecipeConnections.ResetStationSetupCommand}"
+                                            Command="{Binding RecipeConnections.StationSetups.ResetStationSetupCommand}"
                                             AutomationProperties.Name="{loc:Loc Key=Connections.StationSetupReset}"
                                             Style="{StaticResource QuietCommandButtonStyle}"
                                             ToolTip="{loc:Loc Key=Connections.StationSetupResetTooltip}">
@@ -1017,7 +711,7 @@
                                                Text="{loc:Loc Key=Connections.StationSetupTitle}" />
                                     <TextBlock Margin="0,2,0,0"
                                                Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{Binding RecipeConnections.StationSkeletonSummaryText}" />
+                                               Text="{Binding RecipeConnections.StationSetups.StationSkeletonSummaryText}" />
                                 </StackPanel>
                             </DockPanel>
                             <TextBlock Margin="0,5,0,0"
@@ -1025,80 +719,80 @@
                                        Text="{loc:Loc Key=Connections.StationSetupHint}"
                                        TextWrapping="Wrap" />
                             <WrapPanel Margin="0,8,0,0"
-                                       IsEnabled="{Binding RecipeConnections.IsEditable}">
+                                       IsEnabled="{Binding RecipeConnections.StationSetups.IsEditable}">
                                 <StackPanel Width="180" Margin="0,0,7,6">
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.StationSetupStationName}" />
                                     <TextBox x:Name="StationSetupNameTextBox"
                                              Margin="0,3,0,0"
-                                             Tag="{Binding RecipeConnections.IsStationNameValid}"
+                                             Tag="{Binding RecipeConnections.StationSetups.IsStationNameValid}"
                                              AutomationProperties.Name="{loc:Loc Key=Connections.StationSetupStationName}"
                                              Style="{StaticResource StationSetupTextBoxStyle}"
-                                             Text="{Binding RecipeConnections.StationName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                             Text="{Binding RecipeConnections.StationSetups.StationName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Width="150" Margin="0,0,7,6">
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.StationSetupWaferType}" />
                                     <TextBox x:Name="StationSetupWaferTypeTextBox"
                                              Margin="0,3,0,0"
-                                             Tag="{Binding RecipeConnections.IsWaferTypeValid}"
+                                             Tag="{Binding RecipeConnections.StationSetups.IsWaferTypeValid}"
                                              AutomationProperties.Name="{loc:Loc Key=Connections.StationSetupWaferType}"
                                              Style="{StaticResource StationSetupTextBoxStyle}"
-                                             Text="{Binding RecipeConnections.WaferType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                             Text="{Binding RecipeConnections.StationSetups.WaferType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Width="104" Margin="0,0,7,6">
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.StationSetupAxisTravel}" />
                                     <TextBox x:Name="StationSetupAxisTravelTextBox"
                                              Margin="0,3,0,0"
-                                             Tag="{Binding RecipeConnections.IsAxisTravelValid}"
+                                             Tag="{Binding RecipeConnections.StationSetups.IsAxisTravelValid}"
                                              AutomationProperties.Name="{loc:Loc Key=Connections.StationSetupAxisTravel}"
                                              Style="{StaticResource StationSetupTextBoxStyle}"
-                                             Text="{Binding RecipeConnections.AxisTravelText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                             Text="{Binding RecipeConnections.StationSetups.AxisTravelText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Width="112" Margin="0,0,7,6">
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.StationSetupTransportSpeed}" />
                                     <TextBox x:Name="StationSetupTransportSpeedTextBox"
                                              Margin="0,3,0,0"
-                                             Tag="{Binding RecipeConnections.IsTransportSpeedValid}"
+                                             Tag="{Binding RecipeConnections.StationSetups.IsTransportSpeedValid}"
                                              AutomationProperties.Name="{loc:Loc Key=Connections.StationSetupTransportSpeed}"
                                              Style="{StaticResource StationSetupTextBoxStyle}"
-                                             Text="{Binding RecipeConnections.TransportSpeedText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                             Text="{Binding RecipeConnections.StationSetups.TransportSpeedText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Width="106" Margin="0,0,7,6">
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.StationSetupEntrySensor}" />
                                     <TextBox x:Name="StationSetupEntrySensorTextBox"
                                              Margin="0,3,0,0"
-                                             Tag="{Binding RecipeConnections.IsEntrySensorPositionValid}"
+                                             Tag="{Binding RecipeConnections.StationSetups.IsEntrySensorPositionValid}"
                                              AutomationProperties.Name="{loc:Loc Key=Connections.StationSetupEntrySensor}"
                                              Style="{StaticResource StationSetupTextBoxStyle}"
-                                             Text="{Binding RecipeConnections.EntrySensorPositionText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                             Text="{Binding RecipeConnections.StationSetups.EntrySensorPositionText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Width="106" Margin="0,0,7,6">
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.StationSetupProcessSensor}" />
                                     <TextBox x:Name="StationSetupProcessSensorTextBox"
                                              Margin="0,3,0,0"
-                                             Tag="{Binding RecipeConnections.IsProcessSensorPositionValid}"
+                                             Tag="{Binding RecipeConnections.StationSetups.IsProcessSensorPositionValid}"
                                              AutomationProperties.Name="{loc:Loc Key=Connections.StationSetupProcessSensor}"
                                              Style="{StaticResource StationSetupTextBoxStyle}"
-                                             Text="{Binding RecipeConnections.ProcessSensorPositionText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                             Text="{Binding RecipeConnections.StationSetups.ProcessSensorPositionText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Width="118" Margin="0,0,0,6">
                                     <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.StationSetupCylinderTiming}" />
                                     <TextBox x:Name="StationSetupCylinderTimingTextBox"
                                              Margin="0,3,0,0"
-                                             Tag="{Binding RecipeConnections.IsCylinderTravelTimeValid}"
+                                             Tag="{Binding RecipeConnections.StationSetups.IsCylinderTravelTimeValid}"
                                              AutomationProperties.Name="{loc:Loc Key=Connections.StationSetupCylinderTiming}"
                                              Style="{StaticResource StationSetupTextBoxStyle}"
-                                             Text="{Binding RecipeConnections.CylinderTravelTimeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                             Text="{Binding RecipeConnections.StationSetups.CylinderTravelTimeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                             </WrapPanel>
                             <TextBlock Margin="0,0,0,2"
                                        FontSize="11"
-                                       Text="{Binding RecipeConnections.StationSetupValidationText}"
+                                       Text="{Binding RecipeConnections.StationSetups.StationSetupValidationText}"
                                        TextWrapping="Wrap">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding RecipeConnections.HasStationSetupValidationError}" Value="True">
+                                            <DataTrigger Binding="{Binding RecipeConnections.StationSetups.HasStationSetupValidationError}" Value="True">
                                                 <Setter Property="Foreground" Value="{DynamicResource State.Fault}" />
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -1106,7 +800,7 @@
                                 </TextBlock.Style>
                             </TextBlock>
                             <ItemsControl Margin="0,7,0,0"
-                                          ItemsSource="{Binding RecipeConnections.StationSkeletonItems}">
+                                          ItemsSource="{Binding RecipeConnections.StationSetups.StationSkeletonItems}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <WrapPanel />
@@ -1162,32 +856,32 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Visibility="{Binding RecipeConnections.IsWaferHandlerSetupVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding RecipeConnections.SemanticSetups.IsWaferHandlerSetupVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
                             <DockPanel LastChildFill="True">
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="10,0,0,0">
-                                    <Button x:Name="ApplyWaferHandlerSetupButton" Command="{Binding RecipeConnections.ApplyWaferHandlerSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupApply}" Style="{StaticResource PrimaryCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupApply}" /></Button>
-                                    <Button Margin="6,0,0,0" Command="{Binding RecipeConnections.CancelWaferHandlerSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupClose}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupClose}" /></Button>
-                                    <Button Margin="6,0,0,0" Command="{Binding RecipeConnections.ResetWaferHandlerSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupReset}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupReset}" /></Button>
+                                    <Button x:Name="ApplyWaferHandlerSetupButton" Command="{Binding RecipeConnections.SemanticSetups.ApplyWaferHandlerSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupApply}" Style="{StaticResource PrimaryCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupApply}" /></Button>
+                                    <Button Margin="6,0,0,0" Command="{Binding RecipeConnections.SemanticSetups.CancelWaferHandlerSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupClose}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupClose}" /></Button>
+                                    <Button Margin="6,0,0,0" Command="{Binding RecipeConnections.SemanticSetups.ResetWaferHandlerSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupReset}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupReset}" /></Button>
                                 </StackPanel>
                                 <StackPanel><TextBlock FontWeight="SemiBold" Text="{loc:Loc Key=Connections.WaferHandlerSetupTitle}" /><TextBlock Margin="0,2,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Connections.SemanticSetupHint}" TextWrapping="Wrap" /></StackPanel>
                             </DockPanel>
                             <WrapPanel Margin="0,8,0,0">
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerHorizontalAxis}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsWaferHandlerHorizontalAxisValid}" ItemsSource="{Binding RecipeConnections.WaferHandlerAxisOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.WaferHandlerHorizontalAxisId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerVerticalAxis}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsWaferHandlerVerticalAxisValid}" ItemsSource="{Binding RecipeConnections.WaferHandlerAxisOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.WaferHandlerVerticalAxisId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerWorkpiece}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsWaferHandlerWorkpieceValid}" ItemsSource="{Binding RecipeConnections.WaferHandlerWorkpieceOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.WaferHandlerWorkpieceComponentId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerSourcePresent}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsWaferHandlerSourcePresentValid}" ItemsSource="{Binding RecipeConnections.WaferHandlerInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.WaferHandlerSourcePresentSensorChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerGateInput}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsWaferHandlerGateOpenValid}" ItemsSource="{Binding RecipeConnections.WaferHandlerInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.WaferHandlerGateOpenSensorChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerPickCommand}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsWaferHandlerPickCommandValid}" ItemsSource="{Binding RecipeConnections.WaferHandlerOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.WaferHandlerPickCommandChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerPlaceCommand}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsWaferHandlerPlaceCommandValid}" ItemsSource="{Binding RecipeConnections.WaferHandlerOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.WaferHandlerPlaceCommandChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerHoldingFeedback}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsWaferHandlerHoldingFeedbackValid}" ItemsSource="{Binding RecipeConnections.WaferHandlerInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.WaferHandlerHoldingFeedbackChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerPlacedFeedback}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsWaferHandlerPlacedFeedbackValid}" ItemsSource="{Binding RecipeConnections.WaferHandlerInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.WaferHandlerPlacedFeedbackChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupTimingFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerPickHorizontal}" /><TextBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsWaferHandlerPickHorizontalValid}" Text="{Binding RecipeConnections.WaferHandlerPickHorizontalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource StationSetupTextBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupTimingFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerPickVertical}" /><TextBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsWaferHandlerPickVerticalValid}" Text="{Binding RecipeConnections.WaferHandlerPickVerticalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource StationSetupTextBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupTimingFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerPlaceHorizontal}" /><TextBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsWaferHandlerPlaceHorizontalValid}" Text="{Binding RecipeConnections.WaferHandlerPlaceHorizontalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource StationSetupTextBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupTimingFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerPlaceVertical}" /><TextBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsWaferHandlerPlaceVerticalValid}" Text="{Binding RecipeConnections.WaferHandlerPlaceVerticalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource StationSetupTextBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerHorizontalAxis}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsWaferHandlerHorizontalAxisValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.WaferHandlerAxisOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.WaferHandlerHorizontalAxisId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerVerticalAxis}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsWaferHandlerVerticalAxisValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.WaferHandlerAxisOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.WaferHandlerVerticalAxisId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerWorkpiece}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsWaferHandlerWorkpieceValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.WaferHandlerWorkpieceOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.WaferHandlerWorkpieceComponentId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerSourcePresent}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsWaferHandlerSourcePresentValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.WaferHandlerInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.WaferHandlerSourcePresentSensorChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerGateInput}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsWaferHandlerGateOpenValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.WaferHandlerInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.WaferHandlerGateOpenSensorChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerPickCommand}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsWaferHandlerPickCommandValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.WaferHandlerOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.WaferHandlerPickCommandChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerPlaceCommand}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsWaferHandlerPlaceCommandValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.WaferHandlerOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.WaferHandlerPlaceCommandChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerHoldingFeedback}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsWaferHandlerHoldingFeedbackValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.WaferHandlerInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.WaferHandlerHoldingFeedbackChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerPlacedFeedback}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsWaferHandlerPlacedFeedbackValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.WaferHandlerInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.WaferHandlerPlacedFeedbackChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupTimingFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerPickHorizontal}" /><TextBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsWaferHandlerPickHorizontalValid}" Text="{Binding RecipeConnections.SemanticSetups.WaferHandlerPickHorizontalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource StationSetupTextBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupTimingFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerPickVertical}" /><TextBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsWaferHandlerPickVerticalValid}" Text="{Binding RecipeConnections.SemanticSetups.WaferHandlerPickVerticalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource StationSetupTextBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupTimingFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerPlaceHorizontal}" /><TextBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsWaferHandlerPlaceHorizontalValid}" Text="{Binding RecipeConnections.SemanticSetups.WaferHandlerPlaceHorizontalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource StationSetupTextBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupTimingFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.WaferHandlerPlaceVertical}" /><TextBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsWaferHandlerPlaceVerticalValid}" Text="{Binding RecipeConnections.SemanticSetups.WaferHandlerPlaceVerticalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource StationSetupTextBoxStyle}" /></StackPanel>
                             </WrapPanel>
-                            <TextBlock Margin="0,2,0,0" Text="{Binding RecipeConnections.WaferHandlerSetupValidationText}" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Style.Triggers><DataTrigger Binding="{Binding RecipeConnections.HasWaferHandlerSetupValidationError}" Value="True"><Setter Property="Foreground" Value="{DynamicResource State.Fault}" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                            <TextBlock Margin="0,2,0,0" Text="{Binding RecipeConnections.SemanticSetups.WaferHandlerSetupValidationText}" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Style.Triggers><DataTrigger Binding="{Binding RecipeConnections.SemanticSetups.HasWaferHandlerSetupValidationError}" Value="True"><Setter Property="Foreground" Value="{DynamicResource State.Fault}" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
                         </StackPanel>
                     </Border>
 
@@ -1199,20 +893,20 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Visibility="{Binding RecipeConnections.IsPrealignerSetupVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding RecipeConnections.SemanticSetups.IsPrealignerSetupVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
-                            <DockPanel LastChildFill="True"><StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="10,0,0,0"><Button x:Name="ApplyPrealignerSetupButton" Command="{Binding RecipeConnections.ApplyPrealignerSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupApply}" Style="{StaticResource PrimaryCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupApply}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.CancelPrealignerSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupClose}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupClose}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.ResetPrealignerSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupReset}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupReset}" /></Button></StackPanel><StackPanel><TextBlock FontWeight="SemiBold" Text="{loc:Loc Key=Connections.PrealignerSetupTitle}" /><TextBlock Margin="0,2,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Connections.SemanticSetupHint}" TextWrapping="Wrap" /></StackPanel></DockPanel>
+                            <DockPanel LastChildFill="True"><StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="10,0,0,0"><Button x:Name="ApplyPrealignerSetupButton" Command="{Binding RecipeConnections.SemanticSetups.ApplyPrealignerSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupApply}" Style="{StaticResource PrimaryCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupApply}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.SemanticSetups.CancelPrealignerSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupClose}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupClose}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.SemanticSetups.ResetPrealignerSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupReset}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupReset}" /></Button></StackPanel><StackPanel><TextBlock FontWeight="SemiBold" Text="{loc:Loc Key=Connections.PrealignerSetupTitle}" /><TextBlock Margin="0,2,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Connections.SemanticSetupHint}" TextWrapping="Wrap" /></StackPanel></DockPanel>
                             <WrapPanel Margin="0,8,0,0">
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerStage}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsPrealignerRotaryStageValid}" ItemsSource="{Binding RecipeConnections.PrealignerStageOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.PrealignerRotaryStageComponentId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerClamp}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsPrealignerClampCylinderValid}" ItemsSource="{Binding RecipeConnections.PrealignerCylinderOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.PrealignerClampCylinderComponentId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerWaferPresentInput}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsPrealignerWaferPresentValid}" ItemsSource="{Binding RecipeConnections.PrealignerInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.PrealignerWaferPresentSensorChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerAccepted}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsPrealignerAlignmentAcceptedValid}" ItemsSource="{Binding RecipeConnections.PrealignerOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.PrealignerAlignmentAcceptedCommandChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerReady}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsPrealignerAlignmentReadyValid}" ItemsSource="{Binding RecipeConnections.PrealignerInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.PrealignerAlignmentReadyFeedbackChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerComplete}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsPrealignerAlignmentCompleteValid}" ItemsSource="{Binding RecipeConnections.PrealignerInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.PrealignerAlignmentCompleteFeedbackChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupTimingFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerTarget}" /><TextBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsPrealignerAlignmentTargetValid}" Text="{Binding RecipeConnections.PrealignerAlignmentTargetText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource StationSetupTextBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupTimingFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerTolerance}" /><TextBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsPrealignerAlignmentToleranceValid}" Text="{Binding RecipeConnections.PrealignerAlignmentToleranceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource StationSetupTextBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerStage}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsPrealignerRotaryStageValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.PrealignerStageOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.PrealignerRotaryStageComponentId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerClamp}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsPrealignerClampCylinderValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.PrealignerCylinderOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.PrealignerClampCylinderComponentId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerWaferPresentInput}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsPrealignerWaferPresentValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.PrealignerInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.PrealignerWaferPresentSensorChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerAccepted}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsPrealignerAlignmentAcceptedValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.PrealignerOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.PrealignerAlignmentAcceptedCommandChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerReady}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsPrealignerAlignmentReadyValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.PrealignerInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.PrealignerAlignmentReadyFeedbackChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerComplete}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsPrealignerAlignmentCompleteValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.PrealignerInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.PrealignerAlignmentCompleteFeedbackChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupTimingFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerTarget}" /><TextBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsPrealignerAlignmentTargetValid}" Text="{Binding RecipeConnections.SemanticSetups.PrealignerAlignmentTargetText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource StationSetupTextBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupTimingFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.PrealignerTolerance}" /><TextBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsPrealignerAlignmentToleranceValid}" Text="{Binding RecipeConnections.SemanticSetups.PrealignerAlignmentToleranceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource StationSetupTextBoxStyle}" /></StackPanel>
                             </WrapPanel>
-                            <TextBlock Margin="0,2,0,0" Text="{Binding RecipeConnections.PrealignerSetupValidationText}" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Style.Triggers><DataTrigger Binding="{Binding RecipeConnections.HasPrealignerSetupValidationError}" Value="True"><Setter Property="Foreground" Value="{DynamicResource State.Fault}" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                            <TextBlock Margin="0,2,0,0" Text="{Binding RecipeConnections.SemanticSetups.PrealignerSetupValidationText}" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Style.Triggers><DataTrigger Binding="{Binding RecipeConnections.SemanticSetups.HasPrealignerSetupValidationError}" Value="True"><Setter Property="Foreground" Value="{DynamicResource State.Fault}" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
                         </StackPanel>
                     </Border>
 
@@ -1224,17 +918,17 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Visibility="{Binding RecipeConnections.IsInspectionHandoffSetupVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding RecipeConnections.SemanticSetups.IsInspectionHandoffSetupVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
-                            <DockPanel LastChildFill="True"><StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="10,0,0,0"><Button x:Name="ApplyInspectionHandoffSetupButton" Command="{Binding RecipeConnections.ApplyInspectionHandoffSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupApply}" Style="{StaticResource PrimaryCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupApply}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.CancelInspectionHandoffSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupClose}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupClose}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.ResetInspectionHandoffSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupReset}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupReset}" /></Button></StackPanel><StackPanel><TextBlock FontWeight="SemiBold" Text="{loc:Loc Key=Connections.InspectionHandoffSetupTitle}" /><TextBlock Margin="0,2,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Connections.SemanticSetupHint}" TextWrapping="Wrap" /></StackPanel></DockPanel>
+                            <DockPanel LastChildFill="True"><StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="10,0,0,0"><Button x:Name="ApplyInspectionHandoffSetupButton" Command="{Binding RecipeConnections.SemanticSetups.ApplyInspectionHandoffSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupApply}" Style="{StaticResource PrimaryCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupApply}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.SemanticSetups.CancelInspectionHandoffSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupClose}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupClose}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.SemanticSetups.ResetInspectionHandoffSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupReset}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupReset}" /></Button></StackPanel><StackPanel><TextBlock FontWeight="SemiBold" Text="{loc:Loc Key=Connections.InspectionHandoffSetupTitle}" /><TextBlock Margin="0,2,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Connections.SemanticSetupHint}" TextWrapping="Wrap" /></StackPanel></DockPanel>
                             <WrapPanel Margin="0,8,0,0">
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSetupCamera}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsInspectionHandoffCameraValid}" ItemsSource="{Binding RecipeConnections.InspectionCameraOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.InspectionHandoffCameraId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSetupPosition}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsInspectionHandoffPositionValid}" ItemsSource="{Binding RecipeConnections.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.InspectionHandoffPositionSensorChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSetupAccepted}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsInspectionHandoffAcceptedValid}" ItemsSource="{Binding RecipeConnections.InspectionOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.InspectionHandoffAcceptedChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSetupReady}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsInspectionHandoffReadyValid}" ItemsSource="{Binding RecipeConnections.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.InspectionHandoffReadyChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSetupComplete}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsInspectionHandoffCompleteValid}" ItemsSource="{Binding RecipeConnections.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.InspectionHandoffCompleteChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSetupCamera}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsInspectionHandoffCameraValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionCameraOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.InspectionHandoffCameraId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSetupPosition}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsInspectionHandoffPositionValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.InspectionHandoffPositionSensorChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSetupAccepted}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsInspectionHandoffAcceptedValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.InspectionHandoffAcceptedChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSetupReady}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsInspectionHandoffReadyValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.InspectionHandoffReadyChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSetupComplete}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsInspectionHandoffCompleteValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.InspectionHandoffCompleteChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
                             </WrapPanel>
-                            <TextBlock Margin="0,2,0,0" Text="{Binding RecipeConnections.InspectionHandoffSetupValidationText}" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Style.Triggers><DataTrigger Binding="{Binding RecipeConnections.HasInspectionHandoffSetupValidationError}" Value="True"><Setter Property="Foreground" Value="{DynamicResource State.Fault}" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                            <TextBlock Margin="0,2,0,0" Text="{Binding RecipeConnections.SemanticSetups.InspectionHandoffSetupValidationText}" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Style.Triggers><DataTrigger Binding="{Binding RecipeConnections.SemanticSetups.HasInspectionHandoffSetupValidationError}" Value="True"><Setter Property="Foreground" Value="{DynamicResource State.Fault}" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
                         </StackPanel>
                     </Border>
 
@@ -1246,17 +940,17 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Visibility="{Binding RecipeConnections.IsInspectionSortRouterSetupVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding RecipeConnections.SemanticSetups.IsInspectionSortRouterSetupVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
-                            <DockPanel LastChildFill="True"><StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="10,0,0,0"><Button x:Name="ApplyInspectionSortSetupButton" Command="{Binding RecipeConnections.ApplyInspectionSortRouterSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupApply}" Style="{StaticResource PrimaryCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupApply}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.CancelInspectionSortRouterSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupClose}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupClose}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.ResetInspectionSortRouterSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupReset}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupReset}" /></Button></StackPanel><StackPanel><TextBlock FontWeight="SemiBold" Text="{loc:Loc Key=Connections.InspectionSortSetupTitle}" /><TextBlock Margin="0,2,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Connections.SemanticSetupHint}" TextWrapping="Wrap" /></StackPanel></DockPanel>
+                            <DockPanel LastChildFill="True"><StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="10,0,0,0"><Button x:Name="ApplyInspectionSortSetupButton" Command="{Binding RecipeConnections.SemanticSetups.ApplyInspectionSortRouterSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupApply}" Style="{StaticResource PrimaryCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupApply}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.SemanticSetups.CancelInspectionSortRouterSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupClose}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupClose}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.SemanticSetups.ResetInspectionSortRouterSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupReset}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupReset}" /></Button></StackPanel><StackPanel><TextBlock FontWeight="SemiBold" Text="{loc:Loc Key=Connections.InspectionSortSetupTitle}" /><TextBlock Margin="0,2,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Connections.SemanticSetupHint}" TextWrapping="Wrap" /></StackPanel></DockPanel>
                             <WrapPanel Margin="0,8,0,0">
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSetupCamera}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsInspectionSortCameraValid}" ItemsSource="{Binding RecipeConnections.InspectionCameraOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.InspectionSortCameraId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSortPassConveyor}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsInspectionSortPassConveyorValid}" ItemsSource="{Binding RecipeConnections.InspectionConveyorOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.InspectionSortPassConveyorId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSortNgConveyor}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsInspectionSortNgConveyorValid}" ItemsSource="{Binding RecipeConnections.InspectionConveyorOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.InspectionSortNgConveyorId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSortPassFeedback}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsInspectionSortPassFeedbackValid}" ItemsSource="{Binding RecipeConnections.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.InspectionSortPassFeedbackChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSortNgFeedback}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsInspectionSortNgFeedbackValid}" ItemsSource="{Binding RecipeConnections.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.InspectionSortNgFeedbackChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSetupCamera}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsInspectionSortCameraValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionCameraOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.InspectionSortCameraId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSortPassConveyor}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsInspectionSortPassConveyorValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionConveyorOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.InspectionSortPassConveyorId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSortNgConveyor}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsInspectionSortNgConveyorValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionConveyorOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.InspectionSortNgConveyorId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSortPassFeedback}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsInspectionSortPassFeedbackValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.InspectionSortPassFeedbackChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.InspectionSortNgFeedback}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsInspectionSortNgFeedbackValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.InspectionSortNgFeedbackChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
                             </WrapPanel>
-                            <TextBlock Margin="0,2,0,0" Text="{Binding RecipeConnections.InspectionSortRouterSetupValidationText}" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Style.Triggers><DataTrigger Binding="{Binding RecipeConnections.HasInspectionSortRouterSetupValidationError}" Value="True"><Setter Property="Foreground" Value="{DynamicResource State.Fault}" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                            <TextBlock Margin="0,2,0,0" Text="{Binding RecipeConnections.SemanticSetups.InspectionSortRouterSetupValidationText}" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Style.Triggers><DataTrigger Binding="{Binding RecipeConnections.SemanticSetups.HasInspectionSortRouterSetupValidationError}" Value="True"><Setter Property="Foreground" Value="{DynamicResource State.Fault}" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
                         </StackPanel>
                     </Border>
 
@@ -1268,19 +962,19 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Visibility="{Binding RecipeConnections.IsOhtHandoffSetupVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding RecipeConnections.SemanticSetups.IsOhtHandoffSetupVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
-                            <DockPanel LastChildFill="True"><StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="10,0,0,0"><Button x:Name="ApplyOhtSetupButton" Command="{Binding RecipeConnections.ApplyOhtHandoffSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupApply}" Style="{StaticResource PrimaryCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupApply}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.CancelOhtHandoffSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupClose}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupClose}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.ResetOhtHandoffSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupReset}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupReset}" /></Button></StackPanel><StackPanel><TextBlock FontWeight="SemiBold" Text="{loc:Loc Key=Connections.OhtSetupTitle}" /><TextBlock Margin="0,2,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Connections.SemanticSetupHint}" TextWrapping="Wrap" /></StackPanel></DockPanel>
+                            <DockPanel LastChildFill="True"><StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="10,0,0,0"><Button x:Name="ApplyOhtSetupButton" Command="{Binding RecipeConnections.SemanticSetups.ApplyOhtHandoffSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupApply}" Style="{StaticResource PrimaryCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupApply}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.SemanticSetups.CancelOhtHandoffSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupClose}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupClose}" /></Button><Button Margin="6,0,0,0" Command="{Binding RecipeConnections.SemanticSetups.ResetOhtHandoffSetupCommand}" AutomationProperties.Name="{loc:Loc Key=Connections.SemanticSetupReset}" Style="{StaticResource QuietCommandButtonStyle}"><TextBlock Text="{loc:Loc Key=Connections.SemanticSetupReset}" /></Button></StackPanel><StackPanel><TextBlock FontWeight="SemiBold" Text="{loc:Loc Key=Connections.OhtSetupTitle}" /><TextBlock Margin="0,2,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Connections.SemanticSetupHint}" TextWrapping="Wrap" /></StackPanel></DockPanel>
                             <WrapPanel Margin="0,8,0,0">
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.OhtTransportConveyor}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsOhtTransportConveyorValid}" ItemsSource="{Binding RecipeConnections.InspectionConveyorOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.OhtTransportConveyorId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.OhtSetupRouteAvailable}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsOhtRouteAvailableValid}" ItemsSource="{Binding RecipeConnections.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.OhtRouteAvailableChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.OhtSetupVehicleDocked}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsOhtVehicleDockedValid}" ItemsSource="{Binding RecipeConnections.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.OhtVehicleDockedChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.OhtSetupLoadPortReady}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsOhtLoadPortReadyValid}" ItemsSource="{Binding RecipeConnections.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.OhtLoadPortReadyChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.OhtCarrierReceived}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsOhtCarrierReceivedValid}" ItemsSource="{Binding RecipeConnections.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.OhtCarrierReceivedChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.OhtHandoffReady}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsOhtHandoffReadyValid}" ItemsSource="{Binding RecipeConnections.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.OhtHandoffReadyChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
-                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.OhtCarrierTransferred}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.IsOhtCarrierTransferredValid}" ItemsSource="{Binding RecipeConnections.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.OhtCarrierTransferredChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.OhtTransportConveyor}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsOhtTransportConveyorValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionConveyorOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.OhtTransportConveyorId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.OhtSetupRouteAvailable}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsOhtRouteAvailableValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.OhtRouteAvailableChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.OhtSetupVehicleDocked}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsOhtVehicleDockedValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.OhtVehicleDockedChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.OhtSetupLoadPortReady}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsOhtLoadPortReadyValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.OhtLoadPortReadyChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.OhtCarrierReceived}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsOhtCarrierReceivedValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.OhtCarrierReceivedChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.OhtHandoffReady}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsOhtHandoffReadyValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.OhtHandoffReadyChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
+                                <StackPanel Style="{StaticResource LoadLockSetupFieldStyle}"><TextBlock FontSize="11" Text="{loc:Loc Key=Connections.OhtCarrierTransferred}" /><ComboBox Margin="0,3,0,0" Tag="{Binding RecipeConnections.SemanticSetups.IsOhtCarrierTransferredValid}" ItemsSource="{Binding RecipeConnections.SemanticSetups.InspectionInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding RecipeConnections.SemanticSetups.OhtCarrierTransferredChannelId, Mode=TwoWay}" Style="{StaticResource LoadLockSetupComboBoxStyle}" /></StackPanel>
                             </WrapPanel>
-                            <TextBlock Margin="0,2,0,0" Text="{Binding RecipeConnections.OhtHandoffSetupValidationText}" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Style.Triggers><DataTrigger Binding="{Binding RecipeConnections.HasOhtHandoffSetupValidationError}" Value="True"><Setter Property="Foreground" Value="{DynamicResource State.Fault}" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                            <TextBlock Margin="0,2,0,0" Text="{Binding RecipeConnections.SemanticSetups.OhtHandoffSetupValidationText}" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Style.Triggers><DataTrigger Binding="{Binding RecipeConnections.SemanticSetups.HasOhtHandoffSetupValidationError}" Value="True"><Setter Property="Foreground" Value="{DynamicResource State.Fault}" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
                         </StackPanel>
                     </Border>
 
@@ -1292,22 +986,22 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Visibility="{Binding RecipeConnections.IsCheckpointTemplatePreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding RecipeConnections.CheckpointTemplate.IsPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
                             <DockPanel LastChildFill="True">
                                 <StackPanel DockPanel.Dock="Right"
                                             Margin="10,0,0,0"
                                             Orientation="Horizontal">
                                     <Button x:Name="ApplyRecipeCheckpointTemplateButton"
-                                            Command="{Binding RecipeConnections.ApplyCheckpointTemplateCommand}"
+                                            Command="{Binding RecipeConnections.CheckpointTemplate.ApplyCommand}"
                                             AutomationProperties.Name="{loc:Loc Key=Connections.CheckpointTemplateApply}"
                                             Style="{StaticResource PrimaryCommandButtonStyle}"
                                             ToolTip="{loc:Loc Key=Connections.CheckpointTemplateApplyTooltip}">
-                                        <TextBlock Text="{Binding RecipeConnections.CheckpointTemplateApplyText}" />
+                                        <TextBlock Text="{Binding RecipeConnections.CheckpointTemplate.ApplyText}" />
                                     </Button>
                                     <Button x:Name="CancelRecipeCheckpointTemplateButton"
                                             Margin="6,0,0,0"
-                                            Command="{Binding RecipeConnections.CancelCheckpointTemplateCommand}"
+                                            Command="{Binding RecipeConnections.CheckpointTemplate.CancelCommand}"
                                             AutomationProperties.Name="{loc:Loc Key=Connections.CheckpointTemplateClose}"
                                             Style="{StaticResource QuietCommandButtonStyle}"
                                             ToolTip="{loc:Loc Key=Connections.CheckpointTemplateCloseTooltip}">
@@ -1319,7 +1013,7 @@
                                                Text="{loc:Loc Key=Connections.CheckpointTemplateTitle}" />
                                     <TextBlock Margin="0,2,0,0"
                                                Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{Binding RecipeConnections.CheckpointTemplateSummaryText}" />
+                                               Text="{Binding RecipeConnections.CheckpointTemplate.SummaryText}" />
                                 </StackPanel>
                             </DockPanel>
                             <TextBlock Margin="0,5,0,0"
@@ -1327,7 +1021,7 @@
                                        Text="{loc:Loc Key=Connections.CheckpointTemplateHint}"
                                        TextWrapping="Wrap" />
                             <ItemsControl Margin="0,7,0,0"
-                                          ItemsSource="{Binding RecipeConnections.CheckpointTemplateItems}">
+                                          ItemsSource="{Binding RecipeConnections.CheckpointTemplate.Items}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <WrapPanel />
@@ -1383,21 +1077,21 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Visibility="{Binding RecipeConnections.HasRecipeDryRunResult, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding RecipeConnections.DryRun.HasRecipeDryRunResult, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
                             <DockPanel LastChildFill="True">
                                 <TextBlock DockPanel.Dock="Left"
                                            Margin="0,0,10,0"
                                            FontWeight="SemiBold"
-                                           Text="{Binding RecipeConnections.RecipeDryRunStatusText}">
+                                            Text="{Binding RecipeConnections.DryRun.RecipeDryRunStatusText}">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding RecipeConnections.RecipeDryRunPassed}" Value="True">
+                                                <DataTrigger Binding="{Binding RecipeConnections.DryRun.RecipeDryRunPassed}" Value="True">
                                                     <Setter Property="Foreground" Value="{DynamicResource State.Running}" />
                                                 </DataTrigger>
-                                                <DataTrigger Binding="{Binding RecipeConnections.RecipeDryRunWarning}" Value="True">
+                                                <DataTrigger Binding="{Binding RecipeConnections.DryRun.RecipeDryRunWarning}" Value="True">
                                                     <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -1405,7 +1099,7 @@
                                     </TextBlock.Style>
                                 </TextBlock>
                                 <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                           Text="{Binding RecipeConnections.RecipeDryRunDetailText}"
+                                           Text="{Binding RecipeConnections.DryRun.RecipeDryRunDetailText}"
                                            TextWrapping="Wrap" />
                             </DockPanel>
 
@@ -1413,13 +1107,13 @@
                                     Padding="7,4"
                                     Background="{DynamicResource Surface.Raised}"
                                     CornerRadius="4">
-                                <TextBlock Text="{Binding RecipeConnections.RecipeDryRunIssueText}"
+                                <TextBlock Text="{Binding RecipeConnections.DryRun.RecipeDryRunIssueText}"
                                            TextWrapping="Wrap">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Foreground" Value="{DynamicResource State.Running}" />
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding RecipeConnections.HasRecipeDryRunIssue}" Value="True">
+                                                <DataTrigger Binding="{Binding RecipeConnections.DryRun.HasRecipeDryRunIssue}" Value="True">
                                                     <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -1433,7 +1127,7 @@
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource Text.Secondary}"
                                        Text="{loc:Loc Key=Connections.DryRunFinalStates}" />
-                            <ItemsControl ItemsSource="{Binding RecipeConnections.RecipeDryRunFinalStates}">
+                            <ItemsControl ItemsSource="{Binding RecipeConnections.DryRun.FinalStates}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <WrapPanel />
@@ -1512,8 +1206,8 @@
                                        Foreground="{DynamicResource Text.Secondary}"
                                        Text="{loc:Loc Key=Connections.DryRunTimeline}" />
                             <ListBox x:Name="RecipeDryRunTimelineListBox"
-                                     ItemsSource="{Binding RecipeConnections.RecipeDryRunTimeline}"
-                                     SelectedItem="{Binding RecipeConnections.SelectedRecipeDryRunStep, Mode=TwoWay}"
+                                     ItemsSource="{Binding RecipeConnections.DryRun.Timeline}"
+                                     SelectedItem="{Binding RecipeConnections.DryRun.SelectedRecipeDryRunStep, Mode=TwoWay}"
                                      Background="Transparent"
                                      BorderThickness="0"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -1561,7 +1255,7 @@
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal">
-                                            <Button Command="{Binding DataContext.RecipeConnections.OpenRecipeDryRunStepCommand, RelativeSource={RelativeSource AncestorType={x:Type ListBox}}}"
+                                            <Button Command="{Binding DataContext.RecipeConnections.DryRun.OpenRecipeDryRunStepCommand, RelativeSource={RelativeSource AncestorType={x:Type ListBox}}}"
                                                     CommandParameter="{Binding}"
                                                     AutomationProperties.Name="{Binding Name}"
                                                     Style="{StaticResource QuietCommandButtonStyle}"
@@ -1595,7 +1289,7 @@
                                                     Margin="2,0,0,0"
                                                     Padding="0"
                                                     AutomationProperties.Name="{loc:Loc Key=Connections.DryRunPlaybackOpen}"
-                                                    Command="{Binding DataContext.RecipeConnections.PlayRecipeDryRunStepCommand, RelativeSource={RelativeSource AncestorType={x:Type ListBox}}}"
+                                                     Command="{Binding DataContext.RecipeConnections.DryRun.PlayRecipeDryRunStepCommand, RelativeSource={RelativeSource AncestorType={x:Type ListBox}}}"
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource QuietCommandButtonStyle}"
                                                     ToolTip="{loc:Loc Key=Connections.DryRunPlaybackOpenTooltip}">
@@ -1608,7 +1302,8 @@
                         </StackPanel>
                     </Border>
                 </Grid>
-            </Border>
+                </Border>
+            </ScrollViewer>
 
             <ListBox x:Name="ConnectionRowsListBox"
                      Grid.Row="2"
@@ -1734,7 +1429,7 @@
                                     </Button>
                                     <Button x:Name="PreviewConnectionSequenceStepButton"
                                             Margin="0,0,6,0"
-                                            Command="{Binding DataContext.RecipeConnections.PreviewSequenceStepCommand, RelativeSource={RelativeSource AncestorType={x:Type ListBox}}}"
+                                            Command="{Binding DataContext.RecipeConnections.SequenceStepPreview.PreviewSequenceStepCommand, RelativeSource={RelativeSource AncestorType={x:Type ListBox}}}"
                                             CommandParameter="{Binding}"
                                             AutomationProperties.Name="{loc:Loc Key=Connections.PreviewStep}"
                                             ToolTip="{loc:Loc Key=Connections.PreviewStepTooltip}">

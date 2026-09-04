@@ -51,8 +51,7 @@ public sealed class MachineLayoutViewModel : ViewModelBase
     private bool _isEditable = true;
     private bool _isUpdatingSelection;
     private bool _isUpdatingDefinition;
-    private IReadOnlyDictionary<LayoutItem, (double X, double Y)>? _dragStartPositions;
-    private LayoutTransformStart? _transformStart;
+    private readonly LayoutSelectionEditingWorkflow _selectionEditingWorkflow = new();
 
     public ObservableCollection<LayoutItem> Items => _items;
     public IReadOnlyList<ComponentLibraryItem> LibraryItems { get; private set; } = CreateLibraryItems();
@@ -226,67 +225,20 @@ public sealed class MachineLayoutViewModel : ViewModelBase
         SetSelection(selected, primary);
     }
 
-    public bool BeginSelectionDrag()
-    {
-        if (!IsEditable || _dragStartPositions is not null || _transformStart is not null)
-        {
-            return false;
-        }
+    public bool BeginSelectionDrag() =>
+        _selectionEditingWorkflow.BeginSelectionDrag(SelectedItems, IsEditable);
 
-        var selected = SelectedItems.Where(item => item.Component is not null).ToArray();
-        if (selected.Length == 0)
-        {
-            return false;
-        }
-
-        _dragStartPositions = selected.ToDictionary(item => item, item => (item.CurrentX, item.CurrentY));
-        return true;
-    }
-
-    public bool UpdateSelectionDrag(double deltaX, double deltaY)
-    {
-        if (_dragStartPositions is null || _dragStartPositions.Count == 0)
-        {
-            return false;
-        }
-
-        var primary = SelectedItem is not null && _dragStartPositions.ContainsKey(SelectedItem)
-            ? SelectedItem
-            : _dragStartPositions.Keys.First();
-        var primaryStart = _dragStartPositions[primary];
-        var appliedX = Definition?.SnapToGrid == false
-            ? deltaX
-            : SnapCoordinate(primaryStart.X + deltaX) - primaryStart.X;
-        var appliedY = Definition?.SnapToGrid == false
-            ? deltaY
-            : SnapCoordinate(primaryStart.Y + deltaY) - primaryStart.Y;
-
-        _isUpdatingDefinition = true;
-        try
-        {
-            foreach (var (item, start) in _dragStartPositions)
-            {
-                item.SetCurrentX(start.X + appliedX, snapToGrid: false);
-                item.SetCurrentY(start.Y + appliedY, snapToGrid: false);
-            }
-        }
-        finally
-        {
-            _isUpdatingDefinition = false;
-        }
-        return true;
-    }
+    public bool UpdateSelectionDrag(double deltaX, double deltaY) =>
+        ApplyDefinitionUpdate(() => _selectionEditingWorkflow.UpdateSelectionDrag(
+            deltaX,
+            deltaY,
+            SelectedItem,
+            Definition?.SnapToGrid != false,
+            GridSize));
 
     public bool CompleteSelectionDrag()
     {
-        if (_dragStartPositions is null)
-        {
-            return false;
-        }
-
-        var changed = _dragStartPositions.Any(entry =>
-            entry.Key.CurrentX != entry.Value.X || entry.Key.CurrentY != entry.Value.Y);
-        _dragStartPositions = null;
+        var changed = _selectionEditingWorkflow.CompleteSelectionDrag();
         if (changed)
         {
             DefinitionChanged?.Invoke(this, EventArgs.Empty);
@@ -294,263 +246,26 @@ public sealed class MachineLayoutViewModel : ViewModelBase
         return changed;
     }
 
-    public void CancelSelectionDrag()
-    {
-        if (_dragStartPositions is null)
-        {
-            return;
-        }
+    public void CancelSelectionDrag() =>
+        ApplyDefinitionUpdate(_selectionEditingWorkflow.CancelSelectionDrag);
 
-        _isUpdatingDefinition = true;
-        try
-        {
-            foreach (var (item, start) in _dragStartPositions)
-            {
-                item.SetCurrentX(start.X, snapToGrid: false);
-                item.SetCurrentY(start.Y, snapToGrid: false);
-            }
-        }
-        finally
-        {
-            _isUpdatingDefinition = false;
-            _dragStartPositions = null;
-        }
-    }
-
-    public bool BeginSelectionTransform(LayoutTransformHandle handle)
-    {
-        if (!IsEditable || _dragStartPositions is not null || _transformStart is not null)
-        {
-            return false;
-        }
-
-        var selected = SelectedItems.Where(item => item.Component is not null).ToArray();
-        if (selected.Length == 0)
-        {
-            return false;
-        }
-
-        var items = selected.Select(item => new LayoutTransformItemStart(
-            item,
-            item.CurrentX,
-            item.CurrentY,
-            item.CurrentWidth,
-            item.CurrentHeight,
-            item.CurrentRotationDegrees)).ToArray();
-        var bounds = GetTransformBounds(items);
-        _transformStart = new LayoutTransformStart(
-            items,
-            bounds.X,
-            bounds.Y,
-            bounds.Width,
-            bounds.Height,
-            handle);
-        return true;
-    }
+    public bool BeginSelectionTransform(LayoutTransformHandle handle) =>
+        _selectionEditingWorkflow.BeginSelectionTransform(SelectedItems, handle, IsEditable);
 
     public bool UpdateSelectionTransform(
         double pointerX,
         double pointerY,
-        bool preserveAspectRatio = false)
-    {
-        if (_transformStart is not { } start ||
-            !double.IsFinite(pointerX) ||
-            !double.IsFinite(pointerY))
-        {
-            return false;
-        }
-
-        if (start.Items.Count == 1)
-        {
-            return UpdateSingleSelectionTransform(start, pointerX, pointerY, preserveAspectRatio);
-        }
-
-        return start.Handle == LayoutTransformHandle.Rotation
-            ? UpdateGroupRotation(start, pointerX, pointerY)
-            : UpdateGroupResize(start, pointerX, pointerY, preserveAspectRatio);
-    }
-
-    private bool UpdateSingleSelectionTransform(
-        LayoutTransformStart start,
-        double pointerX,
-        double pointerY,
-        bool preserveAspectRatio)
-    {
-        var item = start.Items[0];
-        if (start.Handle == LayoutTransformHandle.Rotation)
-        {
-            var deltaX = pointerX - item.X;
-            var deltaY = pointerY - item.Y;
-            if (Math.Abs(deltaX) < 0.000001d && Math.Abs(deltaY) < 0.000001d)
-            {
-                return false;
-            }
-
-            SetTransformValues(
-                item.Item,
-                item.X,
-                item.Y,
-                item.Width,
-                item.Height,
-                NormalizeRotation((Math.Atan2(deltaY, deltaX) * 180d / Math.PI) + 90d));
-            return true;
-        }
-
-        var (signX, signY) = GetResizeSigns(start.Handle);
-        var radians = item.RotationDegrees * Math.PI / 180d;
-        var axisXX = Math.Cos(radians);
-        var axisXY = Math.Sin(radians);
-        var axisYX = -axisXY;
-        var axisYY = axisXX;
-        var fixedX = item.X - (signX * item.Width * axisXX / 2d) -
-            (signY * item.Height * axisYX / 2d);
-        var fixedY = item.Y - (signX * item.Width * axisXY / 2d) -
-            (signY * item.Height * axisYY / 2d);
-        var pointerDeltaX = pointerX - fixedX;
-        var pointerDeltaY = pointerY - fixedY;
-        var width = signX * ((pointerDeltaX * axisXX) + (pointerDeltaY * axisXY));
-        var height = signY * ((pointerDeltaX * axisYX) + (pointerDeltaY * axisYY));
-        var minimumSize = Definition?.SnapToGrid == false ? 1d : GridSize;
-        if (preserveAspectRatio)
-        {
-            (width, height) = ConstrainAspectRatio(
-                width,
-                height,
-                item.Width,
-                item.Height,
-                Math.Max(minimumSize / item.Width, minimumSize / item.Height));
-        }
-        else if (Definition?.SnapToGrid != false)
-        {
-            width = SnapCoordinate(width);
-            height = SnapCoordinate(height);
-        }
-        width = Math.Max(minimumSize, width);
-        height = Math.Max(minimumSize, height);
-
-        SetTransformValues(
-            item.Item,
-            fixedX + (signX * width * axisXX / 2d) + (signY * height * axisYX / 2d),
-            fixedY + (signX * width * axisXY / 2d) + (signY * height * axisYY / 2d),
-            width,
-            height,
-            item.RotationDegrees);
-        return true;
-    }
-
-    private bool UpdateGroupResize(
-        LayoutTransformStart start,
-        double pointerX,
-        double pointerY,
-        bool preserveAspectRatio)
-    {
-        var (signX, signY) = GetResizeSigns(start.Handle);
-        var fixedX = start.X - (signX * start.Width / 2d);
-        var fixedY = start.Y - (signY * start.Height / 2d);
-        var width = signX * (pointerX - fixedX);
-        var height = signY * (pointerY - fixedY);
-        var minimumSize = Definition?.SnapToGrid == false ? 1d : GridSize;
-        var minimumWidth = start.Width * start.Items.Max(item => minimumSize / item.Width);
-        var minimumHeight = start.Height * start.Items.Max(item => minimumSize / item.Height);
-        if (preserveAspectRatio)
-        {
-            (width, height) = ConstrainAspectRatio(
-                width,
-                height,
-                start.Width,
-                start.Height,
-                Math.Max(minimumWidth / start.Width, minimumHeight / start.Height));
-        }
-        else
-        {
-            if (Definition?.SnapToGrid != false)
-            {
-                width = SnapCoordinate(width);
-                height = SnapCoordinate(height);
-            }
-            width = Math.Max(minimumWidth, width);
-            height = Math.Max(minimumHeight, height);
-        }
-        var scaleX = width / start.Width;
-        var scaleY = height / start.Height;
-
-        SetTransformValues(start.Items.Select(item => new LayoutTransformValue(
-            item.Item,
-            fixedX + ((item.X - fixedX) * scaleX),
-            fixedY + ((item.Y - fixedY) * scaleY),
-            item.Width * scaleX,
-            item.Height * scaleY,
-            item.RotationDegrees)));
-        return true;
-    }
-
-    private (double Width, double Height) ConstrainAspectRatio(
-        double candidateWidth,
-        double candidateHeight,
-        double initialWidth,
-        double initialHeight,
-        double minimumScale)
-    {
-        var scaleX = Math.Max(minimumScale, candidateWidth / initialWidth);
-        var scaleY = Math.Max(minimumScale, candidateHeight / initialHeight);
-        var useWidth = Math.Abs(scaleX - 1d) >= Math.Abs(scaleY - 1d);
-        var scale = useWidth ? scaleX : scaleY;
-        if (Definition?.SnapToGrid != false)
-        {
-            var initialPrimarySize = useWidth ? initialWidth : initialHeight;
-            scale = Math.Max(
-                minimumScale,
-                SnapCoordinate(initialPrimarySize * scale) / initialPrimarySize);
-        }
-        return (initialWidth * scale, initialHeight * scale);
-    }
-
-    private bool UpdateGroupRotation(
-        LayoutTransformStart start,
-        double pointerX,
-        double pointerY)
-    {
-        var deltaX = pointerX - start.X;
-        var deltaY = pointerY - start.Y;
-        if (Math.Abs(deltaX) < 0.000001d && Math.Abs(deltaY) < 0.000001d)
-        {
-            return false;
-        }
-
-        var rotation = NormalizeRotation(
-            (Math.Atan2(deltaY, deltaX) * 180d / Math.PI) + 90d);
-        var radians = rotation * Math.PI / 180d;
-        var cosine = Math.Cos(radians);
-        var sine = Math.Sin(radians);
-        SetTransformValues(start.Items.Select(item =>
-        {
-            var x = item.X - start.X;
-            var y = item.Y - start.Y;
-            return new LayoutTransformValue(
-                item.Item,
-                start.X + (x * cosine) - (y * sine),
-                start.Y + (x * sine) + (y * cosine),
-                item.Width,
-                item.Height,
-                NormalizeRotation(item.RotationDegrees + rotation));
-        }));
-        return true;
-    }
+        bool preserveAspectRatio = false) =>
+        ApplyDefinitionUpdate(() => _selectionEditingWorkflow.UpdateSelectionTransform(
+            pointerX,
+            pointerY,
+            Definition?.SnapToGrid != false,
+            GridSize,
+            preserveAspectRatio));
 
     public bool CompleteSelectionTransform()
     {
-        if (_transformStart is not { } start)
-        {
-            return false;
-        }
-
-        var changed = start.Items.Any(item =>
-            item.Item.CurrentX != item.X ||
-            item.Item.CurrentY != item.Y ||
-            item.Item.CurrentWidth != item.Width ||
-            item.Item.CurrentHeight != item.Height ||
-            item.Item.CurrentRotationDegrees != item.RotationDegrees);
-        _transformStart = null;
+        var changed = _selectionEditingWorkflow.CompleteSelectionTransform();
         if (changed)
         {
             DefinitionChanged?.Invoke(this, EventArgs.Empty);
@@ -558,91 +273,29 @@ public sealed class MachineLayoutViewModel : ViewModelBase
         return changed;
     }
 
-    public void CancelSelectionTransform()
-    {
-        if (_transformStart is not { } start)
-        {
-            return;
-        }
-
-        SetTransformValues(start.Items.Select(item => new LayoutTransformValue(
-            item.Item,
-            item.X,
-            item.Y,
-            item.Width,
-            item.Height,
-            item.RotationDegrees)));
-        _transformStart = null;
-    }
+    public void CancelSelectionTransform() =>
+        ApplyDefinitionUpdate(_selectionEditingWorkflow.CancelSelectionTransform);
 
     public bool NudgeSelection(string direction)
     {
-        var step = Definition?.SnapToGrid == false ? 1d : GridSize;
-        return direction switch
+        var changed = ApplyDefinitionUpdate(() => _selectionEditingWorkflow.NudgeSelection(
+            SelectedItems,
+            direction,
+            Definition?.SnapToGrid != false,
+            GridSize));
+        if (changed)
         {
-            "Left" => MoveSelection(-step, 0),
-            "Right" => MoveSelection(step, 0),
-            "Up" => MoveSelection(0, -step),
-            "Down" => MoveSelection(0, step),
-            _ => false
-        };
+            DefinitionChanged?.Invoke(this, EventArgs.Empty);
+        }
+        return changed;
     }
 
     public bool AlignSelection(LayoutSelectionAlignment alignment)
     {
-        var selected = SelectedItems.Where(item => item.Component is not null).ToArray();
-        if (selected.Length < 2 || SelectedItem is not { Component: not null } primary)
-        {
-            return false;
-        }
-
-        var (primaryHalfWidth, primaryHalfHeight) = GetRotatedHalfExtents(primary);
-        var anchor = alignment switch
-        {
-            LayoutSelectionAlignment.Left => primary.CurrentX - primaryHalfWidth,
-            LayoutSelectionAlignment.HorizontalCenter => primary.CurrentX,
-            LayoutSelectionAlignment.Right => primary.CurrentX + primaryHalfWidth,
-            LayoutSelectionAlignment.Top => primary.CurrentY - primaryHalfHeight,
-            LayoutSelectionAlignment.VerticalCenter => primary.CurrentY,
-            LayoutSelectionAlignment.Bottom => primary.CurrentY + primaryHalfHeight,
-            _ => throw new ArgumentOutOfRangeException(nameof(alignment), alignment, null)
-        };
-
-        var changed = false;
-        _isUpdatingDefinition = true;
-        try
-        {
-            foreach (var item in selected)
-            {
-                var (halfWidth, halfHeight) = GetRotatedHalfExtents(item);
-                switch (alignment)
-                {
-                    case LayoutSelectionAlignment.Left:
-                        changed |= SetX(item, anchor + halfWidth);
-                        break;
-                    case LayoutSelectionAlignment.HorizontalCenter:
-                        changed |= SetX(item, anchor);
-                        break;
-                    case LayoutSelectionAlignment.Right:
-                        changed |= SetX(item, anchor - halfWidth);
-                        break;
-                    case LayoutSelectionAlignment.Top:
-                        changed |= SetY(item, anchor + halfHeight);
-                        break;
-                    case LayoutSelectionAlignment.VerticalCenter:
-                        changed |= SetY(item, anchor);
-                        break;
-                    case LayoutSelectionAlignment.Bottom:
-                        changed |= SetY(item, anchor - halfHeight);
-                        break;
-                }
-            }
-        }
-        finally
-        {
-            _isUpdatingDefinition = false;
-        }
-
+        var changed = ApplyDefinitionUpdate(() => _selectionEditingWorkflow.AlignSelection(
+            SelectedItems,
+            SelectedItem,
+            alignment));
         if (changed)
         {
             DefinitionChanged?.Invoke(this, EventArgs.Empty);
@@ -650,77 +303,20 @@ public sealed class MachineLayoutViewModel : ViewModelBase
         return changed;
     }
 
-    public bool CanChangeSelectionLayerOrder(LayoutLayerOrder order)
-    {
-        var (items, selected) = GetLayerOrderState();
-        if (selected.Count == 0 || selected.Count == items.Count)
-        {
-            return false;
-        }
-
-        return order switch
-        {
-            LayoutLayerOrder.SendToBack or LayoutLayerOrder.SendBackward =>
-                items.TakeWhile(selected.Contains).Count() != selected.Count,
-            LayoutLayerOrder.BringForward or LayoutLayerOrder.BringToFront =>
-                items.AsEnumerable().Reverse().TakeWhile(selected.Contains).Count() != selected.Count,
-            _ => false
-        };
-    }
+    public bool CanChangeSelectionLayerOrder(LayoutLayerOrder order) =>
+        _selectionEditingWorkflow.CanChangeSelectionLayerOrder(Items, SelectedItems, order);
 
     public bool ChangeSelectionLayerOrder(LayoutLayerOrder order)
     {
-        if (!CanChangeSelectionLayerOrder(order))
+        var changed = ApplyDefinitionUpdate(() => _selectionEditingWorkflow.ChangeSelectionLayerOrder(
+            Items,
+            SelectedItems,
+            order));
+        if (changed)
         {
-            return false;
+            DefinitionChanged?.Invoke(this, EventArgs.Empty);
         }
-
-        var (items, selected) = GetLayerOrderState();
-        switch (order)
-        {
-            case LayoutLayerOrder.SendToBack:
-                items = items.Where(selected.Contains).Concat(items.Where(item => !selected.Contains(item))).ToList();
-                break;
-            case LayoutLayerOrder.BringToFront:
-                items = items.Where(item => !selected.Contains(item)).Concat(items.Where(selected.Contains)).ToList();
-                break;
-            case LayoutLayerOrder.SendBackward:
-                for (var index = 1; index < items.Count; index++)
-                {
-                    if (selected.Contains(items[index]) && !selected.Contains(items[index - 1]))
-                    {
-                        (items[index - 1], items[index]) = (items[index], items[index - 1]);
-                    }
-                }
-                break;
-            case LayoutLayerOrder.BringForward:
-                for (var index = items.Count - 2; index >= 0; index--)
-                {
-                    if (selected.Contains(items[index]) && !selected.Contains(items[index + 1]))
-                    {
-                        (items[index], items[index + 1]) = (items[index + 1], items[index]);
-                    }
-                }
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(order), order, null);
-        }
-
-        _isUpdatingDefinition = true;
-        try
-        {
-            for (var index = 0; index < items.Count; index++)
-            {
-                items[index].SetZIndex(index);
-            }
-        }
-        finally
-        {
-            _isUpdatingDefinition = false;
-        }
-
-        DefinitionChanged?.Invoke(this, EventArgs.Empty);
-        return true;
+        return changed;
     }
 
     public void RefreshLocalization()
@@ -840,61 +436,12 @@ public sealed class MachineLayoutViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectionSummaryText));
     }
 
-    private bool MoveSelection(double deltaX, double deltaY)
-    {
-        var selected = SelectedItems.Where(item => item.Component is not null).ToArray();
-        if (selected.Length == 0)
-        {
-            return false;
-        }
-
-        _isUpdatingDefinition = true;
-        try
-        {
-            foreach (var item in selected)
-            {
-                item.SetCurrentX(item.CurrentX + deltaX, snapToGrid: false);
-                item.SetCurrentY(item.CurrentY + deltaY, snapToGrid: false);
-            }
-        }
-        finally
-        {
-            _isUpdatingDefinition = false;
-        }
-
-        DefinitionChanged?.Invoke(this, EventArgs.Empty);
-        return true;
-    }
-
-    private (List<LayoutItem> Items, HashSet<LayoutItem> Selected) GetLayerOrderState()
-    {
-        var items = _items
-            .Where(item => item.Component is not null)
-            .OrderBy(item => item.ZIndex)
-            .ThenBy(item => item.Id, StringComparer.Ordinal)
-            .ToList();
-        return (items, SelectedItems.Where(item => item.Component is not null).ToHashSet());
-    }
-
-    private double SnapCoordinate(double value) =>
-        Math.Round(value / GridSize, MidpointRounding.AwayFromZero) * GridSize;
-
-    private void SetTransformValues(
-        LayoutItem item,
-        double x,
-        double y,
-        double width,
-        double height,
-        double rotationDegrees)
+    private T ApplyDefinitionUpdate<T>(Func<T> update)
     {
         _isUpdatingDefinition = true;
         try
         {
-            item.SetCurrentX(x, snapToGrid: false);
-            item.SetCurrentY(y, snapToGrid: false);
-            item.CurrentWidth = width;
-            item.CurrentHeight = height;
-            item.CurrentRotationDegrees = rotationDegrees;
+            return update();
         }
         finally
         {
@@ -902,100 +449,17 @@ public sealed class MachineLayoutViewModel : ViewModelBase
         }
     }
 
-    private void SetTransformValues(IEnumerable<LayoutTransformValue> values)
+    private void ApplyDefinitionUpdate(Action update)
     {
         _isUpdatingDefinition = true;
         try
         {
-            foreach (var value in values)
-            {
-                value.Item.SetCurrentX(value.X, snapToGrid: false);
-                value.Item.SetCurrentY(value.Y, snapToGrid: false);
-                value.Item.CurrentWidth = value.Width;
-                value.Item.CurrentHeight = value.Height;
-                value.Item.CurrentRotationDegrees = value.RotationDegrees;
-            }
+            update();
         }
         finally
         {
             _isUpdatingDefinition = false;
         }
-    }
-
-    private static (double SignX, double SignY) GetResizeSigns(LayoutTransformHandle handle) => handle switch
-    {
-        LayoutTransformHandle.TopLeft => (-1d, -1d),
-        LayoutTransformHandle.TopRight => (1d, -1d),
-        LayoutTransformHandle.BottomRight => (1d, 1d),
-        LayoutTransformHandle.BottomLeft => (-1d, 1d),
-        _ => throw new ArgumentOutOfRangeException(nameof(handle), handle, null)
-    };
-
-    private static double NormalizeRotation(double degrees)
-    {
-        var normalized = ((degrees % 360d) + 360d) % 360d;
-        return normalized >= 180d ? normalized - 360d : normalized;
-    }
-
-    private static (double HalfWidth, double HalfHeight) GetRotatedHalfExtents(LayoutItem item)
-        => GetRotatedHalfExtents(item.Width, item.Height, item.RotationDegrees);
-
-    private static (double HalfWidth, double HalfHeight) GetRotatedHalfExtents(
-        double width,
-        double height,
-        double rotationDegrees)
-    {
-        var radians = rotationDegrees * Math.PI / 180d;
-        var cosine = Math.Abs(Math.Cos(radians));
-        var sine = Math.Abs(Math.Sin(radians));
-        return (
-            ((width * cosine) + (height * sine)) / 2d,
-            ((width * sine) + (height * cosine)) / 2d);
-    }
-
-    private static (double X, double Y, double Width, double Height) GetTransformBounds(
-        IReadOnlyList<LayoutTransformItemStart> items)
-    {
-        var minimumX = double.PositiveInfinity;
-        var minimumY = double.PositiveInfinity;
-        var maximumX = double.NegativeInfinity;
-        var maximumY = double.NegativeInfinity;
-        foreach (var item in items)
-        {
-            var (halfWidth, halfHeight) = GetRotatedHalfExtents(
-                item.Width,
-                item.Height,
-                item.RotationDegrees);
-            minimumX = Math.Min(minimumX, item.X - halfWidth);
-            minimumY = Math.Min(minimumY, item.Y - halfHeight);
-            maximumX = Math.Max(maximumX, item.X + halfWidth);
-            maximumY = Math.Max(maximumY, item.Y + halfHeight);
-        }
-        return (
-            (minimumX + maximumX) / 2d,
-            (minimumY + maximumY) / 2d,
-            maximumX - minimumX,
-            maximumY - minimumY);
-    }
-
-    private static bool SetX(LayoutItem item, double value)
-    {
-        if (item.CurrentX == value)
-        {
-            return false;
-        }
-        item.SetCurrentX(value, snapToGrid: false);
-        return true;
-    }
-
-    private static bool SetY(LayoutItem item, double value)
-    {
-        if (item.CurrentY == value)
-        {
-            return false;
-        }
-        item.SetCurrentY(value, snapToGrid: false);
-        return true;
     }
 
     private void OnItemDefinitionChanged(object? sender, EventArgs args)
@@ -1024,27 +488,4 @@ public sealed class MachineLayoutViewModel : ViewModelBase
         return project.Layouts.Count == 1 ? project.Layouts[0] : null;
     }
 
-    private sealed record LayoutTransformItemStart(
-        LayoutItem Item,
-        double X,
-        double Y,
-        double Width,
-        double Height,
-        double RotationDegrees);
-
-    private sealed record LayoutTransformStart(
-        IReadOnlyList<LayoutTransformItemStart> Items,
-        double X,
-        double Y,
-        double Width,
-        double Height,
-        LayoutTransformHandle Handle);
-
-    private sealed record LayoutTransformValue(
-        LayoutItem Item,
-        double X,
-        double Y,
-        double Width,
-        double Height,
-        double RotationDegrees);
 }

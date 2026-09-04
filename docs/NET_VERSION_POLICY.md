@@ -6,7 +6,7 @@
 - Language version: C# 12
 - Nullable: enable
 - ImplicitUsings: enable
-- Product version: `0.2.0-dev.4`
+- Product version: `0.2.0-dev.5`
 
 The public repository is currently on the Release 2 development line. This is
 not a release tag or a downloadable release; the release-candidate gates below
@@ -24,8 +24,8 @@ commit build only when the state is `clean` and the recorded commit is a full
 ## Release candidate convention
 
 - Use Semantic Versioning: `MAJOR.MINOR.PATCH[-prerelease]`.
-- Use `-rc.N` for a candidate and remove the suffix only after every required
-  release gate passes.
+- Use `-dev.N` for a development candidate and `-rc.N` for a release candidate;
+  remove the suffix only after every required release gate passes.
 - Name the framework-dependent archive
   `OpenVisionLab.MachineStudio-<version>-windows-framework-dependent.zip`.
 - Name the current self-contained Windows x64 archive

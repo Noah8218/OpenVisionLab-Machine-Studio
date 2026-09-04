@@ -11,7 +11,9 @@ public sealed class SequenceCompilerTests
     public void Compile_InspectionCycle_ProducesFiveTypedStepKinds()
     {
         var compiler = new SequenceCompiler();
-        var result = compiler.Compile(CreateInspectionCycle(), Targets());
+        var definition = CreateInspectionCycle();
+        definition.WatchdogTimeoutMs = 2500;
+        var result = compiler.Compile(definition, Targets());
 
         Assert.True(result.IsSuccess);
         Assert.Collection(
@@ -25,6 +27,24 @@ public sealed class SequenceCompilerTests
         Assert.Equal(
             TimeSpan.FromMilliseconds(2000),
             Assert.IsType<WaitAxisDoneStep>(result.Sequence.Steps[3]).Timeout);
+        Assert.Equal(TimeSpan.FromMilliseconds(2500), result.Sequence.WatchdogTimeout);
+    }
+
+    [Fact]
+    public void Compile_NegativeWatchdogIsRejectedAndZeroMeansUnlimited()
+    {
+        var invalid = CreateInspectionCycle();
+        invalid.WatchdogTimeoutMs = -1;
+        var unlimited = CreateInspectionCycle();
+
+        var invalidResult = new SequenceCompiler().Compile(invalid, Targets());
+        var unlimitedResult = new SequenceCompiler().Compile(unlimited, Targets());
+
+        Assert.Contains(
+            invalidResult.Errors,
+            error => error.Code == SequenceCompilationErrorCode.InvalidWatchdogTimeout);
+        Assert.True(unlimitedResult.IsSuccess);
+        Assert.Equal(TimeSpan.Zero, unlimitedResult.Sequence!.WatchdogTimeout);
     }
 
     [Fact]

@@ -123,7 +123,8 @@ public sealed class DeterministicRecipeDryRunRunner
             sourceRuntime.Cameras,
             automaticRun: null,
             sourceRuntime.Layout,
-            sourceRuntime.PickPlaceWorkpiece);
+            sourceRuntime.PickPlaceWorkpiece,
+            sourceRuntime.TimeScale);
         var steps = definition.Steps.ToDictionary(step => step.Id, StringComparer.Ordinal);
         var timeline = new List<RecipeDryRunStepTrace>();
         RecipeDryRunIssue? firstIssue = null;

@@ -58,6 +58,115 @@ public sealed class AutomaticRunIntegrationTests
     }
 
     [Fact]
+    public async Task AbortAutomaticRun_StopsAutomaticContinuationAndRequiresReset()
+    {
+        using var engine = await CreateEngineAsync();
+        Assert.True((await engine.EnqueueCommandAsync(new ConfigureRuntimeCommand(
+            CreateRuntime(
+                CreateWaitForInputSequence(),
+                new AutomaticRunConfiguration(
+                    "automatic-cycle",
+                    null,
+                    true,
+                    Repeat: true,
+                    RepeatDelayMilliseconds: 5))))).IsAccepted);
+        Assert.True((await engine.EnqueueCommandAsync(
+            new StartAutomaticRunCommand(beginRealTime: false))).IsAccepted);
+
+        var aborted = await engine.EnqueueCommandAsync(
+            new AbortSequenceCommand("automatic-cycle"));
+        var snapshot = engine.CurrentSnapshot;
+
+        Assert.True(aborted.IsAccepted, aborted.Detail);
+        Assert.False(snapshot.AutomaticRun.IsActive);
+        Assert.False(snapshot.AutomaticRun.IsWaitingForRepeat);
+        Assert.Equal(SimulationRunMode.Paused, snapshot.RunMode);
+        Assert.Equal(SequenceExecutionStatus.Aborted, Assert.Single(snapshot.Sequences).Status);
+        var restartWithoutReset = await engine.EnqueueCommandAsync(
+            new StartAutomaticRunCommand(beginRealTime: false));
+        Assert.False(restartWithoutReset.IsAccepted);
+
+        Assert.True((await engine.EnqueueCommandAsync(new ResetCommand())).IsAccepted);
+        Assert.True((await engine.EnqueueCommandAsync(
+            new StartAutomaticRunCommand(beginRealTime: false))).IsAccepted);
+
+        await engine.StopAsync();
+        var events = await ReadAllEventsAsync(engine);
+        Assert.Contains(events, item => item.Code == "AutomaticRunAborted");
+    }
+
+    [Fact]
+    public async Task RetryFaultedAutomaticRun_StaysPausedAndDoesNotResumeRepeat()
+    {
+        var definition = new SequenceDefinition
+        {
+            Id = "automatic-cycle",
+            Name = "Automatic Cycle",
+            WatchdogTimeoutMs = 5,
+            Steps =
+            {
+                new SequenceStepDefinition
+                {
+                    Id = "wait-start",
+                    Name = "Wait Start",
+                    Action = SequenceStepAction.WaitSignal,
+                    TargetId = "di.start",
+                    Parameter = "true",
+                    NextStepId = "complete"
+                },
+                new SequenceStepDefinition
+                {
+                    Id = "complete",
+                    Name = "Complete",
+                    Action = SequenceStepAction.Complete
+                }
+            }
+        };
+        var sequence = Compile(
+            definition,
+            new Dictionary<string, ChannelKind>(StringComparer.Ordinal)
+            {
+                ["di.start"] = ChannelKind.DigitalInput
+            });
+        using var engine = await CreateEngineAsync();
+        Assert.True((await engine.EnqueueCommandAsync(new ConfigureRuntimeCommand(
+            CreateRuntime(
+                sequence,
+                new AutomaticRunConfiguration(
+                    "automatic-cycle",
+                    null,
+                    true,
+                    Repeat: true,
+                    RepeatDelayMilliseconds: 5))))).IsAccepted);
+        Assert.True((await engine.EnqueueCommandAsync(
+            new StartAutomaticRunCommand(beginRealTime: false))).IsAccepted);
+        Assert.True((await engine.EnqueueCommandAsync(new StepCommand())).IsAccepted);
+        Assert.Equal(
+            SequenceExecutionStatus.Faulted,
+            Assert.Single(engine.CurrentSnapshot.Sequences).Status);
+
+        var retried = await engine.EnqueueCommandAsync(
+            new RetrySequenceCommand("automatic-cycle"));
+        var snapshot = engine.CurrentSnapshot;
+
+        Assert.True(retried.IsAccepted, retried.Detail);
+        Assert.Equal(SimulationRunMode.Paused, snapshot.RunMode);
+        Assert.Equal(SequenceExecutionStatus.Running, Assert.Single(snapshot.Sequences).Status);
+        Assert.Equal("wait-start", Assert.Single(snapshot.Sequences).CurrentStepId);
+        Assert.False(snapshot.AutomaticRun.IsActive);
+        Assert.False(snapshot.AutomaticRun.IsWaitingForRepeat);
+        Assert.Equal(TimeSpan.Zero, Assert.Single(snapshot.Sequences).TotalElapsed);
+
+        await Task.Delay(20);
+        Assert.Equal(snapshot.TickIndex, engine.CurrentSnapshot.TickIndex);
+
+        await engine.StopAsync();
+        var events = await ReadAllEventsAsync(engine);
+        Assert.Contains(events, item => item.Code == "SequenceRetried");
+        Assert.DoesNotContain(events, item => item.Code == "AutomaticRunCycleRestarted");
+    }
+
+    [Fact]
     public async Task StartAutomaticRun_StepDrivenModeRemainsPausedUntilOneTickIsRequested()
     {
         using var engine = await CreateEngineAsync();
@@ -165,6 +274,50 @@ public sealed class AutomaticRunIntegrationTests
     }
 
     [Fact]
+    public async Task Repeat_CompletionAtWatchdogBoundaryStartsEachCycleWithFreshBudget()
+    {
+        var definition = new SequenceDefinition
+        {
+            Id = "automatic-cycle",
+            Name = "Automatic Cycle",
+            WatchdogTimeoutMs = 5,
+            Steps =
+            {
+                new SequenceStepDefinition
+                {
+                    Id = "complete",
+                    Name = "Complete",
+                    Action = SequenceStepAction.Complete
+                }
+            }
+        };
+        CompiledSequence sequence = Compile(
+            definition,
+            new Dictionary<string, ChannelKind>(StringComparer.Ordinal));
+        using var engine = await CreateEngineAsync();
+        Assert.True((await engine.EnqueueCommandAsync(new ConfigureRuntimeCommand(
+            CreateRuntime(
+                sequence,
+                new AutomaticRunConfiguration(
+                    "automatic-cycle",
+                    null,
+                    true,
+                    Repeat: true,
+                    RepeatDelayMilliseconds: 5))))).IsAccepted);
+        Assert.True((await engine.EnqueueCommandAsync(
+            new StartAutomaticRunCommand(beginRealTime: false))).IsAccepted);
+
+        await engine.EnqueueCommandAsync(new StepCommand());
+        await engine.EnqueueCommandAsync(new StepCommand());
+        SimulationSnapshot snapshot = engine.CurrentSnapshot;
+
+        Assert.Equal(2, snapshot.AutomaticRun.CompletedCycleCount);
+        Assert.Equal(SequenceExecutionStatus.Completed, Assert.Single(snapshot.Sequences).Status);
+        Assert.Null(Assert.Single(snapshot.Sequences).LastError);
+        Assert.Equal(TimeSpan.FromMilliseconds(5), Assert.Single(snapshot.Sequences).TotalElapsed);
+    }
+
+    [Fact]
     public async Task PauseStepAndReset_ControlAutomaticRunAndClearCycleState()
     {
         using var engine = await CreateEngineAsync();
@@ -206,6 +359,74 @@ public sealed class AutomaticRunIntegrationTests
         Assert.Equal(0, snapshot.AutomaticRun.RemainingDelayTicks);
         Assert.False(Assert.Single(snapshot.Signals, signal => signal.Id == "di.start").Value);
         Assert.Equal(SequenceExecutionStatus.Ready, Assert.Single(snapshot.Sequences).Status);
+    }
+
+    [Fact]
+    [Trait("Category", "Soak")]
+    public async Task HeadlessSoak_TenThousandTicksKeepsDeterministicStateWithinLatestEventLimit()
+    {
+        var first = await RunHeadlessSoakAsync();
+        var second = await RunHeadlessSoakAsync();
+
+        Assert.Equal(first, second);
+        Assert.Equal(10_000, first.TickIndex);
+        Assert.Equal(TimeSpan.FromTicks(FixedStep.Ticks * 10_000), first.SimulationTime);
+        Assert.True(first.CompletedCycleCount >= 1_000);
+        Assert.True(first.IsActive);
+        Assert.Equal(64, first.EventCount);
+        Assert.True(first.FirstEventIndex > 1);
+        Assert.Equal(first.FirstEventIndex + 63, first.LastEventIndex);
+    }
+
+    private static async Task<HeadlessSoakEvidence> RunHeadlessSoakAsync()
+    {
+        using var engine = new FixedStepSimulationEngine(new SimulationSettings
+        {
+            FixedStep = FixedStep,
+            CommandQueueCapacity = 8,
+            EventBufferCapacity = 64
+        });
+        await engine.StartAsync();
+        Assert.True((await engine.EnqueueCommandAsync(new ConfigureRuntimeCommand(
+            CreateRuntime(
+                CreateCompleteSequence(),
+                new AutomaticRunConfiguration(
+                    "automatic-cycle",
+                    null,
+                    true,
+                    Repeat: true,
+                    RepeatDelayMilliseconds: 5))))).IsAccepted);
+        Assert.True((await engine.EnqueueCommandAsync(
+            new StartAutomaticRunCommand(beginRealTime: false))).IsAccepted);
+
+        for (var batch = 0; batch < 100; batch++)
+        {
+            var results = await Task.WhenAll(
+                Enumerable.Range(0, 100)
+                    .Select(_ => engine.EnqueueCommandAsync(new StepCommand())));
+            Assert.All(results, result => Assert.True(result.IsAccepted, result.Detail));
+        }
+
+        var snapshot = engine.CurrentSnapshot;
+        await engine.StopAsync();
+        var events = await ReadAllEventsAsync(engine);
+        Assert.Equal(64, events.Count);
+        for (var index = 1; index < events.Count; index++)
+        {
+            Assert.Equal(events[index - 1].EventIndex + 1, events[index].EventIndex);
+        }
+        Assert.Contains(events, item => item.Code == "AutomaticRunCycleCompleted");
+
+        return new HeadlessSoakEvidence(
+            snapshot.TickIndex,
+            snapshot.SimulationTime,
+            snapshot.AutomaticRun.CompletedCycleCount,
+            snapshot.AutomaticRun.IsActive,
+            snapshot.AutomaticRun.IsWaitingForRepeat,
+            Assert.Single(snapshot.Sequences).Status,
+            events.Count,
+            events[0].EventIndex,
+            events[^1].EventIndex);
     }
 
     private static async Task<RepeatEvidence> RunTwoCyclesAsync()
@@ -360,4 +581,15 @@ public sealed class AutomaticRunIntegrationTests
         bool IsWaitingForRepeat,
         int RemainingDelayTicks,
         IReadOnlyList<(long TickIndex, string Code)> AutomaticEvents);
+
+    private sealed record HeadlessSoakEvidence(
+        long TickIndex,
+        TimeSpan SimulationTime,
+        long CompletedCycleCount,
+        bool IsActive,
+        bool IsWaitingForRepeat,
+        SequenceExecutionStatus SequenceStatus,
+        int EventCount,
+        long FirstEventIndex,
+        long LastEventIndex);
 }

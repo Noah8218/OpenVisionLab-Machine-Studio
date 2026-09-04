@@ -68,7 +68,7 @@ public sealed class ConcreteFaultRepeatComparisonTests
             accepted.Package);
 
         Assert.True(repeated.IsComplete);
-        Assert.True(repeated.IsSuccess);
+        Assert.True(repeated.IsSuccess, repeated.FirstMismatch?.ToString());
         Assert.Equal(2, repeated.CompletedRuns);
         Assert.Null(repeated.FirstMismatch);
         Assert.All(repeated.Runs, run => Assert.True(run.ReferenceComparison.IsMatch));

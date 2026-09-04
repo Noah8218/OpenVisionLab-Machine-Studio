@@ -1,0 +1,331 @@
+<UserControl x:Class="OpenVisionLab.MachineStudio.View.Inspector.AxisCommissioningPanelView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+             xmlns:behavior="clr-namespace:OpenVisionLab.MachineStudio.Behavior"
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
+    <StackPanel x:Name="AxisCommissioningPanel"
+                Margin="0,8,0,0"
+                DataContext="{Binding AxisCommissioning}">
+        <StackPanel.Style>
+            <Style TargetType="StackPanel">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding HasSelectedAxisStage}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </StackPanel.Style>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                       Text="{loc:Loc Key=Axis.HomePosition}" />
+            <TextBlock Grid.Column="1"
+                       Style="{StaticResource TelemetryTextStyle}"
+                       Text="{Binding CurrentAxisHomeText}" />
+            <TextBlock Grid.Row="1"
+                       Margin="0,6,0,0"
+                       Foreground="{DynamicResource Text.Secondary}"
+                       Text="{loc:Loc Key=Axis.SoftLimits}" />
+            <TextBlock Grid.Row="1"
+                       Grid.Column="1"
+                       Margin="8,6,0,0"
+                       Style="{StaticResource TelemetryTextStyle}"
+                       Text="{Binding CurrentAxisLimitsText}" />
+            <TextBlock Grid.Row="2"
+                       Margin="0,6,0,0"
+                       Foreground="{DynamicResource Text.Secondary}"
+                       Text="{loc:Loc Key=Axis.DriveTuning}" />
+            <TextBlock x:Name="AxisDriveTuningText"
+                       Grid.Row="3"
+                       Grid.ColumnSpan="2"
+                       Margin="0,3,0,0"
+                       HorizontalAlignment="Right"
+                       Style="{StaticResource TelemetryTextStyle}"
+                       Text="{Binding CurrentAxisDriveTuningText}"
+                       TextWrapping="Wrap" />
+            <TextBlock Grid.Row="4"
+                       Margin="0,6,0,0"
+                       Foreground="{DynamicResource Text.Secondary}"
+                       Text="{loc:Loc Key=Axis.MotionInterlock}" />
+            <TextBlock x:Name="AxisInterlockStatusText"
+                       Grid.Row="4"
+                       Grid.Column="1"
+                       Margin="8,6,0,0"
+                       HorizontalAlignment="Right"
+                       Text="{Binding CurrentAxisInterlockText}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource TelemetryTextStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCurrentAxisInterlocked}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource State.Fault}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Grid.Row="5"
+                       Margin="0,6,0,0"
+                       Foreground="{DynamicResource Text.Secondary}"
+                       Text="{loc:Loc Key=Axis.FollowingError}" />
+            <TextBlock x:Name="AxisFollowingErrorText"
+                       Grid.Row="5"
+                       Grid.Column="1"
+                       Margin="8,6,0,0"
+                       HorizontalAlignment="Right"
+                       Style="{StaticResource TelemetryTextStyle}"
+                       Text="{Binding CurrentAxisFollowingErrorText}" />
+            <TextBlock Grid.Row="6"
+                       Margin="0,6,0,0"
+                       Foreground="{DynamicResource Text.Secondary}"
+                       Text="{loc:Loc Key=Axis.DriveAlarm}" />
+            <TextBlock x:Name="AxisDriveAlarmStatusText"
+                       Grid.Row="6"
+                       Grid.Column="1"
+                       Margin="8,6,0,0"
+                       HorizontalAlignment="Right"
+                       Text="{Binding CurrentAxisDriveAlarmText}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource TelemetryTextStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCurrentAxisDriveAlarmActive}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource State.Fault}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </Grid>
+        <WrapPanel Margin="0,8,0,0"
+                   HorizontalAlignment="Stretch">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center"
+                           Foreground="{DynamicResource Text.Secondary}"
+                           Text="{loc:Loc Key=Axis.TargetPosition}" />
+                <TextBox x:Name="AxisTargetPositionTextBox"
+                         Margin="8,0,0,0"
+                         MinWidth="58"
+                         Height="{StaticResource Density.InspectorFieldHeight}"
+                         Padding="7,0"
+                         VerticalContentAlignment="Center"
+                         TextAlignment="Right"
+                         Text="{Binding AxisTargetPositionText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="{Binding AxisTargetPositionValidationText}"
+                         AutomationProperties.Name="{loc:Loc Key=Axis.TargetPosition}">
+                <TextBox.Style>
+                    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasAxisTargetPositionError}" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBox.Style>
+                </TextBox>
+                <TextBlock Margin="4,0,0,0"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource Text.Secondary}"
+                           Text="{Binding CurrentAxisUnitText}" />
+            </StackPanel>
+            <Button x:Name="MoveAxisAbsoluteButton"
+                    Margin="4,0,0,0"
+                    MinWidth="46"
+                    Command="{Binding MoveAxisAbsoluteCommand}"
+                    Content="{loc:Loc Key=Axis.Move}"
+                    ToolTip="{loc:Loc Key=Axis.MoveTooltip}"
+                    AutomationProperties.Name="{loc:Loc Key=Axis.Move}" />
+        </WrapPanel>
+        <TextBlock x:Name="AxisTargetValidationText"
+                   Margin="2,4,2,0"
+                   FontSize="10.5"
+                   Foreground="{DynamicResource State.Fault}"
+                   Text="{Binding AxisTargetPositionValidationText}"
+                   TextWrapping="Wrap">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasAxisTargetPositionError}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+        <WrapPanel Margin="0,8,0,0"
+                   HorizontalAlignment="Stretch">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center"
+                           Foreground="{DynamicResource Text.Secondary}"
+                           Text="{loc:Loc Key=Axis.RelativeDistance}" />
+                <TextBox x:Name="AxisRelativeDistanceTextBox"
+                         Margin="8,0,0,0"
+                         MinWidth="58"
+                         Height="{StaticResource Density.InspectorFieldHeight}"
+                         Padding="7,0"
+                         VerticalContentAlignment="Center"
+                         TextAlignment="Right"
+                         Text="{Binding AxisRelativeDistanceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="{Binding AxisRelativeDistanceValidationText}"
+                         AutomationProperties.Name="{loc:Loc Key=Axis.RelativeDistance}">
+                <TextBox.Style>
+                    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasAxisRelativeDistanceError}" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBox.Style>
+                </TextBox>
+                <TextBlock Margin="4,0,0,0"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource Text.Secondary}"
+                           Text="{Binding CurrentAxisUnitText}" />
+            </StackPanel>
+            <Button x:Name="MoveAxisRelativeButton"
+                    Margin="4,0,0,0"
+                    MinWidth="58"
+                    Command="{Binding MoveAxisRelativeCommand}"
+                    Content="{loc:Loc Key=Axis.MoveRelative}"
+                    ToolTip="{loc:Loc Key=Axis.MoveRelativeTooltip}"
+                    AutomationProperties.Name="{loc:Loc Key=Axis.MoveRelative}" />
+        </WrapPanel>
+        <TextBlock x:Name="AxisRelativeDistanceValidationText"
+                   Margin="2,4,2,0"
+                   FontSize="10.5"
+                   Foreground="{DynamicResource State.Fault}"
+                   Text="{Binding AxisRelativeDistanceValidationText}"
+                   TextWrapping="Wrap">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasAxisRelativeDistanceError}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+        <WrapPanel Margin="0,8,0,0"
+                   HorizontalAlignment="Stretch">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center"
+                           Foreground="{DynamicResource Text.Secondary}"
+                           Text="{loc:Loc Key=Axis.CommandVelocity}" />
+                <TextBox x:Name="AxisCommandVelocityTextBox"
+                         Margin="8,0,0,0"
+                         MinWidth="58"
+                         Height="{StaticResource Density.InspectorFieldHeight}"
+                         Padding="7,0"
+                         VerticalContentAlignment="Center"
+                         TextAlignment="Right"
+                         Text="{Binding AxisCommandVelocityText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="{Binding AxisCommandVelocityValidationText}"
+                         AutomationProperties.Name="{loc:Loc Key=Axis.CommandVelocity}">
+                <TextBox.Style>
+                    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasAxisCommandVelocityError}" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBox.Style>
+                </TextBox>
+                <TextBlock Margin="4,0,0,0"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource Text.Secondary}"
+                           Text="{Binding CurrentAxisVelocityUnitText}" />
+            </StackPanel>
+            <Button x:Name="MoveAxisVelocityButton"
+                    Margin="4,0,0,0"
+                    MinWidth="58"
+                    Command="{Binding MoveAxisVelocityCommand}"
+                    Content="{loc:Loc Key=Axis.MoveVelocity}"
+                    ToolTip="{loc:Loc Key=Axis.MoveVelocityTooltip}"
+                    AutomationProperties.Name="{loc:Loc Key=Axis.MoveVelocity}" />
+        </WrapPanel>
+        <TextBlock x:Name="AxisCommandVelocityValidationText"
+                   Margin="2,4,2,0"
+                   FontSize="10.5"
+                   Foreground="{DynamicResource State.Fault}"
+                   Text="{Binding AxisCommandVelocityValidationText}"
+                   TextWrapping="Wrap">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasAxisCommandVelocityError}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+        <Grid Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="6" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="6" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="6" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button x:Name="JogNegativeButton"
+                    IsEnabled="{Binding CanJogAxis}"
+                    Grid.Column="0"
+                    Content="{loc:Loc Key=Axis.JogNegative}"
+                    ToolTip="{loc:Loc Key=Axis.HoldJogNegativeTooltip}"
+                    AutomationProperties.Name="{loc:Loc Key=Axis.JogNegative}">
+                <b:Interaction.Behaviors>
+                    <behavior:PressAndReleaseCommandBehavior PressCommand="{Binding BeginAxisJogNegativeCommand}"
+                                                            ReleaseCommand="{Binding EndAxisJogCommand}" />
+                </b:Interaction.Behaviors>
+            </Button>
+            <Button x:Name="HomeAxisButton"
+                    Grid.Column="2"
+                    Command="{Binding HomeAxisCommand}"
+                    Content="{loc:Loc Key=Axis.Home}"
+                    ToolTip="{loc:Loc Key=Axis.HomeTooltip}"
+                    AutomationProperties.Name="{loc:Loc Key=Axis.Home}" />
+            <Button x:Name="StopAxisMotionButton"
+                    Grid.Column="4"
+                    Command="{Binding StopAxisMotionCommand}"
+                    Content="{loc:Loc Key=Axis.Stop}"
+                    ToolTip="{loc:Loc Key=Axis.StopTooltip}"
+                    AutomationProperties.Name="{loc:Loc Key=Axis.Stop}" />
+            <Button x:Name="JogPositiveButton"
+                    IsEnabled="{Binding CanJogAxis}"
+                    Grid.Column="6"
+                    Content="{loc:Loc Key=Axis.JogPositive}"
+                    ToolTip="{loc:Loc Key=Axis.HoldJogPositiveTooltip}"
+                    AutomationProperties.Name="{loc:Loc Key=Axis.JogPositive}">
+                <b:Interaction.Behaviors>
+                    <behavior:PressAndReleaseCommandBehavior PressCommand="{Binding BeginAxisJogPositiveCommand}"
+                                                            ReleaseCommand="{Binding EndAxisJogCommand}" />
+                </b:Interaction.Behaviors>
+            </Button>
+        </Grid>
+        <TextBlock Margin="2,7,2,0"
+                   FontSize="10.5"
+                   Foreground="{DynamicResource Text.Secondary}"
+                   Text="{Binding AxisCommissioningHintText}"
+                   TextWrapping="Wrap" />
+    </StackPanel>
+</UserControl>

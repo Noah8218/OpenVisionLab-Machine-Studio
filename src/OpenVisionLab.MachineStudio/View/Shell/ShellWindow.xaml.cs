@@ -95,6 +95,7 @@ public partial class ShellWindow : MachineFluentWindow
         {
             if (await viewModel.TryResolveUnsavedChangesAsync())
             {
+                await viewModel.ShutdownAsync();
                 _closeApproved = true;
                 Close();
             }

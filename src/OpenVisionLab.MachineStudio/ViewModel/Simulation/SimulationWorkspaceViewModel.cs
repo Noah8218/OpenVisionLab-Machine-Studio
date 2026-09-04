@@ -21,15 +21,14 @@ public sealed record SimulationScenarioFaultKindOption(SimulationFaultKind Kind,
 /// </summary>
 public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisposable
 {
-    private const string AutomaticCycleAssertionDefaultId = "automatic-cycle-completed";
-    private const string NoActiveFaultsAssertionDefaultId = "final-faults-cleared";
-    private const string FinalEquipmentStateAssertionDefaultId = "final-equipment-state";
     private readonly RelayCommand loadScenarioProfileCommand;
     private readonly RelayCommand resetScenarioCommand;
+    private readonly SimulationScenarioProjectMapper scenarioProjectMapper = new();
     private readonly ObservableCollection<SimulationScenarioProfile> scenarioProfiles = [];
     private HashSet<string> availableFinalEquipmentTargetIds = new(StringComparer.Ordinal);
     private SimulationScenarioProfile? selectedScenarioProfile;
     private string scenarioProfilePath = string.Empty;
+    private string? scenarioProfileLoadError;
     private string? scenarioTargetId;
     private int scenarioSeed;
     private int scenarioDurationCycles = 200;
@@ -48,9 +47,9 @@ public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisp
     private bool requireFinalEquipmentState;
     private string? finalEquipmentTargetId;
     private string finalEquipmentExpectedState = string.Empty;
-    private string automaticCycleAssertionId = AutomaticCycleAssertionDefaultId;
-    private string noActiveFaultsAssertionId = NoActiveFaultsAssertionDefaultId;
-    private string finalEquipmentStateAssertionId = FinalEquipmentStateAssertionDefaultId;
+    private string automaticCycleAssertionId = SimulationScenarioProjectMapper.AutomaticCycleAssertionDefaultId;
+    private string noActiveFaultsAssertionId = SimulationScenarioProjectMapper.NoActiveFaultsAssertionDefaultId;
+    private string finalEquipmentStateAssertionId = SimulationScenarioProjectMapper.FinalEquipmentStateAssertionDefaultId;
     private bool isDisposed;
 
     public SimulationWorkspaceViewModel()
@@ -93,7 +92,9 @@ public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisp
             }
 
             scenarioProfilePath = value;
+            scenarioProfileLoadError = null;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(ScenarioProfileLoadError));
             OnPropertyChanged(nameof(LoadScenarioProfileTooltip));
         }
     }
@@ -436,15 +437,8 @@ public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisp
         }
     }
 
-    public bool IsScheduledFaultConfigurationValid => !IsScheduledFaultEnabled
-        || (ScheduledFaultTargetId is not null
-            && ScheduledFaultKind is SimulationFaultKind.StuckDigitalInput
-                or SimulationFaultKind.CylinderTravelBlocked
-                or SimulationFaultKind.AxisMotionBlocked
-            && ScheduledFaultInjectTick >= 0
-            && ScheduledFaultHoldTicks >= 1
-            && (long)ScheduledFaultInjectTick + ScheduledFaultHoldTicks < ScenarioDurationCycles
-            && (!RestartSequenceAfterFault || RecoverySequenceId is not null));
+    public bool IsScheduledFaultConfigurationValid =>
+        SimulationScenarioProjectMapper.IsScheduledFaultConfigurationValid(CreateProjectSnapshot());
 
     public string ScheduledFaultSummary
     {
@@ -496,71 +490,19 @@ public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisp
 
     public string LoadScenarioProfileTooltip => string.IsNullOrWhiteSpace(ScenarioProfilePath)
         ? OpenVisionLanguageService.T("Simulation.LoadJsonHint")
-        : string.Format(
-            System.Globalization.CultureInfo.CurrentCulture,
-            OpenVisionLanguageService.T("Simulation.LoadJsonPath"),
-            ScenarioProfilePath);
+        : ScenarioProfileLoadError is not null
+            ? ScenarioProfileLoadError
+            : string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                OpenVisionLanguageService.T("Simulation.LoadJsonPath"),
+                ScenarioProfilePath);
+
+    public string? ScenarioProfileLoadError => scenarioProfileLoadError;
 
     public string ResetScenarioTooltip => OpenVisionLanguageService.T("Simulation.ResetScenarioHint");
 
-    public DeterministicConditionScenarioProfile BuildEngineProfile(string targetId)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(targetId);
-        var profile = SelectedScenarioProfile;
-        var initialState = profile.Mode switch
-        {
-            SimulationScenarioMode.Fault => DeterministicConditionState.Degraded,
-            SimulationScenarioMode.Recovery => DeterministicConditionState.Fault,
-            SimulationScenarioMode.Congested => DeterministicConditionState.Degraded,
-            _ => DeterministicConditionState.Normal
-        };
-
-        var minimumStateTicks = profile.Mode switch
-        {
-            SimulationScenarioMode.Fault => 8,
-            SimulationScenarioMode.Recovery => 8,
-            SimulationScenarioMode.Congested => 12,
-            _ => 20
-        };
-
-        var jitterTicks = profile.Mode switch
-        {
-            SimulationScenarioMode.Normal => 0,
-            SimulationScenarioMode.Fault => 3,
-            SimulationScenarioMode.Recovery => 2,
-            _ => 4
-        };
-
-        var faultRecovery = IsScheduledFaultEnabled && IsScheduledFaultConfigurationValid
-            ? new DeterministicFaultRecoverySchedule(
-                ScheduledFaultKind,
-                ScheduledFaultTargetId!,
-                ScheduledFaultInjectTick,
-                ScheduledFaultHoldTicks,
-                RequiresScheduledFaultValue ? ScheduledFaultForcedValue : null,
-                RestartSequenceAfterFault ? RecoverySequenceId : null)
-            : null;
-        var scenarioId = faultRecovery is null
-            ? profile.ProfileId
-            : $"{profile.ProfileId}:{faultRecovery.FaultKind}:{faultRecovery.TargetId}:" +
-              $"{faultRecovery.ForcedValue}:{faultRecovery.InjectTick}:{faultRecovery.HoldTicks}:" +
-              $"{faultRecovery.RestartSequenceId ?? "clear"}";
-
-        return new DeterministicConditionScenarioProfile(
-            DeterministicConditionScenarioProfile.CurrentSchemaVersion,
-            scenarioId,
-            profile.Name,
-            profile.Description,
-            targetId,
-            ScenarioSeed,
-            ScenarioDurationCycles,
-            minimumStateTicks,
-            jitterTicks,
-            initialState,
-            FaultRecovery: faultRecovery,
-            Assertions: DeterministicScenarioAssertion.FromProjectDefinitions(
-                BuildProjectAssertions()));
-    }
+    public DeterministicConditionScenarioProfile BuildEngineProfile(string targetId) =>
+        scenarioProjectMapper.BuildEngineProfile(CreateProjectSnapshot(), targetId);
 
     public void EnsureScenarioTarget(IEnumerable<string> targetIds)
     {
@@ -619,65 +561,7 @@ public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisp
     public void LoadProjectScenario(SimulationDefinition simulation)
     {
         ArgumentNullException.ThrowIfNull(simulation);
-        var assertions = simulation.TestScenarioAssertions ?? [];
-        var automaticCycle = assertions.FirstOrDefault(assertion =>
-            assertion.Kind == TestScenarioAssertionKind.AutomaticCycleCompleted);
-        var noActiveFaults = assertions.FirstOrDefault(assertion =>
-            assertion.Kind == TestScenarioAssertionKind.NoActiveFaults);
-        var finalEquipmentState = assertions.FirstOrDefault(assertion =>
-            assertion.Kind == TestScenarioAssertionKind.FinalEquipmentState);
-        requireAutomaticCycleCompleted = automaticCycle is not null;
-        minimumCompletedCycles = automaticCycle is null
-            ? 1
-            : (int)Math.Clamp(automaticCycle.MinimumCount, 1, int.MaxValue);
-        requireNoActiveFaults = noActiveFaults is not null;
-        requireFinalEquipmentState = finalEquipmentState is not null;
-        finalEquipmentTargetId = string.IsNullOrWhiteSpace(finalEquipmentState?.TargetId)
-            ? null
-            : finalEquipmentState.TargetId.Trim();
-        finalEquipmentExpectedState = finalEquipmentState?.ExpectedState?.Trim() ?? string.Empty;
-        automaticCycleAssertionId = NormalizeAssertionId(
-            automaticCycle?.AssertionId,
-            AutomaticCycleAssertionDefaultId);
-        noActiveFaultsAssertionId = NormalizeAssertionId(
-            noActiveFaults?.AssertionId,
-            NoActiveFaultsAssertionDefaultId);
-        finalEquipmentStateAssertionId = NormalizeAssertionId(
-            finalEquipmentState?.AssertionId,
-            FinalEquipmentStateAssertionDefaultId);
-        selectedScenarioProfile = scenarioProfiles.FirstOrDefault(profile =>
-            string.Equals(profile.ProfileId, simulation.TestScenarioProfileId, StringComparison.OrdinalIgnoreCase))
-            ?? scenarioProfiles[0];
-        scenarioSeed = simulation.TestScenarioSeed ?? simulation.Seed;
-        scenarioDurationCycles = Math.Clamp(simulation.TestScenarioDurationCycles, 1, 100_000);
-        batchRepetitionCount = Math.Clamp(simulation.TestScenarioBatchRepetitions, 1, 100);
-        scenarioTargetId = string.IsNullOrWhiteSpace(simulation.TestScenarioTargetId)
-            ? null
-            : simulation.TestScenarioTargetId.Trim();
-        var legacyAxisFault = simulation.TestScenarioAxisFault;
-        var fault = simulation.TestScenarioFault;
-        isScheduledFaultEnabled = fault?.Enabled ?? legacyAxisFault?.Enabled == true;
-        scheduledFaultKind = fault is null
-            ? SimulationFaultKind.AxisMotionBlocked
-            : ToSimulationFaultKind(fault.Kind);
-        var targetId = fault?.TargetId ?? legacyAxisFault?.AxisId;
-        scheduledFaultTargetId = string.IsNullOrWhiteSpace(targetId)
-            ? null
-            : targetId.Trim();
-        scheduledFaultForcedValue = fault?.ForcedValue ?? false;
-        scheduledFaultInjectTick = Math.Clamp(
-            fault?.InjectTick ?? legacyAxisFault?.InjectTick ?? 50,
-            0,
-            99_999);
-        scheduledFaultHoldTicks = Math.Clamp(
-            fault?.HoldTicks ?? legacyAxisFault?.HoldTicks ?? 3,
-            1,
-            100_000);
-        var restartSequenceId = fault?.RestartSequenceId ?? legacyAxisFault?.RestartSequenceId;
-        restartSequenceAfterFault = !string.IsNullOrWhiteSpace(restartSequenceId);
-        recoverySequenceId = restartSequenceAfterFault
-            ? restartSequenceId!.Trim()
-            : null;
+        ApplyProjectSnapshot(scenarioProjectMapper.Load(simulation, scenarioProfiles));
         OnPropertyChanged(nameof(SelectedScenarioProfile));
         OnPropertyChanged(nameof(ScenarioSeed));
         OnPropertyChanged(nameof(ScenarioDurationCycles));
@@ -712,23 +596,7 @@ public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisp
     public void SaveProjectScenario(SimulationDefinition simulation)
     {
         ArgumentNullException.ThrowIfNull(simulation);
-        simulation.TestScenarioProfileId = SelectedScenarioProfile.ProfileId;
-        simulation.TestScenarioSeed = ScenarioSeed;
-        simulation.TestScenarioDurationCycles = ScenarioDurationCycles;
-        simulation.TestScenarioTargetId = ScenarioTargetId;
-        simulation.TestScenarioBatchRepetitions = BatchRepetitionCount;
-        simulation.TestScenarioAxisFault = null;
-        simulation.TestScenarioFault = new TestScenarioFaultDefinition
-        {
-            Enabled = IsScheduledFaultEnabled,
-            Kind = ToProjectFaultKind(ScheduledFaultKind),
-            TargetId = ScheduledFaultTargetId,
-            ForcedValue = RequiresScheduledFaultValue ? ScheduledFaultForcedValue : null,
-            InjectTick = ScheduledFaultInjectTick,
-            HoldTicks = ScheduledFaultHoldTicks,
-            RestartSequenceId = RestartSequenceAfterFault ? RecoverySequenceId : null
-        };
-        simulation.TestScenarioAssertions = BuildProjectAssertions();
+        scenarioProjectMapper.Save(simulation, CreateProjectSnapshot());
     }
 
     public void Dispose()
@@ -744,17 +612,26 @@ public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisp
 
     private void LoadScenarioProfile()
     {
-        if (isDisposed || string.IsNullOrWhiteSpace(ScenarioProfilePath) || !File.Exists(ScenarioProfilePath))
+        if (isDisposed)
         {
             return;
         }
 
-        var profile = SimulationScenarioProfile.LoadFromJson(ScenarioProfilePath);
-        if (profile is null)
+        if (!SimulationScenarioProfile.TryLoadFromJson(
+                ScenarioProfilePath,
+                out SimulationScenarioProfile? profile,
+                out string? error)
+            || profile is null)
         {
+            scenarioProfileLoadError = error ?? "The scenario profile is invalid.";
+            OnPropertyChanged(nameof(ScenarioProfileLoadError));
+            OnPropertyChanged(nameof(LoadScenarioProfileTooltip));
             return;
         }
 
+        scenarioProfileLoadError = null;
+        OnPropertyChanged(nameof(ScenarioProfileLoadError));
+        OnPropertyChanged(nameof(LoadScenarioProfileTooltip));
         var normalized = SimulationScenarioProfile.Normalize(profile);
         var existingIndex = scenarioProfiles
             .Select((item, index) => (item, index))
@@ -780,6 +657,7 @@ public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisp
     private void ResetScenario()
     {
         var normal = SimulationScenarioProfile.GetBuiltInById("normal");
+        scenarioProfileLoadError = null;
         selectedScenarioProfile = normal;
         scenarioSeed = normal.Seed;
         scenarioDurationCycles = 200;
@@ -795,10 +673,12 @@ public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisp
         requireFinalEquipmentState = false;
         finalEquipmentTargetId = null;
         finalEquipmentExpectedState = string.Empty;
-        automaticCycleAssertionId = AutomaticCycleAssertionDefaultId;
-        noActiveFaultsAssertionId = NoActiveFaultsAssertionDefaultId;
-        finalEquipmentStateAssertionId = FinalEquipmentStateAssertionDefaultId;
+        automaticCycleAssertionId = SimulationScenarioProjectMapper.AutomaticCycleAssertionDefaultId;
+        noActiveFaultsAssertionId = SimulationScenarioProjectMapper.NoActiveFaultsAssertionDefaultId;
+        finalEquipmentStateAssertionId = SimulationScenarioProjectMapper.FinalEquipmentStateAssertionDefaultId;
         OnPropertyChanged(nameof(SelectedScenarioProfile));
+        OnPropertyChanged(nameof(ScenarioProfileLoadError));
+        OnPropertyChanged(nameof(LoadScenarioProfileTooltip));
         OnPropertyChanged(nameof(ScenarioSeed));
         OnPropertyChanged(nameof(ScenarioDurationCycles));
         OnPropertyChanged(nameof(IsScheduledFaultEnabled));
@@ -854,56 +734,56 @@ public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisp
         OnPropertyChanged(nameof(AssertionSummary));
     }
 
-    private List<TestScenarioAssertionDefinition> BuildProjectAssertions()
-    {
-        var assertions = new List<TestScenarioAssertionDefinition>(3);
-        if (RequireAutomaticCycleCompleted)
-        {
-            assertions.Add(new TestScenarioAssertionDefinition
-            {
-                AssertionId = automaticCycleAssertionId,
-                Kind = TestScenarioAssertionKind.AutomaticCycleCompleted,
-                MinimumCount = MinimumCompletedCycles
-            });
-        }
-        if (RequireNoActiveFaults)
-        {
-            assertions.Add(new TestScenarioAssertionDefinition
-            {
-                AssertionId = noActiveFaultsAssertionId,
-                Kind = TestScenarioAssertionKind.NoActiveFaults
-            });
-        }
-        if (RequireFinalEquipmentState)
-        {
-            assertions.Add(new TestScenarioAssertionDefinition
-            {
-                AssertionId = finalEquipmentStateAssertionId,
-                Kind = TestScenarioAssertionKind.FinalEquipmentState,
-                TargetId = FinalEquipmentTargetId,
-                ExpectedState = FinalEquipmentExpectedState.Trim()
-            });
-        }
+    private SimulationScenarioProjectSnapshot CreateProjectSnapshot() =>
+        new(
+            SelectedScenarioProfile,
+            scenarioSeed,
+            scenarioDurationCycles,
+            batchRepetitionCount,
+            scenarioTargetId,
+            isScheduledFaultEnabled,
+            scheduledFaultKind,
+            scheduledFaultTargetId,
+            scheduledFaultForcedValue,
+            scheduledFaultInjectTick,
+            scheduledFaultHoldTicks,
+            restartSequenceAfterFault,
+            recoverySequenceId,
+            requireAutomaticCycleCompleted,
+            minimumCompletedCycles,
+            requireNoActiveFaults,
+            requireFinalEquipmentState,
+            finalEquipmentTargetId,
+            finalEquipmentExpectedState,
+            automaticCycleAssertionId,
+            noActiveFaultsAssertionId,
+            finalEquipmentStateAssertionId);
 
-        return assertions;
+    private void ApplyProjectSnapshot(SimulationScenarioProjectSnapshot snapshot)
+    {
+        requireAutomaticCycleCompleted = snapshot.RequireAutomaticCycleCompleted;
+        minimumCompletedCycles = snapshot.MinimumCompletedCycles;
+        requireNoActiveFaults = snapshot.RequireNoActiveFaults;
+        requireFinalEquipmentState = snapshot.RequireFinalEquipmentState;
+        finalEquipmentTargetId = snapshot.FinalEquipmentTargetId;
+        finalEquipmentExpectedState = snapshot.FinalEquipmentExpectedState;
+        automaticCycleAssertionId = snapshot.AutomaticCycleAssertionId;
+        noActiveFaultsAssertionId = snapshot.NoActiveFaultsAssertionId;
+        finalEquipmentStateAssertionId = snapshot.FinalEquipmentStateAssertionId;
+        selectedScenarioProfile = snapshot.SelectedScenarioProfile;
+        scenarioSeed = snapshot.ScenarioSeed;
+        scenarioDurationCycles = snapshot.ScenarioDurationCycles;
+        batchRepetitionCount = snapshot.BatchRepetitionCount;
+        scenarioTargetId = snapshot.ScenarioTargetId;
+        isScheduledFaultEnabled = snapshot.IsScheduledFaultEnabled;
+        scheduledFaultKind = snapshot.ScheduledFaultKind;
+        scheduledFaultTargetId = snapshot.ScheduledFaultTargetId;
+        scheduledFaultForcedValue = snapshot.ScheduledFaultForcedValue;
+        scheduledFaultInjectTick = snapshot.ScheduledFaultInjectTick;
+        scheduledFaultHoldTicks = snapshot.ScheduledFaultHoldTicks;
+        restartSequenceAfterFault = snapshot.RestartSequenceAfterFault;
+        recoverySequenceId = snapshot.RecoverySequenceId;
     }
-
-    private static string NormalizeAssertionId(string? assertionId, string defaultId) =>
-        string.IsNullOrWhiteSpace(assertionId) ? defaultId : assertionId.Trim();
-
-    private static SimulationFaultKind ToSimulationFaultKind(TestScenarioFaultKind kind) => kind switch
-    {
-        TestScenarioFaultKind.StuckDigitalInput => SimulationFaultKind.StuckDigitalInput,
-        TestScenarioFaultKind.CylinderTravelBlocked => SimulationFaultKind.CylinderTravelBlocked,
-        _ => SimulationFaultKind.AxisMotionBlocked
-    };
-
-    private static TestScenarioFaultKind ToProjectFaultKind(SimulationFaultKind kind) => kind switch
-    {
-        SimulationFaultKind.StuckDigitalInput => TestScenarioFaultKind.StuckDigitalInput,
-        SimulationFaultKind.CylinderTravelBlocked => TestScenarioFaultKind.CylinderTravelBlocked,
-        _ => TestScenarioFaultKind.AxisMotionBlocked
-    };
 
     private static string FaultKindDisplayName(SimulationFaultKind kind) => kind switch
     {

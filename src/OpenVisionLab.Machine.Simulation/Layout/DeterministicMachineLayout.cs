@@ -71,7 +71,10 @@ public sealed class DeterministicMachineLayout
             .OrderBy(loadLock => loadLock.Configuration.Id, StringComparer.Ordinal)
             .ToArray();
         _orderedWaferHandlers = configuration.WaferHandlers
-            .Select(handler => new WaferHandlerRuntimeState(handler, signalHub))
+            .Select(handler => new WaferHandlerRuntimeState(
+                handler,
+                signalHub,
+                (WorkpieceRuntimeState)_componentsById[handler.WorkpieceComponentId]))
             .OrderBy(handler => handler.Configuration.Id, StringComparer.Ordinal)
             .ToArray();
         _orderedInspectionSortRouters = configuration.InspectionSortRouters
@@ -102,7 +105,6 @@ public sealed class DeterministicMachineLayout
             StringComparer.Ordinal);
 
         InitializeWorkpieceCarrierPositions();
-        ProjectWaferHandlerOwnership();
         ValidateSignalBindings();
     }
 
@@ -189,7 +191,6 @@ public sealed class DeterministicMachineLayout
         var conveyorTransitions = EvaluateConveyorsAndWorkpieces();
         var sensorTransitions = EvaluateSensors();
         EvaluateWaferHandlers(axisSnapshots);
-        ProjectWaferHandlerOwnership();
         EvaluateInspectionSortRouters(cameraSnapshots);
         EvaluateInspectionHandoffs(cameraSnapshots);
         EvaluatePrealigners(axisSnapshots);
@@ -255,7 +256,6 @@ public sealed class DeterministicMachineLayout
         {
             handler.Reset();
         }
-        ProjectWaferHandlerOwnership();
 
         foreach (var sorter in _orderedInspectionSortRouters)
         {
@@ -486,16 +486,6 @@ public sealed class DeterministicMachineLayout
             throw new ArgumentException(
                 $"Wafer-handler '{handler.Configuration.Id}' signal '{channelId}' must identify a configured {expectedKind} channel.",
                 nameof(_signalHub));
-        }
-    }
-
-    private void ProjectWaferHandlerOwnership()
-    {
-        foreach (var handler in _orderedWaferHandlers)
-        {
-            var workpiece = (WorkpieceRuntimeState)_componentsById[
-                handler.Configuration.WorkpieceComponentId];
-            workpiece.ApplyTransferOwnership(handler.Configuration.Id, handler.State);
         }
     }
 

@@ -1,6 +1,9 @@
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Core.Layouts;
+using OpenVisionLab.MachineStudio.Model;
+using OpenVisionLab.MachineStudio.View.Dialogs;
 using OpenVisionLab.MachineStudio.ViewModel;
+using OpenVisionLab.Wpf.MessageDialogs;
 using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
@@ -149,6 +152,201 @@ public sealed class LayoutStartupViewModelTests
         Assert.NotNull(dropped);
         Assert.Equal(40, dropped.CurrentX);
         Assert.Equal(180, dropped.CurrentY);
+    }
+
+    [Theory]
+    [InlineData("malformed", "{\"schema\":\"1.12\",\"name\":")]
+    [InlineData("future-schema", "{\"schema\":\"2.0\",\"name\":\"future\"}")]
+    [InlineData("null-document", "null")]
+    [InlineData("missing", null)]
+    [InlineData("directory", null)]
+    public async Task ExpectedOpenFailureReportsAndPreservesDirtyProject(
+        string caseName,
+        string? rejectedContent)
+    {
+        var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+        var directory = CreateTestDirectory();
+        try
+        {
+            OpenVisionLanguageService.SetLanguage(OpenVisionLanguage.English, save: false);
+            var project = new ProjectDocumentStore().Load(File.ReadAllText(SamplePath));
+            using var viewModel = new MainViewModel(project, initialProjectPath: SamplePath);
+            await WaitForAsync(() => viewModel.SceneSnapshots.Latest?.Axes.Count > 0);
+            Assert.True(viewModel.TryAddLayoutComponent(LayoutComponentKind.MachineFrame));
+
+            var rejectedPath = Path.Combine(directory, $"{caseName}.ovmachine");
+            if (caseName == "directory")
+            {
+                Directory.CreateDirectory(rejectedPath);
+            }
+            else if (rejectedContent is not null)
+            {
+                await File.WriteAllTextAsync(rejectedPath, rejectedContent);
+            }
+            var rejectedBytes = rejectedContent is null
+                ? null
+                : await File.ReadAllBytesAsync(rejectedPath);
+
+            var title = viewModel.Title;
+            var projectStatus = viewModel.ProjectStatusText;
+            var currentProjectPath = viewModel.CurrentProjectPath;
+            var projectModel = Assert.IsType<MachineProjectDocument>(
+                viewModel.ProjectTree.Roots.Single().Model);
+            var projectEvidence = new ProjectDocumentStore().SerializeForEvidence(projectModel);
+            var layoutDefinition = viewModel.Layout.Definition;
+            var selectedItem = viewModel.Layout.SelectedItem;
+            var layoutCount = viewModel.LayoutComponentCountText;
+            var snapshot = viewModel.SceneSnapshots.Latest;
+            var designMode = viewModel.IsDesignMode;
+            var running = viewModel.IsRunning;
+            var promptCount = 0;
+            var presentationCount = 0;
+            string? presentedDetails = null;
+            viewModel.UnsavedProjectPrompt = () =>
+            {
+                promptCount++;
+                return UnsavedProjectDecision.Cancel;
+            };
+            viewModel.ProjectOpenFailurePresenter = details =>
+            {
+                presentationCount++;
+                presentedDetails = details;
+            };
+
+            var opened = await viewModel.OpenProjectReplacingCurrentAsync(rejectedPath);
+
+            Assert.False(opened);
+            Assert.Equal(0, promptCount);
+            Assert.Equal(1, presentationCount);
+            Assert.NotNull(presentedDetails);
+            var presentedOptions = MainMessageDialogHost.CreateProjectOpenFailureDialogOptions(presentedDetails!);
+            Assert.Equal("Project open failed", presentedOptions.Title);
+            Assert.StartsWith(
+                "The project file could not be opened. The current project remains unchanged.",
+                presentedOptions.Message,
+                StringComparison.Ordinal);
+            var expectedDetail = caseName switch
+            {
+                "malformed" or "null-document" =>
+                    "The file content is not a valid Machine Studio project.",
+                "future-schema" =>
+                    "Project schema '2.0' is not supported. The latest supported schema is '1.12'.",
+                "missing" => "The project file could not be found.",
+                "directory" => "The project file cannot be read with the current permissions.",
+                _ => throw new ArgumentOutOfRangeException(nameof(caseName))
+            };
+            Assert.Contains(expectedDetail, presentedOptions.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                "Unsupported machine project schema",
+                presentedOptions.Message,
+                StringComparison.Ordinal);
+            Assert.Equal(WpfMessageDialogKind.Warning, presentedOptions.Kind);
+            Assert.Equal(WpfMessageDialogResult.OK, presentedOptions.DefaultResult);
+            Assert.Equal("OK", presentedOptions.PrimaryButtonText);
+            Assert.Equal("The project could not be opened", viewModel.StatusMessage);
+            Assert.Equal(title, viewModel.Title);
+            Assert.Equal(projectStatus, viewModel.ProjectStatusText);
+            Assert.Equal(currentProjectPath, viewModel.CurrentProjectPath);
+            Assert.Same(projectModel, viewModel.ProjectTree.Roots.Single().Model);
+            Assert.Equal(
+                projectEvidence,
+                new ProjectDocumentStore().SerializeForEvidence(projectModel));
+            Assert.Same(layoutDefinition, viewModel.Layout.Definition);
+            Assert.Same(selectedItem, viewModel.Layout.SelectedItem);
+            Assert.Equal(layoutCount, viewModel.LayoutComponentCountText);
+            Assert.Same(snapshot, viewModel.SceneSnapshots.Latest);
+            Assert.Equal(designMode, viewModel.IsDesignMode);
+            Assert.Equal(running, viewModel.IsRunning);
+            Assert.True(viewModel.HasUnsavedChanges);
+            Assert.EndsWith(" *", viewModel.Title, StringComparison.Ordinal);
+            if (rejectedContent is not null)
+            {
+                Assert.NotNull(rejectedBytes);
+                Assert.Equal(
+                    rejectedBytes,
+                    await File.ReadAllBytesAsync(rejectedPath));
+            }
+        }
+        finally
+        {
+            OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ProjectOpenFailureDialogOptionsAreLocalizedAndDefaultToAcknowledgement()
+    {
+        var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+        try
+        {
+            OpenVisionLanguageService.SetLanguage(OpenVisionLanguage.Korean, save: false);
+            var korean = MainMessageDialogHost.CreateProjectOpenFailureDialogOptions("상세 원인");
+            Assert.Equal("프로젝트 열기 실패", korean.Title);
+            Assert.Contains("현재 프로젝트는 그대로 유지됩니다.", korean.Message, StringComparison.Ordinal);
+            Assert.Contains("상세 원인", korean.Message, StringComparison.Ordinal);
+            Assert.Equal("확인", korean.PrimaryButtonText);
+
+            OpenVisionLanguageService.SetLanguage(OpenVisionLanguage.English, save: false);
+            var english = MainMessageDialogHost.CreateProjectOpenFailureDialogOptions("failure details");
+            Assert.Equal("Project open failed", english.Title);
+            Assert.Contains("The current project remains unchanged.", english.Message, StringComparison.Ordinal);
+            Assert.Contains("failure details", english.Message, StringComparison.Ordinal);
+            Assert.Equal("OK", english.PrimaryButtonText);
+            Assert.Equal(WpfMessageDialogKind.Warning, english.Kind);
+            Assert.Equal(WpfMessageDialogResult.OK, english.DefaultResult);
+        }
+        finally
+        {
+            OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
+        }
+    }
+
+    [Fact]
+    public void ProjectMessageDialogHostKeepsDecisionAndFailureDefaults()
+    {
+        var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+        try
+        {
+            OpenVisionLanguageService.SetLanguage(OpenVisionLanguage.English, save: false);
+
+            var unsaved = MainMessageDialogHost.CreateUnsavedProjectDialogOptions();
+            Assert.Equal(WpfMessageDialogKind.Question, unsaved.Kind);
+            Assert.Equal(WpfMessageDialogResult.Yes, unsaved.DefaultResult);
+            Assert.Equal("Save", unsaved.PrimaryButtonText);
+            Assert.Equal("Don't save", unsaved.SecondaryButtonText);
+            Assert.Equal("Cancel", unsaved.TertiaryButtonText);
+
+            var saveFailure = MainMessageDialogHost.CreateProjectSaveFailureDialogOptions("failure details");
+            Assert.Equal(WpfMessageDialogKind.Warning, saveFailure.Kind);
+            Assert.Equal(WpfMessageDialogResult.OK, saveFailure.DefaultResult);
+            Assert.Contains("failure details", saveFailure.Message, StringComparison.Ordinal);
+            Assert.Equal("OK", saveFailure.PrimaryButtonText);
+        }
+        finally
+        {
+            OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
+        }
+    }
+
+    private static string CreateTestDirectory()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            $"ovl-project-open-failure-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        return directory;
+    }
+
+    private static async Task WaitForAsync(Func<bool> condition)
+    {
+        var timeout = DateTime.UtcNow.AddSeconds(5);
+        while (!condition() && DateTime.UtcNow < timeout)
+        {
+            await Task.Delay(20);
+        }
+
+        Assert.True(condition(), "The initial runtime configuration did not become observable.");
     }
 
     private static bool Overlaps(

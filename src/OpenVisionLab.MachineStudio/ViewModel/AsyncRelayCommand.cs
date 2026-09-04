@@ -9,7 +9,7 @@ public sealed class AsyncRelayCommand : ICommand
     private readonly Predicate<object?>? _canExecute;
     private readonly Action<Exception>? _onException;
     private readonly bool _useCommandManagerRequery;
-    private bool _isExecuting;
+    private int _isExecuting;
     private event EventHandler? LocalCanExecuteChanged;
 
     public AsyncRelayCommand(
@@ -45,22 +45,27 @@ public sealed class AsyncRelayCommand : ICommand
     }
 
     public bool CanExecute(object? parameter) =>
-        !_isExecuting && (_canExecute?.Invoke(parameter) ?? true);
+        Volatile.Read(ref _isExecuting) == 0
+        && (_canExecute?.Invoke(parameter) ?? true);
 
     public void RaiseCanExecuteChanged() =>
         LocalCanExecuteChanged?.Invoke(this, EventArgs.Empty);
 
     public async void Execute(object? parameter)
     {
-        if (!CanExecute(parameter))
+        if (Interlocked.CompareExchange(ref _isExecuting, 1, 0) != 0)
         {
             return;
         }
 
-        _isExecuting = true;
-        InvalidateCanExecute();
         try
         {
+            if (!(_canExecute?.Invoke(parameter) ?? true))
+            {
+                return;
+            }
+
+            InvalidateCanExecute();
             await _execute(parameter);
         }
         catch (OperationCanceledException)
@@ -79,7 +84,7 @@ public sealed class AsyncRelayCommand : ICommand
         }
         finally
         {
-            _isExecuting = false;
+            Volatile.Write(ref _isExecuting, 0);
             InvalidateCanExecute();
         }
     }

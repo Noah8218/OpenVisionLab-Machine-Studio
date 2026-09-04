@@ -8,6 +8,7 @@ using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Events;
 using OpenVisionLab.Machine.Simulation.Layout;
+using OpenVisionLab.Machine.Simulation.Snapshots;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Simulation.Tests;
@@ -185,6 +186,31 @@ public sealed class DeterministicConveyorWorkpieceTests
         Assert.True(reverseCommand.EventIndex < reverseState.EventIndex);
     }
 
+    [Fact]
+    public async Task ManualCommand_ConveyorPairRejectionDoesNotPartiallyChangeOutputs()
+    {
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings { FixedStep = TimeSpan.FromMilliseconds(100) });
+        await engine.StartAsync();
+        Assert.True((await engine.EnqueueCommandAsync(
+            new ConfigureRuntimeCommand(CreateRuntime(interlockRun: true)))).IsAccepted);
+        Assert.True((await engine.EnqueueCommandAsync(new StartManualControlCommand())).IsAccepted);
+        Assert.True((await engine.EnqueueCommandAsync(new PauseCommand())).IsAccepted);
+
+        SimulationSnapshot before = engine.CurrentSnapshot;
+        SimulationCommandResult result = await engine.EnqueueCommandAsync(
+            new SetConveyorCommand("conveyor-1", true, ConveyorDirection.Reverse));
+        SimulationSnapshot after = engine.CurrentSnapshot;
+
+        Assert.False(result.IsAccepted);
+        Assert.Equal(SimulationCommandErrorCode.SignalWriteRejected, result.ErrorCode);
+        Assert.Equal(before.SignalRevision, after.SignalRevision);
+        Assert.False(after.Signals.Single(signal => signal.Id == "do.conveyor.reverse").Value);
+        Assert.False(after.Signals.Single(signal => signal.Id == "do.conveyor.run").Value);
+
+        await engine.StopAsync();
+    }
+
     private static DeterministicSignalHub CreateHub(bool includeSensor = false)
     {
         var channels = new List<ChannelDefinition>
@@ -234,13 +260,20 @@ public sealed class DeterministicConveyorWorkpieceTests
         return layout;
     }
 
-    private static SimulationRuntimeConfiguration CreateRuntime()
+    private static SimulationRuntimeConfiguration CreateRuntime(bool interlockRun = false)
     {
-        ChannelDefinition[] channels =
-        [
-            Channel("do.conveyor.run", ChannelKind.DigitalOutput),
+        var channels = new List<ChannelDefinition>
+        {
+            Channel(
+                "do.conveyor.run",
+                ChannelKind.DigitalOutput,
+                interlockRun ? new[] { "di.guard" } : Array.Empty<string>()),
             Channel("do.conveyor.reverse", ChannelKind.DigitalOutput)
-        ];
+        };
+        if (interlockRun)
+        {
+            channels.Insert(0, Channel("di.guard", ChannelKind.DigitalInput));
+        }
         var layout = new MachineLayoutRuntimeConfiguration(
             "main",
             "Main",
@@ -282,13 +315,17 @@ public sealed class DeterministicConveyorWorkpieceTests
             new LayoutRuntimeTransform(x, y, rotationDegrees),
             new LayoutRuntimeSize(20, 20));
 
-    private static ChannelDefinition Channel(string id, ChannelKind kind) =>
+    private static ChannelDefinition Channel(
+        string id,
+        ChannelKind kind,
+        params string[] interlockIds) =>
         new()
         {
             Id = id,
             Name = id,
             Kind = kind,
-            InitialValue = 0
+            InitialValue = 0,
+            InterlockIds = interlockIds.ToList()
         };
 
     private static IReadOnlyDictionary<string, AxisSnapshot> EmptyAxes() =>

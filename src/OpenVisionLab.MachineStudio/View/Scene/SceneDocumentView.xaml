@@ -1,11 +1,12 @@
   <UserControl x:Class="OpenVisionLab.MachineStudio.View.Scene.SceneDocumentView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+             xmlns:behavior="clr-namespace:OpenVisionLab.MachineStudio.Behavior"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:scene="clr-namespace:OpenVisionLab.MachineStudio.View.Scene"
              xmlns:project="clr-namespace:OpenVisionLab.MachineStudio.View.Project"
              xmlns:sequence="clr-namespace:OpenVisionLab.MachineStudio.View.Sequence"
-             xmlns:integration="clr-namespace:OpenVisionLab.MachineStudio.View.Integration"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
     <TabControl SelectedIndex="{Binding SelectedDocumentTabIndex, Mode=TwoWay}">
         <TabItem Header="{loc:Loc Key=Shell.MachineLayout}">
@@ -27,12 +28,16 @@
                                                 IsDesignMode="{Binding IsSceneEditable}"
                                                 ItemsSource="{Binding Layout.Items}"
                                                 SelectedItem="{Binding Layout.SelectedItem, Mode=TwoWay}"
-                                                SelectionRequested="OnSceneSelectionRequested"
-                                                MoveRequested="OnSceneMoveRequested"
-                                                MarqueeSelectionRequested="OnSceneMarqueeSelectionRequested"
-                                                TransformRequested="OnSceneTransformRequested"
-                                                LibraryComponentDropRequested="OnLibraryComponentDropRequested"
-                                                SnapshotSource="{Binding SceneSnapshotSource}" />
+                                                SnapshotSource="{Binding SceneSnapshotSource}">
+                        <b:Interaction.Behaviors>
+                            <behavior:MachineSceneViewportCommandBehavior
+                                SelectionRequestedCommand="{Binding SceneSelectionRequestedCommand}"
+                                MoveRequestedCommand="{Binding SceneMoveRequestedCommand}"
+                                MarqueeSelectionRequestedCommand="{Binding SceneMarqueeSelectionRequestedCommand}"
+                                TransformRequestedCommand="{Binding SceneTransformRequestedCommand}"
+                                LibraryComponentDropRequestedCommand="{Binding SceneLibraryComponentDropRequestedCommand}" />
+                        </b:Interaction.Behaviors>
+                    </scene:MachineSceneViewport>
                 </Border>
 
                 <Border Width="460"
@@ -319,10 +324,13 @@
                         HorizontalAlignment="Right"
                         VerticalAlignment="Bottom"
                         AutomationProperties.Name="{loc:Loc Key=Scene.FitLayout}"
-                        Click="OnFitLayoutClick"
                         Content="{loc:Loc Key=Scene.FitLayout}"
                         Style="{StaticResource GlobalCommandButtonStyle}"
-                        ToolTip="{loc:Loc Key=Scene.FitLayoutTooltip}" />
+                        ToolTip="{loc:Loc Key=Scene.FitLayoutTooltip}">
+                    <b:Interaction.Behaviors>
+                        <behavior:FitSceneViewportBehavior SceneViewport="{Binding ElementName=SceneViewport}" />
+                    </b:Interaction.Behaviors>
+                </Button>
             </Grid>
                 </Grid>
             </Border>
@@ -399,9 +407,6 @@
                 <sequence:SequenceEditorView Grid.Row="1"
                                              DataContext="{Binding SequenceEditor}" />
             </Grid>
-        </TabItem>
-        <TabItem Header="{loc:Loc Key=Integration.Tab}">
-            <integration:MachineIntegrationExchangeView />
         </TabItem>
     </TabControl>
 </UserControl>

@@ -5,7 +5,8 @@
              xmlns:behavior="clr-namespace:OpenVisionLab.MachineStudio.Behavior"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
-             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
+             xmlns:local="clr-namespace:OpenVisionLab.MachineStudio.View.Inspector">
     <UserControl.Resources>
         <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <loc:LocalizedFaultKindConverter x:Key="LocalizedFaultKindConverter" />
@@ -55,6 +56,9 @@
                                     <DataTrigger Binding="{Binding IsMultiAxisCommissioningRecipeSelection}" Value="True">
                                         <Setter Property="Visibility" Value="Collapsed" />
                                     </DataTrigger>
+                                    <DataTrigger Binding="{Binding HasSelectedAnalogChannel}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </ListBox.Style>
@@ -75,6 +79,62 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+
+                    <Border x:Name="AnalogIoAuthoringPanel"
+                            IsEnabled="{Binding IsSceneEditable}"
+                            Style="{StaticResource InspectorCardStyle}"
+                            Visibility="{Binding HasSelectedAnalogChannel, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel DataContext="{Binding AnalogIoAuthoring}">
+                            <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                       Text="{loc:Loc Key=Io.AnalogAuthoring}" />
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Text="{Binding DisplayName}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding Id}" />
+                                <TextBlock Grid.Column="1"
+                                           Margin="8,0,0,0"
+                                           Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{Binding KindText}" />
+                            </Grid>
+                            <TextBlock Margin="0,0,0,8"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Io.AnalogAuthoringHint}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
+                                       Text="{loc:Loc Key=Io.InitialValue}" />
+                            <TextBox x:Name="AnalogInitialValueTextBox"
+                                     Height="30"
+                                     AutomationProperties.AutomationId="AnalogInitialValueTextBox"
+                                     AutomationProperties.Name="{loc:Loc Key=Io.InitialValue}"
+                                     Text="{Binding InitialValueText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="{Binding InitialValueText}" />
+                            <Border Margin="0,10,0,0"
+                                    Padding="8,6"
+                                    Background="{DynamicResource Surface.Panel}"
+                                    CornerRadius="4">
+                                <TextBlock x:Name="AnalogValueValidationMessage"
+                                           Text="{Binding ValidationMessage}"
+                                           TextWrapping="Wrap">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource State.Running}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasValidationErrors}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Border>
+                        </StackPanel>
+                    </Border>
 
                     <Border x:Name="MultiAxisRecipeDesignPanel"
                             Style="{StaticResource InspectorCardStyle}"
@@ -476,6 +536,352 @@
                     </Style>
                 </ScrollViewer.Style>
                 <StackPanel Margin="4">
+                    <Border x:Name="RuntimeDebuggerPanel"
+                            Style="{StaticResource InspectorCardStyle}">
+                        <StackPanel>
+                            <TextBlock x:Name="RuntimeDebuggerSectionAnchor"
+                                       Style="{StaticResource SectionCaptionStyle}"
+                                       Text="{loc:Loc Key=Inspector.RuntimeDebugger}" />
+                            <TextBlock Margin="0,2,0,8"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Debugger.Hint}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Text="{Binding RuntimeDebugger.SequenceStateText}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,2,0,0"
+                                       Style="{StaticResource TelemetryTextStyle}"
+                                       Text="{Binding RuntimeDebugger.CurrentStepText}"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding RuntimeDebugger.CurrentStepText}" />
+                            <Border Margin="0,7,0,0"
+                                    Padding="8,5"
+                                    Background="{DynamicResource Surface.Panel}"
+                                    BorderBrush="{DynamicResource Border.Subtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="4">
+                                <TextBlock FontWeight="SemiBold"
+                                           Text="{Binding RuntimeDebugger.PauseReasonText}"
+                                           TextWrapping="Wrap" />
+                            </Border>
+                            <Button x:Name="SemanticSequenceStepButton"
+                                    Margin="0,8,0,0"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{Binding RuntimeDebugger.SemanticStepCommand}"
+                                    Content="{loc:Loc Key=Debugger.NextSequenceStep}"
+                                    Style="{StaticResource PrimaryCommandButtonStyle}"
+                                    ToolTip="{loc:Loc Key=Debugger.NextSequenceStepTooltip}"
+                                    AutomationProperties.Name="{loc:Loc Key=Debugger.NextSequenceStep}" />
+                            <TextBlock Margin="0,5,0,0"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding RuntimeDebugger.OperationStatusText}"
+                                       TextWrapping="Wrap" />
+
+                            <Expander x:Name="DebuggerBreakpointsExpander"
+                                      Margin="0,8,0,0"
+                                      Header="{loc:Loc Key=Debugger.Breakpoints}"
+                                      IsExpanded="True">
+                                <StackPanel Margin="0,5,0,0">
+                                    <ComboBox x:Name="DebuggerBreakpointComboBox"
+                                              ItemsSource="{Binding RuntimeDebugger.Breakpoints}"
+                                              SelectedItem="{Binding RuntimeDebugger.SelectedBreakpoint, Mode=TwoWay}"
+                                              ToolTip="{loc:Loc Key=Debugger.BreakpointSelectionTooltip}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Margin="0,0,6,0"
+                                                               FontWeight="Bold"
+                                                               Text="●">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsEnabled}" Value="True">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource State.Fault}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding DisplayText}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding DisplayText}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button x:Name="ToggleSequenceBreakpointButton"
+                                            Margin="0,6,0,0"
+                                            HorizontalAlignment="Stretch"
+                                            Command="{Binding RuntimeDebugger.ToggleBreakpointCommand}"
+                                            Content="{Binding RuntimeDebugger.BreakpointActionText}"
+                                            Style="{StaticResource GlobalCommandButtonStyle}"
+                                            AutomationProperties.Name="{Binding RuntimeDebugger.BreakpointActionText}" />
+                                </StackPanel>
+                            </Expander>
+
+                            <Expander x:Name="DebuggerWatchesExpander"
+                                      Margin="0,7,0,0"
+                                      Header="{loc:Loc Key=Debugger.StateWatches}">
+                                <StackPanel Margin="0,5,0,0">
+                                    <ComboBox x:Name="DebuggerWatchTargetComboBox"
+                                              ItemsSource="{Binding RuntimeDebugger.WatchTargets}"
+                                              SelectedItem="{Binding RuntimeDebugger.SelectedWatchTarget, Mode=TwoWay}"
+                                              DisplayMemberPath="DisplayText"
+                                              ToolTip="{loc:Loc Key=Debugger.WatchSelectionTooltip}" />
+                                    <WrapPanel Margin="0,6,0,0">
+                                        <Button Margin="0,0,6,4"
+                                                Command="{Binding RuntimeDebugger.AddWatchCommand}"
+                                                Content="{loc:Loc Key=Debugger.AddWatch}"
+                                                Style="{StaticResource GlobalCommandButtonStyle}" />
+                                        <Button Command="{Binding RuntimeDebugger.RemoveWatchCommand}"
+                                                Content="{loc:Loc Key=Debugger.RemoveWatch}"
+                                                Style="{StaticResource GlobalCommandButtonStyle}" />
+                                    </WrapPanel>
+                                    <ListBox x:Name="DebuggerWatchList"
+                                             Margin="0,5,0,0"
+                                             MaxHeight="150"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             ItemsSource="{Binding RuntimeDebugger.Watches}"
+                                             SelectedItem="{Binding RuntimeDebugger.SelectedWatch, Mode=TwoWay}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="3,2">
+                                                    <TextBlock FontWeight="SemiBold"
+                                                               Text="{Binding Name}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                               Text="{Binding KindText}" />
+                                                    <TextBlock Style="{StaticResource TelemetryTextStyle}"
+                                                               Text="{Binding ValueText}"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
+                            </Expander>
+
+                            <Expander x:Name="DebuggerTimelineExpander"
+                                      Margin="0,7,0,0"
+                                      Header="{loc:Loc Key=Debugger.Timeline}">
+                                <StackPanel Margin="0,5,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{Binding RuntimeDebugger.TimelineSummaryText}" />
+                                        <Button Grid.Column="1"
+                                                Margin="8,0,0,0"
+                                                Command="{Binding RuntimeDebugger.ClearTimelineCommand}"
+                                                Content="{loc:Loc Key=Debugger.ClearTimeline}"
+                                                Style="{StaticResource GlobalCommandButtonStyle}" />
+                                    </Grid>
+                                    <ListBox x:Name="DebuggerTimelineList"
+                                             Margin="0,5,0,0"
+                                             MaxHeight="220"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             ItemsSource="{Binding RuntimeDebugger.Timeline}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="3,3">
+                                                    <TextBlock Style="{StaticResource TelemetryTextStyle}"
+                                                               Text="{Binding HeaderText}" />
+                                                    <TextBlock FontWeight="SemiBold"
+                                                               Text="{Binding Category}" />
+                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                               Text="{Binding Code}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding Code}" />
+                                                    <TextBlock Text="{Binding Message}"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
+                            </Expander>
+
+                            <Expander x:Name="DebuggerAlarmsExpander"
+                                      Margin="0,7,0,0"
+                                      Header="{loc:Loc Key=Debugger.AlarmsRecovery}"
+                                      IsExpanded="True">
+                                 <StackPanel Margin="0,5,0,0">
+                                     <TextBlock FontWeight="SemiBold"
+                                                Text="{Binding RuntimeDebugger.AlarmSummaryText}" />
+                                     <TextBlock Margin="0,2,0,0"
+                                                Foreground="{DynamicResource Text.Secondary}"
+                                                Text="{Binding RuntimeDebugger.AlarmAcknowledgementSummaryText}"
+                                                TextWrapping="Wrap" />
+                                     <ListBox x:Name="DebuggerAlarmList"
+                                              Margin="0,5,0,0"
+                                              MaxHeight="170"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             ItemsSource="{Binding RuntimeDebugger.Alarms}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="3,3">
+                                                    <TextBlock FontWeight="SemiBold"
+                                                               Text="{Binding Source}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding Source}" />
+                                                    <TextBlock Text="{Binding State}"
+                                                               TextWrapping="Wrap" />
+                                                     <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                                Text="{Binding RecoveryText}"
+                                                                TextWrapping="Wrap" />
+                                                     <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                                Text="{Binding LifecycleText}"
+                                                                TextWrapping="Wrap" />
+                                                     <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                                Text="{Binding OccurrenceText}"
+                                                                TextWrapping="Wrap" />
+                                                     <Button Margin="0,4,0,0"
+                                                             HorizontalAlignment="Left"
+                                                             Command="{Binding DataContext.RuntimeDebugger.AcknowledgeAlarmCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                             CommandParameter="{Binding}"
+                                                             Content="{Binding AcknowledgeActionText}"
+                                                             IsEnabled="{Binding CanAcknowledge}"
+                                                             Style="{StaticResource GlobalCommandButtonStyle}"
+                                                             AutomationProperties.Name="{Binding AcknowledgeActionText}" />
+                                                 </StackPanel>
+                                             </DataTemplate>
+                                         </ListBox.ItemTemplate>
+                                    </ListBox>
+                                     <TextBlock Margin="0,5,0,0"
+                                                Foreground="{DynamicResource Text.Secondary}"
+                                                Text="{loc:Loc Key=Debugger.AlarmRecoveryHint}"
+                                                TextWrapping="Wrap" />
+                                     <WrapPanel Margin="0,6,0,0">
+                                         <Button x:Name="AcknowledgeAllAlarmsButton"
+                                                 Margin="0,0,6,4"
+                                                 Command="{Binding RuntimeDebugger.AcknowledgeAllAlarmsCommand}"
+                                                 Content="{loc:Loc Key=Debugger.AcknowledgeAllAlarms}"
+                                                 Style="{StaticResource GlobalCommandButtonStyle}"
+                                                 AutomationProperties.Name="{loc:Loc Key=Debugger.AcknowledgeAllAlarms}" />
+                                         <Button Margin="0,0,6,4"
+                                                 Command="{Binding FaultManager.ClearAllCommand}"
+                                                 Content="{loc:Loc Key=Inspector.ClearAll}"
+                                                Style="{StaticResource GlobalCommandButtonStyle}" />
+                                        <Button Command="{Binding ResetCommand}"
+                                                Content="{loc:Loc Key=Shell.Reset}"
+                                                 Style="{StaticResource GlobalCommandButtonStyle}" />
+                                     </WrapPanel>
+                                     <Expander x:Name="DebuggerAlarmHistoryExpander"
+                                               Margin="0,6,0,0"
+                                               Header="{loc:Loc Key=Debugger.AlarmHistory}"
+                                               IsExpanded="False">
+                                         <StackPanel Margin="0,5,0,0">
+                                             <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                        Text="{Binding RuntimeDebugger.AlarmHistorySummaryText}" />
+                                             <ListBox x:Name="DebuggerAlarmHistoryList"
+                                                      Margin="0,5,0,0"
+                                                      MaxHeight="170"
+                                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                      ItemsSource="{Binding RuntimeDebugger.AlarmHistory}">
+                                                 <ListBox.ItemTemplate>
+                                                     <DataTemplate>
+                                                         <StackPanel Margin="3,3">
+                                                             <TextBlock FontWeight="SemiBold"
+                                                                        Text="{Binding Source}"
+                                                                        TextTrimming="CharacterEllipsis"
+                                                                        ToolTip="{Binding Source}" />
+                                                             <TextBlock Text="{Binding State}"
+                                                                        TextWrapping="Wrap" />
+                                                             <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                                        Text="{Binding LifecycleText}"
+                                                                        TextWrapping="Wrap" />
+                                                             <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                                        Text="{Binding OccurrenceText}"
+                                                                        TextWrapping="Wrap" />
+                                                             <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                                        Text="{Binding ClearedAtText}"
+                                                                        TextWrapping="Wrap" />
+                                                         </StackPanel>
+                                                     </DataTemplate>
+                                                 </ListBox.ItemTemplate>
+                                             </ListBox>
+                                         </StackPanel>
+                                     </Expander>
+                                 </StackPanel>
+                             </Expander>
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="SimulationCommandTracePanel"
+                            Style="{StaticResource InspectorCardStyle}">
+                        <StackPanel>
+                            <TextBlock x:Name="SimulationCommandTraceSectionAnchor"
+                                       Style="{StaticResource SectionCaptionStyle}"
+                                       Text="{loc:Loc Key=Simulation.CommandTrace}" />
+                            <TextBlock Margin="0,2,0,8"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Simulation.CommandTraceHint}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,0,0,4"
+                                       FontWeight="SemiBold"
+                                       Text="{Binding SimulationCommandTraceStatusText}"
+                                       TextWrapping="Wrap" />
+                            <WrapPanel Margin="0,4,0,0">
+                                <Button x:Name="StartSimulationCommandTraceCaptureButton"
+                                        Margin="0,0,6,4"
+                                        Content="{loc:Loc Key=Simulation.StartCommandTraceCapture}"
+                                        Style="{StaticResource GlobalCommandButtonStyle}"
+                                        Command="{Binding StartSimulationCommandTraceCaptureCommand}"
+                                        AutomationProperties.Name="{loc:Loc Key=Simulation.StartCommandTraceCapture}" />
+                                <Button x:Name="ExportSimulationCommandTraceButton"
+                                        Margin="0,0,6,4"
+                                        Content="{loc:Loc Key=Simulation.ExportCommandTrace}"
+                                        Style="{StaticResource GlobalCommandButtonStyle}"
+                                        Command="{Binding ExportSimulationCommandTraceCommand}"
+                                        AutomationProperties.Name="{loc:Loc Key=Simulation.ExportCommandTrace}" />
+                                <Button x:Name="ReplaySimulationCommandTraceButton"
+                                        Margin="0,0,6,4"
+                                        Content="{loc:Loc Key=Simulation.ReplayCommandTrace}"
+                                        Style="{StaticResource GlobalCommandButtonStyle}"
+                                        Command="{Binding ReplaySimulationCommandTraceCommand}"
+                                        AutomationProperties.Name="{loc:Loc Key=Simulation.ReplayCommandTrace}" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="UnifiedCommissioningEvidencePanel"
+                            Style="{StaticResource InspectorCardStyle}">
+                        <StackPanel>
+                            <TextBlock x:Name="UnifiedCommissioningEvidenceSectionAnchor"
+                                       Style="{StaticResource SectionCaptionStyle}"
+                                       Text="{loc:Loc Key=Simulation.UnifiedCommissioningEvidence}" />
+                            <TextBlock Margin="0,2,0,8"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Simulation.UnifiedCommissioningEvidenceHint}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,0,0,4"
+                                       FontWeight="SemiBold"
+                                       Text="{Binding UnifiedCommissioningEvidenceStatusText}"
+                                       TextWrapping="Wrap" />
+                            <WrapPanel Margin="0,4,0,0">
+                                <Button x:Name="ExportUnifiedCommissioningEvidenceButton"
+                                        Margin="0,0,6,4"
+                                        Content="{loc:Loc Key=Simulation.ExportUnifiedCommissioningEvidence}"
+                                        Style="{StaticResource GlobalCommandButtonStyle}"
+                                        Command="{Binding ExportUnifiedCommissioningEvidenceCommand}"
+                                        AutomationProperties.Name="{loc:Loc Key=Simulation.ExportUnifiedCommissioningEvidence}" />
+                                <Button x:Name="ImportUnifiedCommissioningEvidenceButton"
+                                        Margin="0,0,6,4"
+                                        Content="{loc:Loc Key=Simulation.ImportUnifiedCommissioningEvidence}"
+                                        Style="{StaticResource GlobalCommandButtonStyle}"
+                                        Command="{Binding ImportUnifiedCommissioningEvidenceCommand}"
+                                        AutomationProperties.Name="{loc:Loc Key=Simulation.ImportUnifiedCommissioningEvidence}" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
                     <Border x:Name="MultiAxisRecipeRunPanel"
                             Style="{StaticResource InspectorCardStyle}">
                         <StackPanel>
@@ -939,6 +1345,22 @@
                                        Foreground="{DynamicResource Text.Secondary}"
                                        Text="{Binding BatchArtifactStatusText}"
                                        TextWrapping="Wrap" />
+                            <TextBlock Margin="0,7,0,0"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Simulation.EvidenceExchangeHint}"
+                                       TextWrapping="Wrap" />
+                            <WrapPanel Margin="0,8,0,0">
+                                <Button Margin="0,0,6,4"
+                                        Content="{loc:Loc Key=Simulation.ExportEvidence}"
+                                        Style="{StaticResource GlobalCommandButtonStyle}"
+                                        Command="{Binding ExportSimulationEvidenceCommand}"
+                                        AutomationProperties.Name="{loc:Loc Key=Simulation.ExportEvidence}" />
+                                <Button Margin="0,0,6,4"
+                                        Content="{loc:Loc Key=Simulation.ImportEvidence}"
+                                        Style="{StaticResource GlobalCommandButtonStyle}"
+                                        Command="{Binding ImportSimulationEvidenceCommand}"
+                                        AutomationProperties.Name="{loc:Loc Key=Simulation.ImportEvidence}" />
+                            </WrapPanel>
                             <Border x:Name="ScenarioAssertionOutcomesPanel"
                                     Margin="0,9,0,0"
                                     Padding="9,7"
@@ -1069,6 +1491,7 @@
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -1124,349 +1547,7 @@
                                         ToolTip="{loc:Loc Key=Equipment.StartManualControlTooltip}"
                                         AutomationProperties.Name="{loc:Loc Key=Equipment.StartManualControl}" />
                             </StackPanel>
-                            <StackPanel x:Name="AxisCommissioningPanel"
-                                        Margin="0,8,0,0">
-                                <StackPanel.Style>
-                                    <Style TargetType="StackPanel">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding HasSelectedAxisStage}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </StackPanel.Style>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Axis.HomePosition}" />
-                                    <TextBlock Grid.Column="1"
-                                               Style="{StaticResource TelemetryTextStyle}"
-                                               Text="{Binding CurrentAxisHomeText}" />
-                                    <TextBlock Grid.Row="1"
-                                               Margin="0,6,0,0"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Axis.SoftLimits}" />
-                                    <TextBlock Grid.Row="1"
-                                               Grid.Column="1"
-                                               Margin="8,6,0,0"
-                                               Style="{StaticResource TelemetryTextStyle}"
-                                               Text="{Binding CurrentAxisLimitsText}" />
-                                    <TextBlock Grid.Row="2"
-                                               Margin="0,6,0,0"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Axis.DriveTuning}" />
-                                    <TextBlock x:Name="AxisDriveTuningText"
-                                               Grid.Row="3"
-                                               Grid.ColumnSpan="2"
-                                               Margin="0,3,0,0"
-                                               HorizontalAlignment="Right"
-                                               Style="{StaticResource TelemetryTextStyle}"
-                                               Text="{Binding CurrentAxisDriveTuningText}"
-                                               TextWrapping="Wrap" />
-                                    <TextBlock Grid.Row="4"
-                                               Margin="0,6,0,0"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Axis.MotionInterlock}" />
-                                    <TextBlock x:Name="AxisInterlockStatusText"
-                                               Grid.Row="4"
-                                               Grid.Column="1"
-                                               Margin="8,6,0,0"
-                                               HorizontalAlignment="Right"
-                                               Text="{Binding CurrentAxisInterlockText}">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource TelemetryTextStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsCurrentAxisInterlocked}" Value="True">
-                                                        <Setter Property="Foreground" Value="{DynamicResource State.Fault}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                    <TextBlock Grid.Row="5"
-                                               Margin="0,6,0,0"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Axis.FollowingError}" />
-                                    <TextBlock x:Name="AxisFollowingErrorText"
-                                               Grid.Row="5"
-                                               Grid.Column="1"
-                                               Margin="8,6,0,0"
-                                               HorizontalAlignment="Right"
-                                               Style="{StaticResource TelemetryTextStyle}"
-                                               Text="{Binding CurrentAxisFollowingErrorText}" />
-                                    <TextBlock Grid.Row="6"
-                                               Margin="0,6,0,0"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Axis.DriveAlarm}" />
-                                    <TextBlock x:Name="AxisDriveAlarmStatusText"
-                                               Grid.Row="6"
-                                               Grid.Column="1"
-                                               Margin="8,6,0,0"
-                                               HorizontalAlignment="Right"
-                                               Text="{Binding CurrentAxisDriveAlarmText}">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource TelemetryTextStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsCurrentAxisDriveAlarmActive}" Value="True">
-                                                        <Setter Property="Foreground" Value="{DynamicResource State.Fault}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </Grid>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="4" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock VerticalAlignment="Center"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Axis.TargetPosition}" />
-                                    <TextBox x:Name="AxisTargetPositionTextBox"
-                                             Grid.Column="2"
-                                             MinWidth="58"
-                                             Height="{StaticResource Density.InspectorFieldHeight}"
-                                             Padding="7,0"
-                                             VerticalContentAlignment="Center"
-                                             TextAlignment="Right"
-                                             Text="{Binding AxisTargetPositionText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                             ToolTip="{Binding AxisTargetPositionValidationText}"
-                                             AutomationProperties.Name="{loc:Loc Key=Axis.TargetPosition}">
-                                        <TextBox.Style>
-                                            <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding HasAxisTargetPositionError}" Value="True">
-                                                        <Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBox.Style>
-                                    </TextBox>
-                                    <TextBlock Grid.Column="4"
-                                               VerticalAlignment="Center"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{Binding CurrentAxisUnitText}" />
-                                    <Button x:Name="MoveAxisAbsoluteButton"
-                                            Grid.Column="6"
-                                            MinWidth="46"
-                                            Command="{Binding MoveAxisAbsoluteCommand}"
-                                            Content="{loc:Loc Key=Axis.Move}"
-                                            ToolTip="{loc:Loc Key=Axis.MoveTooltip}"
-                                            AutomationProperties.Name="{loc:Loc Key=Axis.Move}" />
-                                </Grid>
-                                <TextBlock x:Name="AxisTargetValidationText"
-                                           Margin="2,4,2,0"
-                                           FontSize="10.5"
-                                           Foreground="{DynamicResource State.Fault}"
-                                           Text="{Binding AxisTargetPositionValidationText}"
-                                           TextWrapping="Wrap">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasAxisTargetPositionError}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="4" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock VerticalAlignment="Center"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Axis.RelativeDistance}" />
-                                    <TextBox x:Name="AxisRelativeDistanceTextBox"
-                                             Grid.Column="2"
-                                             MinWidth="58"
-                                             Height="{StaticResource Density.InspectorFieldHeight}"
-                                             Padding="7,0"
-                                             VerticalContentAlignment="Center"
-                                             TextAlignment="Right"
-                                             Text="{Binding AxisRelativeDistanceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                             ToolTip="{Binding AxisRelativeDistanceValidationText}"
-                                             AutomationProperties.Name="{loc:Loc Key=Axis.RelativeDistance}">
-                                        <TextBox.Style>
-                                            <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding HasAxisRelativeDistanceError}" Value="True">
-                                                        <Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBox.Style>
-                                    </TextBox>
-                                    <TextBlock Grid.Column="4"
-                                               VerticalAlignment="Center"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{Binding CurrentAxisUnitText}" />
-                                    <Button x:Name="MoveAxisRelativeButton"
-                                            Grid.Column="6"
-                                            MinWidth="58"
-                                            Command="{Binding MoveAxisRelativeCommand}"
-                                            Content="{loc:Loc Key=Axis.MoveRelative}"
-                                            ToolTip="{loc:Loc Key=Axis.MoveRelativeTooltip}"
-                                            AutomationProperties.Name="{loc:Loc Key=Axis.MoveRelative}" />
-                                </Grid>
-                                <TextBlock x:Name="AxisRelativeDistanceValidationText"
-                                           Margin="2,4,2,0"
-                                           FontSize="10.5"
-                                           Foreground="{DynamicResource State.Fault}"
-                                           Text="{Binding AxisRelativeDistanceValidationText}"
-                                           TextWrapping="Wrap">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasAxisRelativeDistanceError}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="4" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock VerticalAlignment="Center"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Axis.CommandVelocity}" />
-                                    <TextBox x:Name="AxisCommandVelocityTextBox"
-                                             Grid.Column="2"
-                                             MinWidth="58"
-                                             Height="{StaticResource Density.InspectorFieldHeight}"
-                                             Padding="7,0"
-                                             VerticalContentAlignment="Center"
-                                             TextAlignment="Right"
-                                             Text="{Binding AxisCommandVelocityText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                             ToolTip="{Binding AxisCommandVelocityValidationText}"
-                                             AutomationProperties.Name="{loc:Loc Key=Axis.CommandVelocity}">
-                                        <TextBox.Style>
-                                            <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding HasAxisCommandVelocityError}" Value="True">
-                                                        <Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBox.Style>
-                                    </TextBox>
-                                    <TextBlock Grid.Column="4"
-                                               VerticalAlignment="Center"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{Binding CurrentAxisVelocityUnitText}" />
-                                    <Button x:Name="MoveAxisVelocityButton"
-                                            Grid.Column="6"
-                                            MinWidth="58"
-                                            Command="{Binding MoveAxisVelocityCommand}"
-                                            Content="{loc:Loc Key=Axis.MoveVelocity}"
-                                            ToolTip="{loc:Loc Key=Axis.MoveVelocityTooltip}"
-                                            AutomationProperties.Name="{loc:Loc Key=Axis.MoveVelocity}" />
-                                </Grid>
-                                <TextBlock x:Name="AxisCommandVelocityValidationText"
-                                           Margin="2,4,2,0"
-                                           FontSize="10.5"
-                                           Foreground="{DynamicResource State.Fault}"
-                                           Text="{Binding AxisCommandVelocityValidationText}"
-                                           TextWrapping="Wrap">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasAxisCommandVelocityError}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="6" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="6" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="6" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button x:Name="JogNegativeButton"
-                                            IsEnabled="{Binding CanJogAxis}"
-                                            Grid.Column="0"
-                                            Content="{loc:Loc Key=Axis.JogNegative}"
-                                            ToolTip="{loc:Loc Key=Axis.HoldJogNegativeTooltip}"
-                                            AutomationProperties.Name="{loc:Loc Key=Axis.JogNegative}">
-                                        <b:Interaction.Behaviors>
-                                            <behavior:PressAndReleaseCommandBehavior PressCommand="{Binding BeginAxisJogNegativeCommand}"
-                                                                                    ReleaseCommand="{Binding EndAxisJogCommand}" />
-                                        </b:Interaction.Behaviors>
-                                    </Button>
-
-                                    <Button x:Name="HomeAxisButton"
-                                            Grid.Column="2"
-                                            Command="{Binding HomeAxisCommand}"
-                                            Content="{loc:Loc Key=Axis.Home}"
-                                            ToolTip="{loc:Loc Key=Axis.HomeTooltip}"
-                                            AutomationProperties.Name="{loc:Loc Key=Axis.Home}" />
-                                    <Button x:Name="StopAxisMotionButton"
-                                            Grid.Column="4"
-                                            Command="{Binding StopAxisMotionCommand}"
-                                            Content="{loc:Loc Key=Axis.Stop}"
-                                            ToolTip="{loc:Loc Key=Axis.StopTooltip}"
-                                            AutomationProperties.Name="{loc:Loc Key=Axis.Stop}" />
-                                    <Button x:Name="JogPositiveButton"
-                                            IsEnabled="{Binding CanJogAxis}"
-                                            Grid.Column="6"
-                                            Content="{loc:Loc Key=Axis.JogPositive}"
-                                            ToolTip="{loc:Loc Key=Axis.HoldJogPositiveTooltip}"
-                                            AutomationProperties.Name="{loc:Loc Key=Axis.JogPositive}">
-                                        <b:Interaction.Behaviors>
-                                            <behavior:PressAndReleaseCommandBehavior PressCommand="{Binding BeginAxisJogPositiveCommand}"
-                                                                                    ReleaseCommand="{Binding EndAxisJogCommand}" />
-                                        </b:Interaction.Behaviors>
-                                    </Button>
-
-                                </Grid>
-                                <TextBlock Margin="2,7,2,0"
-                                           FontSize="10.5"
-                                           Foreground="{DynamicResource Text.Secondary}"
-                                           Text="{Binding AxisCommissioningHintText}"
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
+                            <local:AxisCommissioningPanelView x:Name="AxisCommissioningContent" />
                             <StackPanel x:Name="SensorCommissioningPanel"
                                         Margin="0,10,0,0">
                                 <StackPanel.Style>
@@ -1889,6 +1970,388 @@
                                        Text="{Binding CurrentCameraEvidenceDetailsText}"
                                        ToolTip="{Binding CurrentCameraEvidenceDetailsText}"
                                        TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="MachineIntegrationPanel"
+                            Style="{StaticResource InspectorCardStyle}">
+                        <StackPanel>
+                            <TextBlock x:Name="MachineIntegrationSectionAnchor"
+                                       Style="{StaticResource SectionCaptionStyle}"
+                                       Text="{loc:Loc Key=Integration.Workspace}" />
+                            <TextBlock Margin="0,2,0,8"
+                                       FontSize="10.5"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Integration.Hint}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
+                                       Text="{loc:Loc Key=Integration.ExchangeRoot}" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="IntegrationExchangeRootTextBox"
+                                         MinHeight="28"
+                                         HorizontalScrollBarVisibility="Auto"
+                                         Text="{Binding Integration.ExchangeRoot, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         TextWrapping="NoWrap"
+                                         ToolTip="{Binding Integration.ExchangeRoot}"
+                                         AutomationProperties.AutomationId="IntegrationExchangeRootTextBox"
+                                         AutomationProperties.Name="{loc:Loc Key=Integration.ExchangeRoot}" />
+                                <Button x:Name="BrowseIntegrationExchangeRootButton"
+                                        Grid.Column="1"
+                                        Margin="6,0,0,0"
+                                        Command="{Binding Integration.BrowseExchangeRootCommand}"
+                                        Content="{loc:Loc Key=Integration.Browse}"
+                                        ToolTip="{loc:Loc Key=Integration.BrowseExchangeRootTooltip}"
+                                        AutomationProperties.AutomationId="BrowseIntegrationExchangeRootButton"
+                                        AutomationProperties.Name="{loc:Loc Key=Integration.Browse}" />
+                            </Grid>
+                            <TextBlock Margin="0,3,0,0"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding Integration.ExchangeRootStatusText}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
+                                       Text="{loc:Loc Key=Integration.Recipe}" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="IntegrationRecipePathTextBox"
+                                         MinHeight="28"
+                                         HorizontalScrollBarVisibility="Auto"
+                                         Text="{Binding Integration.InspectionRecipePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         TextWrapping="NoWrap"
+                                         ToolTip="{Binding Integration.InspectionRecipePath}"
+                                         AutomationProperties.AutomationId="IntegrationRecipePathTextBox"
+                                         AutomationProperties.Name="{loc:Loc Key=Integration.Recipe}" />
+                                <Button x:Name="BrowseIntegrationRecipeButton"
+                                        Grid.Column="1"
+                                        Margin="6,0,0,0"
+                                        Command="{Binding Integration.BrowseRecipeCommand}"
+                                        Content="{loc:Loc Key=Integration.Browse}"
+                                        ToolTip="{loc:Loc Key=Integration.BrowseRecipeTooltip}"
+                                        AutomationProperties.AutomationId="BrowseIntegrationRecipeButton"
+                                        AutomationProperties.Name="{loc:Loc Key=Integration.Browse}" />
+                            </Grid>
+                            <TextBlock Margin="0,3,0,0"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding Integration.InspectionRecipeStatusText}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
+                                       Text="{loc:Loc Key=Integration.ConsumerVersion}" />
+                            <TextBox x:Name="IntegrationTwoDConsumerVersionTextBox"
+                                     MinHeight="28"
+                                     Text="{Binding Integration.TwoDConsumerVersion, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.AutomationId="IntegrationTwoDConsumerVersionTextBox"
+                                     AutomationProperties.Name="{loc:Loc Key=Integration.ConsumerVersion}" />
+                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
+                                       Text="{loc:Loc Key=Integration.ConsumerCommit}" />
+                            <TextBox x:Name="IntegrationTwoDConsumerCommitTextBox"
+                                     MinHeight="28"
+                                     FontFamily="{StaticResource Typography.Telemetry}"
+                                     FontSize="9.5"
+                                     HorizontalScrollBarVisibility="Auto"
+                                     Text="{Binding Integration.TwoDConsumerCommit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     TextWrapping="NoWrap"
+                                     ToolTip="{loc:Loc Key=Integration.ConsumerCommitTooltip}"
+                                     AutomationProperties.AutomationId="IntegrationTwoDConsumerCommitTextBox"
+                                     AutomationProperties.Name="{loc:Loc Key=Integration.ConsumerCommit}" />
+                            <TextBlock Margin="0,3,0,0"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding Integration.TwoDConsumerIdentityStatusText}"
+                                       TextWrapping="Wrap" />
+                            <Expander Margin="0,10,0,0"
+                                      IsExpanded="True"
+                                      Header="{loc:Loc Key=Integration.TcpSetup}">
+                                <StackPanel Margin="0,7,0,0">
+                                    <TextBlock Margin="0,0,0,6"
+                                               FontSize="10"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{loc:Loc Key=Integration.TcpSetupHint}"
+                                               TextWrapping="Wrap" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="7" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Margin="0,6,0,0"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{loc:Loc Key=Integration.TcpListenAddress}" />
+                                        <TextBox x:Name="IntegrationTcpListenAddressTextBox"
+                                                 Grid.Column="2"
+                                                 MinHeight="28"
+                                                 Text="{Binding Integration.TcpListenAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                                 AutomationProperties.AutomationId="IntegrationTcpListenAddressTextBox"
+                                                 AutomationProperties.Name="{loc:Loc Key=Integration.TcpListenAddress}" />
+                                        <TextBlock Grid.Row="1"
+                                                   Margin="0,7,0,0"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{loc:Loc Key=Integration.TcpListenPort}" />
+                                        <TextBox x:Name="IntegrationTcpListenPortTextBox"
+                                                 Grid.Row="1"
+                                                 Grid.Column="2"
+                                                 Margin="0,3,0,0"
+                                                 MinHeight="28"
+                                                 Text="{Binding Integration.TcpListenPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                                 AutomationProperties.AutomationId="IntegrationTcpListenPortTextBox"
+                                                 AutomationProperties.Name="{loc:Loc Key=Integration.TcpListenPort}" />
+                                        <TextBlock Grid.Row="2"
+                                                   Margin="0,7,0,0"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{loc:Loc Key=Integration.TcpPeerHost}" />
+                                        <TextBox x:Name="IntegrationTcpPeerHostTextBox"
+                                                 Grid.Row="2"
+                                                 Grid.Column="2"
+                                                 Margin="0,3,0,0"
+                                                 MinHeight="28"
+                                                 Text="{Binding Integration.TcpPeerHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                                 AutomationProperties.AutomationId="IntegrationTcpPeerHostTextBox"
+                                                 AutomationProperties.Name="{loc:Loc Key=Integration.TcpPeerHost}" />
+                                        <TextBlock Grid.Row="3"
+                                                   Margin="0,7,0,0"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{loc:Loc Key=Integration.TcpPeerPort}" />
+                                        <TextBox x:Name="IntegrationTcpPeerPortTextBox"
+                                                 Grid.Row="3"
+                                                 Grid.Column="2"
+                                                 Margin="0,3,0,0"
+                                                 MinHeight="28"
+                                                 Text="{Binding Integration.TcpPeerPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                                 AutomationProperties.AutomationId="IntegrationTcpPeerPortTextBox"
+                                                 AutomationProperties.Name="{loc:Loc Key=Integration.TcpPeerPort}" />
+                                        <TextBlock Grid.Row="4"
+                                                   Margin="0,7,0,0"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{loc:Loc Key=Integration.TcpSharedKey}" />
+                                        <PasswordBox x:Name="IntegrationTcpSharedKeyBox"
+                                                     Grid.Row="4"
+                                                     Grid.Column="2"
+                                                     Margin="0,3,0,0"
+                                                     MinHeight="28"
+                                                     PasswordChanged="OnIntegrationTcpSharedKeyPasswordChanged"
+                                                     IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                                     AutomationProperties.AutomationId="IntegrationTcpSharedKeyBox"
+                                                     AutomationProperties.Name="{loc:Loc Key=Integration.TcpSharedKey}" />
+                                    </Grid>
+                                    <TextBlock x:Name="IntegrationTcpSharedKeyStatusTextBlock"
+                                               Margin="0,5,0,0"
+                                               FontSize="10"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding Integration.SharedKeyStatusText}"
+                                               TextWrapping="Wrap" />
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="7" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="StartIntegrationTcpListenerButton"
+                                                Command="{Binding Integration.StartTcpListenerCommand}"
+                                                MinHeight="34"
+                                                Style="{StaticResource PrimaryCommandButtonStyle}"
+                                                AutomationProperties.AutomationId="StartIntegrationTcpListenerButton"
+                                                AutomationProperties.Name="{loc:Loc Key=Integration.StartTcpListener}">
+                                            <TextBlock Text="{loc:Loc Key=Integration.StartTcpListener}"
+                                                       TextAlignment="Center"
+                                                       TextWrapping="Wrap" />
+                                        </Button>
+                                        <Button x:Name="StopIntegrationTcpListenerButton"
+                                                Grid.Column="2"
+                                                Command="{Binding Integration.StopTcpListenerCommand}"
+                                                MinHeight="34"
+                                                AutomationProperties.AutomationId="StopIntegrationTcpListenerButton"
+                                                AutomationProperties.Name="{loc:Loc Key=Integration.StopTcpListener}">
+                                            <TextBlock Text="{loc:Loc Key=Integration.StopTcpListener}"
+                                                       TextAlignment="Center"
+                                                       TextWrapping="Wrap" />
+                                        </Button>
+                                    </Grid>
+                                    <Grid Margin="0,6,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="7" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="PingIntegrationTcpPeerButton"
+                                                Command="{Binding Integration.PingTcpPeerCommand}"
+                                                MinHeight="34"
+                                                AutomationProperties.AutomationId="PingIntegrationTcpPeerButton"
+                                                AutomationProperties.Name="{loc:Loc Key=Integration.PingTcpPeer}">
+                                            <TextBlock Text="{loc:Loc Key=Integration.PingTcpPeer}"
+                                                       TextAlignment="Center"
+                                                       TextWrapping="Wrap" />
+                                        </Button>
+                                        <Button x:Name="PushIntegrationTcpTransactionButton"
+                                                Grid.Column="2"
+                                                Command="{Binding Integration.PushLatestTransactionCommand}"
+                                                MinHeight="34"
+                                                AutomationProperties.AutomationId="PushIntegrationTcpTransactionButton"
+                                                AutomationProperties.Name="{loc:Loc Key=Integration.PushTcpTransaction}">
+                                            <TextBlock Text="{loc:Loc Key=Integration.PushTcpTransaction}"
+                                                       TextAlignment="Center"
+                                                       TextWrapping="Wrap" />
+                                        </Button>
+                                    </Grid>
+                                    <Button x:Name="PullIntegrationTcpTransactionButton"
+                                            Margin="0,6,0,0"
+                                            Command="{Binding Integration.PullLatestTransactionCommand}"
+                                            MinHeight="34"
+                                            AutomationProperties.AutomationId="PullIntegrationTcpTransactionButton"
+                                            AutomationProperties.Name="{loc:Loc Key=Integration.PullTcpTransaction}">
+                                        <TextBlock Text="{loc:Loc Key=Integration.PullTcpTransaction}"
+                                                   TextAlignment="Center"
+                                                   TextWrapping="Wrap" />
+                                    </Button>
+                                    <TextBlock x:Name="IntegrationTcpListenerStatusTextBlock"
+                                               Margin="0,6,0,0"
+                                               FontSize="10"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding Integration.TcpListenerStatusText}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock x:Name="IntegrationTcpTransferStatusTextBlock"
+                                               Margin="0,3,0,0"
+                                               FontFamily="{StaticResource Typography.Telemetry}"
+                                               FontSize="9.5"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding Integration.LastTcpTransferText}"
+                                               TextWrapping="Wrap"
+                                               ToolTip="{Binding Integration.LastTcpTransferText}" />
+                                </StackPanel>
+                            </Expander>
+                            <Grid Margin="0,9,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="7" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="SaveIntegrationSetupButton"
+                                        Command="{Binding Integration.SaveSetupCommand}"
+                                        Content="{loc:Loc Key=Integration.SaveSetup}"
+                                        ToolTip="{loc:Loc Key=Integration.SaveSetupTooltip}"
+                                        AutomationProperties.AutomationId="SaveIntegrationSetupButton"
+                                        AutomationProperties.Name="{loc:Loc Key=Integration.SaveSetup}" />
+                                <Button x:Name="ResetIntegrationSetupButton"
+                                        Grid.Column="2"
+                                        Command="{Binding Integration.ResetSetupCommand}"
+                                        Click="OnResetIntegrationSetupClicked"
+                                        Content="{loc:Loc Key=Integration.ResetSetup}"
+                                        ToolTip="{loc:Loc Key=Integration.ResetSetupTooltip}"
+                                        AutomationProperties.AutomationId="ResetIntegrationSetupButton"
+                                        AutomationProperties.Name="{loc:Loc Key=Integration.ResetSetup}" />
+                            </Grid>
+                            <Grid Margin="0,9,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="7" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="PublishTwoDImageHandoffButton"
+                                        Command="{Binding Integration.PublishTwoDImageHandoffCommand}"
+                                        IsEnabled="{Binding Integration.CanPublishTwoDImageHandoff}"
+                                        Style="{StaticResource PrimaryCommandButtonStyle}"
+                                        Content="{loc:Loc Key=Integration.PublishTwoDShort}"
+                                        ToolTip="{loc:Loc Key=Integration.PublishTwoDTooltip}"
+                                        AutomationProperties.AutomationId="PublishTwoDImageHandoffButton"
+                                        AutomationProperties.Name="{loc:Loc Key=Integration.PublishTwoD}" />
+                                <Button x:Name="RefreshIntegrationResultsButton"
+                                        Grid.Column="2"
+                                        Command="{Binding Integration.RefreshResultsCommand}"
+                                        IsEnabled="{Binding Integration.CanRefreshResults}"
+                                        Content="{loc:Loc Key=Integration.RefreshResults}"
+                                        ToolTip="{loc:Loc Key=Integration.RefreshResultsTooltip}"
+                                        AutomationProperties.AutomationId="RefreshIntegrationResultsButton"
+                                        AutomationProperties.Name="{loc:Loc Key=Integration.RefreshResults}" />
+                            </Grid>
+                            <Grid Margin="0,10,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{loc:Loc Key=Integration.HandoffStatus}" />
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding Integration.HandoffStatusText}"
+                                           TextWrapping="Wrap"
+                                           ToolTip="{Binding Integration.HandoffStatusText}" />
+                                <TextBlock Grid.Row="1"
+                                           Margin="0,5,0,0"
+                                           Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{loc:Loc Key=Integration.AcknowledgementStatus}" />
+                                <TextBlock Grid.Row="1"
+                                           Grid.Column="2"
+                                           Margin="0,5,0,0"
+                                           Text="{Binding Integration.AcknowledgementStatusText}"
+                                           TextWrapping="Wrap"
+                                           ToolTip="{Binding Integration.AcknowledgementStatusText}" />
+                                <TextBlock Grid.Row="2"
+                                           Margin="0,5,0,0"
+                                           Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{loc:Loc Key=Integration.ResultStatus}" />
+                                <TextBlock x:Name="MachineIntegrationResultStatusTextBlock"
+                                           Grid.Row="2"
+                                           Grid.Column="2"
+                                           Margin="0,5,0,0"
+                                           Text="{Binding Integration.ResultStatusText}"
+                                           TextWrapping="Wrap"
+                                           ToolTip="{Binding Integration.ResultStatusText}" />
+                                <TextBlock Grid.Row="3"
+                                           Margin="0,5,0,0"
+                                           Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{loc:Loc Key=Integration.ProjectionStatus}" />
+                                <TextBlock Grid.Row="3"
+                                           Grid.Column="2"
+                                           Margin="0,5,0,0"
+                                           Text="{Binding Integration.ProjectionStatusText}"
+                                           TextWrapping="Wrap"
+                                           ToolTip="{Binding Integration.ProjectionStatusText}" />
+                                <TextBlock Grid.Row="4"
+                                           Margin="0,5,0,0"
+                                           Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{loc:Loc Key=Integration.LastTransaction}" />
+                                <TextBlock Grid.Row="4"
+                                           Grid.Column="2"
+                                           Margin="0,5,0,0"
+                                           FontFamily="{StaticResource Typography.Telemetry}"
+                                           FontSize="9.5"
+                                           Text="{Binding Integration.LastTransactionText}"
+                                           TextWrapping="Wrap"
+                                           ToolTip="{Binding Integration.LastTransactionText}" />
+                            </Grid>
+                            <TextBlock Margin="0,9,0,0"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Integration.ThreeDReadOnlyHint}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock x:Name="MachineIntegrationStatusTextBlock"
+                                       Margin="0,7,0,0"
+                                       Text="{Binding Integration.StatusText}"
+                                       TextWrapping="Wrap"
+                                       ToolTip="{Binding Integration.StatusText}" />
                         </StackPanel>
                     </Border>
                     <Border>

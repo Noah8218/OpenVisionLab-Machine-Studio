@@ -29,6 +29,12 @@
     <None Include="..\..\samples\sample-pick-and-place.ovmachine"
           Link="sample-pick-and-place.ovmachine"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\VisionInspectionCell\VisionInspectionCell.ovmachine"
+          Link="VisionInspectionCell.ovmachine"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\WaferEFEMVisionCell\WaferEFEMVisionCell.ovmachine"
+          Link="WaferEFEMVisionCell.ovmachine"
+          CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\SemiconductorRecipes\*.ovmachine"
           Link="SemiconductorRecipes\%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />

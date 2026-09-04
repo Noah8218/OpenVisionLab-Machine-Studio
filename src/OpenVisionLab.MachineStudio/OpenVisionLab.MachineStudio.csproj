@@ -19,6 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="OpenVisionLab.MachineStudio.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.122" />
     <PackageReference Include="WPF-UI" Version="$(WpfUiVersion)" />
     <PackageReference Include="OpenVisionLab.Integration.Transport.Tcp" Version="[0.1.0-alpha.3]" />
@@ -84,6 +88,7 @@
     <PropertyGroup>
       <_OpenVisionRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..'))</_OpenVisionRepositoryRoot>
       <_OpenVisionBuildIdentityFile>$(IntermediateOutputPath)OpenVisionBuildIdentity.g.cs</_OpenVisionBuildIdentityFile>
+      <_OpenVisionApplicationId>OpenVisionLab.MachineStudio</_OpenVisionApplicationId>
     </PropertyGroup>
     <Exec Command="git -C &quot;$(_OpenVisionRepositoryRoot)&quot; rev-parse HEAD"
           ConsoleToMSBuild="true"
@@ -112,6 +117,14 @@
         <_Parameter1>$(_OpenVisionInformationalVersion)</_Parameter1>
       </_OpenVisionBuildIdentityAttribute>
       <_OpenVisionBuildIdentityAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>OpenVisionIntegrationApplicationId</_Parameter1>
+        <_Parameter2>$(_OpenVisionApplicationId)</_Parameter2>
+      </_OpenVisionBuildIdentityAttribute>
+      <_OpenVisionBuildIdentityAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>OpenVisionApplicationVersion</_Parameter1>
+        <_Parameter2>$(Version)</_Parameter2>
+      </_OpenVisionBuildIdentityAttribute>
+      <_OpenVisionBuildIdentityAttribute Include="System.Reflection.AssemblyMetadataAttribute">
         <_Parameter1>OpenVisionSourceCommit</_Parameter1>
         <_Parameter2>$(_OpenVisionSourceCommit)</_Parameter2>
       </_OpenVisionBuildIdentityAttribute>
@@ -124,6 +137,42 @@
     <WriteCodeFragment Language="C#"
                        OutputFile="$(_OpenVisionBuildIdentityFile)"
                        AssemblyAttributes="@(_OpenVisionBuildIdentityAttribute)" />
+  </Target>
+
+  <Target Name="GenerateOpenVisionRuntimeBuildManifest"
+          AfterTargets="Build"
+          DependsOnTargets="GenerateOpenVisionBuildIdentity"
+          Condition="Exists('$(TargetPath)')">
+    <GetFileHash Files="$(TargetPath)" Algorithm="SHA256" HashEncoding="hex">
+      <Output TaskParameter="Items" ItemName="_OpenVisionRuntimeEntryAssembly" />
+    </GetFileHash>
+    <Exec Command="powershell -NoProfile -NonInteractive -Command &quot;(Get-Item -LiteralPath '$(TargetPath)').Length&quot;"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" ItemName="_OpenVisionEntryAssemblyLengthOutput" />
+    </Exec>
+    <PropertyGroup>
+      <_OpenVisionRuntimeManifestPath>$(TargetDir)openvisionlab.runtime.json</_OpenVisionRuntimeManifestPath>
+      <_OpenVisionEntryAssemblyByteLength>@(_OpenVisionEntryAssemblyLengthOutput)</_OpenVisionEntryAssemblyByteLength>
+      <_OpenVisionEntryAssemblySha256>@(_OpenVisionRuntimeEntryAssembly->'%(FileHash)')</_OpenVisionEntryAssemblySha256>
+      <_OpenVisionRuntimeManifestJson>{&quot;schemaVersion&quot;:&quot;1.0&quot;,&quot;identity&quot;:{&quot;applicationId&quot;:&quot;$(_OpenVisionApplicationId)&quot;,&quot;applicationVersion&quot;:&quot;$(Version)&quot;,&quot;sourceCommit&quot;:&quot;$(_OpenVisionSourceCommit)&quot;,&quot;sourceState&quot;:&quot;$(_OpenVisionSourceState)&quot;},&quot;entryAssembly&quot;:{&quot;relativePath&quot;:&quot;$(TargetFileName)&quot;,&quot;byteLength&quot;:$(_OpenVisionEntryAssemblyByteLength),&quot;sha256&quot;:&quot;$(_OpenVisionEntryAssemblySha256)&quot;}}</_OpenVisionRuntimeManifestJson>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_OpenVisionRuntimeManifestPath)"
+                      Lines="$(_OpenVisionRuntimeManifestJson)"
+                      Overwrite="true"
+                      Encoding="UTF-8" />
+  </Target>
+
+  <Target Name="IncludeOpenVisionRuntimeBuildManifestInPublish"
+          AfterTargets="ComputeFilesToPublish"
+          DependsOnTargets="GenerateOpenVisionRuntimeBuildManifest"
+          Condition="Exists('$(_OpenVisionRuntimeManifestPath)')">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(_OpenVisionRuntimeManifestPath)">
+        <RelativePath>openvisionlab.runtime.json</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
   </Target>
 
 </Project>

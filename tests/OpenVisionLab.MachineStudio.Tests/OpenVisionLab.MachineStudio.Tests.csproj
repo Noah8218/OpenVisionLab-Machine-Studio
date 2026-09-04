@@ -14,10 +14,18 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="OpenVisionLab.Integration.Transport.Tcp" Version="[0.1.0-alpha.3]" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\OpenVisionLab.MachineStudio\OpenVisionLab.MachineStudio.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="OpenVisionIntegrationApplicationId" Value="OpenVisionLab.MachineStudio" />
+    <AssemblyMetadata Include="OpenVisionApplicationVersion" Value="0.1.0-test" />
+    <AssemblyMetadata Include="OpenVisionSourceCommit" Value="1111111111111111111111111111111111111111" />
+    <AssemblyMetadata Include="OpenVisionSourceState" Value="dirty" />
   </ItemGroup>
 
   <ItemGroup>

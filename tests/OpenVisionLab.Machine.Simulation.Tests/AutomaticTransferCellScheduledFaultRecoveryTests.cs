@@ -211,7 +211,11 @@ public sealed class AutomaticTransferCellScheduledFaultRecoveryTests
         Assert.True((await ExecuteAsync(
             engine, new StartConditionScenarioCommand(profile), commandResults, snapshots, events)).IsAccepted);
         Assert.True((await ExecuteAsync(
-            engine, new StartAutomaticRunCommand(), commandResults, snapshots, events)).IsAccepted);
+            engine,
+            new StartAutomaticRunCommand(beginRealTime: false),
+            commandResults,
+            snapshots,
+            events)).IsAccepted);
         Assert.True((await ExecuteAsync(
             engine, new PauseCommand(), commandResults, snapshots, events)).IsAccepted);
 

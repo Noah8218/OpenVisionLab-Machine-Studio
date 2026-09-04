@@ -13,13 +13,22 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.4`
+Current version: `v0.2.0-dev.5`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.5` (2026-09-05)
+
+- Consolidated the Machine Studio refactoring into explicit ownership boundaries
+  across simulation, ViewModel, and Direct EXE smoke verification code.
+- Preserved the existing project, recipe, simulation, and integration contracts
+  while adding focused unit coverage for the extracted responsibilities.
+- The 31-state Direct EXE Recipe Connection matrix remains partial (16/31); this
+  development candidate does not claim full runtime UI verification.
 
 #### `v0.2.0-dev.4` (2026-09-04)
 

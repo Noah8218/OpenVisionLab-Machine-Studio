@@ -287,6 +287,8 @@ public sealed class DeterministicFaultInjectionTests
             var injected = await engine.EnqueueCommandAsync(inject);
             Assert.True(injected.IsAccepted, injected.Detail);
             var paused = engine.CurrentSnapshot;
+            var baselineTick = paused.TickIndex;
+            var baselineTime = paused.SimulationTime;
             await Task.Delay(50);
             Assert.Equal(paused.TickIndex, engine.CurrentSnapshot.TickIndex);
             Assert.Equal(paused.Axes[0].Position, engine.CurrentSnapshot.Axes[0].Position, 10);
@@ -336,16 +338,16 @@ public sealed class DeterministicFaultInjectionTests
             Assert.True(injectedEvent.EventIndex < alarmEvent.EventIndex);
             Assert.True(alarmEvent.EventIndex < alarmClearedEvent.EventIndex);
             Assert.True(alarmClearedEvent.EventIndex < faultClearedEvent.EventIndex);
-            Assert.Equal(4, alarmEvent.TickIndex);
-            Assert.Equal(TimeSpan.FromMilliseconds(20), alarmEvent.SimulationTime);
+            Assert.Equal(baselineTick + 4, alarmEvent.TickIndex);
+            Assert.Equal(baselineTime + TimeSpan.FromMilliseconds(20), alarmEvent.SimulationTime);
             runEvidence.Add(string.Join('|',
                 alarmed.State,
                 alarmed.Position,
                 alarmed.CommandPosition,
                 alarmed.FollowingError,
                 alarmed.DriveAlarmActive,
-                alarmEvent.TickIndex,
-                alarmEvent.SimulationTime));
+                alarmEvent.TickIndex - baselineTick,
+                alarmEvent.SimulationTime - baselineTime));
         }
 
         Assert.Equal(runEvidence[0], runEvidence[1]);

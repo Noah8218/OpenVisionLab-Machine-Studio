@@ -22,6 +22,14 @@ public sealed class SequenceStepTemplateCatalogTests
         Assert.Equal(
             new[] { "axis.x" },
             _catalog.GetTargets(SequenceStepAction.MoveAxis, targets).Select(target => target.Id));
+        Assert.Equal(
+            new[] { "sequence.child" },
+            _catalog.GetTargets(
+                SequenceStepAction.CallSubsequence,
+                targets.Append(new SequenceAuthoringTarget(
+                    "sequence.child",
+                    "Child sequence",
+                    SequenceAuthoringTargetKind.Subsequence))).Select(target => target.Id));
         Assert.Empty(_catalog.GetTargets(SequenceStepAction.Complete, targets));
     }
 

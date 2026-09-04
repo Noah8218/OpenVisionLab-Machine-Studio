@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -5,6 +6,8 @@ namespace OpenVisionLab.Machine.Core.Projects;
 
 public sealed class ProjectDocumentStore
 {
+    private static readonly Version CurrentSchemaVersion = Version.Parse(MachineProjectDocument.CurrentSchema);
+
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
@@ -14,9 +17,11 @@ public sealed class ProjectDocumentStore
 
     public string Save(MachineProjectDocument document)
     {
-        document.Schema = MachineProjectDocument.CurrentSchema;
-        document.ModifiedAt = DateTimeOffset.UtcNow;
-        return Serialize(document);
+        ArgumentNullException.ThrowIfNull(document);
+        var modifiedAt = DateTimeOffset.UtcNow;
+        var json = SerializeForSave(document, modifiedAt);
+        ApplySaveMetadata(document, modifiedAt);
+        return json;
     }
 
     public string Serialize(MachineProjectDocument document)
@@ -36,11 +41,23 @@ public sealed class ProjectDocumentStore
     public MachineProjectDocument Load(string json)
     {
         var doc = JsonSerializer.Deserialize<MachineProjectDocument>(json, Options)
-                  ?? throw new InvalidOperationException("Failed to deserialize project document.");
+                  ?? throw new ProjectDocumentLoadException(
+                      ProjectDocumentLoadErrorCode.EmptyDocument,
+                      "The project document is empty.");
 
         if (string.IsNullOrEmpty(doc.Schema))
         {
             doc.Schema = MachineProjectDocument.CurrentSchema;
+        }
+
+        if (!Version.TryParse(doc.Schema, out var schemaVersion)
+            || schemaVersion > CurrentSchemaVersion)
+        {
+            throw new ProjectDocumentLoadException(
+                ProjectDocumentLoadErrorCode.UnsupportedSchema,
+                $"Unsupported machine project schema '{doc.Schema}'. " +
+                $"The latest supported schema is '{MachineProjectDocument.CurrentSchema}'.",
+                doc.Schema);
         }
 
         doc.Simulation ??= new SimulationDefinition();
@@ -60,13 +77,16 @@ public sealed class ProjectDocumentStore
 
     public async Task SaveAsync(MachineProjectDocument document, string path, CancellationToken cancellationToken = default)
     {
-        var json = Save(document);
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var fullPath = Path.GetFullPath(path);
         var directory = Path.GetDirectoryName(fullPath)
             ?? throw new ArgumentException("The project path must include a directory.", nameof(path));
         var temporaryPath = Path.Combine(
             directory,
             $".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
+        var modifiedAt = DateTimeOffset.UtcNow;
+        var json = SerializeForSave(document, modifiedAt);
 
         try
         {
@@ -79,6 +99,8 @@ public sealed class ProjectDocumentStore
             {
                 File.Move(temporaryPath, fullPath);
             }
+
+            ApplySaveMetadata(document, modifiedAt);
         }
         finally
         {
@@ -91,7 +113,73 @@ public sealed class ProjectDocumentStore
 
     public async Task<MachineProjectDocument> LoadAsync(string path, CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var fullPath = Path.GetFullPath(path);
+        try
+        {
+            return await LoadFileAsync(fullPath, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception primaryException) when (ShouldTryBackup(primaryException))
+        {
+            try
+            {
+                return await LoadFileAsync(fullPath + ".bak", cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception backupException) when (IsExpectedLoadFailure(backupException))
+            {
+                if (backupException is ProjectDocumentLoadException
+                    {
+                        ErrorCode: ProjectDocumentLoadErrorCode.UnsupportedSchema
+                    })
+                {
+                    ExceptionDispatchInfo.Capture(backupException).Throw();
+                }
+
+                ExceptionDispatchInfo.Capture(primaryException).Throw();
+                throw;
+            }
+        }
+    }
+
+    private string SerializeForSave(MachineProjectDocument document, DateTimeOffset modifiedAt)
+    {
+        var root = JsonNode.Parse(Serialize(document))?.AsObject()
+            ?? throw new InvalidOperationException("Failed to serialize project document.");
+        root["schema"] = MachineProjectDocument.CurrentSchema;
+        root["modifiedAt"] = modifiedAt;
+        return root.ToJsonString(Options);
+    }
+
+    private static void ApplySaveMetadata(MachineProjectDocument document, DateTimeOffset modifiedAt)
+    {
+        document.Schema = MachineProjectDocument.CurrentSchema;
+        document.ModifiedAt = modifiedAt;
+    }
+
+    private async Task<MachineProjectDocument> LoadFileAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
         var json = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
         return Load(json);
     }
+
+    private static bool ShouldTryBackup(Exception exception) => exception switch
+    {
+        ProjectDocumentLoadException
+        {
+            ErrorCode: ProjectDocumentLoadErrorCode.UnsupportedSchema
+        } => false,
+        _ => IsExpectedLoadFailure(exception)
+    };
+
+    private static bool IsExpectedLoadFailure(Exception exception) => exception switch
+    {
+        ProjectDocumentLoadException => true,
+        JsonException => true,
+        IOException => true,
+        UnauthorizedAccessException => true,
+        ArgumentOutOfRangeException => true,
+        _ => false
+    };
 }

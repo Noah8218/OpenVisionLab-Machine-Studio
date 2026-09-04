@@ -7,7 +7,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using OpenVisionLab.MachineStudio.View.Scene;
 using OpenVisionLab.MachineStudio.View.Project;
-using OpenVisionLab.MachineStudio.View.Integration;
 using OpenVisionLab.MachineStudio.View.Sequence;
 
 namespace OpenVisionLab.MachineStudio.View.Shell;
@@ -102,9 +101,6 @@ internal static class SmokeLayoutValidator
         var connectionWorkbench = EnumerateVisualDescendants(window)
             .OfType<RecipeConnectionWorkbenchView>()
             .FirstOrDefault(workbench => workbench.IsVisible);
-        var integrationExchange = EnumerateVisualDescendants(window)
-            .OfType<MachineIntegrationExchangeView>()
-            .FirstOrDefault(exchange => exchange.IsVisible);
         var failures = new List<string>();
         var expectedDpi = 96.0 * requestedScalePercent / 100.0;
 
@@ -123,7 +119,7 @@ internal static class SmokeLayoutValidator
                 "The scene renderer did not rebuild FormattedText for the observed DPI.");
         }
 
-        if (sceneViewport is null && sequenceEditor is null && connectionWorkbench is null && integrationExchange is null)
+        if (sceneViewport is null && sequenceEditor is null && connectionWorkbench is null)
         {
             failures.Add("No supported document surface was visible during layout validation.");
         }

@@ -54,12 +54,20 @@ public sealed class SimulationRuntimeConfiguration
         IEnumerable<VirtualCameraConfiguration> cameras,
         AutomaticRunConfiguration? automaticRun,
         MachineLayoutRuntimeConfiguration? layout,
-        PickPlaceWorkpieceRuntimeConfiguration? pickPlaceWorkpiece)
+        PickPlaceWorkpieceRuntimeConfiguration? pickPlaceWorkpiece,
+        double? timeScale = null)
     {
         ArgumentNullException.ThrowIfNull(axes);
         ArgumentNullException.ThrowIfNull(channels);
         ArgumentNullException.ThrowIfNull(sequences);
         ArgumentNullException.ThrowIfNull(cameras);
+        if (timeScale.HasValue && (!double.IsFinite(timeScale.Value) || timeScale.Value <= 0))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(timeScale),
+                timeScale,
+                "Time scale must be finite and positive when specified.");
+        }
 
         Axes = Array.AsReadOnly(axes.Select(CloneAxis).ToArray());
         Channels = Array.AsReadOnly(channels.Select(CloneChannel).ToArray());
@@ -77,6 +85,7 @@ public sealed class SimulationRuntimeConfiguration
                 pickPlaceWorkpiece.GripperSignalId,
                 pickPlaceWorkpiece.PickX,
                 pickPlaceWorkpiece.PickY);
+        TimeScale = timeScale;
     }
 
     public IReadOnlyList<AxisConfiguration> Axes { get; }
@@ -86,6 +95,7 @@ public sealed class SimulationRuntimeConfiguration
     public AutomaticRunConfiguration? AutomaticRun { get; }
     public MachineLayoutRuntimeConfiguration? Layout { get; }
     public PickPlaceWorkpieceRuntimeConfiguration? PickPlaceWorkpiece { get; }
+    public double? TimeScale { get; }
 
     private static AxisConfiguration CloneAxis(AxisConfiguration source)
     {

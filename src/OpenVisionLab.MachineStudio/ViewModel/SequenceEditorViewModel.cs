@@ -2,15 +2,10 @@ using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using OpenVisionLab;
-using OpenVisionLab.Machine.Core.Channels;
-using OpenVisionLab.Machine.Core.Devices;
-using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Core.Sequences;
 using OpenVisionLab.Machine.Sequence.Authoring;
 using OpenVisionLab.Machine.Sequence.Compilation;
-using OpenVisionLab.Machine.Simulation.Axis;
-using OpenVisionLab.Machine.Simulation.Layout;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
@@ -30,11 +25,13 @@ public sealed class SequenceEditorViewModel : ViewModelBase
         SequenceStepAction.MoveAxis,
         SequenceStepAction.WaitAxisDone,
         SequenceStepAction.TriggerCamera,
-        SequenceStepAction.WaitVisionResult
+        SequenceStepAction.WaitVisionResult,
+        SequenceStepAction.CallSubsequence
     };
 
     private readonly SequenceDefinitionEditor _editor = new();
     private readonly SequenceStepTemplateCatalog _templateCatalog = new();
+    private readonly SequenceAuthoringTargetCatalog _targetCatalog = new();
     private readonly ICommand _addStepCommand;
     private readonly ICommand _deleteStepCommand;
     private readonly ICommand _moveStepUpCommand;
@@ -87,6 +84,7 @@ public sealed class SequenceEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedSequence, value))
             {
+                LoadAuthoringTargets();
                 LoadSteps();
             }
         }
@@ -147,7 +145,6 @@ public sealed class SequenceEditorViewModel : ViewModelBase
     {
         ArgumentNullException.ThrowIfNull(project);
         _project = project;
-        LoadAuthoringTargets();
         string? preferredId = project.Simulation.AutomaticRun?.SequenceId
             ?? SelectedSequence?.Id
             ?? project.Sequences.FirstOrDefault()?.Id;
@@ -164,6 +161,7 @@ public sealed class SequenceEditorViewModel : ViewModelBase
             ?? Sequences.FirstOrDefault();
         if (SelectedSequence is null)
         {
+            LoadAuthoringTargets();
             LoadSteps();
         }
     }
@@ -177,12 +175,13 @@ public sealed class SequenceEditorViewModel : ViewModelBase
 
     private void LoadAuthoringTargets()
     {
-        _authoringTargets = BuildAuthoringTargets(_project);
-        _expectedStateTargets = BuildExpectedStateTargets(_project);
+        SequenceAuthoringTargetCatalogSnapshot targetCatalog = _targetCatalog.Build(_project);
+        _authoringTargets = targetCatalog.AuthoringTargets;
+        _expectedStateTargets = targetCatalog.ExpectedStateTargets;
         string? preferredTemplateId = SelectedTemplate?.Id;
         Templates.Clear();
         foreach (SequenceStepTemplateDefinition template in
-                 _templateCatalog.GetAvailableTemplates(_authoringTargets))
+                 _templateCatalog.GetAvailableTemplates(_targetCatalog.GetTargetsForSequence(_authoringTargets, SelectedSequence)))
         {
             Templates.Add(template);
         }
@@ -230,7 +229,7 @@ public sealed class SequenceEditorViewModel : ViewModelBase
 
     public string? TryAddStepForTarget(string targetId)
     {
-        SequenceAuthoringTarget? target = _authoringTargets.FirstOrDefault(candidate =>
+        SequenceAuthoringTarget? target = _targetCatalog.GetTargetsForSequence(_authoringTargets, SelectedSequence).FirstOrDefault(candidate =>
             string.Equals(candidate.Id, targetId, StringComparison.Ordinal));
         if (!IsEditable || SelectedSequence is null || target is null)
         {
@@ -244,6 +243,7 @@ public sealed class SequenceEditorViewModel : ViewModelBase
             SequenceAuthoringTargetKind.DigitalOutput => "set-output-on",
             SequenceAuthoringTargetKind.Axis => "move-axis-home",
             SequenceAuthoringTargetKind.Camera => "trigger-camera",
+            SequenceAuthoringTargetKind.Subsequence => "call-subsequence",
             _ => string.Empty
         };
         int ordinal = NextStepOrdinal(SelectedSequence);
@@ -281,7 +281,7 @@ public sealed class SequenceEditorViewModel : ViewModelBase
                     index + 1,
                     SupportedNonTerminalActions,
                     _templateCatalog,
-                    _authoringTargets,
+                    _targetCatalog.GetTargetsForSequence(_authoringTargets, SelectedSequence),
                     _expectedStateTargets);
                 item.DefinitionChanged += OnStepDefinitionChanged;
                 Steps.Add(item);
@@ -307,7 +307,7 @@ public sealed class SequenceEditorViewModel : ViewModelBase
         SequenceStepDraftResult draft = _templateCatalog.CreateDraft(
             SelectedTemplate.Id,
             $"step-{ordinal}",
-            _authoringTargets);
+            _targetCatalog.GetTargetsForSequence(_authoringTargets, SelectedSequence));
         if (!draft.IsCreated || draft.Step is null)
         {
             StructuralEditStatus = draft.Message;
@@ -391,14 +391,9 @@ public sealed class SequenceEditorViewModel : ViewModelBase
             return;
         }
 
-        var channelKinds = _project.Channels
-            .GroupBy(channel => channel.Id, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.First().Kind, StringComparer.Ordinal);
-        var targets = new SequenceCompilationTargets(
-            channelKinds,
-            _project.Axes.Select(axis => axis.Id),
-            _project.Devices.Where(device => device.Kind == DeviceKind.Camera).Select(device => device.Id));
-        SequenceCompilationResult result = new SequenceCompiler().Compile(SelectedSequence, targets);
+        SequenceCompilationResult result = new SequenceCompiler().Compile(
+            SelectedSequence,
+            _targetCatalog.BuildCompilationTargets(_project));
         foreach (SequenceCompilationError error in result.Errors)
         {
             ValidationMessages.Add($"{error.Code} [{error.StepId ?? "sequence"}]: {error.Message}");
@@ -431,76 +426,6 @@ public sealed class SequenceEditorViewModel : ViewModelBase
         return ordinal;
     }
 
-    private static IReadOnlyList<SequenceAuthoringTarget> BuildAuthoringTargets(
-        MachineProjectDocument project)
-    {
-        var targets = new List<SequenceAuthoringTarget>();
-        targets.AddRange(project.Channels
-            .Where(channel => channel.Kind is ChannelKind.DigitalInput or ChannelKind.DigitalOutput)
-            .Select(channel => new SequenceAuthoringTarget(
-                channel.Id,
-                TargetDisplayName(channel.Name, channel.Id),
-                channel.Kind == ChannelKind.DigitalInput
-                    ? SequenceAuthoringTargetKind.DigitalInput
-                    : SequenceAuthoringTargetKind.DigitalOutput)));
-        targets.AddRange(project.Axes.Select(axis => new SequenceAuthoringTarget(
-            axis.Id,
-            TargetDisplayName(axis.Name, axis.Id),
-            SequenceAuthoringTargetKind.Axis,
-            axis.HomePosition.ToString(System.Globalization.CultureInfo.InvariantCulture))));
-        targets.AddRange(project.Devices
-            .Where(device => device.Kind == DeviceKind.Camera)
-            .Select(device => new SequenceAuthoringTarget(
-                device.Id,
-                TargetDisplayName(device.Name, device.Id),
-                SequenceAuthoringTargetKind.Camera)));
-        return targets;
-    }
-
-    private static IReadOnlyList<SequenceExpectedStateTarget> BuildExpectedStateTargets(
-        MachineProjectDocument project)
-    {
-        var targets = project.Axes
-            .Select(axis => new SequenceExpectedStateTarget(
-                axis.Id,
-                TargetDisplayName(axis.Name, axis.Id),
-                Enum.GetNames<AxisState>()))
-            .ToList();
-        MachineLayoutDefinition? layout = project.Simulation.ActiveLayoutId is { Length: > 0 } activeLayoutId
-            ? project.Layouts.FirstOrDefault(candidate =>
-                string.Equals(candidate.Id, activeLayoutId, StringComparison.Ordinal))
-            : project.Layouts.Count == 1
-                ? project.Layouts[0]
-                : null;
-        if (layout is null)
-        {
-            return targets;
-        }
-
-        foreach (LayoutComponentDefinition component in layout.Components)
-        {
-            IReadOnlyList<string>? states = component.Kind switch
-            {
-                LayoutComponentKind.PneumaticCylinder => Enum.GetNames<PneumaticCylinderState>(),
-                LayoutComponentKind.Conveyor => ["Stopped", "ForwardRunning", "ReverseRunning"],
-                LayoutComponentKind.DigitalSensor => ["Clear", "Detected"],
-                LayoutComponentKind.Workpiece => Enum.GetNames<WorkpieceInspectionState>(),
-                _ => null
-            };
-            if (states is not null)
-            {
-                targets.Add(new SequenceExpectedStateTarget(
-                    component.Id,
-                    TargetDisplayName(component.Name, component.Id),
-                    states));
-            }
-        }
-
-        return targets;
-    }
-
-    private static string TargetDisplayName(string? name, string id) =>
-        string.IsNullOrWhiteSpace(name) ? id : $"{name} · {id}";
 }
 
 public sealed class SequenceStepEditorItem : ViewModelBase
@@ -617,7 +542,10 @@ public sealed class SequenceStepEditorItem : ViewModelBase
             }
 
             _definition.Action = value;
-            NormalizeForAction();
+            SequenceDefinitionEditor.NormalizeStep(
+                _definition,
+                _templateCatalog,
+                _authoringTargets);
             OnPropertyChanged();
             OnPropertyChanged(nameof(AvailableTargets));
             OnPropertyChanged(nameof(AvailableParameterOptions));
@@ -644,12 +572,15 @@ public sealed class SequenceStepEditorItem : ViewModelBase
             bool moveWasAtTargetDefault = _definition.Action == SequenceStepAction.MoveAxis
                 && string.Equals(
                     _definition.Parameter,
-                    DefaultParameterFor(_definition.TargetId),
+                    SequenceDefinitionEditor.FindDefaultParameter(_definition.TargetId, _authoringTargets)
+                        ?? string.Empty,
                     StringComparison.Ordinal);
             _definition.TargetId = normalized;
             if (moveWasAtTargetDefault)
             {
-                _definition.Parameter = DefaultParameterFor(normalized);
+                _definition.Parameter = SequenceDefinitionEditor.FindDefaultParameter(
+                    normalized,
+                    _authoringTargets) ?? string.Empty;
                 OnPropertyChanged(nameof(Parameter));
             }
 
@@ -753,79 +684,6 @@ public sealed class SequenceStepEditorItem : ViewModelBase
             : string.Join(" ", messages);
     }
 
-    private void NormalizeForAction()
-    {
-        if (_definition.Action == SequenceStepAction.Complete)
-        {
-            _definition.TargetId = string.Empty;
-            _definition.Parameter = string.Empty;
-            _definition.TimeoutMs = 0;
-            _definition.NextStepId = null;
-            _definition.ErrorStepId = null;
-            _definition.FailureStepId = null;
-            return;
-        }
-
-        IReadOnlyList<SequenceAuthoringTarget> targets = AvailableTargets;
-        if (targets.Count == 0)
-        {
-            _definition.TargetId = string.Empty;
-        }
-        else if (!targets.Any(target =>
-                     string.Equals(target.Id, _definition.TargetId, StringComparison.Ordinal)))
-        {
-            _definition.TargetId = targets[0].Id;
-        }
-
-        IReadOnlyList<string> parameterOptions = AvailableParameterOptions;
-        if (parameterOptions.Count != 0
-            && !parameterOptions.Contains(_definition.Parameter, StringComparer.OrdinalIgnoreCase))
-        {
-            _definition.Parameter = parameterOptions[0];
-        }
-
-        if (_definition.Action == SequenceStepAction.MoveAxis
-            && (!double.TryParse(
-                    _definition.Parameter,
-                    System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    out double position)
-                || !double.IsFinite(position)))
-        {
-            _definition.Parameter = targets.FirstOrDefault(target =>
-                    string.Equals(target.Id, _definition.TargetId, StringComparison.Ordinal))
-                ?.DefaultParameter ?? "0";
-        }
-
-        if (_definition.Action == SequenceStepAction.TriggerCamera
-            && string.IsNullOrWhiteSpace(_definition.Parameter))
-        {
-            _definition.Parameter = "default";
-        }
-
-        if (_definition.Action is SequenceStepAction.SetSignal
-            or SequenceStepAction.MoveAxis
-            or SequenceStepAction.TriggerCamera)
-        {
-            _definition.TimeoutMs = 0;
-        }
-
-        if (_definition.Action is SequenceStepAction.WaitAxisDone or SequenceStepAction.WaitVisionResult)
-        {
-            _definition.Parameter = string.Empty;
-        }
-
-        if (_definition.Action == SequenceStepAction.WaitVisionResult && _definition.TimeoutMs <= 0)
-        {
-            _definition.TimeoutMs = 1000;
-        }
-
-        if (_definition.Action != SequenceStepAction.WaitVisionResult)
-        {
-            _definition.FailureStepId = null;
-        }
-    }
-
     private void SetString(
         string current,
         string? value,
@@ -874,7 +732,4 @@ public sealed class SequenceStepEditorItem : ViewModelBase
         OnPropertyChanged(nameof(AvailableExpectedStates));
     }
 
-    private string DefaultParameterFor(string targetId) =>
-        _authoringTargets.FirstOrDefault(target =>
-            string.Equals(target.Id, targetId, StringComparison.Ordinal))?.DefaultParameter ?? string.Empty;
 }

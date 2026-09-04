@@ -5,7 +5,8 @@ public enum SequenceExecutionStatus
     Ready,
     Running,
     Completed,
-    Faulted
+    Faulted,
+    Aborted
 }
 
 public enum SequenceExecutionErrorCode
@@ -19,6 +20,8 @@ public enum SequenceExecutionErrorCode
     AxisStateReadFailed,
     AxisFaulted,
     StepTimedOut,
+    SequenceWatchdogTimedOut,
+    SubsequenceDepthExceeded,
     CameraTriggerFailed,
     VisionResultNotTriggered,
     VisionResultReadFailed,
@@ -41,14 +44,19 @@ public sealed record SequenceExecutionSnapshot(
     TimeSpan ElapsedInStep,
     TimeSpan TotalElapsed,
     long TickCount,
-    SequenceExecutionError? LastError);
+    SequenceExecutionError? LastError,
+    TimeSpan WatchdogTimeout,
+    string? ActiveSequenceId = null,
+    IReadOnlyList<string>? CallStack = null);
 
 public sealed record SequenceExecutionResult(
     SequenceExecutionSnapshot Snapshot,
     bool Transitioned,
     string? PreviousStepId,
     string? CurrentStepId,
-    SequenceExecutionError? Error)
+    SequenceExecutionError? Error,
+    string? PreviousSequenceId = null,
+    string? CurrentSequenceId = null)
 {
     public bool IsSuccess => Error is null;
 }

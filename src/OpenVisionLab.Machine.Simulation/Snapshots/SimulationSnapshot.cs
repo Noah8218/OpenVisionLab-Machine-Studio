@@ -20,6 +20,7 @@ public sealed class SimulationSnapshot
     public IReadOnlyList<Axis.AxisSnapshot> Axes { get; }
     public long SignalRevision { get; }
     public IReadOnlyList<DigitalSignalSnapshot> Signals { get; }
+    public IReadOnlyList<AnalogSignalSnapshot> AnalogSignals { get; }
     public IReadOnlyList<SequenceExecutionSnapshot> Sequences { get; }
     public IReadOnlyList<VirtualCameraSnapshot> Cameras { get; }
     public AutomaticRunSnapshot AutomaticRun { get; }
@@ -33,6 +34,7 @@ public sealed class SimulationSnapshot
     public IReadOnlyList<InspectionHandoffSnapshot> InspectionHandoffs { get; }
     public IReadOnlyList<OhtHandoffSnapshot> OhtHandoffs { get; }
     public IReadOnlyList<PrealignerSnapshot> Prealigners { get; }
+    public SequenceDebugSnapshot SequenceDebug { get; }
 
     public SimulationSnapshot(
         TimeSpan simulationTime,
@@ -136,7 +138,9 @@ public sealed class SimulationSnapshot
         IEnumerable<InspectionSortRouterSnapshot>? inspectionSortRouters = null,
         IEnumerable<InspectionHandoffSnapshot>? inspectionHandoffs = null,
         IEnumerable<OhtHandoffSnapshot>? ohtHandoffs = null,
-        IEnumerable<PrealignerSnapshot>? prealigners = null)
+        IEnumerable<PrealignerSnapshot>? prealigners = null,
+        SequenceDebugSnapshot? sequenceDebug = null,
+        IEnumerable<AnalogSignalSnapshot>? analogSignals = null)
     {
         SimulationTime = simulationTime;
         TickIndex = tickIndex;
@@ -146,6 +150,7 @@ public sealed class SimulationSnapshot
         Axes = axes.ToImmutableList();
         SignalRevision = signalRevision;
         Signals = signals.ToImmutableList();
+        AnalogSignals = (analogSignals ?? Array.Empty<AnalogSignalSnapshot>()).ToImmutableList();
         Sequences = sequences.ToImmutableList();
         Cameras = cameras.ToImmutableList();
         AutomaticRun = automaticRun ?? throw new ArgumentNullException(nameof(automaticRun));
@@ -176,5 +181,6 @@ public sealed class SimulationSnapshot
         Prealigners = (prealigners ?? Array.Empty<PrealignerSnapshot>())
             .OrderBy(prealigner => prealigner.Id, StringComparer.Ordinal)
             .ToImmutableList();
+        SequenceDebug = sequenceDebug ?? SequenceDebugSnapshot.Empty;
     }
 }

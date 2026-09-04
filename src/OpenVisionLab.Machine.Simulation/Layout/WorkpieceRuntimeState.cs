@@ -12,9 +12,18 @@ internal sealed class WorkpieceRuntimeState : LayoutComponentRuntimeState
     public double CarrierPosition { get; private set; }
     public string? TransferOwnerId { get; private set; }
     public WaferHandlerOwnershipState? TransferOwnershipState { get; private set; }
+    private bool IsOnAuthoredCarrier =>
+        TransferOwnershipState is null
+            or WaferHandlerOwnershipState.Source
+            or WaferHandlerOwnershipState.Destination;
 
     public void Tick(ConveyorRuntimeState conveyor)
     {
+        if (!IsOnAuthoredCarrier)
+        {
+            return;
+        }
+
         if (!conveyor.IsRunning)
         {
             UpdateCarrierPosition(conveyor);
@@ -47,19 +56,36 @@ internal sealed class WorkpieceRuntimeState : LayoutComponentRuntimeState
             + ((Y - conveyor.Y) * Math.Sin(radians));
     }
 
-    public void ApplyTransferOwnership(
-        string ownerId,
-        WaferHandlerOwnershipState ownershipState)
+    public void AttachTransferOwner(string ownerId)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerId);
+        if (TransferOwnerId is not null)
+        {
+            throw new InvalidOperationException(
+                $"Workpiece '{Configuration.Id}' already has transfer owner '{TransferOwnerId}'.");
+        }
+
         TransferOwnerId = ownerId;
+        TransferOwnershipState = WaferHandlerOwnershipState.Source;
+    }
+
+    public void ApplyTransferTransition(WaferHandlerOwnershipState ownershipState)
+    {
+        if (TransferOwnerId is null)
+        {
+            throw new InvalidOperationException(
+                $"Workpiece '{Configuration.Id}' has no transfer owner.");
+        }
+
         TransferOwnershipState = ownershipState;
     }
 
     public override void Reset()
     {
         base.Reset();
-        TransferOwnerId = null;
-        TransferOwnershipState = null;
+        TransferOwnershipState = TransferOwnerId is null
+            ? null
+            : WaferHandlerOwnershipState.Source;
     }
 
     public override LayoutComponentSnapshot CaptureSnapshot() =>
@@ -74,8 +100,12 @@ internal sealed class WorkpieceRuntimeState : LayoutComponentRuntimeState
             Configuration.Size.Height,
             null,
             null,
-            CarrierComponentId: WorkpieceConfiguration.ConveyorComponentId,
-            CarrierPosition: CarrierPosition,
+            CarrierComponentId: IsOnAuthoredCarrier
+                ? WorkpieceConfiguration.ConveyorComponentId
+                : null,
+            CarrierPosition: IsOnAuthoredCarrier
+                ? CarrierPosition
+                : null,
             WorkpieceType: WorkpieceConfiguration.Type,
             InspectionState: WorkpieceConfiguration.InspectionState,
             TransferOwnerId: TransferOwnerId,

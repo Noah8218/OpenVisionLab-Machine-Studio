@@ -3,7 +3,7 @@ using OpenVisionLab.Machine.Core.Channels;
 namespace OpenVisionLab.Machine.IO.Channels;
 
 /// <summary>
-/// Identifies the component requesting a discrete signal write.
+/// Identifies the component requesting a signal write.
 /// </summary>
 public enum SignalWriteOwner
 {
@@ -24,9 +24,14 @@ public enum SignalHubErrorCode
     DuplicateChannelId,
     UnsupportedChannelKind,
     InvalidInitialValue,
+    InvalidAnalogValue,
     ChannelNotFound,
     ChannelKindMismatch,
-    WriteOwnerNotAllowed
+    WriteOwnerNotAllowed,
+    InvalidInterlockConfiguration,
+    InterlockChannelNotFound,
+    InterlockChannelKindMismatch,
+    InterlockNotSatisfied
 }
 
 /// <summary>
@@ -102,6 +107,49 @@ public sealed class SignalReadResult
 }
 
 /// <summary>
+/// Describes one deterministic analog-signal read.
+/// </summary>
+public sealed class AnalogSignalReadResult
+{
+    private AnalogSignalReadResult(
+        bool isAccepted,
+        SignalHubErrorCode errorCode,
+        string? channelId,
+        ChannelKind? kind,
+        double? value,
+        long revision)
+    {
+        IsAccepted = isAccepted;
+        ErrorCode = errorCode;
+        ChannelId = channelId;
+        Kind = kind;
+        Value = value;
+        Revision = revision;
+    }
+
+    public bool IsAccepted { get; }
+    public SignalHubErrorCode ErrorCode { get; }
+    public string? ChannelId { get; }
+    public ChannelKind? Kind { get; }
+    public double? Value { get; }
+    public long Revision { get; }
+
+    internal static AnalogSignalReadResult Accepted(
+        string channelId,
+        ChannelKind kind,
+        double value,
+        long revision) =>
+        new(true, SignalHubErrorCode.None, channelId, kind, value, revision);
+
+    internal static AnalogSignalReadResult Rejected(
+        SignalHubErrorCode errorCode,
+        string? channelId,
+        long revision,
+        ChannelKind? kind = null) =>
+        new(false, errorCode, channelId, kind, null, revision);
+}
+
+/// <summary>
 /// Describes one accepted or rejected discrete-signal write.
 /// </summary>
 public sealed class SignalWriteResult
@@ -169,6 +217,143 @@ public sealed class SignalWriteResult
         SignalWriteOwner owner,
         bool requestedValue,
         bool? currentValue,
+        long revision) =>
+        new(
+            false,
+            errorCode,
+            channelId,
+            kind,
+            owner,
+            requestedValue,
+            currentValue,
+            currentValue,
+            false,
+            revision);
+}
+
+/// <summary>
+/// Describes an atomic pair of digital-output writes.
+/// </summary>
+public sealed class DigitalOutputPairWriteResult
+{
+    private DigitalOutputPairWriteResult(
+        bool isAccepted,
+        SignalHubErrorCode errorCode,
+        string? channelId,
+        SignalWriteOwner owner,
+        int changedSignalCount,
+        long revision)
+    {
+        IsAccepted = isAccepted;
+        ErrorCode = errorCode;
+        ChannelId = channelId;
+        Owner = owner;
+        ChangedSignalCount = changedSignalCount;
+        Revision = revision;
+    }
+
+    public bool IsAccepted { get; }
+    public SignalHubErrorCode ErrorCode { get; }
+    public string? ChannelId { get; }
+    public SignalWriteOwner Owner { get; }
+    public int ChangedSignalCount { get; }
+    public bool StateChanged => ChangedSignalCount > 0;
+    public long Revision { get; }
+
+    internal static DigitalOutputPairWriteResult Accepted(
+        SignalWriteOwner owner,
+        int changedSignalCount,
+        long revision) =>
+        new(
+            true,
+            SignalHubErrorCode.None,
+            null,
+            owner,
+            changedSignalCount,
+            revision);
+
+    internal static DigitalOutputPairWriteResult Rejected(
+        SignalHubErrorCode errorCode,
+        string? channelId,
+        SignalWriteOwner owner,
+        long revision) =>
+        new(
+            false,
+            errorCode,
+            channelId,
+            owner,
+            0,
+            revision);
+}
+
+/// <summary>
+/// Describes one accepted or rejected analog-signal write.
+/// </summary>
+public sealed class AnalogSignalWriteResult
+{
+    private AnalogSignalWriteResult(
+        bool isAccepted,
+        SignalHubErrorCode errorCode,
+        string? channelId,
+        ChannelKind? kind,
+        SignalWriteOwner owner,
+        double requestedValue,
+        double? previousValue,
+        double? currentValue,
+        bool stateChanged,
+        long revision)
+    {
+        IsAccepted = isAccepted;
+        ErrorCode = errorCode;
+        ChannelId = channelId;
+        Kind = kind;
+        Owner = owner;
+        RequestedValue = requestedValue;
+        PreviousValue = previousValue;
+        CurrentValue = currentValue;
+        StateChanged = stateChanged;
+        Revision = revision;
+    }
+
+    public bool IsAccepted { get; }
+    public SignalHubErrorCode ErrorCode { get; }
+    public string? ChannelId { get; }
+    public ChannelKind? Kind { get; }
+    public SignalWriteOwner Owner { get; }
+    public double RequestedValue { get; }
+    public double? PreviousValue { get; }
+    public double? CurrentValue { get; }
+    public bool StateChanged { get; }
+    public long Revision { get; }
+
+    internal static AnalogSignalWriteResult Accepted(
+        string channelId,
+        ChannelKind kind,
+        SignalWriteOwner owner,
+        double requestedValue,
+        double previousValue,
+        double currentValue,
+        bool stateChanged,
+        long revision) =>
+        new(
+            true,
+            SignalHubErrorCode.None,
+            channelId,
+            kind,
+            owner,
+            requestedValue,
+            previousValue,
+            currentValue,
+            stateChanged,
+            revision);
+
+    internal static AnalogSignalWriteResult Rejected(
+        SignalHubErrorCode errorCode,
+        string? channelId,
+        ChannelKind? kind,
+        SignalWriteOwner owner,
+        double requestedValue,
+        double? currentValue,
         long revision) =>
         new(
             false,

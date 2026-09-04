@@ -11,6 +11,7 @@ public interface ISimulationEngine : IDisposable
     SimulationSnapshot CurrentSnapshot { get; }
     ChannelReader<SimulationSnapshot> SnapshotReader { get; }
     ChannelReader<SimulationEvent> EventReader { get; }
+    Task<SimulationEngineTerminationResult> Termination { get; }
     Task StartAsync(CancellationToken cancellationToken = default);
     Task StopAsync(CancellationToken cancellationToken = default);
     Task<SimulationCommandResult> EnqueueCommandAsync(

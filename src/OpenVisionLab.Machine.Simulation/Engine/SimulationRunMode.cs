@@ -5,5 +5,6 @@ public enum SimulationRunMode
     Paused,
     RealTime,
     FastForward,
-    SingleStep
+    SingleStep,
+    SequenceStep
 }

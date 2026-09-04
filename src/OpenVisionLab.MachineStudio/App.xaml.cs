@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using OpenVisionLab.MachineStudio.View.Shell;
 using OpenVisionLab.MachineStudio.ViewModel;
+using OpenVisionLab.MachineStudio.Smoke;
 
 namespace OpenVisionLab.MachineStudio;
 
@@ -11,6 +12,13 @@ public partial class App : Application
     {
         try
         {
+            if (MachineIntegrationExeSmoke.IsRequested(e.Args))
+            {
+                var exitCode = await MachineIntegrationExeSmoke.RunAsync(e.Args);
+                Shutdown(exitCode);
+                return;
+            }
+
             if (DirectExeSmokeHost.IsRequested(e.Args))
             {
                 await DirectExeSmokeHost.RunAsync(e.Args);

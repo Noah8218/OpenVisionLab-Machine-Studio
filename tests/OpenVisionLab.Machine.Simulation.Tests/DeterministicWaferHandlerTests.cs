@@ -37,17 +37,68 @@ public sealed class DeterministicWaferHandlerTests
     }
 
     [Fact]
+    public void Tick_TransferDetachesWhileHeldAndReattachesAtDestination()
+    {
+        var (hub, layout) = CreateLayout();
+        SetInput(hub, "di.source", true);
+        SetOutput(hub, "do.conveyor.run", true);
+
+        layout.Tick(Axes(0, 260));
+        LayoutComponentSnapshot source = Workpiece(layout);
+        Assert.Equal(WaferHandlerOwnershipState.Source, source.TransferOwnershipState);
+        Assert.Equal("transport", source.CarrierComponentId);
+        Assert.Equal(0.5, source.X, precision: 10);
+        Assert.Equal(0.5, source.CarrierPosition!.Value, precision: 10);
+
+        SetOutput(hub, "do.pick", true);
+        layout.Tick(Axes(0, 260));
+        LayoutComponentSnapshot held = Workpiece(layout);
+        Assert.Equal(WaferHandlerOwnershipState.Handler, held.TransferOwnershipState);
+        Assert.Null(held.CarrierComponentId);
+        Assert.Null(held.CarrierPosition);
+        Assert.Equal(1, held.X, precision: 10);
+
+        layout.Tick(Axes(0, 260));
+        Assert.Equal(held.X, Workpiece(layout).X, precision: 10);
+
+        SetOutput(hub, "do.pick", false);
+        SetInput(hub, "di.gate", true);
+        SetOutput(hub, "do.place", true);
+        layout.Tick(Axes(140, 260));
+        LayoutComponentSnapshot placed = Workpiece(layout);
+        Assert.Equal(WaferHandlerOwnershipState.Destination, placed.TransferOwnershipState);
+        Assert.Equal("transport", placed.CarrierComponentId);
+        Assert.Equal(1, placed.CarrierPosition!.Value, precision: 10);
+        Assert.Equal(held.X, placed.X, precision: 10);
+
+        layout.Tick(Axes(140, 260));
+        Assert.Equal(placed.X + 0.5, Workpiece(layout).X, precision: 10);
+
+        layout.Reset();
+        LayoutComponentSnapshot reset = Workpiece(layout);
+        Assert.Equal(WaferHandlerOwnershipState.Source, reset.TransferOwnershipState);
+        Assert.Equal("handler", reset.TransferOwnerId);
+        Assert.Equal("transport", reset.CarrierComponentId);
+        Assert.Equal(0, reset.X, precision: 10);
+        Assert.Equal(0, reset.CarrierPosition!.Value, precision: 10);
+    }
+
+    [Fact]
     public void Tick_UnsafeOrSimultaneousRequest_LatchesFailClosedUntilReset()
     {
         var (hub, layout) = CreateLayout();
         SetInput(hub, "di.source", true);
+        SetOutput(hub, "do.conveyor.run", true);
         SetOutput(hub, "do.pick", true);
         SetOutput(hub, "do.place", true);
 
         layout.Tick(Axes(0, 260));
 
         Assert.Equal(WaferHandlerOwnershipState.InterlockFault, Handler(layout).State);
-        Assert.Equal(WaferHandlerOwnershipState.InterlockFault, Workpiece(layout).TransferOwnershipState);
+        LayoutComponentSnapshot faulted = Workpiece(layout);
+        Assert.Equal(WaferHandlerOwnershipState.InterlockFault, faulted.TransferOwnershipState);
+        Assert.Null(faulted.CarrierComponentId);
+        Assert.Null(faulted.CarrierPosition);
         AssertSignal(hub, "di.holding", false);
         AssertSignal(hub, "di.placed", false);
 
@@ -55,6 +106,7 @@ public sealed class DeterministicWaferHandlerTests
         SetOutput(hub, "do.place", false);
         layout.Tick(Axes(0, 260));
         Assert.Equal(WaferHandlerOwnershipState.InterlockFault, Handler(layout).State);
+        Assert.Equal(faulted.X, Workpiece(layout).X, precision: 10);
 
         layout.Reset();
         Assert.Equal(WaferHandlerOwnershipState.Source, Handler(layout).State);

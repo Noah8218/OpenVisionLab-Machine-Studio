@@ -167,9 +167,9 @@
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="58" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="5*" />
                             <ColumnDefinition Width="58" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="7*" />
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Row="0" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Name}" />
@@ -184,12 +184,14 @@
                                   Style="{StaticResource SequenceComboBoxStyle}" />
                         <TextBlock Grid.Row="1" Grid.Column="2" Margin="8,0,7,0"
                                    Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Target}" />
-                        <ComboBox Grid.Row="1" Grid.Column="3"
+                        <ComboBox x:Name="SequenceTargetComboBox"
+                                  Grid.Row="1" Grid.Column="3"
                                   DisplayMemberPath="Name"
                                   IsEnabled="{Binding SelectedStep.HasTargetOptions}"
                                   ItemsSource="{Binding SelectedStep.AvailableTargets}"
                                   SelectedValue="{Binding SelectedStep.TargetId, Mode=TwoWay}"
                                   SelectedValuePath="Id"
+                                  ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}"
                                   Style="{StaticResource SequenceComboBoxStyle}" />
 
                         <TextBlock Grid.Row="2" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Value}" />

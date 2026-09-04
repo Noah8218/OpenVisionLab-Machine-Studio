@@ -447,6 +447,16 @@ public sealed class DeterministicMultiAxisCommissioningRunner
         int runIndex,
         CancellationToken cancellationToken)
     {
+        // Commissioning owns an explicit paused single-step stream; authored
+        // real-time pacing must not open a wall-clock tick window between commands.
+        var singleStepRuntime = new SimulationRuntimeConfiguration(
+            runtime.Axes,
+            runtime.Channels,
+            runtime.Sequences,
+            runtime.Cameras,
+            runtime.AutomaticRun,
+            runtime.Layout,
+            runtime.PickPlaceWorkpiece);
         using var engine = new FixedStepSimulationEngine(new SimulationSettings
         {
             FixedStep = fixedStep,
@@ -458,7 +468,7 @@ public sealed class DeterministicMultiAxisCommissioningRunner
         {
             await RequireAcceptedAsync(
                 engine,
-                new ConfigureRuntimeCommand(runtime),
+                new ConfigureRuntimeCommand(singleStepRuntime),
                 cancellationToken).ConfigureAwait(false);
             await RequireAcceptedAsync(engine, new ResetCommand(), cancellationToken).ConfigureAwait(false);
             snapshots.Add(engine.CurrentSnapshot);

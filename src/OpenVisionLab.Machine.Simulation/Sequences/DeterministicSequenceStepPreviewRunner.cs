@@ -113,7 +113,8 @@ public sealed class DeterministicSequenceStepPreviewRunner
             sourceRuntime.Cameras,
             automaticRun: null,
             sourceRuntime.Layout,
-            sourceRuntime.PickPlaceWorkpiece);
+            sourceRuntime.PickPlaceWorkpiece,
+            sourceRuntime.TimeScale);
 
         using var engine = new FixedStepSimulationEngine(new SimulationSettings { FixedStep = fixedStep });
         await engine.StartAsync(cancellationToken).ConfigureAwait(false);

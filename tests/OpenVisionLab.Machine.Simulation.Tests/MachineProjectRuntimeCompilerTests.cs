@@ -1,4 +1,5 @@
 using OpenVisionLab.Machine.Core.Axes;
+using OpenVisionLab.Machine.Core.Channels;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Core.Devices;
 using OpenVisionLab.Machine.Simulation.Compilation;
@@ -13,6 +14,55 @@ namespace OpenVisionLab.Machine.Simulation.Tests;
 public sealed class MachineProjectRuntimeCompilerTests
 {
     private static readonly TimeSpan FixedStep = TimeSpan.FromMilliseconds(5);
+
+    public static TheoryData<string> BundledSamplePaths => new()
+    {
+        "AutomaticTransferCell.ovmachine",
+        "sample-pick-and-place.ovmachine",
+        "VisionInspectionCell.ovmachine",
+        "WaferEFEMVisionCell.ovmachine",
+        Path.Combine("SemiconductorRecipes", "01-FoupLoadPort.ovmachine"),
+        Path.Combine("SemiconductorRecipes", "02-CassetteMapper.ovmachine"),
+        Path.Combine("SemiconductorRecipes", "03-WaferPrealigner.ovmachine"),
+        Path.Combine("SemiconductorRecipes", "04-WaferOcrInspection.ovmachine"),
+        Path.Combine("SemiconductorRecipes", "05-LoadLockEntry.ovmachine"),
+        Path.Combine("SemiconductorRecipes", "06-SpinCoatTrack.ovmachine"),
+        Path.Combine("SemiconductorRecipes", "07-DevelopTrack.ovmachine"),
+        Path.Combine("SemiconductorRecipes", "08-DryEtchTransfer.ovmachine"),
+        Path.Combine("SemiconductorRecipes", "09-CmpTransfer.ovmachine"),
+        Path.Combine("SemiconductorRecipes", "10-MetrologySorter.ovmachine")
+    };
+
+    [Theory]
+    [MemberData(nameof(BundledSamplePaths))]
+    public void Compile_AllBundledSamples_ProducesRuntimeWithAuthoredTimeScale(string relativePath)
+    {
+        string path = Path.Combine(AppContext.BaseDirectory, relativePath);
+        MachineProjectDocument project = new ProjectDocumentStore().Load(File.ReadAllText(path));
+
+        MachineProjectRuntimeCompilationResult result = Compile(project);
+
+        Assert.True(result.IsSuccess, $"{relativePath}:{Environment.NewLine}{ErrorSummary(result)}");
+        Assert.Equal(project.Simulation.DefaultTimeScale, result.Configuration!.TimeScale);
+        Assert.All(result.Configuration.Sequences, sequence => Assert.Equal(TimeSpan.Zero, sequence.WatchdogTimeout));
+    }
+
+    [Fact]
+    public void Compile_WatchdogPolicyRoundTripsIntoRuntime()
+    {
+        MachineProjectDocument project = LoadSample();
+        project.Sequences.Single().WatchdogTimeoutMs = 1234;
+        var store = new ProjectDocumentStore();
+
+        MachineProjectDocument reopened = store.Load(store.Serialize(project));
+        MachineProjectRuntimeCompilationResult result = Compile(reopened);
+
+        Assert.Equal(1234, reopened.Sequences.Single().WatchdogTimeoutMs);
+        Assert.True(result.IsSuccess, ErrorSummary(result));
+        Assert.Equal(
+            TimeSpan.FromMilliseconds(1234),
+            Assert.Single(result.Configuration!.Sequences).WatchdogTimeout);
+    }
 
     [Fact]
     public void Compile_AutomaticTransferCell_ProducesCompleteRuntimeConfiguration()
@@ -76,6 +126,112 @@ public sealed class MachineProjectRuntimeCompilerTests
         Assert.NotNull(result.Configuration);
         Assert.Null(result.Configuration.Layout);
         Assert.Null(result.Configuration.AutomaticRun);
+    }
+
+    [Fact]
+    public async Task Compile_AnalogChannels_ProjectsIntoRuntimeSnapshot()
+    {
+        var project = new MachineProjectDocument
+        {
+            Simulation = new SimulationDefinition { FixedStepMilliseconds = 5 },
+            Channels =
+            [
+                new ChannelDefinition
+                {
+                    Id = "ai.height",
+                    Name = "Height",
+                    Kind = ChannelKind.AnalogInput,
+                    InitialValue = 12.5
+                },
+                new ChannelDefinition
+                {
+                    Id = "ao.speed",
+                    Name = "Speed",
+                    Kind = ChannelKind.AnalogOutput,
+                    InitialValue = -2.25
+                }
+            ]
+        };
+
+        MachineProjectRuntimeCompilationResult compilation = Compile(project);
+        Assert.True(compilation.IsSuccess, ErrorSummary(compilation));
+
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings { FixedStep = FixedStep });
+        await engine.StartAsync();
+        var configured = await engine.EnqueueCommandAsync(
+            new ConfigureRuntimeCommand(compilation.Configuration!));
+
+        Assert.True(configured.IsAccepted, configured.Detail);
+        Assert.Equal(
+            new[] { "ai.height", "ao.speed" },
+            engine.CurrentSnapshot.AnalogSignals.Select(signal => signal.Id));
+        Assert.Equal(
+            12.5,
+            engine.CurrentSnapshot.AnalogSignals.Single(signal => signal.Id == "ai.height").Value);
+        Assert.Equal(
+            -2.25,
+            engine.CurrentSnapshot.AnalogSignals.Single(signal => signal.Id == "ao.speed").Value);
+        Assert.Empty(engine.CurrentSnapshot.Signals);
+        await engine.StopAsync();
+    }
+
+    [Fact]
+    public async Task Compile_DefaultTimeScale_ConfiguresRuntimeWithoutChangingFixedStep()
+    {
+        MachineProjectDocument project = LoadSample();
+        project.Simulation.DefaultTimeScale = 2.5;
+
+        MachineProjectRuntimeCompilationResult result = Compile(project);
+
+        Assert.True(result.IsSuccess, ErrorSummary(result));
+        Assert.Equal(2.5, result.Configuration!.TimeScale);
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings { FixedStep = FixedStep, TimeScale = 0.5 });
+        await engine.StartAsync();
+        SimulationCommandResult configured = await engine.EnqueueCommandAsync(
+            new ConfigureRuntimeCommand(result.Configuration));
+        SimulationCommandResult stepped = await engine.EnqueueCommandAsync(new StepCommand());
+
+        Assert.True(configured.IsAccepted, configured.Detail);
+        Assert.True(stepped.IsAccepted, stepped.Detail);
+        Assert.Equal(2.5, engine.CurrentSnapshot.TimeScale);
+        Assert.Equal(FixedStep, engine.CurrentSnapshot.SimulationTime);
+        Assert.Equal(1, engine.CurrentSnapshot.TickIndex);
+        await engine.StopAsync();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(0.09)]
+    [InlineData(10.01)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void Compile_InvalidDefaultTimeScale_ReturnsStableTypedError(double timeScale)
+    {
+        MachineProjectDocument project = LoadSample();
+        project.Simulation.DefaultTimeScale = timeScale;
+
+        AssertStableError(
+            project,
+            MachineProjectRuntimeCompilationErrorCode.TimeScaleInvalid,
+            "simulation.defaultTimeScale",
+            "between 0.1 and 10.0");
+    }
+
+    [Fact]
+    public void Compile_MissingOutputInterlock_ReturnsStableTypedError()
+    {
+        MachineProjectDocument project = LoadSample();
+        project.Channels.First(channel =>
+                channel.Kind == OpenVisionLab.Machine.Core.Channels.ChannelKind.DigitalOutput)
+            .InterlockIds.Add("di.missing-interlock");
+
+        AssertStableError(
+            project,
+            MachineProjectRuntimeCompilationErrorCode.SignalConfigurationInvalid,
+            "di.missing-interlock",
+            "InterlockChannelNotFound");
     }
 
     [Fact]

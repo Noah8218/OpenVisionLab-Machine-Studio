@@ -75,7 +75,7 @@ internal sealed class LayoutEditHistory
         _undo.Add(new LayoutEdit(before, after));
         if (_undo.Count > Capacity)
         {
-            // Bounded full snapshots stay simple; use deltas only if real project sizes require them.
+            // ponytail: bounded full snapshots stay simple; use deltas only if real project sizes require them.
             _undo.RemoveAt(0);
         }
         _redo.Clear();

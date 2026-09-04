@@ -1,16 +1,17 @@
 using System.IO;
 using System.Windows.Input;
-using Microsoft.Win32;
 using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Devices;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Infrastructure.Vision;
+using OpenVisionLab.MachineStudio.View.Dialogs;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
 public sealed class CameraImageSourceEditorViewModel : ViewModelBase
 {
     private readonly Action<string, string> _sourceApplied;
+    private readonly Func<string, string?> _selectSourceFile;
     private MachineProjectDocument _project = new();
     private string? _projectPath;
     private string? _cameraId;
@@ -23,8 +24,16 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase
     private bool _needsProjectSave;
 
     public CameraImageSourceEditorViewModel(Action<string, string> sourceApplied)
+        : this(sourceApplied, CameraImageSourceFileDialogHost.SelectSourceFile)
+    {
+    }
+
+    internal CameraImageSourceEditorViewModel(
+        Action<string, string> sourceApplied,
+        Func<string, string?> selectSourceFile)
     {
         _sourceApplied = sourceApplied ?? throw new ArgumentNullException(nameof(sourceApplied));
+        _selectSourceFile = selectSourceFile ?? throw new ArgumentNullException(nameof(selectSourceFile));
         BrowseCommand = new RelayCommand(_ => Browse(), _ => CanBrowse);
         ApplyCommand = new RelayCommand(_ => Apply(), _ => CanApply);
         RevertCommand = new RelayCommand(_ => Synchronize(), _ => CanRevert);
@@ -152,22 +161,15 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase
         }
 
         var projectRoot = Path.GetDirectoryName(_projectPath)!;
-        var dialog = new OpenFileDialog
-        {
-            Title = OpenVisionLanguageService.T("Camera.SelectSourceFile"),
-            Filter = "Image files|*.bmp;*.jpg;*.jpeg;*.png;*.pgm;*.ppm;*.tif;*.tiff;*.raw|All files (*.*)|*.*",
-            CheckFileExists = true,
-            Multiselect = false,
-            InitialDirectory = projectRoot
-        };
-        if (dialog.ShowDialog() != true)
+        var selectedPath = _selectSourceFile(projectRoot);
+        if (selectedPath is null)
         {
             return;
         }
 
         try
         {
-            var relativePath = Path.GetRelativePath(projectRoot, Path.GetFullPath(dialog.FileName));
+            var relativePath = Path.GetRelativePath(projectRoot, Path.GetFullPath(selectedPath));
             PathText = new ProjectAssetPathResolver(projectRoot)
                 .ResolveExistingFile(relativePath)
                 .RelativePath;

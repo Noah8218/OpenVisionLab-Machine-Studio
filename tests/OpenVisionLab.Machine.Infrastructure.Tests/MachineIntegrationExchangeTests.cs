@@ -8,305 +8,518 @@ namespace OpenVisionLab.Machine.Infrastructure.Tests;
 public sealed class MachineIntegrationExchangeTests
 {
     [Fact]
-    public void PublishHandoff_CopiesIdentifiedArtifactsWithoutExecutingAnything()
+    public void PublishHandoff_StagesHashesAndPublishesOneTransactionDirectory()
     {
-        using var directory = new TemporaryDirectory();
-        var project = directory.Write("source/project.ovmachine", [1, 2, 3]);
-        var source = directory.Write("source/frame.c3d", [4, 5, 6, 7]);
+        using var fixture = new ExchangeFixture();
 
-        var handoff = MachineIntegrationExchange.PublishHandoff(CreateRequest(
-            directory.Path,
-            project,
-            source));
+        var published = MachineIntegrationExchange.PublishHandoff(
+            fixture.Root,
+            fixture.Handoff,
+            fixture.SourcePaths);
 
-        var transaction = TransactionDirectory(directory.Path, handoff.TransactionId);
-        var persisted = IntegrationContractJson.DeserializeHandoff(
-            File.ReadAllBytes(Path.Combine(transaction, "handoff.json")));
-        Assert.Equal(handoff.MessageId, persisted.MessageId);
-        Assert.Equal(handoff.TransactionId, persisted.TransactionId);
-        Assert.Equal(handoff.Producer, persisted.Producer);
-        Assert.Equal(handoff.Context.ProjectId, persisted.Context.ProjectId);
-        Assert.Equal(handoff.Context.SequenceId, persisted.Context.SequenceId);
-        Assert.Equal(handoff.Context.Artifacts, persisted.Context.Artifacts);
-        Assert.False(File.Exists(Path.Combine(transaction, "acknowledgement.json")));
-        Assert.False(File.Exists(Path.Combine(transaction, "result.json")));
-        foreach (var artifact in persisted.Context.Artifacts)
-        {
-            Assert.True(
-                IntegrationContractValidator.ValidateArtifactFile(artifact, transaction).IsValid);
-        }
+        Assert.Equal(fixture.Handoff, published);
+        var read = MachineIntegrationExchange.ReadHandoff(
+            fixture.Root,
+            fixture.Handoff.TransactionId);
+        Assert.Equal(fixture.Handoff.MessageId, read.MessageId);
+        Assert.Equal(
+            fixture.Handoff.Context.Artifacts.Count,
+            Directory.EnumerateFiles(
+                    Path.Combine(
+                        fixture.Root,
+                        IntegrationTransactionLayout.TransactionsDirectoryName,
+                        fixture.Handoff.TransactionId.ToString("D"),
+                        IntegrationTransactionLayout.ArtifactsDirectoryName),
+                    "*",
+                    SearchOption.AllDirectories)
+                .Count());
+
+        var discovered = MachineIntegrationExchange.DiscoverTransactions(fixture.Root);
+        Assert.Single(discovered);
+        Assert.False(discovered[0].HasAcknowledgement);
+        Assert.False(discovered[0].HasResult);
     }
 
     [Fact]
-    public void ReadResult_ValidatesTheCompleteSequenceAndRunRecord()
+    public void PublishHandoff_WhenSourceIdentityDiffers_DoesNotPublishPartialTransaction()
     {
-        using var directory = new TemporaryDirectory();
-        var project = directory.Write("source/project.ovmachine", [1, 2, 3]);
-        var source = directory.Write("source/frame.c3d", [4, 5, 6, 7]);
-        var handoff = MachineIntegrationExchange.PublishHandoff(CreateRequest(
-            directory.Path,
-            project,
-            source));
-        var transaction = TransactionDirectory(directory.Path, handoff.TransactionId);
-        var acknowledgement = new IntegrationAcknowledgement(
-            IntegrationContractSchema.Legacy,
-            IntegrationMessageKind.Acknowledgement,
-            Guid.NewGuid(),
-            handoff.TransactionId,
-            handoff.MessageId,
-            handoff.CreatedAtUtc.AddSeconds(1),
-            ThreeDIdentity(),
-            IntegrationAcknowledgementStatus.Accepted,
-            null);
+        using var fixture = new ExchangeFixture();
         File.WriteAllBytes(
-            Path.Combine(transaction, "acknowledgement.json"),
-            IntegrationContractJson.Serialize(acknowledgement));
-        var runRecordPath = directory.WriteRelative(transaction, "artifacts/run-record.json", [8, 9]);
-        var runRecordBytes = File.ReadAllBytes(runRecordPath);
-        var result = new IntegrationResult(
-            IntegrationContractSchema.Legacy,
-            IntegrationMessageKind.Result,
-            Guid.NewGuid(),
-            handoff.TransactionId,
-            handoff.MessageId,
-            acknowledgement.MessageId,
-            acknowledgement.CreatedAtUtc.AddSeconds(1),
-            ThreeDIdentity(),
-            IntegrationResultStatus.Completed,
-            IntegrationInspectionDisposition.Pass,
-            "run-1",
-            new IntegrationArtifactReference(
-                IntegrationArtifactRoles.RunRecord,
-                "run-1",
-                "artifacts/run-record.json",
-                runRecordBytes.LongLength,
-                Convert.ToHexString(SHA256.HashData(runRecordBytes))),
-            null);
-        File.WriteAllBytes(
-            Path.Combine(transaction, "result.json"),
-            IntegrationContractJson.Serialize(result));
-
-        var imported = MachineIntegrationExchange.ReadResult(
-            directory.Path,
-            handoff.TransactionId);
-
-        Assert.Equal(result, imported.Result);
-        Assert.Equal(IntegrationInspectionDisposition.Pass, imported.Result.Disposition);
-    }
-
-    [Fact]
-    public void ReadProgress_ReturnsPendingThenAcknowledgedWithoutRequiringResult()
-    {
-        using var directory = new TemporaryDirectory();
-        var project = directory.Write("source/project.ovmachine", [1, 2, 3]);
-        var source = directory.Write("source/frame.c3d", [4, 5, 6]);
-        var handoff = MachineIntegrationExchange.PublishHandoff(CreateRequest(
-            directory.Path,
-            project,
-            source));
-
-        var pending = MachineIntegrationExchange.ReadProgress(
-            directory.Path,
-            handoff.TransactionId);
-
-        Assert.Equivalent(handoff, pending.Handoff, strict: true);
-        Assert.Null(pending.Acknowledgement);
-        Assert.Null(pending.Result);
-
-        var acknowledgement = new IntegrationAcknowledgement(
-            IntegrationContractSchema.Legacy,
-            IntegrationMessageKind.Acknowledgement,
-            Guid.NewGuid(),
-            handoff.TransactionId,
-            handoff.MessageId,
-            handoff.CreatedAtUtc.AddSeconds(1),
-            ThreeDIdentity(),
-            IntegrationAcknowledgementStatus.Accepted,
-            null);
-        File.WriteAllBytes(
-            Path.Combine(
-                TransactionDirectory(directory.Path, handoff.TransactionId),
-                IntegrationTransactionLayout.AcknowledgementFileName),
-            IntegrationContractJson.Serialize(acknowledgement));
-
-        var acknowledged = MachineIntegrationExchange.ReadProgress(
-            directory.Path,
-            handoff.TransactionId);
-
-        Assert.Equal(acknowledgement, acknowledged.Acknowledgement);
-        Assert.Null(acknowledged.Result);
-        var exception = Assert.Throws<IntegrationContractException>(() =>
-            MachineIntegrationExchange.ReadResult(directory.Path, handoff.TransactionId));
-        Assert.Equal(IntegrationErrorCode.InvalidState, exception.ErrorCode);
-    }
-
-    [Fact]
-    public void ReadResult_WhenRunRecordChanges_FailsClosed()
-    {
-        using var directory = new TemporaryDirectory();
-        var project = directory.Write("source/project.ovmachine", [1]);
-        var source = directory.Write("source/frame.c3d", [2]);
-        var handoff = MachineIntegrationExchange.PublishHandoff(CreateRequest(
-            directory.Path,
-            project,
-            source));
-        var transaction = TransactionDirectory(directory.Path, handoff.TransactionId);
-        var acknowledgement = new IntegrationAcknowledgement(
-            IntegrationContractSchema.Legacy,
-            IntegrationMessageKind.Acknowledgement,
-            Guid.NewGuid(),
-            handoff.TransactionId,
-            handoff.MessageId,
-            handoff.CreatedAtUtc.AddSeconds(1),
-            ThreeDIdentity(),
-            IntegrationAcknowledgementStatus.Accepted,
-            null);
-        File.WriteAllBytes(Path.Combine(transaction, "acknowledgement.json"), IntegrationContractJson.Serialize(acknowledgement));
-        directory.WriteRelative(transaction, "artifacts/run-record.json", [3]);
-        var result = new IntegrationResult(
-            IntegrationContractSchema.Legacy,
-            IntegrationMessageKind.Result,
-            Guid.NewGuid(),
-            handoff.TransactionId,
-            handoff.MessageId,
-            acknowledgement.MessageId,
-            acknowledgement.CreatedAtUtc.AddSeconds(1),
-            ThreeDIdentity(),
-            IntegrationResultStatus.Completed,
-            IntegrationInspectionDisposition.Pass,
-            "run-1",
-            new IntegrationArtifactReference(
-                IntegrationArtifactRoles.RunRecord,
-                "run-1",
-                "artifacts/run-record.json",
-                1,
-                Convert.ToHexString(SHA256.HashData([3]))),
-            null);
-        File.WriteAllBytes(Path.Combine(transaction, "result.json"), IntegrationContractJson.Serialize(result));
-        directory.WriteRelative(transaction, "artifacts/run-record.json", [4, 5]);
+            fixture.SourcePaths["inspection-source"],
+            [0xFF, 0xEE, 0xDD]);
 
         var exception = Assert.Throws<IntegrationContractException>(() =>
-            MachineIntegrationExchange.ReadResult(directory.Path, handoff.TransactionId));
+            MachineIntegrationExchange.PublishHandoff(
+                fixture.Root,
+                fixture.Handoff,
+                fixture.SourcePaths));
 
         Assert.Equal(IntegrationErrorCode.ArtifactLengthMismatch, exception.ErrorCode);
+        var transactionsRoot = Path.Combine(
+            fixture.Root,
+            IntegrationTransactionLayout.TransactionsDirectoryName);
+        Assert.Empty(MachineIntegrationExchange.DiscoverTransactions(fixture.Root));
+        var diagnostic = Assert.Single(
+            MachineIntegrationExchange.DiagnoseTransactions(fixture.Root));
+        Assert.Equal(
+            MachineIntegrationTransactionState.Quarantined,
+            diagnostic.State);
+        Assert.Contains("publish-failed", diagnostic.Detail);
+        var quarantineDirectory = Assert.Single(
+            Directory.EnumerateDirectories(Path.Combine(
+                transactionsRoot,
+                ".quarantine")));
+        Assert.True(File.Exists(Path.Combine(quarantineDirectory, "quarantine.json")));
+        Assert.DoesNotContain(
+            Directory.EnumerateDirectories(transactionsRoot),
+            path => Guid.TryParse(Path.GetFileName(path), out _));
     }
 
     [Fact]
-    public void PublishHandoff_RejectsTraversingTargetNameBeforeCreatingTransaction()
+    public void ReadResult_ValidatesTheFullV2SequenceAndResultArtifacts()
     {
-        using var directory = new TemporaryDirectory();
-        var project = directory.Write("source/project.ovmachine", [1]);
-        var request = CreateRequest(directory.Path, project, project) with
-        {
-            Artifacts =
-            [
-                new(
-                    IntegrationArtifactRoles.MachineProject,
-                    "project-1",
-                    project,
-                    "../project.ovmachine")
-            ]
-        };
+        using var fixture = new ExchangeFixture();
+        MachineIntegrationExchange.PublishHandoff(
+            fixture.Root,
+            fixture.Handoff,
+            fixture.SourcePaths);
+        var acknowledgement = new IntegrationAcknowledgementV2(
+            IntegrationContractSchema.V2,
+            IntegrationMessageKind.Acknowledgement,
+            Guid.NewGuid(),
+            fixture.Handoff.TransactionId,
+            fixture.Handoff.MessageId,
+            fixture.Handoff.CreatedAtUtc,
+            ExchangeFixture.Consumer,
+            IntegrationAcknowledgementStatus.Accepted,
+            null);
+        var resultPath = Path.Combine(
+            fixture.TransactionDirectory,
+            IntegrationTransactionLayout.ArtifactsDirectoryName,
+            "run-record.json");
+        File.WriteAllText(resultPath, "{\"runId\":\"run-1\"}");
+        var resultBytes = File.ReadAllBytes(resultPath);
+        var result = new IntegrationResultV2(
+            IntegrationContractSchema.V2,
+            IntegrationMessageKind.Result,
+            Guid.NewGuid(),
+            fixture.Handoff.TransactionId,
+            fixture.Handoff.MessageId,
+            acknowledgement.MessageId,
+            acknowledgement.CreatedAtUtc,
+            ExchangeFixture.Consumer,
+            IntegrationResultStatus.Completed,
+            IntegrationInspectionOutcome.Pass,
+            "run-1",
+            new IntegrationArtifactReference(
+                IntegrationArtifactRoles.RunRecord,
+                "run-1",
+                "artifacts/run-record.json",
+                resultBytes.LongLength,
+                Convert.ToHexString(SHA256.HashData(resultBytes))),
+            IntegrationRunCorrelation.FromContext(fixture.Handoff.Context),
+            [],
+            [],
+            null);
 
-        Assert.Throws<ArgumentException>(() =>
-            MachineIntegrationExchange.PublishHandoff(request));
-        Assert.False(Directory.Exists(Path.Combine(directory.Path, "transactions")));
+        File.WriteAllBytes(
+            Path.Combine(
+                fixture.TransactionDirectory,
+                IntegrationTransactionLayout.AcknowledgementFileName),
+            IntegrationContractJson.SerializeCanonical(acknowledgement));
+        File.WriteAllBytes(
+            Path.Combine(
+                fixture.TransactionDirectory,
+                IntegrationTransactionLayout.ResultFileName),
+            IntegrationContractJson.SerializeCanonical(result));
+
+        var read = MachineIntegrationExchange.ReadResult(
+            fixture.Root,
+            fixture.Handoff.TransactionId);
+
+        Assert.Equal(IntegrationInspectionOutcome.Pass, read.Outcome);
+        Assert.Equal("run-1", read.RunId);
     }
 
     [Fact]
-    public void PublishHandoff_WhenContractIsInvalid_RemovesUnpublishedTransaction()
+    public void PublishHandoff_RejectsUnsafeArtifactPathBeforeCreatingTransaction()
     {
-        using var directory = new TemporaryDirectory();
-        var source = directory.Write("source/frame.c3d", [2]);
-        var request = CreateRequest(directory.Path, source, source) with
+        using var fixture = new ExchangeFixture();
+        var unsafeHandoff = fixture.Handoff with
         {
-            Artifacts =
-            [
-                new(
-                    IntegrationArtifactRoles.InspectionSource,
-                    "frame-1",
-                    source,
-                    "frame.c3d")
-            ]
+            Context = fixture.Handoff.Context with
+            {
+                Artifacts =
+                [
+                    fixture.Handoff.Context.Artifacts[0] with
+                    {
+                        RelativePath = "../outside.ovmachine"
+                    },
+                    fixture.Handoff.Context.Artifacts[1],
+                    fixture.Handoff.Context.Artifacts[2]
+                ]
+            }
         };
 
-        Assert.Throws<IntegrationContractException>(() =>
-            MachineIntegrationExchange.PublishHandoff(request));
-        Assert.Empty(Directory.GetDirectories(
-            Path.Combine(directory.Path, "transactions")));
+        var exception = Assert.Throws<IntegrationContractException>(() =>
+            MachineIntegrationExchange.PublishHandoff(
+                fixture.Root,
+                unsafeHandoff,
+                fixture.SourcePaths));
+
+        Assert.Equal(IntegrationErrorCode.UnsafeArtifactPath, exception.ErrorCode);
+        Assert.False(Directory.Exists(fixture.TransactionDirectory));
     }
 
-    private static MachineHandoffRequest CreateRequest(
-        string exchangeRoot,
-        string project,
-        string source) => new(
-        exchangeRoot,
-        new IntegrationApplicationIdentity(
-            IntegrationApplicationIds.MachineStudio,
-            "0.1.0-rc.4",
-            "1111111111111111111111111111111111111111",
-            IntegrationSourceState.Clean),
-        "project-1",
-        "1.11",
-        "automatic",
-        "inspect",
-        "camera-1",
-        "mm",
-        "camera-frame",
-        [
-            new(
-                IntegrationArtifactRoles.MachineProject,
-                "project-1",
-                project,
-                "project.ovmachine"),
-            new(
-                IntegrationArtifactRoles.InspectionSource,
-                "frame-1",
-                source,
-                "frame.c3d")
-        ]);
-
-    private static IntegrationApplicationIdentity ThreeDIdentity() => new(
-        IntegrationApplicationIds.ThreeDStudio,
-        "0.2.0-dev",
-        "2222222222222222222222222222222222222222",
-        IntegrationSourceState.Clean);
-
-    private static string TransactionDirectory(string root, Guid transactionId) =>
-        Path.Combine(root, "transactions", transactionId.ToString("D"));
-
-    private sealed class TemporaryDirectory : IDisposable
+    [Fact]
+    public async Task PublishHandoffAsync_ReportsTransferLifecycle()
     {
-        public TemporaryDirectory()
+        using var fixture = new ExchangeFixture();
+        var progress = new RecordingProgress();
+
+        await MachineIntegrationExchange.PublishHandoffAsync(
+            fixture.Root,
+            fixture.Handoff,
+            fixture.SourcePaths,
+            progress,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Contains(
+            progress.Values,
+            value => value.Phase == MachineIntegrationTransferPhase.Preflight);
+        Assert.Contains(
+            progress.Values,
+            value => value.Phase == MachineIntegrationTransferPhase.Copying);
+        Assert.Contains(
+            progress.Values,
+            value => value.Phase == MachineIntegrationTransferPhase.Validating);
+        var published = Assert.Single(
+            progress.Values.Where(value =>
+                value.Phase == MachineIntegrationTransferPhase.Published));
+        Assert.Equal(fixture.Handoff.TransactionId, published.TransactionId);
+        Assert.Equal(fixture.Handoff.Context.Artifacts.Count, published.CompletedArtifacts);
+        Assert.Equal(published.TotalBytes, published.BytesCopied);
+        Assert.Equal(1, published.FractionCompleted);
+    }
+
+    [Fact]
+    public async Task PublishHandoffAsync_WhenCancelled_QuarantinesStaging()
+    {
+        using var fixture = new ExchangeFixture();
+        using var cancellation = new CancellationTokenSource();
+        var progress = new RecordingProgress(value =>
         {
-            Path = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "OpenVisionLab-Machine-Integration-Tests",
+            if (value.Phase == MachineIntegrationTransferPhase.Preflight)
+            {
+                cancellation.Cancel();
+            }
+        });
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            MachineIntegrationExchange.PublishHandoffAsync(
+                fixture.Root,
+                fixture.Handoff,
+                fixture.SourcePaths,
+                progress,
+                cancellationToken: cancellation.Token));
+
+        Assert.Empty(MachineIntegrationExchange.DiscoverTransactions(fixture.Root));
+        Assert.Contains(
+            progress.Values,
+            value => value.Phase == MachineIntegrationTransferPhase.Quarantined);
+        var diagnostic = Assert.Single(
+            MachineIntegrationExchange.DiagnoseTransactions(fixture.Root));
+        Assert.Equal(
+            MachineIntegrationTransactionState.Quarantined,
+            diagnostic.State);
+        Assert.Contains("cancelled", diagnostic.Detail);
+    }
+
+    [Fact]
+    public void PublishHandoff_WhenFreeSpaceRequirementCannotBeMet_FailsBeforeStaging()
+    {
+        using var fixture = new ExchangeFixture();
+
+        var exception = Assert.Throws<IntegrationContractException>(() =>
+            MachineIntegrationExchange.PublishHandoffAsync(
+                    fixture.Root,
+                    fixture.Handoff,
+                    fixture.SourcePaths,
+                    minimumFreeSpaceBytes: long.MaxValue)
+                .GetAwaiter()
+                .GetResult());
+
+        Assert.Equal(IntegrationErrorCode.InvalidState, exception.ErrorCode);
+        Assert.False(Directory.Exists(Path.Combine(
+            fixture.Root,
+            IntegrationTransactionLayout.TransactionsDirectoryName)));
+    }
+
+    [Fact]
+    public void DiagnoseTransactions_ReportsPublishedArtifactAndStorageState()
+    {
+        using var fixture = new ExchangeFixture();
+        MachineIntegrationExchange.PublishHandoff(
+            fixture.Root,
+            fixture.Handoff,
+            fixture.SourcePaths);
+
+        var diagnostic = Assert.Single(
+            MachineIntegrationExchange.DiagnoseTransactions(fixture.Root));
+
+        Assert.Equal(
+            MachineIntegrationTransactionState.Published,
+            diagnostic.State);
+        Assert.Equal(fixture.Handoff.TransactionId, diagnostic.TransactionId);
+        Assert.Equal(fixture.Handoff.Context.Artifacts.Count, diagnostic.ArtifactCount);
+        Assert.Equal(
+            fixture.Handoff.Context.Artifacts.Sum(artifact => artifact.ByteLength),
+            diagnostic.DeclaredBytes);
+        Assert.Equal(diagnostic.DeclaredBytes, diagnostic.MaterializedBytes);
+        Assert.True(diagnostic.AvailableFreeBytes > 0);
+        Assert.Null(diagnostic.Detail);
+    }
+
+    [Fact]
+    public void DiagnoseTransactions_ReportsIncompleteAndUnknownDirectories()
+    {
+        using var fixture = new ExchangeFixture();
+        var transactionsRoot = Path.Combine(
+            fixture.Root,
+            IntegrationTransactionLayout.TransactionsDirectoryName);
+        Directory.CreateDirectory(transactionsRoot);
+        var stagingDirectory = Path.Combine(
+            transactionsRoot,
+            $".{Guid.NewGuid():D}.{Guid.NewGuid():N}.staging");
+        Directory.CreateDirectory(stagingDirectory);
+        Directory.CreateDirectory(Path.Combine(transactionsRoot, "unexpected"));
+
+        var diagnostics = MachineIntegrationExchange.DiagnoseTransactions(fixture.Root);
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.State == MachineIntegrationTransactionState.Staging);
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.State == MachineIntegrationTransactionState.Invalid);
+    }
+
+    [Fact]
+    public void CleanupStaging_QuarantinesStaleDirectoriesAndPurgesRetentionExpiredEvidence()
+    {
+        using var fixture = new ExchangeFixture();
+        var transactionsRoot = Path.Combine(
+            fixture.Root,
+            IntegrationTransactionLayout.TransactionsDirectoryName);
+        Directory.CreateDirectory(transactionsRoot);
+        var stagingDirectory = Path.Combine(
+            transactionsRoot,
+            $".{Guid.NewGuid():D}.{Guid.NewGuid():N}.staging");
+        Directory.CreateDirectory(Path.Combine(
+            stagingDirectory,
+            IntegrationTransactionLayout.ArtifactsDirectoryName));
+        File.WriteAllBytes(
+            Path.Combine(
+                stagingDirectory,
+                IntegrationTransactionLayout.ArtifactsDirectoryName,
+                "partial.bin"),
+            [0x01, 0x02]);
+        var now = DateTimeOffset.UtcNow;
+        Directory.SetLastWriteTimeUtc(
+            stagingDirectory,
+            now.UtcDateTime.AddHours(-2));
+
+        var report = MachineIntegrationExchange.CleanupStaging(
+            fixture.Root,
+            TimeSpan.FromMinutes(30),
+            now);
+
+        Assert.Equal(1, report.ScannedStagingDirectories);
+        Assert.Equal(1, report.QuarantinedStagingDirectories);
+        var diagnostic = Assert.Single(report.Diagnostics);
+        Assert.Equal(
+            MachineIntegrationTransactionState.Quarantined,
+            diagnostic.State);
+        Assert.Contains("stale-staging", diagnostic.Detail);
+        Assert.False(Directory.Exists(stagingDirectory));
+
+        var purged = MachineIntegrationExchange.PurgeQuarantine(
+            fixture.Root,
+            TimeSpan.Zero,
+            now.AddHours(1));
+
+        Assert.Equal(1, purged);
+        Assert.Empty(MachineIntegrationExchange.DiagnoseTransactions(fixture.Root));
+    }
+
+    [Fact]
+    public void PublishHandoff_RejectsReservedArtifactFileName()
+    {
+        using var fixture = new ExchangeFixture();
+        var unsafeHandoff = fixture.Handoff with
+        {
+            Context = fixture.Handoff.Context with
+            {
+                Artifacts =
+                [
+                    fixture.Handoff.Context.Artifacts[0] with
+                    {
+                        RelativePath = "artifacts/CON"
+                    },
+                    fixture.Handoff.Context.Artifacts[1],
+                    fixture.Handoff.Context.Artifacts[2]
+                ]
+            }
+        };
+
+        var exception = Assert.Throws<IntegrationContractException>(() =>
+            MachineIntegrationExchange.PublishHandoff(
+                fixture.Root,
+                unsafeHandoff,
+                fixture.SourcePaths));
+
+        Assert.Equal(IntegrationErrorCode.UnsafeArtifactPath, exception.ErrorCode);
+        Assert.False(Directory.Exists(Path.Combine(
+            fixture.Root,
+            IntegrationTransactionLayout.TransactionsDirectoryName)));
+    }
+
+    private sealed class RecordingProgress : IProgress<MachineIntegrationTransferProgress>
+    {
+        private readonly Action<MachineIntegrationTransferProgress>? _onReport;
+
+        public RecordingProgress(
+            Action<MachineIntegrationTransferProgress>? onReport = null)
+        {
+            _onReport = onReport;
+        }
+
+        public List<MachineIntegrationTransferProgress> Values { get; } = [];
+
+        public void Report(MachineIntegrationTransferProgress value)
+        {
+            Values.Add(value);
+            _onReport?.Invoke(value);
+        }
+    }
+
+    private sealed class ExchangeFixture : IDisposable
+    {
+        public ExchangeFixture()
+        {
+            Root = Path.Combine(
+                "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio",
+                "integration-adapter-tests",
                 Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(Path);
+            SourceRoot = Path.Combine(Root, "source");
+            Directory.CreateDirectory(SourceRoot);
+
+            var projectPath = Write("machine.ovmachine", [0x01, 0x02, 0x03]);
+            var sourcePath = Write("inspection-source.pcd", [0x10, 0x20, 0x30, 0x40]);
+            var recipePath = Write("inspection-recipe.json", [0x7B, 0x7D]);
+            SourcePaths = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["machine-project"] = projectPath,
+                ["inspection-source"] = sourcePath,
+                ["inspection-recipe"] = recipePath
+            };
+
+            var sourceHash = Hash(sourcePath);
+            var recipeHash = Hash(recipePath);
+            var transactionId = Guid.NewGuid();
+            var context = new IntegrationInspectionContextV2(
+                "machine-project-1",
+                "1.0",
+                "sequence-1",
+                "step-1",
+                "camera-1",
+                "acquisition-1",
+                "frame-1",
+                "mm",
+                IntegrationInspectionModality.ThreeD,
+                IntegrationInspectionInputKind.PointCloud,
+                sourceHash,
+                recipeHash,
+                Consumer,
+                [
+                    Artifact(
+                        IntegrationArtifactRoles.MachineProject,
+                        "machine-project",
+                        projectPath,
+                        "artifacts/machine.ovmachine"),
+                    Artifact(
+                        IntegrationArtifactRoles.InspectionSource,
+                        "inspection-source",
+                        sourcePath,
+                        "artifacts/inspection-source.pcd"),
+                    Artifact(
+                        IntegrationArtifactRoles.InspectionRecipe,
+                        "inspection-recipe",
+                        recipePath,
+                        "artifacts/inspection-recipe.json")
+                ]);
+            Handoff = new(
+                IntegrationContractSchema.V2,
+                IntegrationMessageKind.Handoff,
+                Guid.NewGuid(),
+                transactionId,
+                DateTimeOffset.UtcNow,
+                new IntegrationApplicationIdentity(
+                    IntegrationApplicationIds.MachineStudio,
+                    "0.1.0-rc.1",
+                    new string('1', 40),
+                    IntegrationSourceState.Clean),
+                context);
         }
 
-        public string Path { get; }
-
-        public string Write(string relativePath, byte[] bytes) =>
-            WriteRelative(Path, relativePath, bytes);
-
-        public string WriteRelative(string root, string relativePath, byte[] bytes)
-        {
-            var fullPath = System.IO.Path.Combine(
-                root,
-                relativePath.Replace('/', System.IO.Path.DirectorySeparatorChar));
-            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(fullPath)!);
-            File.WriteAllBytes(fullPath, bytes);
-            return fullPath;
-        }
+        public string Root { get; }
+        public string SourceRoot { get; }
+        public string TransactionDirectory => Path.Combine(
+            Root,
+            IntegrationTransactionLayout.TransactionsDirectoryName,
+            Handoff.TransactionId.ToString("D"));
+        public Dictionary<string, string> SourcePaths { get; }
+        public IntegrationHandoffV2 Handoff { get; }
+        public static IntegrationApplicationIdentity Consumer { get; } = new(
+            "OpenVisionLab.ThreeDStudio",
+            "0.1.1",
+            new string('2', 40),
+            IntegrationSourceState.Clean);
 
         public void Dispose()
         {
-            if (Directory.Exists(Path))
+            if (Directory.Exists(Root))
             {
-                Directory.Delete(Path, recursive: true);
+                Directory.Delete(Root, recursive: true);
             }
+        }
+
+        private string Write(string name, byte[] bytes)
+        {
+            var path = Path.Combine(SourceRoot, name);
+            File.WriteAllBytes(path, bytes);
+            return path;
+        }
+
+        private static IntegrationArtifactReference Artifact(
+            string role,
+            string id,
+            string sourcePath,
+            string relativePath)
+        {
+            var info = new FileInfo(sourcePath);
+            return new(
+                role,
+                id,
+                relativePath,
+                info.Length,
+                Hash(sourcePath));
+        }
+
+        private static string Hash(string path)
+        {
+            using var stream = File.OpenRead(path);
+            return Convert.ToHexString(SHA256.HashData(stream));
         }
     }
 }

@@ -8,21 +8,28 @@ internal sealed class WaferHandlerRuntimeState
 {
     private const double PositionTolerance = 0.001;
     private readonly DeterministicSignalHub _signalHub;
+    private readonly WorkpieceRuntimeState _workpiece;
     private bool _previousPickCommand;
     private bool _previousPlaceCommand;
     private WaferHandlerSnapshot? _snapshot;
 
     public WaferHandlerRuntimeState(
         WaferHandlerRuntimeConfiguration configuration,
-        DeterministicSignalHub signalHub)
+        DeterministicSignalHub signalHub,
+        WorkpieceRuntimeState workpiece)
     {
         Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _signalHub = signalHub ?? throw new ArgumentNullException(nameof(signalHub));
+        _workpiece = workpiece ?? throw new ArgumentNullException(nameof(workpiece));
+        _workpiece.AttachTransferOwner(Configuration.Id);
         Reset();
     }
 
     public WaferHandlerRuntimeConfiguration Configuration { get; }
-    public WaferHandlerOwnershipState State { get; private set; }
+    public WaferHandlerOwnershipState State =>
+        _workpiece.TransferOwnershipState
+        ?? throw new InvalidOperationException(
+            $"Wafer-handler '{Configuration.Id}' workpiece has no ownership state.");
 
     public void Tick(IReadOnlyDictionary<string, AxisSnapshot> axes)
     {
@@ -45,15 +52,15 @@ internal sealed class WaferHandlerRuntimeState
             bool placeRising = place && !_previousPlaceCommand;
             if ((pick && place) || (pickRising && !pickPermitted) || (placeRising && !placePermitted))
             {
-                State = WaferHandlerOwnershipState.InterlockFault;
+                _workpiece.ApplyTransferTransition(WaferHandlerOwnershipState.InterlockFault);
             }
             else if (pickRising)
             {
-                State = WaferHandlerOwnershipState.Handler;
+                _workpiece.ApplyTransferTransition(WaferHandlerOwnershipState.Handler);
             }
             else if (placeRising)
             {
-                State = WaferHandlerOwnershipState.Destination;
+                _workpiece.ApplyTransferTransition(WaferHandlerOwnershipState.Destination);
             }
         }
 
@@ -77,7 +84,6 @@ internal sealed class WaferHandlerRuntimeState
 
     public void Reset()
     {
-        State = WaferHandlerOwnershipState.Source;
         _previousPickCommand = false;
         _previousPlaceCommand = false;
         _snapshot = null;

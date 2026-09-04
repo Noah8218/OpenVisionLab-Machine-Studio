@@ -3,11 +3,10 @@ using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Windows.Input;
-using Microsoft.Win32;
 using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Projects;
-using OpenVisionLab.Machine.Simulation.Sequences;
 using OpenVisionLab.MachineStudio.Model;
+using OpenVisionLab.MachineStudio.View.Dialogs;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
@@ -223,9 +222,12 @@ public sealed class RecipePackCompatibilityComparisonItemViewModel : ViewModelBa
 
 public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 {
-    private readonly ProjectDocumentStore _projectStore = new();
-    private readonly DeterministicRecipeDryRunRunner _dryRunRunner = new();
+    private readonly SemiconductorRecipeGalleryCatalog _catalog = new();
+    private readonly SemiconductorRecipeGalleryValidationWorkflow _validationWorkflow = new();
     private readonly Func<SemiconductorRecipeGalleryItemViewModel, string?, Task<bool>> _createCopy;
+    private readonly Func<string?> _selectCompatibilityReportSavePath;
+    private readonly Func<string?> _selectBaselineCompatibilityReportPath;
+    private readonly Func<string?> _selectCurrentCompatibilityReportPath;
     private readonly RelayCommand _closeCommand;
     private readonly AsyncRelayCommand _createCopyCommand;
     private readonly AsyncRelayCommand _validateAllCommand;
@@ -253,8 +255,24 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 
     public SemiconductorRecipeGalleryViewModel(
         Func<SemiconductorRecipeGalleryItemViewModel, string?, Task<bool>> createCopy)
+        : this(
+            createCopy,
+            SemiconductorRecipeCompatibilityDialogHost.SelectSavePath,
+            SemiconductorRecipeCompatibilityDialogHost.SelectBaselinePath,
+            SemiconductorRecipeCompatibilityDialogHost.SelectCurrentPath)
+    {
+    }
+
+    internal SemiconductorRecipeGalleryViewModel(
+        Func<SemiconductorRecipeGalleryItemViewModel, string?, Task<bool>> createCopy,
+        Func<string?> selectCompatibilityReportSavePath,
+        Func<string?> selectBaselineCompatibilityReportPath,
+        Func<string?> selectCurrentCompatibilityReportPath)
     {
         _createCopy = createCopy;
+        _selectCompatibilityReportSavePath = selectCompatibilityReportSavePath ?? throw new ArgumentNullException(nameof(selectCompatibilityReportSavePath));
+        _selectBaselineCompatibilityReportPath = selectBaselineCompatibilityReportPath ?? throw new ArgumentNullException(nameof(selectBaselineCompatibilityReportPath));
+        _selectCurrentCompatibilityReportPath = selectCurrentCompatibilityReportPath ?? throw new ArgumentNullException(nameof(selectCurrentCompatibilityReportPath));
         OpenCommand = new RelayCommand(_ => Open());
         _closeCommand = new RelayCommand(
             _ => Close(),
@@ -525,55 +543,9 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
                 AppContext.BaseDirectory,
                 "Samples",
                 "SemiconductorRecipes");
-            foreach (var sourcePath in Directory
-                         .EnumerateFiles(galleryPath, "*.ovmachine")
-                         .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase))
+            foreach (var descriptor in _catalog.Enumerate(galleryPath))
             {
-                var project = _projectStore.Load(File.ReadAllText(sourcePath));
-                var sequence = project.Sequences.FirstOrDefault();
-                var sensorCount = project.Devices.Count(device => device.Sensor is not null);
-                var cylinderCount = project.Devices.Count(device => device.Cylinder is not null);
-                var conveyorCount = project.Devices.Count(device => device.Conveyor is not null);
-                var workpieceCount = project.Devices.Count(device => device.Workpiece is not null);
-                var equipmentFocus = project.Axes.Skip(1).Select(axis => axis.Name)
-                    .Concat(project.Devices
-                        .Where(device => device.Id is not
-                            ("device.transport" or
-                             "device.sensor-entry" or
-                             "device.sensor-process" or
-                             "device.process-cylinder" or
-                             "device.wafer"))
-                        .Select(device => device.Name))
-                    .Distinct(StringComparer.CurrentCulture)
-                    .ToArray();
-                var item = new SemiconductorRecipeGalleryItemViewModel
-                {
-                    SourcePath = sourcePath,
-                    FileName = Path.GetFileName(sourcePath),
-                    DisplayName = project.Name,
-                    ProjectSchema = project.Schema,
-                    SequenceName = sequence?.Name ?? OpenVisionLanguageService.T("Shell.NotConfigured"),
-                    EquipmentFocus = string.Join(" · ", equipmentFocus.Length > 0
-                        ? equipmentFocus
-                        : project.Axes.Select(axis => axis.Name).Take(1)),
-                    TopologySummary = string.Format(
-                        CultureInfo.CurrentCulture,
-                        OpenVisionLanguageService.T("Gallery.TopologySummaryCompact"),
-                        project.Axes.Count,
-                        sensorCount,
-                        cylinderCount,
-                        conveyorCount,
-                        workpieceCount),
-                    AxisCount = project.Axes.Count,
-                    SensorCount = sensorCount,
-                    CylinderCount = cylinderCount,
-                    ConveyorCount = conveyorCount,
-                    WorkpieceCount = workpieceCount,
-                    DeviceCount = project.Devices.Count,
-                    ChannelCount = project.Channels.Count,
-                    ComponentCount = project.Layouts.Sum(layout => layout.Components.Count),
-                    StepCount = sequence?.Steps.Count ?? 0
-                };
+                var item = CreateItem(descriptor);
                 item.ResetValidation();
                 Items.Add(item);
             }
@@ -590,6 +562,41 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(HasItems));
         _validateAllCommand.RaiseCanExecuteChanged();
+    }
+
+    private static SemiconductorRecipeGalleryItemViewModel CreateItem(
+        SemiconductorRecipeGalleryItemDescriptor descriptor)
+    {
+        return new SemiconductorRecipeGalleryItemViewModel
+        {
+            SourcePath = descriptor.SourcePath,
+            FileName = descriptor.FileName,
+            DisplayName = descriptor.DisplayName,
+            ProjectSchema = descriptor.ProjectSchema,
+            SequenceName = descriptor.SequenceName ?? OpenVisionLanguageService.T("Shell.NotConfigured"),
+            EquipmentFocus = string.Join(
+                " · ",
+                descriptor.EquipmentFocus.Count > 0
+                    ? descriptor.EquipmentFocus
+                    : new[] { descriptor.FallbackEquipment }),
+            TopologySummary = string.Format(
+                CultureInfo.CurrentCulture,
+                OpenVisionLanguageService.T("Gallery.TopologySummaryCompact"),
+                descriptor.AxisCount,
+                descriptor.SensorCount,
+                descriptor.CylinderCount,
+                descriptor.ConveyorCount,
+                descriptor.WorkpieceCount),
+            AxisCount = descriptor.AxisCount,
+            SensorCount = descriptor.SensorCount,
+            CylinderCount = descriptor.CylinderCount,
+            ConveyorCount = descriptor.ConveyorCount,
+            WorkpieceCount = descriptor.WorkpieceCount,
+            DeviceCount = descriptor.DeviceCount,
+            ChannelCount = descriptor.ChannelCount,
+            ComponentCount = descriptor.ComponentCount,
+            StepCount = descriptor.StepCount
+        };
     }
 
     private async Task ValidateAllAsync()
@@ -618,37 +625,23 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
             foreach (var item in Items)
             {
                 item.MarkValidationRunning();
-                RecipeDryRunResult? result = null;
-                string failureStep = string.Empty;
-                string detail;
-                try
+                var validation = await _validationWorkflow.ValidateAsync(item.SourcePath);
+                string failureStep = validation.FailureStage switch
                 {
-                    var project = await _projectStore.LoadAsync(item.SourcePath);
-                    string? sequenceId = project.Simulation.AutomaticRun?.SequenceId;
-                    if (string.IsNullOrWhiteSpace(sequenceId))
-                    {
-                        failureStep = OpenVisionLanguageService.T("Gallery.ValidationCompileStage");
-                        detail = OpenVisionLanguageService.T("Gallery.ValidationSequenceMissing");
-                    }
-                    else
-                    {
-                        result = await _dryRunRunner.RunAsync(project, sequenceId);
-                        failureStep = result.FirstIssue?.StepId
-                            ?? result.FirstCheckpointMismatch?.StepId
-                            ?? (result.Outcome == RecipeDryRunOutcome.Rejected
-                                ? OpenVisionLanguageService.T("Gallery.ValidationCompileStage")
-                                : result.Timeline.LastOrDefault()?.StepId)
-                            ?? sequenceId;
-                        detail = result.Detail;
-                    }
-                }
-                catch (Exception exception)
-                {
-                    failureStep = OpenVisionLanguageService.T("Gallery.ValidationLoadStage");
-                    detail = exception.Message;
-                }
-
-                bool passed = result?.Outcome == RecipeDryRunOutcome.Completed;
+                    SemiconductorRecipeGalleryValidationFailureStage.Load =>
+                        OpenVisionLanguageService.T("Gallery.ValidationLoadStage"),
+                    SemiconductorRecipeGalleryValidationFailureStage.SequenceMissing =>
+                        OpenVisionLanguageService.T("Gallery.ValidationCompileStage"),
+                    SemiconductorRecipeGalleryValidationFailureStage.Compile
+                        when string.IsNullOrWhiteSpace(validation.FailureStepId) =>
+                        OpenVisionLanguageService.T("Gallery.ValidationCompileStage"),
+                    _ => validation.FailureStepId ?? string.Empty
+                };
+                string detail = validation.FailureStage
+                    == SemiconductorRecipeGalleryValidationFailureStage.SequenceMissing
+                    ? OpenVisionLanguageService.T("Gallery.ValidationSequenceMissing")
+                    : validation.Detail;
+                bool passed = validation.IsPassed;
                 item.MarkValidationCompleted(
                     passed,
                     BuildIdentity.Current,
@@ -746,22 +739,14 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 
     private void SaveCompatibilityReportWithDialog()
     {
-        var dialog = new SaveFileDialog
-        {
-            AddExtension = true,
-            DefaultExt = ".json",
-            Filter = "JSON (*.json)|*.json",
-            FileName = $"OpenVisionLab-MachineStudio-recipe-pack-compatibility-{DateTime.Now:yyyyMMdd-HHmmss}.json",
-            Title = OpenVisionLanguageService.T("Gallery.SaveCompatibilityReport")
-        };
-        if (dialog.ShowDialog() != true)
+        if (_selectCompatibilityReportSavePath() is not { } path)
         {
             return;
         }
 
         try
         {
-            SaveCompatibilityReport(dialog.FileName);
+            SaveCompatibilityReport(path);
         }
         catch (Exception exception)
         {
@@ -771,31 +756,18 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 
     private void CompareCompatibilityReportsWithDialogs()
     {
-        var baselineDialog = CreateCompatibilityReportDialog(
-            OpenVisionLanguageService.T("Gallery.CompareBaselineReport"));
-        if (baselineDialog.ShowDialog() != true)
+        if (_selectBaselineCompatibilityReportPath() is not { } baselinePath)
         {
             return;
         }
 
-        var currentDialog = CreateCompatibilityReportDialog(
-            OpenVisionLanguageService.T("Gallery.CompareCurrentReport"));
-        if (currentDialog.ShowDialog() != true)
+        if (_selectCurrentCompatibilityReportPath() is not { } currentPath)
         {
             return;
         }
 
-        TryCompareCompatibilityReports(baselineDialog.FileName, currentDialog.FileName);
+        TryCompareCompatibilityReports(baselinePath, currentPath);
     }
-
-    private static OpenFileDialog CreateCompatibilityReportDialog(string title) => new()
-    {
-        CheckFileExists = true,
-        DefaultExt = ".json",
-        Filter = "JSON (*.json)|*.json",
-        Multiselect = false,
-        Title = title
-    };
 
     private void ApplyCompatibilityComparison(
         RecipePackCompatibilityComparison comparison,

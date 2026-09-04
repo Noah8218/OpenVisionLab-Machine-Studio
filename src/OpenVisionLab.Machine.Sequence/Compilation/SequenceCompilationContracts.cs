@@ -16,6 +16,9 @@ public enum SequenceCompilationErrorCode
     InvalidNumericParameter,
     UnexpectedParameter,
     InvalidTimeout,
+    InvalidWatchdogTimeout,
+    UnknownSubsequence,
+    SubsequenceCycle,
     NextStepNotFound,
     ErrorStepNotFound,
     MissingSuccessor,
@@ -34,6 +37,12 @@ public enum SequenceCompilationErrorCode
 
 public sealed record SequenceCompilationError(
     SequenceCompilationErrorCode Code,
+    string? StepId,
+    string Message);
+
+public sealed record SequenceCompositionError(
+    SequenceCompilationErrorCode Code,
+    string SequenceId,
     string? StepId,
     string Message);
 
@@ -59,11 +68,12 @@ public sealed class SequenceCompilationTargets
     private readonly IReadOnlyDictionary<string, ChannelKind> _channels;
     private readonly HashSet<string> _axisIds;
     private readonly HashSet<string> _cameraIds;
+    private readonly HashSet<string> _sequenceIds;
 
     public SequenceCompilationTargets(
         IReadOnlyDictionary<string, ChannelKind> channels,
         IEnumerable<string> axisIds)
-        : this(channels, axisIds, Array.Empty<string>())
+        : this(channels, axisIds, Array.Empty<string>(), Array.Empty<string>())
     {
     }
 
@@ -71,14 +81,25 @@ public sealed class SequenceCompilationTargets
         IReadOnlyDictionary<string, ChannelKind> channels,
         IEnumerable<string> axisIds,
         IEnumerable<string> cameraIds)
+        : this(channels, axisIds, cameraIds, Array.Empty<string>())
+    {
+    }
+
+    public SequenceCompilationTargets(
+        IReadOnlyDictionary<string, ChannelKind> channels,
+        IEnumerable<string> axisIds,
+        IEnumerable<string> cameraIds,
+        IEnumerable<string> sequenceIds)
     {
         ArgumentNullException.ThrowIfNull(channels);
         ArgumentNullException.ThrowIfNull(axisIds);
         ArgumentNullException.ThrowIfNull(cameraIds);
+        ArgumentNullException.ThrowIfNull(sequenceIds);
 
         _channels = new Dictionary<string, ChannelKind>(channels, StringComparer.Ordinal);
         _axisIds = new HashSet<string>(axisIds, StringComparer.Ordinal);
         _cameraIds = new HashSet<string>(cameraIds, StringComparer.Ordinal);
+        _sequenceIds = new HashSet<string>(sequenceIds, StringComparer.Ordinal);
     }
 
     internal bool TryGetChannelKind(string id, out ChannelKind kind)
@@ -94,5 +115,10 @@ public sealed class SequenceCompilationTargets
     internal bool ContainsCamera(string id)
     {
         return _cameraIds.Contains(id);
+    }
+
+    internal bool ContainsSequence(string id)
+    {
+        return _sequenceIds.Contains(id);
     }
 }

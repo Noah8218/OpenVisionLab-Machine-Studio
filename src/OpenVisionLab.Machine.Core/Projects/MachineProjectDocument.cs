@@ -4,7 +4,7 @@ namespace OpenVisionLab.Machine.Core.Projects;
 
 public sealed class MachineProjectDocument
 {
-    public const string CurrentSchema = "1.11";
+    public const string CurrentSchema = "1.12";
 
     [JsonPropertyName("schema")]
     public string Schema { get; set; } = CurrentSchema;

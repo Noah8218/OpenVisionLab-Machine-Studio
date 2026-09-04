@@ -6,16 +6,17 @@ using OpenVisionLab.Integration.Transport.Tcp;
 namespace OpenVisionLab.Machine.Infrastructure.Integration;
 
 /// <summary>
-/// Adds the shared authenticated TCP transport to Machine Studio's existing
-/// transaction directory. Transport only copies immutable transaction files;
-/// acknowledgement, inspection, and result refresh remain explicit actions.
+/// Composes the shared authenticated TCP transport with Machine Studio's
+/// existing local transaction store. TCP receipt only materializes immutable
+/// files; Machine acknowledgement, consumer execution, and result projection
+/// remain explicit actions owned by their existing adapters.
 /// </summary>
 public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
 {
-    private readonly byte[] sharedKey;
-    private readonly TcpIntegrationOptions options;
-    private TcpIntegrationServer? server;
-    private bool disposed;
+    private readonly byte[] _sharedKey;
+    private readonly TcpIntegrationOptions _options;
+    private TcpIntegrationServer? _server;
+    private bool _disposed;
 
     public MachineIntegrationTcpExchange(
         string exchangeRoot,
@@ -35,13 +36,13 @@ public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
                 nameof(sharedKey));
         }
 
-        this.sharedKey = sharedKey.ToArray();
-        this.options = options ?? new TcpIntegrationOptions();
+        _sharedKey = sharedKey.ToArray();
+        _options = options ?? new TcpIntegrationOptions();
     }
 
     public string ExchangeRoot { get; }
 
-    public IPEndPoint? LocalEndpoint => server?.LocalEndpoint;
+    public IPEndPoint? LocalEndpoint => _server?.LocalEndpoint;
 
     public event Action<TcpIntegrationTransferReceipt>? RequestCompleted;
 
@@ -52,32 +53,32 @@ public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(listenAddress);
-        if (server is not null)
+        if (_server is not null)
         {
             throw new InvalidOperationException(
                 "The Machine TCP integration listener is already started.");
         }
 
-        var candidate = new TcpIntegrationServer(
+        var server = new TcpIntegrationServer(
             IntegrationApplicationIds.MachineStudio,
             ExchangeRoot,
             listenAddress,
             port,
-            sharedKey,
-            options);
-        candidate.RequestCompleted += OnRequestCompleted;
+            _sharedKey,
+            _options);
+        server.RequestCompleted += OnRequestCompleted;
         try
         {
-            await candidate.StartAsync(cancellationToken).ConfigureAwait(false);
-            server = candidate;
-            return candidate.LocalEndpoint
+            await server.StartAsync(cancellationToken).ConfigureAwait(false);
+            _server = server;
+            return server.LocalEndpoint
                 ?? throw new InvalidOperationException(
                     "The Machine TCP integration listener has no local endpoint.");
         }
         catch
         {
-            candidate.RequestCompleted -= OnRequestCompleted;
-            await candidate.DisposeAsync().ConfigureAwait(false);
+            server.RequestCompleted -= OnRequestCompleted;
+            await server.DisposeAsync().ConfigureAwait(false);
             throw;
         }
     }
@@ -85,21 +86,21 @@ public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
     public async Task StopListeningAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        var active = server;
-        if (active is null)
+        var server = _server;
+        if (server is null)
         {
             return;
         }
 
-        server = null;
-        active.RequestCompleted -= OnRequestCompleted;
+        _server = null;
+        server.RequestCompleted -= OnRequestCompleted;
         try
         {
-            await active.StopAsync(cancellationToken).ConfigureAwait(false);
+            await server.StopAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            await active.DisposeAsync().ConfigureAwait(false);
+            await server.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -135,9 +136,39 @@ public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
                 token),
             cancellationToken);
 
+    public IReadOnlyList<MachineIntegrationTransactionSummary> DiscoverTransactions()
+    {
+        ThrowIfDisposed();
+        return MachineIntegrationExchange.DiscoverTransactions(ExchangeRoot);
+    }
+
+    public IntegrationHandoffV2 ReadHandoff(Guid transactionId)
+    {
+        ThrowIfDisposed();
+        return MachineIntegrationExchange.ReadHandoff(ExchangeRoot, transactionId);
+    }
+
+    public IntegrationHandoffV2 ReadHandoffEnvelope(Guid transactionId)
+    {
+        ThrowIfDisposed();
+        return MachineIntegrationExchange.ReadHandoffEnvelope(ExchangeRoot, transactionId);
+    }
+
+    public IntegrationAcknowledgementV2 ReadAcknowledgement(Guid transactionId)
+    {
+        ThrowIfDisposed();
+        return MachineIntegrationExchange.ReadAcknowledgement(ExchangeRoot, transactionId);
+    }
+
+    public IntegrationResultV2 ReadResult(Guid transactionId)
+    {
+        ThrowIfDisposed();
+        return MachineIntegrationExchange.ReadResult(ExchangeRoot, transactionId);
+    }
+
     public async ValueTask DisposeAsync()
     {
-        if (disposed)
+        if (_disposed)
         {
             return;
         }
@@ -148,14 +179,17 @@ public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
         }
         finally
         {
-            CryptographicOperations.ZeroMemory(sharedKey);
-            disposed = true;
+            CryptographicOperations.ZeroMemory(_sharedKey);
+            _disposed = true;
         }
     }
 
     private async Task<TcpIntegrationTransferReceipt> ExecuteClientAsync(
         TcpIntegrationEndpoint peer,
-        Func<TcpIntegrationClient, CancellationToken, Task<TcpIntegrationTransferReceipt>> operation,
+        Func<
+            TcpIntegrationClient,
+            CancellationToken,
+            Task<TcpIntegrationTransferReceipt>> operation,
         CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
@@ -164,8 +198,8 @@ public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
         using var client = new TcpIntegrationClient(
             IntegrationApplicationIds.MachineStudio,
             peer,
-            sharedKey,
-            options);
+            _sharedKey,
+            _options);
         return await operation(client, cancellationToken).ConfigureAwait(false);
     }
 
@@ -173,5 +207,5 @@ public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
         RequestCompleted?.Invoke(receipt);
 
     private void ThrowIfDisposed() =>
-        ObjectDisposedException.ThrowIf(disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 }

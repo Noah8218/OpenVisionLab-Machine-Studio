@@ -24,6 +24,75 @@ public class FixedStepSimulationEngineTests
         Deceleration = 500
     };
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void Constructor_InvalidTimeScale_IsRejected(double timeScale)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new FixedStepSimulationEngine(new SimulationSettings { TimeScale = timeScale }));
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 0)]
+    public void Constructor_NonPositiveRetentionCapacity_IsRejected(
+        int commandQueueCapacity,
+        int eventBufferCapacity)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new FixedStepSimulationEngine(new SimulationSettings
+            {
+                CommandQueueCapacity = commandQueueCapacity,
+                EventBufferCapacity = eventBufferCapacity
+            }));
+    }
+
+    [Fact]
+    public async Task CommandQueue_BackpressuresWithoutDroppingCommands()
+    {
+        using var engine = new FixedStepSimulationEngine(new SimulationSettings
+        {
+            CommandQueueCapacity = 2,
+            EventBufferCapacity = 512
+        });
+        await engine.StartAsync();
+
+        var results = await Task.WhenAll(
+            Enumerable.Range(0, 100)
+                .Select(_ => engine.EnqueueCommandAsync(new StepCommand())));
+
+        Assert.All(results, result => Assert.True(result.IsAccepted, result.Detail));
+        Assert.Equal(100, engine.CurrentSnapshot.TickIndex);
+    }
+
+    [Fact]
+    public async Task EventBuffer_RetainsLatestOrderedWindow()
+    {
+        using var engine = new FixedStepSimulationEngine(new SimulationSettings
+        {
+            CommandQueueCapacity = 2,
+            EventBufferCapacity = 8
+        });
+        await engine.StartAsync();
+        for (var index = 0; index < 32; index++)
+        {
+            Assert.True((await engine.EnqueueCommandAsync(new StepCommand())).IsAccepted);
+        }
+
+        await engine.StopAsync();
+        var events = await ReadAllEventsAsync(engine);
+
+        Assert.Equal(8, events.Count);
+        Assert.True(events[0].EventIndex > 1);
+        Assert.All(events, item => Assert.Equal("CommandAccepted", item.Code));
+        for (var index = 1; index < events.Count; index++)
+        {
+            Assert.Equal(events[index - 1].EventIndex + 1, events[index].EventIndex);
+        }
+    }
+
     [Fact]
     public async Task EnqueueBeforeStart_ReturnsTypedEngineNotStartedWithoutWaiting()
     {
@@ -55,6 +124,220 @@ public class FixedStepSimulationEngineTests
     }
 
     [Fact]
+    public async Task UnexpectedCommandApplicationFault_CompletesCommandAndReaders()
+    {
+        var expected = new InvalidOperationException("apply fault");
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings(),
+            point =>
+            {
+                if (point == SimulationEngineFaultPoint.BeforeCommandApplication)
+                {
+                    throw expected;
+                }
+            });
+
+        await engine.StartAsync();
+        var command = new PauseCommand();
+        var result = await engine.EnqueueCommandAsync(command).WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.False(result.IsAccepted);
+        Assert.Equal(SimulationCommandErrorCode.EngineFaulted, result.ErrorCode);
+
+        var termination = await engine.Termination.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(SimulationEngineTerminationOutcome.Faulted, termination.Outcome);
+        Assert.Same(expected, termination.Exception);
+        Assert.Equal(command.CommandId, termination.CurrentCommandId);
+        Assert.Equal("ApplyCommand", termination.Operation);
+        await AssertReadersCompletedAsync(engine);
+
+        var postFault = await engine.EnqueueCommandAsync(new StepCommand());
+        Assert.Equal(SimulationCommandErrorCode.EngineFaulted, postFault.ErrorCode);
+
+        await engine.StopAsync();
+        await engine.StopAsync();
+        engine.Dispose();
+    }
+
+    [Fact]
+    public async Task FaultAfterAppliedCommand_CompletesPendingQueuedAndPostFaultCommands()
+    {
+        var expected = new InvalidOperationException("after apply fault");
+        var entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var callbackCount = 0;
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings { CommandQueueCapacity = 8 },
+            point =>
+            {
+                if (point != SimulationEngineFaultPoint.AfterCommandApplication
+                    || Interlocked.Exchange(ref callbackCount, 1) != 0)
+                {
+                    return;
+                }
+
+                entered.TrySetResult(true);
+                release.Task.GetAwaiter().GetResult();
+                throw expected;
+            });
+
+        await engine.StartAsync();
+        var firstCommand = new PauseCommand();
+        var firstTask = engine.EnqueueCommandAsync(firstCommand);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var queuedTasks = new[]
+        {
+            engine.EnqueueCommandAsync(new StepCommand()),
+            engine.EnqueueCommandAsync(new ResetCommand())
+        };
+        release.TrySetResult(true);
+
+        var results = await Task.WhenAll(new[] { firstTask }.Concat(queuedTasks))
+            .WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.All(results, result => Assert.Equal(SimulationCommandErrorCode.EngineFaulted, result.ErrorCode));
+
+        var termination = await engine.Termination.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(SimulationEngineTerminationOutcome.Faulted, termination.Outcome);
+        Assert.Same(expected, termination.Exception);
+        Assert.Equal(firstCommand.CommandId, termination.CurrentCommandId);
+        Assert.Equal("ApplyCommand", termination.Operation);
+
+        var postFault = await engine.EnqueueCommandAsync(new PauseCommand());
+        Assert.Equal(SimulationCommandErrorCode.EngineFaulted, postFault.ErrorCode);
+        await AssertReadersCompletedAsync(engine);
+    }
+
+    [Fact]
+    public async Task UnexpectedTickFaultCapturesTickOperationWithoutFaultingAsCancellation()
+    {
+        var expected = new InvalidOperationException("tick fault");
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings { FixedStep = TimeSpan.FromMilliseconds(5) },
+            point =>
+            {
+                if (point == SimulationEngineFaultPoint.BeforeTick)
+                {
+                    throw expected;
+                }
+            });
+
+        await engine.StartAsync();
+        Assert.True((await engine.EnqueueCommandAsync(new PlayCommand())).IsAccepted);
+
+        var termination = await engine.Termination.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(SimulationEngineTerminationOutcome.Faulted, termination.Outcome);
+        Assert.Same(expected, termination.Exception);
+        Assert.Equal(0, termination.TickIndex);
+        Assert.Equal(TimeSpan.Zero, termination.SimulationTime);
+        Assert.Null(termination.CurrentCommandId);
+        Assert.Equal("Tick", termination.Operation);
+        await AssertReadersCompletedAsync(engine);
+    }
+
+    [Fact]
+    public async Task UnexpectedSnapshotFaultCompletesTerminationWithoutAReaderHang()
+    {
+        var expected = new InvalidOperationException("snapshot fault");
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings(),
+            point =>
+            {
+                if (point == SimulationEngineFaultPoint.BeforeSnapshotPublication)
+                {
+                    throw expected;
+                }
+            });
+
+        await engine.StartAsync();
+
+        var termination = await engine.Termination.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(SimulationEngineTerminationOutcome.Faulted, termination.Outcome);
+        Assert.Same(expected, termination.Exception);
+        Assert.Equal("SnapshotPublication", termination.Operation);
+        await AssertReadersCompletedAsync(engine);
+    }
+
+    [Fact]
+    public async Task UnexpectedEventFaultCompletesTheCurrentCommandWithFaultContext()
+    {
+        var expected = new InvalidOperationException("event fault");
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings(),
+            point =>
+            {
+                if (point == SimulationEngineFaultPoint.BeforeEventPublication)
+                {
+                    throw expected;
+                }
+            });
+
+        await engine.StartAsync();
+        var command = new PauseCommand();
+        var result = await engine.EnqueueCommandAsync(command).WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(SimulationCommandErrorCode.EngineFaulted, result.ErrorCode);
+        var termination = await engine.Termination.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(SimulationEngineTerminationOutcome.Faulted, termination.Outcome);
+        Assert.Same(expected, termination.Exception);
+        Assert.Equal(command.CommandId, termination.CurrentCommandId);
+        Assert.Equal("EventPublication", termination.Operation);
+        await AssertReadersCompletedAsync(engine);
+    }
+
+    [Fact]
+    public async Task UnexpectedPostApplicationSnapshotFaultCompletesTheAffectedCommand()
+    {
+        var expected = new InvalidOperationException("post-application snapshot fault");
+        var publicationCount = 0;
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings(),
+            point =>
+            {
+                if (point == SimulationEngineFaultPoint.BeforeSnapshotPublication
+                    && Interlocked.Increment(ref publicationCount) == 2)
+                {
+                    throw expected;
+                }
+            });
+
+        await engine.StartAsync();
+        var command = new PauseCommand();
+        var result = await engine.EnqueueCommandAsync(command).WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(SimulationCommandErrorCode.EngineFaulted, result.ErrorCode);
+        var termination = await engine.Termination.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(SimulationEngineTerminationOutcome.Faulted, termination.Outcome);
+        Assert.Same(expected, termination.Exception);
+        Assert.Null(termination.CurrentCommandId);
+        Assert.Equal("SnapshotPublication", termination.Operation);
+        await AssertReadersCompletedAsync(engine);
+    }
+
+    [Fact]
+    public async Task StartCancellationAndExplicitStopHaveSeparateNormalTerminalOutcomes()
+    {
+        using (var cancellationEngine = new FixedStepSimulationEngine(new SimulationSettings()))
+        using (var cancellation = new CancellationTokenSource())
+        {
+            await cancellationEngine.StartAsync(cancellation.Token);
+            cancellation.Cancel();
+
+            var cancelled = await cancellationEngine.Termination.WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.Equal(SimulationEngineTerminationOutcome.Cancelled, cancelled.Outcome);
+            await cancellationEngine.StopAsync();
+        }
+
+        using var stoppedEngine = new FixedStepSimulationEngine(new SimulationSettings());
+        await stoppedEngine.StartAsync();
+        await stoppedEngine.StopAsync();
+
+        var stopped = await stoppedEngine.Termination.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(SimulationEngineTerminationOutcome.Stopped, stopped.Outcome);
+        await stoppedEngine.StopAsync();
+    }
+
+    [Fact]
     public async Task PlayPause_AdvancesAndStopsTime()
     {
         var settings = new SimulationSettings { FixedStep = TimeSpan.FromMilliseconds(5) };
@@ -74,6 +357,24 @@ public class FixedStepSimulationEngineTests
         Assert.Equal(pausedTime, engine.CurrentSnapshot.SimulationTime);
 
         await engine.StopAsync();
+    }
+
+    [Fact]
+    public async Task Pause_RemainsResponsiveAtVerySlowInternalTimeScale()
+    {
+        using var engine = new FixedStepSimulationEngine(new SimulationSettings
+        {
+            FixedStep = TimeSpan.FromMilliseconds(5),
+            TimeScale = 0.000001
+        });
+        await engine.StartAsync();
+        Assert.True((await engine.EnqueueCommandAsync(new PlayCommand())).IsAccepted);
+
+        SimulationCommandResult paused = await engine.EnqueueCommandAsync(new PauseCommand())
+            .WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.True(paused.IsAccepted, paused.Detail);
+        Assert.Equal(SimulationRunMode.Paused, engine.CurrentSnapshot.RunMode);
     }
 
     [Fact]
@@ -718,6 +1019,21 @@ public class FixedStepSimulationEngineTests
             events.Add(item);
         }
         return events;
+    }
+
+    private static async Task AssertReadersCompletedAsync(FixedStepSimulationEngine engine)
+    {
+        await Task.WhenAll(
+            DrainReaderAsync(engine.SnapshotReader),
+            DrainReaderAsync(engine.EventReader));
+    }
+
+    private static async Task DrainReaderAsync<T>(System.Threading.Channels.ChannelReader<T> reader)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await foreach (var _ in reader.ReadAllAsync(timeout.Token))
+        {
+        }
     }
 
     private static void AssertCommandBoundary(

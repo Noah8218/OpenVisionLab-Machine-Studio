@@ -86,6 +86,9 @@ Connections.Tab	연결	Connections
 Connections.Title	레시피 연결	Recipe connections
 Connections.QuickAddTitle	구성요소 추가 및 자동 연결	Add and connect equipment
 Connections.QuickAddHint	기존 프로젝트 모델에 축·장치·I/O가 함께 생성됩니다. 센서는 스테이지 또는 워크피스 카드를 먼저 선택하면 해당 대상을 연결하며, 상세 연결은 오른쪽 속성에서 편집합니다.	Axis, device, and I/O definitions are created together in the existing project model. For a sensor, first select its stage or workpiece target; edit detailed links in Properties.
+Connections.CreateVirtualCameraWorkflow	카메라 검사 추가	Add camera inspection
+Connections.CreateVirtualCameraWorkflowTooltip	가상 카메라, 기본 검사 레시피와 TriggerCamera → WaitVisionResult 시퀀스를 현재 프로젝트에 추가합니다. 실행은 시작하지 않습니다.	Add a virtual camera, default inspection recipe, and TriggerCamera → WaitVisionResult sequence to the current project. This does not start a run.
+Connections.VirtualCameraWorkflowCreatedStatus	가상 카메라 검사 구성을 추가했습니다. 실행은 시작되지 않았으며 저장하면 현재 프로젝트에 유지됩니다.	Added the virtual-camera inspection workflow. No run started; save to retain it in the current project.
 Connections.StationSkeletonPreview	반도체 스테이션 구성	Configure semiconductor station
 Connections.StationSkeletonPreviewTooltip	현재 레시피에서 누락된 반도체 이송 스테이션 역할을 찾아 적용 전에 보여줍니다.	Find missing semiconductor transfer-station roles in the current recipe and show them before applying.
 Connections.LoadLockSetupPreview	로드락 설정	Load-lock setup
@@ -538,6 +541,14 @@ Shell.Design	설계	Design
 Shell.Run	운전	Run
 Shell.SimulationOn	시뮬레이션 시작	Simulation ON
 Shell.Pause	일시정지	Pause
+Shell.AbortSequence	시퀀스 중단	Abort sequence
+Shell.AbortSequenceTooltip	활성 시퀀스를 중단합니다. Reset 후 다시 시작할 수 있습니다.	Abort the active sequence. Reset is required before starting again.
+Shell.SequenceAbortedStatus	시퀀스가 중단되었습니다. Reset 후 다시 시작할 수 있습니다.	The sequence was aborted. Reset is required before starting again.
+Shell.SequenceAbortRejectedStatus	시퀀스 중단이 거부되었습니다.	Sequence abort was rejected.
+Shell.RetrySequence	시퀀스 재시도	Retry sequence
+Shell.RetrySequenceTooltip	오류 원인을 해제한 뒤 시퀀스를 처음부터 재시도합니다. 자동 반복은 다시 시작되지 않습니다.	Retry the faulted sequence from its entry step after clearing the cause. Automatic continuation remains stopped.
+Shell.SequenceRetriedStatus	시퀀스를 재시도했습니다. 자동 반복은 중지된 상태입니다.	The sequence was retried from its entry step. Automatic continuation remains stopped.
+Shell.SequenceRetryRejectedStatus	시퀀스 재시도가 거부되었습니다.	Sequence retry was rejected.
 Shell.Step	단계 실행	Step
 Shell.Reset	초기화	Reset
 Shell.CycleStart	사이클 시작	Cycle Start
@@ -574,6 +585,14 @@ Project.UnsavedMessage	현재 프로젝트의 변경 내용을 저장하시겠�
 Project.Save	저장	Save
 Project.DontSave	저장 안 함	Don't save
 Project.Cancel	취소	Cancel
+Project.OpenFailedStatus	프로젝트를 열지 못했습니다	The project could not be opened
+Project.OpenFailedTitle	프로젝트 열기 실패	Project open failed
+Project.OpenFailedMessage	프로젝트 파일을 열지 못했습니다. 현재 프로젝트는 그대로 유지됩니다.{0}{0}{1}	The project file could not be opened. The current project remains unchanged.{0}{0}{1}
+Project.OpenFailedUnsupportedSchemaDetail	프로젝트 스키마 '{0}'은(는) 지원되지 않습니다. 지원되는 최신 스키마는 '{1}'입니다.	Project schema '{0}' is not supported. The latest supported schema is '{1}'.
+Project.OpenFailedInvalidFileDetail	파일 내용이 올바른 Machine Studio 프로젝트가 아닙니다.	The file content is not a valid Machine Studio project.
+Project.OpenFailedNotFoundDetail	프로젝트 파일을 찾을 수 없습니다.	The project file could not be found.
+Project.OpenFailedAccessDetail	프로젝트 파일을 읽을 권한이 없습니다.	The project file cannot be read with the current permissions.
+Project.OpenFailedReadDetail	프로젝트 파일을 읽는 동안 파일 시스템 오류가 발생했습니다.	A file-system error occurred while reading the project file.
 Project.SaveFailedStatus	프로젝트를 저장하지 못했습니다	The project could not be saved
 Project.SaveFailedTitle	프로젝트 저장 실패	Project save failed
 Project.SaveFailedMessage	프로젝트 파일을 안전하게 저장하지 못했습니다.{0}{0}{1}	The project file could not be saved safely.{0}{0}{1}
@@ -768,13 +787,52 @@ Camera.EvidenceNone	저장된 실행 증거 없음	No saved execution evidence
 Camera.EvidenceCapturing	실행 증거 수집 중	Capturing execution evidence
 Camera.EvidenceSaved	프로젝트 실행 증거 저장됨	Project execution evidence saved
 Camera.EvidenceRestored	프로젝트 실행 증거 복원됨	Project execution evidence restored
+Camera.EvidenceImported	가져온 실행 증거가 메모리에 있음	Imported execution evidence is in memory
 Camera.EvidenceStale	프로젝트·빌드·카메라 또는 레시피가 달라 기존 증거가 만료됨	Existing evidence is stale for the project, build, camera, or recipe
 Camera.EvidenceSaveFailed	실행 증거 저장 실패	Execution evidence save failed
 Camera.EvidenceNoComparison	비교할 이전 실행 증거 없음	No prior execution evidence to compare
 Camera.EvidenceMatch	이전 실행 증거와 일치	Matches prior execution evidence
 Camera.EvidenceMismatch	이전 실행 증거와 불일치 · {0}	Differs from prior execution evidence · {0}
+Integration.Workspace	통합 워크스페이스	Integration workspace
+Integration.Hint	교환 설정을 저장한 뒤 명시적으로 Handoff를 게시하고 Result를 새로고침합니다. 이 화면은 소비자 검사를 자동 실행하지 않습니다.	Save the exchange setup, then explicitly publish a Handoff and refresh Result. This screen never runs the consumer inspection automatically.
+Integration.ExchangeRoot	교환 폴더	Exchange folder
+Integration.Browse	찾아보기	Browse
+Integration.BrowseExchangeRootTooltip	Machine Studio와 소비자가 공유할 로컬 교환 폴더를 선택합니다.	Choose the local exchange folder shared by Machine Studio and the consumer.
+Integration.SaveSetup	설정 저장	Save setup
+Integration.SaveSetupTooltip	교환 폴더, 레시피 경로, 소비자 버전을 로컬 설정으로 저장합니다. 작업은 자동 실행하지 않습니다.	Save the exchange folder, recipe path, and consumer version locally. No operation runs automatically.
+Integration.ResetSetup	초기화	Reset
+Integration.ResetSetupTooltip	저장된 통합 설정을 지우고 Handoff/Result 화면을 초기화합니다.	Clear the saved integration setup and reset the Handoff/Result projection.
+Integration.Recipe	2D 검사 레시피	2D inspection recipe
+Integration.BrowseRecipeTooltip	2D 소비자가 읽을 로컬 검사 레시피 파일을 선택합니다.	Choose the local inspection recipe file that the 2D consumer will read.
+Integration.ConsumerVersion	2D 소비자 버전	2D consumer version
+Integration.ConsumerCommit	2D 소비자 source commit	2D consumer source commit
+Integration.ConsumerCommitTooltip	2D 소비자 clean build의 40자리 source commit을 입력합니다.	Enter the 40-character source commit from the 2D consumer clean build.
+Integration.PublishTwoD	2D/Image 게시	Publish 2D/Image
+Integration.PublishTwoDShort	2D/Image 게시	Publish 2D/Image
+Integration.PublishTwoDTooltip	완료된 가상 카메라 프레임과 명시적 소비자 identity로 Handoff만 게시합니다. 소비자 검사는 실행하지 않습니다.	Publish only a Handoff using a completed virtual-camera frame and explicit consumer identity. The consumer inspection is not run.
+Integration.RefreshResults	Result 새로고침	Refresh Result
+Integration.RefreshResultsTooltip	현재 프로젝트의 Handoff, acknowledgement, Result를 교환 폴더에서 읽습니다. 검사를 실행하지 않습니다.	Read the current project's Handoff, acknowledgement, and Result from the exchange folder. No inspection is run.
+Integration.HandoffStatus	Handoff 상태	Handoff status
+Integration.AcknowledgementStatus	Acknowledgement 상태	Acknowledgement status
+Integration.ResultStatus	Result 상태	Result status
+Integration.ProjectionStatus	좌표 투영	Coordinate projection
+Integration.LastTransaction	최근 거래	Latest transaction
+Integration.ThreeDReadOnlyHint	ThreeD/HeightMap Result는 3D Studio가 게시하며 이 화면은 새로고침으로만 읽습니다.	ThreeD/HeightMap Results are published by 3D Studio and are read here only through Refresh Result.
+Integration.TcpSetup	직접 TCP 연결	Direct TCP connection
+Integration.TcpSetupHint	로컬 거래 폴더와 TCP 주소를 저장합니다. 복원만으로 수신이나 연결을 시작하지 않으며 공유 키는 저장하지 않습니다.	Save the local transaction folder and TCP endpoints. Restore never starts listening or connects, and the shared key is never saved.
+Integration.TcpListenAddress	수신 주소	Listen address
+Integration.TcpListenPort	수신 포트	Listen port
+Integration.TcpPeerHost	상대 주소	Peer host
+Integration.TcpPeerPort	상대 포트	Peer port
+Integration.TcpSharedKey	세션 공유 키	Session shared key
+Integration.StartTcpListener	수신 시작	Start listening
+Integration.StopTcpListener	수신 중지	Stop listening
+Integration.PingTcpPeer	상대 Ping	Ping peer
+Integration.PushTcpTransaction	최근 전송	Push latest
+Integration.PullTcpTransaction	ACK/Result 받기	Pull ACK/Result
 Inspector.DigitalIo	디지털 I/O	Digital I/O
 Inspector.FaultManager	장애 관리자	Fault manager
+Inspector.RuntimeDebugger	시퀀스 디버거	Sequence debugger
 Inspector.ActiveFaults	활성 장애	Active faults
 Inspector.VirtualInput	가상 입력	Virtual input
 Inspector.CycleStartDi	사이클 시작 (DI)	Cycle Start (DI)
@@ -803,6 +861,14 @@ Inspector.NominalValue	실제 값	Nominal value
 Inspector.ForceState	Force 상태	Force state
 Io.DigitalInput	DI	DI
 Io.DigitalOutput	DO	DO
+Io.AnalogInput	AI	AI
+Io.AnalogOutput	AO	AO
+Io.AnalogAuthoring	아날로그 I/O 작성	Analog I/O authoring
+Io.AnalogAuthoringHint	시뮬레이션 시작 시 사용할 유한한 숫자 초기값을 입력합니다. 입력값은 프로젝트에 저장됩니다.	Enter the finite numeric value used when the simulation starts. The value is saved with the project.
+Io.InitialValue	초기값	Initial value
+Io.AnalogValueValid	유한한 숫자 값입니다.	Finite numeric value.
+Io.AnalogValueInvalid	유한한 숫자를 입력하세요. 변경 내용은 유효할 때만 프로젝트에 반영됩니다.	Enter a finite number. The project changes only after the value is valid.
+Io.AnalogAuthoringChangedStatus	아날로그 초기값이 변경되었습니다. Simulation ON 전에 저장하세요.	The analog initial value changed. Save before turning Simulation ON.
 Io.StartManualControl	수동 운전 시작	Start manual control
 Io.StartManualControlTooltip	일시정지 상태에서 로컬 I/O 수동 운전을 명시적으로 시작합니다.	Explicitly start local I/O manual control while paused.
 Io.ForceOn	Force ON	Force ON
@@ -944,9 +1010,46 @@ Simulation.BatchArtifactNone	저장된 결과 없음	No retained result
 Simulation.BatchArtifactMemoryOnly	프로젝트를 저장하면 결과가 함께 보존됩니다.	Save the project to retain this result.
 Simulation.BatchArtifactSaved	결과가 프로젝트와 함께 저장되었습니다.	Result saved with the project.
 Simulation.BatchArtifactRestored	저장된 결과와 기준선을 복원했습니다.	Saved result and baseline restored.
+Simulation.BatchArtifactImported	가져온 증거를 메모리에 복원했습니다. 저장 전에는 프로젝트 옆 sidecar를 만들지 않습니다.	Imported evidence is restored in memory; no project sidecar is created until you save.
 Simulation.BatchArtifactStale	저장된 증거가 현재 프로젝트 또는 시나리오와 일치하지 않습니다.	Saved evidence does not match the current project or scenario.
 Simulation.BatchArtifactSaveFailed	결과를 저장하지 못해 메모리에만 유지합니다.	Result could not be saved and remains in memory.
 Simulation.BatchBaselineClearedStatus	승인 기준선을 해제했습니다.	Accepted baseline cleared.
+Simulation.ExportEvidence	증거 내보내기	Export evidence
+Simulation.ImportEvidence	증거 가져오기	Import evidence
+Simulation.EvidenceExchangeHint	현재 테스트 시나리오 결과와 승인 기준선을 하나의 파일로 옮깁니다. 실행·재생·알람 확인 상태는 저장하지 않습니다.	Move the current Test Scenario result and accepted baseline as one file. Runtime, replay, and alarm acknowledgement state are not saved.
+Simulation.EvidenceExported	결정적 시뮬레이션 증거를 내보냈습니다.	Deterministic simulation evidence exported.
+Simulation.EvidenceExportFailed	시뮬레이션 증거를 내보내지 못했습니다.	Simulation evidence could not be exported.
+Simulation.EvidenceImported	결정적 시뮬레이션 증거를 가져왔습니다. 실행하지 않았습니다.	Deterministic simulation evidence imported without execution.
+Simulation.EvidenceImportRejected	현재 프로젝트 또는 시나리오와 일치하지 않아 증거를 가져오지 않았습니다.	Evidence was not imported because it is not valid for the current project or scenario.
+Simulation.UnifiedCommissioningEvidence	통합 커미셔닝 증거	Unified commissioning evidence
+Simulation.UnifiedCommissioningEvidenceHint	반복 검증 결과와 명시적으로 캡처한 명령 trace, 있으면 Vision 실행 증거를 하나의 handoff 파일로 옮깁니다. 실행·재생·획득·프로젝트 저장은 하지 않습니다.	Move the repeat-validation result, explicitly captured command trace, and optional Vision execution evidence into one handoff file. Run, replay, acquisition, and project save are not performed.
+Simulation.ExportUnifiedCommissioningEvidence	커미셔닝 증거 내보내기	Export commissioning evidence
+Simulation.ImportUnifiedCommissioningEvidence	커미셔닝 증거 가져오기	Import commissioning evidence
+Simulation.UnifiedEvidenceNotReady	완료된 반복 검증 결과와 캡처된 명령 trace가 모두 필요합니다.	A completed repeat-validation result and a captured command trace are required.
+Simulation.UnifiedEvidenceReady	내보낼 통합 증거 준비됨 · Vision {0}	Unified evidence ready to export · Vision {0}
+Simulation.UnifiedEvidenceExported	통합 증거 내보냄 · {0} · Vision {1}	Unified evidence exported · {0} · Vision {1}
+Simulation.UnifiedEvidenceImported	통합 증거 가져옴 · {0} · 실행하지 않음 · Vision {1}	Unified evidence imported · {0} · no execution · Vision {1}
+Simulation.UnifiedEvidenceExportFailed	통합 커미셔닝 증거를 내보내지 못했습니다.	Unified commissioning evidence could not be exported.
+Simulation.UnifiedEvidenceImportRejected	현재 프로젝트 또는 시나리오와 일치하지 않아 통합 증거를 가져오지 않았습니다.	Unified commissioning evidence was not imported because it is invalid for the current context.
+Simulation.UnifiedEvidenceVisionIncluded	실행 증거 포함	included
+Simulation.UnifiedEvidenceVisionOmitted	실행 증거 없음	not included
+Simulation.CommandTrace	명령 trace	Command trace
+Simulation.CommandTraceHint	캡처 시작 후 적용된 일시정지형 결정적 명령 경계를 파일로 저장하고, 동일한 일시정지 runtime에서 재생합니다. runtime 설정·실시간 명령·카메라 획득은 trace에 포함되지 않습니다.	After Start capture, save applied paused deterministic command boundaries and replay them against the same paused runtime. Runtime setup, real-time commands, and camera acquisition are not included in the trace.
+Simulation.StartCommandTraceCapture	캡처 시작	Start capture
+Simulation.ExportCommandTrace	Trace 내보내기	Export trace
+Simulation.ReplayCommandTrace	Trace 재생	Replay trace
+Simulation.CommandTraceUnavailable	명령 trace를 사용할 수 없습니다.	Command trace is unavailable.
+Simulation.CommandTraceIdle	캡처를 시작하면 새 명령 경계를 기록합니다.	Start capture to record new command boundaries.
+Simulation.CommandTraceSetupOnly	현재 trace에는 runtime 초기화가 포함되어 있습니다. 캡처 시작을 눌러 재생용 경계를 설정하세요.	The current trace contains runtime initialization. Start capture to define a replayable boundary.
+Simulation.CommandTraceCaptureStarted	새 명령 trace 캡처 경계를 설정했습니다. 이후 적용된 명령을 기록합니다.	A new command trace capture boundary is set. Subsequent applied commands will be recorded.
+Simulation.CommandTraceReady	{0}개 명령 경계 · hash {1}	{0} command boundaries · hash {1}
+Simulation.CommandTraceReadyNonReplayable	{0}개 명령 경계 · replay 불가 항목 포함 · hash {1}	{0} command boundaries · contains non-replayable entries · hash {1}
+Simulation.CommandTraceExported	{0}개 명령 trace를 내보냈습니다. hash {1}	Exported {0} command-trace entries. Hash {1}.
+Simulation.CommandTraceExportFailed	명령 trace를 내보내지 못했습니다.	Command trace could not be exported.
+Simulation.CommandTraceInvalidFile	명령 trace 파일을 읽거나 검증하지 못했습니다.	The command trace file could not be loaded or validated.
+Simulation.CommandTraceReplayed	{0}개 명령 trace를 재생했습니다. hash {1}	Replayed {0} command-trace entries. Hash {1}.
+Simulation.CommandTraceReplayStatus	최근 재생: {0}개 명령 경계 · hash {1}	Last replay: {0} command boundaries · hash {1}
+Simulation.CommandTraceReplayFailed	명령 trace를 재생하지 않았습니다: {0}	Command trace was not replayed: {0}
 Equipment.MachineFrame	머신 프레임	Machine frame
 Equipment.LinearStageMotor	리니어 스테이지 / 모터	Linear stage / motor
 Equipment.RotaryStageMotor	회전 스테이지 / 모터	Rotary stage / motor
@@ -990,6 +1093,7 @@ Equipment.State.Limited	제한	LIMITED
 Equipment.State.Ready	준비	READY
 Equipment.State.Completed	완료	COMPLETED
 Equipment.State.Faulted	고장	FAULTED
+Equipment.State.Aborted	중단됨	ABORTED
 Equipment.State.Exposing	노출 중	EXPOSING
 Equipment.State.Transferring	전송 중	TRANSFERRING
 Equipment.State.FrameReady	프레임 준비	FRAME READY
@@ -1155,6 +1259,65 @@ Runtime.RecoveredWaiting	{0}: 복구 완료, 재시작 대기	{0}: recovered, wa
 Fault.SelectTargetHint	런타임 대상을 선택해 고장을 주입하세요.	Select a runtime target to inject a fault.
 Fault.NoMatchingTarget	현재 스냅샷에 이 고장 유형과 일치하는 런타임 대상이 없습니다.	No matching runtime target for this fault type in the current snapshot.
 Fault.NoActiveFaults	활성 고장 없음	No active faults
+Debugger.Hint	엔진 소유 실행 경계, 세션 중단점, 상태 Watch, 이벤트 및 복구 상태를 한곳에서 확인합니다.	Inspect engine-owned execution boundaries, session breakpoints, state watches, events, and recovery status in one place.
+Debugger.NextSequenceStep	다음 시퀀스 단계	Next sequence step
+Debugger.NextSequenceStepTooltip	일시정지된 실행을 정확히 다음 시퀀스 전이 경계까지 진행합니다.	Advance a paused run to exactly the next sequence transition boundary.
+Debugger.Breakpoints	중단점	Breakpoints
+Debugger.BreakpointSelectionTooltip	실행 전에 일시정지할 시퀀스 단계를 선택합니다.	Select the sequence step where execution pauses before the step runs.
+Debugger.StateWatches	상태 Watch	State watches
+Debugger.WatchSelectionTooltip	최신 불변 런타임 스냅샷에서 관찰할 상태를 선택합니다.	Select state to observe from the latest immutable runtime snapshot.
+Debugger.AddWatch	Watch 추가	Add watch
+Debugger.RemoveWatch	Watch 제거	Remove watch
+Debugger.Timeline	구조화 타임라인	Structured timeline
+Debugger.ClearTimeline	기록 지우기	Clear
+Debugger.AlarmsRecovery	알람 및 복구	Alarms and recovery
+Debugger.AlarmRecoveryHint	주입 고장은 해제하고, 원인이 제거된 뒤 Reset으로 런타임을 복구합니다.	Clear injected faults and use Reset after the underlying cause is removed.
+Debugger.ReadyHint	일시정지 후 다음 시퀀스 경계로 이동하거나 중단점을 설정하세요.	Pause to move to the next sequence boundary or configure a breakpoint.
+Debugger.NoActiveSequence	활성 시퀀스 없음	No active sequence
+Debugger.NoCurrentStep	현재 단계 없음	No current step
+Debugger.PauseSemanticStep	다음 단계 경계	Next-step boundary
+Debugger.PauseBreakpoint	중단점	Breakpoint
+Debugger.PauseCompleted	시퀀스 완료	Sequence completed
+Debugger.PauseFaulted	시퀀스 오류	Sequence faulted
+Debugger.PauseAborted	시퀀스 중단	Sequence aborted
+Debugger.PauseFixedTick	고정 틱	Fixed tick
+Debugger.PauseUser	사용자 일시정지	User pause
+Debugger.PauseReady	일시정지 · 디버깅 준비	Paused · debugger ready
+Debugger.RuntimeActive	런타임 실행 중	Runtime active
+Debugger.RemoveBreakpoint	중단점 해제	Remove breakpoint
+Debugger.SetBreakpoint	중단점 설정	Set breakpoint
+Debugger.NoAlarms	현재 알람 없음	No current alarms
+Debugger.OneAlarm	알람 1건	1 alarm
+Debugger.AlarmCount	알람 {0}건	{0} alarms
+Debugger.AllAlarmsAcknowledged	현재 활성 알람을 모두 확인했습니다.	All current alarms are acknowledged.
+Debugger.OneUnacknowledgedAlarm	미확인 활성 알람 1건	1 unacknowledged alarm
+Debugger.UnacknowledgedAlarmCount	미확인 활성 알람 {0}건	{0} unacknowledged alarms
+Debugger.AcknowledgeAlarm	확인	Acknowledge
+Debugger.AcknowledgeAllAlarms	모두 확인	Acknowledge all
+Debugger.AlarmAcknowledgedAction	확인됨	Acknowledged
+Debugger.AlarmAcknowledgedStatus	알람을 확인 처리했습니다.	Alarm acknowledged.
+Debugger.AlarmHistory	알람 기록	Alarm history
+Debugger.NoAlarmHistory	알람 기록 없음	No alarm history
+Debugger.AlarmHistoryCount	알람 기록 {0}/200건	Alarm history {0}/200
+Debugger.AlarmActive	활성	Active
+Debugger.AlarmCleared	해제됨	Cleared
+Debugger.AlarmAcknowledged	확인됨	Acknowledged
+Debugger.AlarmUnacknowledged	미확인	Unacknowledged
+Debugger.AlarmOccurredAt	발생 {0} · tick {1}	Occurred {0} · tick {1}
+Debugger.AlarmClearedAt	해제 {0} · tick {1}	Cleared {0} · tick {1}
+Debugger.AlarmStillActive	현재 활성	Still active
+Debugger.TimelineCount	최근 이벤트 {0}/200건	Latest {0}/200 events
+Debugger.StepAccepted	다음 시퀀스 경계까지 실행했습니다.	Advanced to the next sequence boundary.
+Debugger.BreakpointSet	중단점을 설정했습니다.	Breakpoint set.
+Debugger.BreakpointRemoved	중단점을 해제했습니다.	Breakpoint removed.
+Debugger.CommandRejected	명령 거부 · {0} · {1}	Command rejected · {0} · {1}
+Debugger.CommandAcceptedStatus	디버거 명령을 적용했습니다.	Debugger command applied.
+Debugger.CommandRejectedStatus	디버거 명령이 거부되었습니다.	Debugger command rejected.
+Debugger.RecoveryClearFault	장애 관리자에서 해당 주입 고장을 해제하세요.	Clear the injected fault in Fault manager.
+Debugger.RecoveryRetry	원인을 해제한 뒤 Retry로 시퀀스를 복구하세요.	Clear the cause, then use Retry to recover the sequence.
+Debugger.RecoveryReset	원인을 해제한 뒤 Reset으로 시퀀스를 복구하세요.	Clear the cause, then use Reset to recover the sequence.
+Debugger.RecoveryAxis	모션 원인을 해제한 뒤 Reset을 실행하세요.	Clear the motion cause, then run Reset.
+Debugger.RecoveryInterlock	장비 조건을 안전 상태로 복구한 뒤 Reset을 실행하세요.	Restore safe equipment conditions, then run Reset.
 Fault.OneActiveFault	활성 고장 1개	1 active fault
 Fault.ActiveFaults	활성 고장 {0}개	{0} active faults
 Fault.StuckDigitalInput	고정 디지털 입력	Stuck DI
@@ -1390,16 +1553,3 @@ Sensor.StatusRejected	{0} 명령이 거부되었습니다.	{0} was rejected.
 Equipment.ManualCommissioning	수동 커미셔닝	Manual commissioning
 Equipment.StartManualControl	수동 운전 시작	Start manual control
 Equipment.StartManualControlTooltip	선택 장비를 자동 또는 시퀀스 운전과 분리된 수동 제어로 전환합니다.	Switch the selected equipment to manual control separately from automatic or sequence operation.
-Integration.Tab	3D 연동	3D Exchange
-Integration.Title	3D Studio 연동	3D Studio exchange
-Integration.SetupTitle	한 번만 설정	One-time setup
-Integration.SetupHint	공유 폴더와 이 프로젝트의 C3D 소스를 저장합니다. 설정 복원만으로는 내보내기, 읽기 또는 검사가 실행되지 않습니다.	Save the shared folder and this project's C3D source. Restoring setup never exports, reads, or runs an inspection.
-Integration.ExchangeRoot	공유 교환 폴더	Shared exchange folder
-Integration.Source	이 프로젝트의 C3D 검사 소스	C3D inspection source for this project
-Integration.Browse	찾아보기	Browse
-Integration.SaveSetup	설정 저장	Save setup
-Integration.Reset	초기화	Reset
-Integration.MachineStepTitle	Machine Studio 작업	Machine Studio action
-Integration.MachineStepHint	내보내기는 현재 저장된 프로젝트와 C3D 소스를 새 거래로 복사합니다. 새로고침은 결과만 읽으며 시뮬레이션을 시작하지 않습니다.	Export copies the currently saved project and C3D source into a new transaction. Refresh only reads status and never starts simulation.
-Integration.Export	3D로 내보내기	Export to 3D
-Integration.Refresh	결과 새로고침	Refresh result

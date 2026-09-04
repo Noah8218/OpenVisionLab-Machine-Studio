@@ -7,7 +7,8 @@ public enum SequenceAuthoringTargetKind
     DigitalInput,
     DigitalOutput,
     Axis,
-    Camera
+    Camera,
+    Subsequence
 }
 
 public sealed record SequenceAuthoringTarget(
@@ -93,7 +94,14 @@ public sealed class SequenceStepTemplateCatalog
                 SequenceStepAction.TriggerCamera,
                 "default",
                 0,
-                SequenceAuthoringTargetKind.Camera)
+                SequenceAuthoringTargetKind.Camera),
+            Template(
+                "call-subsequence",
+                "Call subsequence",
+                SequenceStepAction.CallSubsequence,
+                "",
+                0,
+                SequenceAuthoringTargetKind.Subsequence)
         ]);
 
     private static readonly IReadOnlyList<string> BooleanParameters =
@@ -202,6 +210,7 @@ public sealed class SequenceStepTemplateCatalog
             [SequenceAuthoringTargetKind.Axis],
         SequenceStepAction.TriggerCamera or SequenceStepAction.WaitVisionResult =>
             [SequenceAuthoringTargetKind.Camera],
+        SequenceStepAction.CallSubsequence => [SequenceAuthoringTargetKind.Subsequence],
         _ => Array.Empty<SequenceAuthoringTargetKind>()
     };
 

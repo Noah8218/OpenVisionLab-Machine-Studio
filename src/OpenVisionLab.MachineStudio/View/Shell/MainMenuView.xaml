@@ -24,6 +24,8 @@
         <MenuItem Header="{loc:Loc Key=Shell.Simulation}" Style="{StaticResource MachineTopMenuItemStyle}">
             <MenuItem Header="{loc:Loc Key=Shell.Run}" Command="{Binding RunCommand}" InputGestureText="F5" Style="{StaticResource MachineSubmenuItemStyle}" />
             <MenuItem Header="{loc:Loc Key=Shell.Pause}" Command="{Binding PauseCommand}" InputGestureText="F6" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <MenuItem Header="{loc:Loc Key=Shell.AbortSequence}" Command="{Binding AbortSequenceCommand}" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <MenuItem Header="{loc:Loc Key=Shell.RetrySequence}" Command="{Binding RetrySequenceCommand}" Style="{StaticResource MachineSubmenuItemStyle}" />
             <MenuItem Header="{loc:Loc Key=Shell.Reset}" Command="{Binding ResetCommand}" InputGestureText="Ctrl+Shift+R" Style="{StaticResource MachineSubmenuItemStyle}" />
             <MenuItem Header="{loc:Loc Key=Shell.Step}" Command="{Binding StepCommand}" InputGestureText="F10" Style="{StaticResource MachineSubmenuItemStyle}" />
         </MenuItem>

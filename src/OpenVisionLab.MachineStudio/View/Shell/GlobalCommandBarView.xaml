@@ -115,6 +115,28 @@
                         <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.Pause}" />
                     </StackPanel>
                 </Button>
+                <Button Command="{Binding AbortSequenceCommand}"
+                        AutomationProperties.Name="{loc:Loc Key=Shell.AbortSequence}"
+                        MinWidth="76"
+                        Style="{StaticResource QuietCommandButtonStyle}"
+                        ToolTip="{loc:Loc Key=Shell.AbortSequenceTooltip}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Dismiss24" Foreground="{DynamicResource State.Fault}" />
+                        <TextBlock Style="{StaticResource CompactCommandLabelStyle}"
+                                   Text="{loc:Loc Key=Shell.AbortSequence}" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding RetrySequenceCommand}"
+                        AutomationProperties.Name="{loc:Loc Key=Shell.RetrySequence}"
+                        MinWidth="76"
+                        Style="{StaticResource QuietCommandButtonStyle}"
+                        ToolTip="{loc:Loc Key=Shell.RetrySequenceTooltip}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="ArrowSync24" Foreground="{DynamicResource State.Warning}" />
+                        <TextBlock Style="{StaticResource CompactCommandLabelStyle}"
+                                   Text="{loc:Loc Key=Shell.RetrySequence}" />
+                    </StackPanel>
+                </Button>
                 <Button Command="{Binding StepCommand}"
                         AutomationProperties.Name="{loc:Loc Key=Shell.Step}"
                         Style="{StaticResource QuietCommandButtonStyle}"

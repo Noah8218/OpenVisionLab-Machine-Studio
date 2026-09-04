@@ -164,6 +164,102 @@ public sealed class SequenceDefinitionEditor
         return true;
     }
 
+    /// <summary>
+    /// Keeps editable authored fields compatible with the selected step action
+    /// and the currently available project targets.
+    /// </summary>
+    public static void NormalizeStep(
+        SequenceStepDefinition definition,
+        SequenceStepTemplateCatalog templateCatalog,
+        IReadOnlyList<SequenceAuthoringTarget> authoringTargets)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(templateCatalog);
+        ArgumentNullException.ThrowIfNull(authoringTargets);
+
+        if (definition.Action == SequenceStepAction.Complete)
+        {
+            definition.TargetId = string.Empty;
+            definition.Parameter = string.Empty;
+            definition.TimeoutMs = 0;
+            definition.NextStepId = null;
+            definition.ErrorStepId = null;
+            definition.FailureStepId = null;
+            return;
+        }
+
+        IReadOnlyList<SequenceAuthoringTarget> targets = templateCatalog.GetTargets(
+            definition.Action,
+            authoringTargets);
+        if (targets.Count == 0)
+        {
+            definition.TargetId = string.Empty;
+        }
+        else if (!targets.Any(target =>
+                     string.Equals(target.Id, definition.TargetId, StringComparison.Ordinal)))
+        {
+            definition.TargetId = targets[0].Id;
+        }
+
+        IReadOnlyList<string> parameterOptions = templateCatalog.GetParameterOptions(definition.Action);
+        if (parameterOptions.Count != 0
+            && !parameterOptions.Contains(definition.Parameter, StringComparer.OrdinalIgnoreCase))
+        {
+            definition.Parameter = parameterOptions[0];
+        }
+
+        if (definition.Action == SequenceStepAction.MoveAxis
+            && (!double.TryParse(
+                    definition.Parameter,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out double position)
+                || !double.IsFinite(position)))
+        {
+            definition.Parameter = FindDefaultParameter(definition.TargetId, targets) ?? "0";
+        }
+
+        if (definition.Action == SequenceStepAction.TriggerCamera
+            && string.IsNullOrWhiteSpace(definition.Parameter))
+        {
+            definition.Parameter = "default";
+        }
+
+        if (definition.Action is SequenceStepAction.SetSignal
+            or SequenceStepAction.MoveAxis
+            or SequenceStepAction.TriggerCamera
+            or SequenceStepAction.CallSubsequence)
+        {
+            definition.TimeoutMs = 0;
+        }
+
+        if (definition.Action is SequenceStepAction.WaitAxisDone
+            or SequenceStepAction.WaitVisionResult
+            or SequenceStepAction.CallSubsequence)
+        {
+            definition.Parameter = string.Empty;
+        }
+
+        if (definition.Action == SequenceStepAction.WaitVisionResult && definition.TimeoutMs <= 0)
+        {
+            definition.TimeoutMs = 1000;
+        }
+
+        if (definition.Action != SequenceStepAction.WaitVisionResult)
+        {
+            definition.FailureStepId = null;
+        }
+    }
+
+    public static string? FindDefaultParameter(
+        string? targetId,
+        IReadOnlyList<SequenceAuthoringTarget> authoringTargets)
+    {
+        ArgumentNullException.ThrowIfNull(authoringTargets);
+        return authoringTargets.FirstOrDefault(target =>
+            string.Equals(target.Id, targetId, StringComparison.Ordinal))?.DefaultParameter;
+    }
+
     private static SequenceEditResult? ValidateLinearEdit(
         SequenceDefinition? definition,
         SequenceStepDefinition? step)

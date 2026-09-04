@@ -20,6 +20,14 @@ public sealed class SequenceCompiler
         {
             AddError(errors, SequenceCompilationErrorCode.SequenceIdRequired, null, "Sequence id is required.");
         }
+        if (definition.WatchdogTimeoutMs < 0)
+        {
+            AddError(
+                errors,
+                SequenceCompilationErrorCode.InvalidWatchdogTimeout,
+                null,
+                "Sequence watchdogTimeoutMs cannot be negative; use 0 for unlimited execution.");
+        }
 
         if (definition.Steps is null || definition.Steps.Count == 0)
         {
@@ -104,7 +112,11 @@ public sealed class SequenceCompiler
         }
 
         return new SequenceCompilationResult(
-            new CompiledSequence(definition.Id, definition.Name, compiledSteps.AsReadOnly()),
+            new CompiledSequence(
+                definition.Id,
+                definition.Name,
+                TimeSpan.FromMilliseconds(definition.WatchdogTimeoutMs),
+                compiledSteps.AsReadOnly()),
             Array.Empty<SequenceCompilationError>());
     }
 
@@ -128,11 +140,94 @@ public sealed class SequenceCompiler
             "WaitAxisDone" => CompileWaitAxisDone(source, name, nextStepId, errorStepId, targets, errors),
             nameof(SequenceStepAction.TriggerCamera) => CompileTriggerCamera(source, name, nextStepId, errorStepId, targets, errors),
             "WaitVisionResult" => CompileWaitVisionResult(source, name, nextStepId, errorStepId, failureStepId, targets, errors),
+            nameof(SequenceStepAction.CallSubsequence) => CompileCallSubsequence(source, name, nextStepId, errorStepId, targets, errors),
             nameof(SequenceStepAction.Wait) => CompileLegacyWait(source, name, nextStepId, errorStepId, targets, errors),
             "Complete" => CompileComplete(source, name, errors),
             nameof(SequenceStepAction.None) => CompileComplete(source, name, errors),
             _ => Unsupported(source, errors)
         };
+    }
+
+    public static IReadOnlyList<SequenceCompositionError> ValidateComposition(
+        IEnumerable<CompiledSequence> sequences)
+    {
+        ArgumentNullException.ThrowIfNull(sequences);
+
+        var byId = sequences
+            .Where(sequence => sequence is not null && !string.IsNullOrWhiteSpace(sequence.Id))
+            .GroupBy(sequence => sequence.Id, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        var errors = new List<SequenceCompositionError>();
+        foreach (var sequence in byId.Values.OrderBy(item => item.Id, StringComparer.Ordinal))
+        {
+            foreach (var call in sequence.Steps.OfType<CallSubsequenceStep>())
+            {
+                if (!byId.ContainsKey(call.SequenceId))
+                {
+                    errors.Add(new SequenceCompositionError(
+                        SequenceCompilationErrorCode.UnknownSubsequence,
+                        sequence.Id,
+                        call.Id,
+                        $"Subsequence '{call.SequenceId}' is not configured."));
+                }
+            }
+        }
+
+        var visitState = new Dictionary<string, int>(StringComparer.Ordinal);
+        var path = new List<string>();
+        var reportedCycles = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var sequence in byId.Values.OrderBy(item => item.Id, StringComparer.Ordinal))
+        {
+            Visit(sequence.Id);
+        }
+
+        return errors;
+
+        void Visit(string sequenceId)
+        {
+            if (visitState.TryGetValue(sequenceId, out var state))
+            {
+                if (state == 2)
+                {
+                    return;
+                }
+
+                var cycleStart = path.IndexOf(sequenceId);
+                if (cycleStart < 0)
+                {
+                    return;
+                }
+
+                var cycle = path.Skip(cycleStart).Append(sequenceId).ToArray();
+                var cycleKey = string.Join("\u001f", cycle.Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal));
+                if (reportedCycles.Add(cycleKey))
+                {
+                    errors.Add(new SequenceCompositionError(
+                        SequenceCompilationErrorCode.SubsequenceCycle,
+                        cycle[0],
+                        null,
+                        $"Subsequence call cycle detected: {string.Join(" -> ", cycle)}."));
+                }
+
+                return;
+            }
+
+            visitState[sequenceId] = 1;
+            path.Add(sequenceId);
+            if (byId.TryGetValue(sequenceId, out var sequence))
+            {
+                foreach (var call in sequence.Steps.OfType<CallSubsequenceStep>())
+                {
+                    if (byId.ContainsKey(call.SequenceId))
+                    {
+                        Visit(call.SequenceId);
+                    }
+                }
+            }
+
+            path.RemoveAt(path.Count - 1);
+            visitState[sequenceId] = 2;
+        }
     }
 
     private static void ValidateExpectedStateCheckpoint(
@@ -326,6 +421,33 @@ public sealed class SequenceCompiler
                     errorStepId,
                     timeout.Value)
                 : null;
+    }
+
+    private static CompiledSequenceStep? CompileCallSubsequence(
+        SequenceStepDefinition source,
+        string name,
+        string? nextStepId,
+        string? errorStepId,
+        SequenceCompilationTargets? targets,
+        List<SequenceCompilationError> errors)
+    {
+        var sequenceId = RequireTarget(source, errors);
+        if (!string.IsNullOrWhiteSpace(source.Parameter))
+        {
+            AddError(errors, SequenceCompilationErrorCode.UnexpectedParameter, source.Id, "CallSubsequence parameter must be empty; use targetId for the child Sequence.");
+        }
+
+        ValidateNoTimeout(source, errors);
+        if (sequenceId is not null && targets is not null && !targets.ContainsSequence(sequenceId))
+        {
+            AddError(errors, SequenceCompilationErrorCode.UnknownSubsequence, source.Id, $"Subsequence '{sequenceId}' is not declared by the project.");
+        }
+
+        return sequenceId is not null
+            && string.IsNullOrWhiteSpace(source.Parameter)
+            && source.TimeoutMs == 0
+            ? new CallSubsequenceStep(source.Id, name, sequenceId, nextStepId, errorStepId)
+            : null;
     }
 
     private static CompiledSequenceStep? CompileComplete(

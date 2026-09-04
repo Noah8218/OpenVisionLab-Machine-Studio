@@ -1,6 +1,7 @@
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
+using OpenVisionLab.Integration.Contracts;
 
 namespace OpenVisionLab.MachineStudio;
 
@@ -10,10 +11,20 @@ internal static class BuildIdentity
     public static string SourceCommit { get; } = ResolveMetadata("OpenVisionSourceCommit");
     public static string SourceState { get; } = ResolveMetadata("OpenVisionSourceState");
     public static string Compact { get; } = ResolveCompact();
+    public static IntegrationApplicationIdentity IntegrationIdentity =>
+        LoadQualifiedIntegrationIdentity(typeof(BuildIdentity).Assembly);
     public static bool IsExactCommit =>
         string.Equals(SourceState, "clean", StringComparison.Ordinal)
         && SourceCommit.Length == 40
         && SourceCommit.All(Uri.IsHexDigit);
+
+    internal static IntegrationApplicationIdentity LoadQualifiedIntegrationIdentity(
+        Assembly applicationAssembly,
+        string? manifestPath = null) =>
+        IntegrationRuntimeBuildVerifier.LoadQualifiedIdentity(
+            applicationAssembly,
+            IntegrationApplicationIds.MachineStudio,
+            manifestPath);
 
     public static void SaveReport(string path)
     {
