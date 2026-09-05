@@ -1,3 +1,4 @@
+using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Simulation.Scenarios;
 using OpenVisionLab.MachineStudio.ViewModel;
@@ -27,7 +28,10 @@ public sealed class UnifiedCommissioningEvidenceWorkflowViewModelTests
 
         Assert.False(viewModel.CanExportUnifiedCommissioningEvidence);
         Assert.False(viewModel.ExportUnifiedCommissioningEvidenceCommand.CanExecute(null));
-        Assert.Contains("required", viewModel.UnifiedCommissioningEvidenceStatusText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            OpenVisionLanguageService.T("Simulation.UnifiedEvidenceNotReady"),
+            viewModel.UnifiedCommissioningEvidenceStatusText,
+            StringComparison.Ordinal);
     }
 
     [Fact]

@@ -60,7 +60,9 @@ public sealed class UnifiedCommissioningEvidenceViewModelTests
             Assert.Null(viewModel.LatestEvidence);
             Assert.Equal(0, appliedCount);
             Assert.Contains(statuses, status =>
-                status.Contains("not imported", StringComparison.OrdinalIgnoreCase));
+                status.Contains(
+                    OpenVisionLanguageService.T("Simulation.UnifiedEvidenceImportRejected"),
+                    StringComparison.Ordinal));
             Assert.Contains(logs, log =>
                 log.Contains("import rejected", StringComparison.OrdinalIgnoreCase));
         }

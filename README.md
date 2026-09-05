@@ -13,13 +13,20 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.5`
+Current version: `v0.2.0-dev.6`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.6` (2026-09-05)
+
+- Made unified commissioning evidence tests deterministic across the supported
+  Korean and English language settings by asserting localized catalog values.
+- Retained the `v0.2.0-dev.5` structural refactor and its explicitly recorded
+  partial 31-state Direct EXE matrix.
 
 #### `v0.2.0-dev.5` (2026-09-05)
 
