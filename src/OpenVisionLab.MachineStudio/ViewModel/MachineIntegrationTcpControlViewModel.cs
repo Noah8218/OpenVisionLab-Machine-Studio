@@ -30,6 +30,7 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
     private bool _isTcpListening;
     private CancellationTokenSource? _tcpOperationCancellation;
     private int _tcpOperationActive;
+    private readonly object _lifetimeGate = new();
     private bool _disposed;
 
     internal MachineIntegrationTcpControlViewModel(
@@ -165,15 +166,18 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
                         key,
                         cancellationToken)
                     .ConfigureAwait(false);
-                IsTcpListening = true;
-                TcpListenerStatusText = string.Format(
-                    CultureInfo.CurrentCulture,
-                    L("TcpListeningFormat", "TCP 수신 중: {0}", "TCP listening: {0}"),
-                    endpoint);
-                _setStatus(L(
-                    "TcpStarted",
-                    "TCP 수신을 시작했습니다. 수신만으로 ACK, 검사, Run 또는 Result를 실행하지 않습니다.",
-                    "TCP listening started. Receipt alone never ACKs, inspects, runs, or creates a Result."));
+                TryPublishIfActive(() =>
+                {
+                    IsTcpListening = true;
+                    TcpListenerStatusText = string.Format(
+                        CultureInfo.CurrentCulture,
+                        L("TcpListeningFormat", "TCP 수신 중: {0}", "TCP listening: {0}"),
+                        endpoint);
+                    _setStatus(L(
+                        "TcpStarted",
+                        "TCP 수신을 시작했습니다. 수신만으로 ACK, 검사, Run 또는 Result를 실행하지 않습니다.",
+                        "TCP listening started. Receipt alone never ACKs, inspects, runs, or creates a Result."));
+                });
             }
             finally
             {
@@ -186,15 +190,18 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
         async _ =>
         {
             await _tcpWorkflow.StopListeningAsync().ConfigureAwait(false);
-            IsTcpListening = false;
-            TcpListenerStatusText = L(
-                "TcpStopped",
-                "TCP 수신 중지됨",
-                "TCP listener stopped");
-            _setStatus(L(
-                "TcpStoppedStatus",
-                "TCP 수신을 중지했습니다.",
-                "TCP listening stopped."));
+            TryPublishIfActive(() =>
+            {
+                IsTcpListening = false;
+                TcpListenerStatusText = L(
+                    "TcpStopped",
+                    "TCP 수신 중지됨",
+                    "TCP listener stopped");
+                _setStatus(L(
+                    "TcpStoppedStatus",
+                    "TCP 수신을 중지했습니다.",
+                    "TCP listening stopped."));
+            });
         });
 
     internal Task PingTcpPeerAsync() => RunTcpTransferAsync(
@@ -281,7 +288,7 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
                 {
                     var receipt = await operation(settings, key, cancellationToken)
                         .ConfigureAwait(false);
-                    LastTcpTransferText = string.Format(
+                    var transferText = string.Format(
                         CultureInfo.CurrentCulture,
                         L(
                             "TcpTransferFormat",
@@ -293,12 +300,22 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
                         receipt.FilesTransferred,
                         receipt.BytesTransferred,
                         receipt.Idempotent);
+                    if (!TryPublishIfActive(() => LastTcpTransferText = transferText))
+                    {
+                        return;
+                    }
+
                     if (refreshAfterTransfer)
                     {
+                        if (IsDisposed)
+                        {
+                            return;
+                        }
+
                         await _refreshResults().ConfigureAwait(true);
                     }
 
-                    _setStatus(LastTcpTransferText);
+                    TryPublishIfActive(() => _setStatus(LastTcpTransferText));
                 }
                 finally
                 {
@@ -310,41 +327,35 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
         string busyStatus,
         Func<CancellationToken, Task> operation)
     {
-        if (_disposed)
-        {
-            _setStatus(L(
-                "TcpDisposed",
-                "종료 중인 연동 화면에서는 TCP 작업을 시작할 수 없습니다.",
-                "A TCP action cannot start while the integration workspace is closing."));
-            return;
-        }
-
         if (Interlocked.CompareExchange(ref _tcpOperationActive, 1, 0) != 0)
         {
             return;
         }
 
-        if (_disposed)
+        using var cancellation = new CancellationTokenSource();
+        if (!TryPublishIfActive(() =>
+            {
+                _tcpOperationCancellation = cancellation;
+                IsTcpBusy = true;
+                _setStatus(busyStatus);
+            }))
         {
             Interlocked.Exchange(ref _tcpOperationActive, 0);
             return;
         }
 
-        IsTcpBusy = true;
-        _setStatus(busyStatus);
-        using var cancellation = new CancellationTokenSource();
-        _tcpOperationCancellation = cancellation;
         try
         {
             await operation(cancellation.Token).ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
-            _setStatus(L("TcpCancelled", "TCP 작업을 취소했습니다.", "TCP action cancelled."));
+            TryPublishIfActive(() => _setStatus(
+                L("TcpCancelled", "TCP 작업을 취소했습니다.", "TCP action cancelled.")));
         }
         catch (Exception exception)
         {
-            _setStatus(exception.Message);
+            TryPublishIfActive(() => _setStatus(exception.Message));
         }
         finally
         {
@@ -353,8 +364,33 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
                 _tcpOperationCancellation = null;
             }
 
-            IsTcpBusy = false;
+            TryPublishIfActive(() => IsTcpBusy = false);
             Interlocked.Exchange(ref _tcpOperationActive, 0);
+        }
+    }
+
+    private bool TryPublishIfActive(Action action)
+    {
+        lock (_lifetimeGate)
+        {
+            if (_disposed)
+            {
+                return false;
+            }
+
+            action();
+            return true;
+        }
+    }
+
+    private bool IsDisposed
+    {
+        get
+        {
+            lock (_lifetimeGate)
+            {
+                return _disposed;
+            }
         }
     }
 
@@ -443,12 +479,16 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
 
     public void Dispose()
     {
-        if (_disposed)
+        lock (_lifetimeGate)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
         }
 
-        _disposed = true;
         _tcpOperationCancellation?.Cancel();
         IsTcpListening = false;
         TcpListenerStatusText = L(

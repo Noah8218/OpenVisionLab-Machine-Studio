@@ -77,12 +77,12 @@ public sealed class SimulationFaultCommandHandlerTests
         IList<ServoAxisComponent>? axes = null,
         DeterministicSignalHub? signalHub = null,
         DeterministicMachineLayout? machineLayout = null,
-        IDictionary<SimulationFaultKey, SimulationFaultSnapshot>? activeFaults = null) =>
+        SimulationFaultRuntime? activeFaults = null) =>
         new(
             axes ?? new List<ServoAxisComponent>(),
             signalHub ?? CreateSignalHub(),
             machineLayout,
-            activeFaults ?? new Dictionary<SimulationFaultKey, SimulationFaultSnapshot>(),
+            activeFaults ?? new SimulationFaultRuntime(),
             7,
             TimeSpan.FromMilliseconds(35));
 

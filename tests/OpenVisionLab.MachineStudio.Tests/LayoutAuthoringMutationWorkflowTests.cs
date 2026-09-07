@@ -180,6 +180,10 @@ public sealed class LayoutAuthoringMutationWorkflowTests
             }
         }
 
-        public void Dispose() => History.Dispose();
+        public void Dispose()
+        {
+            History.Dispose();
+            Layout.Dispose();
+        }
     }
 }

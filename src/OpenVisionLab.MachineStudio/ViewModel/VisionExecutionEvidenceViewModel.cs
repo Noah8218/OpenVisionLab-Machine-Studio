@@ -21,7 +21,7 @@ internal readonly record struct VisionEvidenceContext(
 /// ViewModel; this type only records, validates, persists, and presents the
 /// resulting evidence through explicit callbacks.
 /// </summary>
-internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
+internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase, IDisposable
 {
     private enum ArtifactState
     {
@@ -41,6 +41,7 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
     private DeterministicVisionExecutionEvidencePackage? _latestEvidence;
     private DeterministicVisionExecutionComparison? _comparison;
     private ArtifactState _artifactState;
+    private int _disposed;
 
     internal VisionExecutionEvidenceViewModel(
         Func<VisionEvidenceContext> getContext,
@@ -86,7 +87,13 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
 
     internal void BeginCapture(DeterministicVisionExecutionRecorder recorder)
     {
-        _activeRecorder = recorder ?? throw new ArgumentNullException(nameof(recorder));
+        ArgumentNullException.ThrowIfNull(recorder);
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        _activeRecorder = recorder;
         RaiseChanged(invalidateCommands: false);
     }
 
@@ -94,7 +101,7 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
     {
         ArgumentNullException.ThrowIfNull(runtimeEvent);
         ArgumentNullException.ThrowIfNull(snapshot);
-        if (_activeRecorder is null)
+        if (IsDisposed || _activeRecorder is null)
         {
             return;
         }
@@ -106,6 +113,11 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
     internal bool TryComplete(SimulationSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
+        if (IsDisposed)
+        {
+            return false;
+        }
+
         var recorder = _activeRecorder;
         if (recorder is null || !recorder.CanComplete(snapshot))
         {
@@ -145,6 +157,11 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
 
     internal void Restore()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _activeRecorder = null;
         _latestEvidence = null;
         _comparison = null;
@@ -188,7 +205,7 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
 
     internal void Persist()
     {
-        if (_latestEvidence is null)
+        if (IsDisposed || _latestEvidence is null)
         {
             return;
         }
@@ -205,6 +222,11 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
 
     internal void RelinkProjectPath(string projectPath)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (_latestEvidence is not null)
         {
             _latestEvidence = _latestEvidence with
@@ -216,6 +238,11 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
 
     internal void RefreshContext()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (_activeRecorder is not null)
         {
             RaiseChanged(invalidateCommands: false);
@@ -248,6 +275,11 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
 
     internal void PersistForProjectPath(string projectPath)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         RelinkProjectPath(projectPath);
         RefreshContext();
         Persist();
@@ -256,6 +288,11 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
     internal void SetImportedEvidence(
         DeterministicVisionExecutionEvidencePackage? evidence)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _latestEvidence = evidence;
         _comparison = null;
         _artifactState = evidence is null
@@ -266,6 +303,11 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
 
     internal void Clear()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _activeRecorder = null;
         _latestEvidence = null;
         _comparison = null;
@@ -275,7 +317,7 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
 
     internal void CancelCapture()
     {
-        if (_activeRecorder is null)
+        if (IsDisposed || _activeRecorder is null)
         {
             return;
         }
@@ -286,7 +328,7 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
 
     internal DeterministicVisionExecutionEvidencePackage? GetCurrentEvidence()
     {
-        var evidence = _latestEvidence;
+        var evidence = IsDisposed ? null : _latestEvidence;
         if (evidence is null)
         {
             return null;
@@ -303,11 +345,18 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
             : null;
     }
 
-    internal void RefreshLocalization() => RaiseChanged(invalidateCommands: false);
+    internal void RefreshLocalization()
+    {
+        if (!IsDisposed)
+        {
+            RaiseChanged(invalidateCommands: false);
+        }
+    }
 
     private void PersistCore(VisionEvidenceContext context)
     {
-        if (_latestEvidence is null
+        if (IsDisposed
+            || _latestEvidence is null
             || string.IsNullOrWhiteSpace(context.ProjectPath))
         {
             return;
@@ -343,13 +392,36 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase
 
     private void RaiseChanged(bool invalidateCommands)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         OnPropertyChanged(nameof(IsCapturing));
         OnPropertyChanged(nameof(EvidenceHashText));
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(ComparisonText));
-        _notifyParentPresentationChanged(invalidateCommands);
+        if (!IsDisposed)
+        {
+            _notifyParentPresentationChanged(invalidateCommands);
+        }
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _activeRecorder = null;
+        _latestEvidence = null;
+        _comparison = null;
+        _artifactState = ArtifactState.None;
     }
 
     private static string ArtifactPath(string projectPath) =>
         $"{Path.GetFullPath(projectPath)}.vision-result.json";
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

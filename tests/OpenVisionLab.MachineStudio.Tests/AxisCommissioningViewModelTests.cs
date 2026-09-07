@@ -109,4 +109,79 @@ public sealed class AxisCommissioningViewModelTests
         Assert.False(viewModel.HomeAxisCommand.CanExecute(null));
         Assert.Equal(0, dispatchCount);
     }
+
+    [Fact]
+    public async Task DisposeSuppressesLateJogStopAndBlocksFurtherCommands()
+    {
+        var startCompletion = new TaskCompletionSource<SimulationCommandResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var dispatchCount = 0;
+        var viewModel = new AxisCommissioningViewModel(
+            (command, _) =>
+            {
+                dispatchCount++;
+                return dispatchCount == 1
+                    ? startCompletion.Task
+                    : Task.FromResult(CreateAcceptedResult(command));
+            },
+            _ => { });
+
+        viewModel.ApplyProjection(
+            new AxisCommissioningProjection(
+                new AxisSnapshot("axis.x", "X Axis", AxisState.Idle, 12.5, 0),
+                new VirtualAxisDefinition
+                {
+                    Id = "axis.x",
+                    SoftLimitMin = 0,
+                    SoftLimitMax = 100,
+                    MaxVelocity = 50
+                },
+                HasSelectedAxisStage: true,
+                IsRunMode: true,
+                IsApplyingProject: false,
+                IsValidationBusy: false,
+                RuntimeDefinitionDirty: false,
+                IsRunning: true,
+                ControlOwner: SimulationControlOwner.Manual,
+                AutomaticRunActive: false,
+                SequenceRunActive: false));
+
+        Assert.True(viewModel.BeginAxisJog(AxisJogDirection.Positive));
+        var endJogTask = viewModel.EndAxisJogAsync();
+
+        viewModel.Dispose();
+        viewModel.Dispose();
+        viewModel.AxisTargetPositionText = "25";
+        viewModel.ApplyProjection(
+            new AxisCommissioningProjection(
+                new AxisSnapshot("axis.y", "Y Axis", AxisState.Idle, 2, 0),
+                null,
+                HasSelectedAxisStage: false,
+                IsRunMode: false,
+                IsApplyingProject: false,
+                IsValidationBusy: false,
+                RuntimeDefinitionDirty: false,
+                IsRunning: false,
+                ControlOwner: SimulationControlOwner.Definition,
+                AutomaticRunActive: false,
+                SequenceRunActive: false));
+
+        startCompletion.SetResult(CreateAcceptedResult(new JogAxisCommand("axis.x", AxisJogDirection.Positive)));
+        await endJogTask;
+
+        Assert.Equal(1, dispatchCount);
+        Assert.Equal("12.500", viewModel.AxisTargetPositionText);
+        Assert.False(viewModel.CanJogAxis);
+        Assert.False(viewModel.CanMoveAxisAbsolute);
+        Assert.False(viewModel.HomeAxisCommand.CanExecute(null));
+    }
+
+    private static SimulationCommandResult CreateAcceptedResult(SimulationCommand command) =>
+        new(
+            command.CommandId,
+            true,
+            1,
+            TimeSpan.Zero,
+            SimulationCommandErrorCode.None,
+            null);
 }

@@ -2,6 +2,7 @@ using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Simulation.Scenarios;
 using OpenVisionLab.MachineStudio.ViewModel;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
@@ -14,8 +15,10 @@ public sealed class UnifiedCommissioningEvidenceWorkflowViewModelTests
         "Samples",
         "AutomaticTransferCell.ovmachine");
 
-    private static string EvidenceRoot =>
-        "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\pl-0030-unified-evidence\\viewmodel";
+    private static string EvidenceRoot => Path.Combine(
+        TestStorage.RootPath,
+        "pl-0030-unified-evidence",
+        "viewmodel");
 
     [Fact]
     public async Task ExportRequiresCompletedBatchAndExplicitTraceCapture()

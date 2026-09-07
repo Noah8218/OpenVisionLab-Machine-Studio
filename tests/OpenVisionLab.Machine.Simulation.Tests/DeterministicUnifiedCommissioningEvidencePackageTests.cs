@@ -8,6 +8,7 @@ using OpenVisionLab.Machine.Simulation.Events;
 using OpenVisionLab.Machine.Simulation.Layout;
 using OpenVisionLab.Machine.Simulation.Scenarios;
 using OpenVisionLab.Machine.Simulation.Snapshots;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Simulation.Tests;
@@ -17,8 +18,13 @@ public sealed class DeterministicUnifiedCommissioningEvidencePackageTests
     private const string ProjectId = "vision-project";
     private const string ProjectName = "Vision Project";
     private const string ProjectJson = "{\"id\":\"vision-project\",\"name\":\"Vision Project\"}";
-    private const string ProjectPath =
-        "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\pl-0029-unified-evidence\\vision-project.ovmachine";
+    private static string EvidenceRoot => Path.Combine(
+        TestStorage.RootPath,
+        "pl-0029-unified-evidence");
+
+    private static string ProjectPath => Path.Combine(
+        EvidenceRoot,
+        "vision-project.ovmachine");
     private const string BuildIdentity = "0.1.0-test+abc123";
     private const string CameraId = "camera.top";
     private const string RecipeId = "presence-check";
@@ -59,7 +65,7 @@ public sealed class DeterministicUnifiedCommissioningEvidencePackageTests
     {
         var bundle = await CreateBundleAsync(includeVision: true);
         var root = Path.Combine(
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\pl-0029-unified-evidence",
+            EvidenceRoot,
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         var bundlePath = Path.Combine(root, "commissioning.ovcommissioning-evidence.json");

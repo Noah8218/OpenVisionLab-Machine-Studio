@@ -32,10 +32,6 @@ public partial class App : Application
             Console.Error.WriteLine($"Machine Studio startup failed: {exception}");
             Shutdown(2);
         }
-        finally
-        {
-            DirectExeSmokeHost.ReleaseSmokePointer();
-        }
     }
 
     private static void StartInteractiveApplication()

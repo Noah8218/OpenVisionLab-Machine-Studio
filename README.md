@@ -13,13 +13,24 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.6`
+Current version: `v0.2.0-dev.7`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.7` (2026-09-07)
+
+- Consolidated concrete ownership boundaries across simulation, integration,
+  smoke verification, and WPF ViewModel responsibilities while preserving the
+  existing project, recipe, simulation, and integration contracts.
+- Hardened asynchronous lifetime boundaries for commissioning, runtime,
+  integration, and Recipe Connection workflows with focused regression tests.
+- Added late-completion protection for Test Scenario execution and sequence-step
+  preview during shell/workbench disposal; no release package or deployment was
+  published.
 
 #### `v0.2.0-dev.6` (2026-09-05)
 

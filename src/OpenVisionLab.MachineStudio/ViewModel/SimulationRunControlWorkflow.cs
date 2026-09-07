@@ -512,6 +512,11 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             await _executionGate.WaitAsync(cancellationToken);
             try
             {
+                if (!CanEnterExecution())
+                {
+                    return;
+                }
+
                 SetBusy(true);
                 await operation(cancellationToken);
             }
@@ -530,6 +535,14 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
         finally
         {
             EndOperation();
+        }
+    }
+
+    private bool CanEnterExecution()
+    {
+        lock (_lifecycleGate)
+        {
+            return !_disposeRequested;
         }
     }
 

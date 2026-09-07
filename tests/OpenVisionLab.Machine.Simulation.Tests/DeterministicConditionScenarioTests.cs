@@ -4,6 +4,7 @@ using OpenVisionLab.Machine.Simulation.Events;
 using OpenVisionLab.Machine.Simulation.Faults;
 using OpenVisionLab.Machine.Simulation.Layout;
 using OpenVisionLab.Machine.Simulation.Scenarios;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Simulation.Tests;
@@ -467,7 +468,9 @@ public sealed class DeterministicConditionScenarioTests
 
         var normalized = DeterministicConditionScenarioProfile.Normalize(profile);
         var path = Path.Combine(
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\artifacts\\20260810-condition-scenario-tests",
+            TestStorage.RootPath,
+            "artifacts",
+            "20260810-condition-scenario-tests",
             "condition-profile.json");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         DeterministicConditionScenarioProfile.SaveToJson(profile, path);

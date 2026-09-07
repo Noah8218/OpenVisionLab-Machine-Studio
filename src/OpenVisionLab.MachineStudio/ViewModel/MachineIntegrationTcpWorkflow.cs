@@ -10,10 +10,21 @@ namespace OpenVisionLab.MachineStudio.ViewModel;
 /// </summary>
 internal sealed class MachineIntegrationTcpWorkflow : IAsyncDisposable
 {
+    private readonly object _lifecycleGate = new();
     private MachineIntegrationTcpExchange? _listener;
+    private bool _isStarting;
     private bool _disposed;
 
-    public bool IsListening => _listener is not null;
+    public bool IsListening
+    {
+        get
+        {
+            lock (_lifecycleGate)
+            {
+                return _listener is not null;
+            }
+        }
+    }
 
     public async Task<IPEndPoint> StartListeningAsync(
         string exchangeRoot,
@@ -22,13 +33,18 @@ internal sealed class MachineIntegrationTcpWorkflow : IAsyncDisposable
         byte[] sharedKey,
         CancellationToken cancellationToken = default)
     {
-        ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(listenAddress);
-        ArgumentNullException.ThrowIfNull(sharedKey);
-        if (_listener is not null)
+        lock (_lifecycleGate)
         {
-            throw new InvalidOperationException(
-                "The Machine Studio TCP listener is already started.");
+            ThrowIfDisposedLocked();
+            ArgumentNullException.ThrowIfNull(listenAddress);
+            ArgumentNullException.ThrowIfNull(sharedKey);
+            if (_listener is not null || _isStarting)
+            {
+                throw new InvalidOperationException(
+                    "The Machine Studio TCP listener is already started.");
+            }
+
+            _isStarting = true;
         }
 
         MachineIntegrationTcpExchange? listener = null;
@@ -40,17 +56,21 @@ internal sealed class MachineIntegrationTcpWorkflow : IAsyncDisposable
                     listenPort,
                     cancellationToken)
                 .ConfigureAwait(false);
-            if (_disposed)
+            lock (_lifecycleGate)
             {
-                throw new ObjectDisposedException(nameof(MachineIntegrationTcpWorkflow));
+                ThrowIfDisposedLocked();
+                _listener = listener;
+                listener = null;
+                return endpoint;
             }
-
-            _listener = listener;
-            listener = null;
-            return endpoint;
         }
         finally
         {
+            lock (_lifecycleGate)
+            {
+                _isStarting = false;
+            }
+
             if (listener is not null)
             {
                 await listener.DisposeAsync().ConfigureAwait(false);
@@ -60,8 +80,20 @@ internal sealed class MachineIntegrationTcpWorkflow : IAsyncDisposable
 
     public async Task StopListeningAsync()
     {
-        ThrowIfDisposed();
-        var listener = Interlocked.Exchange(ref _listener, null);
+        MachineIntegrationTcpExchange? listener;
+        lock (_lifecycleGate)
+        {
+            ThrowIfDisposedLocked();
+            if (_isStarting)
+            {
+                throw new InvalidOperationException(
+                    "The Machine Studio TCP listener is still starting.");
+            }
+
+            listener = _listener;
+            _listener = null;
+        }
+
         if (listener is null)
         {
             return;
@@ -107,13 +139,19 @@ internal sealed class MachineIntegrationTcpWorkflow : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        MachineIntegrationTcpExchange? listener;
+        lock (_lifecycleGate)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            listener = _listener;
+            _listener = null;
         }
 
-        _disposed = true;
-        var listener = Interlocked.Exchange(ref _listener, null);
         if (listener is not null)
         {
             await listener.DisposeAsync().ConfigureAwait(false);
@@ -133,6 +171,13 @@ internal sealed class MachineIntegrationTcpWorkflow : IAsyncDisposable
         return await operation(exchange, cancellationToken).ConfigureAwait(false);
     }
 
-    private void ThrowIfDisposed() =>
-        ObjectDisposedException.ThrowIf(_disposed, this);
+    private void ThrowIfDisposed()
+    {
+        lock (_lifecycleGate)
+        {
+            ThrowIfDisposedLocked();
+        }
+    }
+
+    private void ThrowIfDisposedLocked() => ObjectDisposedException.ThrowIf(_disposed, this);
 }

@@ -26,10 +26,11 @@ internal sealed record AxisCommissioningProjection(
 /// The parent view model supplies the selected runtime snapshot and dispatches
 /// commands into the simulation engine; this type owns no project or engine state.
 /// </summary>
-public sealed class AxisCommissioningViewModel : ViewModelBase
+public sealed class AxisCommissioningViewModel : ViewModelBase, IDisposable
 {
     private readonly Func<SimulationCommand, string, Task<SimulationCommandResult>> _dispatch;
     private readonly Action<Exception> _onCommandException;
+    private int _disposed;
     private AxisSnapshot? _currentAxis;
     private VirtualAxisDefinition? _currentAxisDefinition;
     private bool _hasSelectedAxisStage;
@@ -108,7 +109,7 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
         get => _axisTargetPositionText;
         set
         {
-            if (!SetProperty(ref _axisTargetPositionText, value ?? string.Empty))
+            if (IsDisposed || !SetProperty(ref _axisTargetPositionText, value ?? string.Empty))
             {
                 return;
             }
@@ -157,7 +158,7 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
         get => _axisRelativeDistanceText;
         set
         {
-            if (!SetProperty(ref _axisRelativeDistanceText, value ?? string.Empty))
+            if (IsDisposed || !SetProperty(ref _axisRelativeDistanceText, value ?? string.Empty))
             {
                 return;
             }
@@ -183,7 +184,7 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
         get => _axisCommandVelocityText;
         set
         {
-            if (!SetProperty(ref _axisCommandVelocityText, value ?? string.Empty))
+            if (IsDisposed || !SetProperty(ref _axisCommandVelocityText, value ?? string.Empty))
             {
                 return;
             }
@@ -239,17 +240,17 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
                         ? OpenVisionLanguageService.T("Axis.ResetForManualHint")
                         : OpenVisionLanguageService.T("Axis.VelocityMoveStartManualHint");
 
-    public bool CanJogAxis => _axisJogInteractionActive ||
-        (CanUseManualAxis && _currentAxis?.State != AxisState.Moving);
-    public bool CanMoveAxisAbsolute => CanUseManualAxis
+    public bool CanJogAxis => !IsDisposed && (_axisJogInteractionActive ||
+        (CanUseManualAxis && _currentAxis?.State != AxisState.Moving));
+    public bool CanMoveAxisAbsolute => !IsDisposed && CanUseManualAxis
         && !_axisJogInteractionActive
         && _currentAxis?.State != AxisState.Moving
         && TryGetAxisTargetPosition(out _);
-    public bool CanMoveAxisRelative => CanUseManualAxis
+    public bool CanMoveAxisRelative => !IsDisposed && CanUseManualAxis
         && !_axisJogInteractionActive
         && _currentAxis?.State != AxisState.Moving
         && TryGetAxisRelativeDistance(out _);
-    public bool CanMoveAxisVelocity => CanUseManualAxis
+    public bool CanMoveAxisVelocity => !IsDisposed && CanUseManualAxis
         && !_axisJogInteractionActive
         && _currentAxis?.State != AxisState.Moving
         && TryGetAxisCommandVelocity(out _);
@@ -258,7 +259,7 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
         new AsyncRelayCommand(
             async _ =>
             {
-                if (_currentAxis is not null && TryGetAxisTargetPosition(out var target))
+                if (!IsDisposed && _currentAxis is not null && TryGetAxisTargetPosition(out var target))
                 {
                     await _dispatch(
                         new MoveAbsoluteCommand(_currentAxis.Id, target),
@@ -273,7 +274,7 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
         new AsyncRelayCommand(
             async _ =>
             {
-                if (_currentAxis is not null && TryGetAxisRelativeDistance(out var distance))
+                if (!IsDisposed && _currentAxis is not null && TryGetAxisRelativeDistance(out var distance))
                 {
                     await _dispatch(
                         new MoveRelativeCommand(_currentAxis.Id, distance),
@@ -288,7 +289,7 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
         new AsyncRelayCommand(
             async _ =>
             {
-                if (_currentAxis is not null && TryGetAxisCommandVelocity(out var velocity))
+                if (!IsDisposed && _currentAxis is not null && TryGetAxisCommandVelocity(out var velocity))
                 {
                     await _dispatch(
                         new MoveVelocityCommand(_currentAxis.Id, velocity),
@@ -311,14 +312,14 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
 
     public ICommand EndAxisJogCommand => _endAxisJogCommand ??= new AsyncRelayCommand(
         async _ => await EndAxisJogAsync(),
-        _ => _axisJogInteractionActive,
+        _ => !IsDisposed && _axisJogInteractionActive,
         _onCommandException,
         useCommandManagerRequery: false);
 
     public ICommand HomeAxisCommand => _homeAxisCommand ??= new AsyncRelayCommand(
         async _ =>
         {
-            if (_currentAxis is not null)
+            if (!IsDisposed && _currentAxis is not null)
             {
                 await _dispatch(
                     new OpenVisionLab.Machine.Simulation.Commands.HomeAxisCommand(_currentAxis.Id),
@@ -342,6 +343,11 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
         AxisCommissioningProjection projection,
         bool invalidateCommands = true)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var axisChanged = !string.Equals(
             _currentAxis?.Id,
             projection.Snapshot?.Id,
@@ -371,6 +377,11 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
 
     internal void InvalidateCommands()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         RaiseCanExecuteChanged(_moveAxisAbsoluteCommand);
         RaiseCanExecuteChanged(_moveAxisRelativeCommand);
         RaiseCanExecuteChanged(_moveAxisVelocityCommand);
@@ -383,7 +394,7 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
 
     internal bool BeginAxisJog(AxisJogDirection direction)
     {
-        if (!CanJogAxis || _axisJogInteractionActive || _currentAxis is null)
+        if (IsDisposed || !CanJogAxis || _axisJogInteractionActive || _currentAxis is null)
         {
             return false;
         }
@@ -401,7 +412,7 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
 
     internal Task EndAxisJogAsync()
     {
-        if (!_axisJogInteractionActive || _axisJogAxisId is null || _axisJogStartTask is null)
+        if (IsDisposed || !_axisJogInteractionActive || _axisJogAxisId is null || _axisJogStartTask is null)
         {
             return Task.CompletedTask;
         }
@@ -417,6 +428,11 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
 
     internal void RefreshLocalization()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         OnPropertyChanged(nameof(CurrentAxisName));
         OnPropertyChanged(nameof(CurrentAxisStateText));
         OnPropertyChanged(nameof(CurrentAxisPositionText));
@@ -435,7 +451,8 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
         OnPropertyChanged(nameof(AxisCommissioningHintText));
     }
 
-    private bool CanUseManualAxis => _isRunMode
+    private bool CanUseManualAxis => !IsDisposed
+        && _isRunMode
         && !_isApplyingProject
         && !_isValidationBusy
         && !_runtimeDefinitionDirty
@@ -492,7 +509,7 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
         Task<SimulationCommandResult> startTask)
     {
         var startResult = await startTask;
-        if (startResult.IsAccepted)
+        if (startResult.IsAccepted && !IsDisposed)
         {
             await _dispatch(
                 new StopAxisCommand(axisId),
@@ -502,6 +519,11 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
 
     private Task StopAxisMotionAsync()
     {
+        if (IsDisposed)
+        {
+            return Task.CompletedTask;
+        }
+
         if (_axisJogInteractionActive)
         {
             return EndAxisJogAsync();
@@ -516,6 +538,11 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
 
     private void NotifyProjectionChanged(bool invalidateCommands = true)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         OnPropertyChanged(nameof(HasCurrentAxis));
         OnPropertyChanged(nameof(HasSelectedAxisStage));
         OnPropertyChanged(nameof(CurrentAxisName));
@@ -567,4 +594,18 @@ public sealed class AxisCommissioningViewModel : ViewModelBase
                 break;
         }
     }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _axisJogInteractionActive = false;
+        _axisJogAxisId = null;
+        _axisJogStartTask = null;
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

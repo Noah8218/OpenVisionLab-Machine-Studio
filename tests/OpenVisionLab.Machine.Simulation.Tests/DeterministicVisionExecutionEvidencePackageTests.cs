@@ -4,6 +4,7 @@ using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Events;
 using OpenVisionLab.Machine.Simulation.Scenarios;
 using OpenVisionLab.Machine.Simulation.Snapshots;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Simulation.Tests;
@@ -52,9 +53,7 @@ public sealed class DeterministicVisionExecutionEvidencePackageTests
     public void SaveLoad_RoundTripsValidEvidenceAndRejectsTampering()
     {
         var package = CreatePackage(100, 20, 50);
-        var artifactRoot = Directory.Exists("D:\\")
-            ? @"D:\OpenVisionLab-TestData\OpenVisionLab-Machine-Studio\unit"
-            : Path.Combine(Path.GetTempPath(), "OpenVisionLab-Machine-Studio", "unit");
+        var artifactRoot = Path.Combine(TestStorage.RootPath, "unit");
         Directory.CreateDirectory(artifactRoot);
         var path = Path.Combine(artifactRoot, $"vision-{Guid.NewGuid():N}.json");
         try

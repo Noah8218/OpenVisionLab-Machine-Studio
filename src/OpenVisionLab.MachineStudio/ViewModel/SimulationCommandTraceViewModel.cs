@@ -13,7 +13,7 @@ namespace OpenVisionLab.MachineStudio.ViewModel;
 /// simulation engine remains the owner of trace entries and is reached only
 /// through an explicit callback.
 /// </summary>
-public sealed class SimulationCommandTraceViewModel : ViewModelBase
+public sealed class SimulationCommandTraceViewModel : ViewModelBase, IDisposable
 {
     private readonly Func<bool> _canStartCapture;
     private readonly Func<FixedStepSimulationEngine?> _getEngine;
@@ -25,6 +25,10 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
     private readonly Action _openExportDialog;
     private readonly Func<Task> _openReplayDialog;
     private readonly Action<Exception> _handleCommandException;
+    private readonly Func<
+        FixedStepSimulationEngine,
+        DeterministicSimulationCommandTracePackage,
+        Task<DeterministicSimulationCommandTraceReplayResult>> _replay;
     private readonly RelayCommand _startCaptureCommand;
     private readonly RelayCommand _exportCommand;
     private readonly AsyncRelayCommand _replayCommand;
@@ -32,6 +36,7 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
     private int? _lastReplayEntryCount;
     private string? _lastReplayHash;
     private bool _lastReplaySucceeded;
+    private int _disposed;
 
     public SimulationCommandTraceViewModel(
         Func<bool> canStartCapture,
@@ -44,6 +49,36 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
         Action openExportDialog,
         Func<Task> openReplayDialog,
         Action<Exception> handleCommandException)
+        : this(
+            canStartCapture,
+            getEngine,
+            applySnapshot,
+            clearUnifiedCommissioningEvidence,
+            notifyUnifiedCommissioningEvidenceChanged,
+            setStatus,
+            log,
+            openExportDialog,
+            openReplayDialog,
+            handleCommandException,
+            ReplayWithDefaultRunner)
+    {
+    }
+
+    internal SimulationCommandTraceViewModel(
+        Func<bool> canStartCapture,
+        Func<FixedStepSimulationEngine?> getEngine,
+        Action<SimulationSnapshot> applySnapshot,
+        Action clearUnifiedCommissioningEvidence,
+        Action notifyUnifiedCommissioningEvidenceChanged,
+        Action<string> setStatus,
+        Action<string> log,
+        Action openExportDialog,
+        Func<Task> openReplayDialog,
+        Action<Exception> handleCommandException,
+        Func<
+            FixedStepSimulationEngine,
+            DeterministicSimulationCommandTracePackage,
+            Task<DeterministicSimulationCommandTraceReplayResult>> replay)
     {
         _canStartCapture = canStartCapture ?? throw new ArgumentNullException(nameof(canStartCapture));
         _getEngine = getEngine ?? throw new ArgumentNullException(nameof(getEngine));
@@ -58,6 +93,7 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
         _openReplayDialog = openReplayDialog ?? throw new ArgumentNullException(nameof(openReplayDialog));
         _handleCommandException = handleCommandException
             ?? throw new ArgumentNullException(nameof(handleCommandException));
+        _replay = replay ?? throw new ArgumentNullException(nameof(replay));
         _startCaptureCommand = new RelayCommand(
             _ => StartCapture(),
             _ => CanStartCapture,
@@ -73,18 +109,23 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
             useCommandManagerRequery: false);
     }
 
-    public bool IsCaptureStarted => _captureStarted;
-    public bool CanStartCapture => _canStartCapture() && _getEngine() is not null;
-    public bool CanExportTrace => CanStartCapture
+    public bool IsCaptureStarted => !IsDisposed && _captureStarted;
+    public bool CanStartCapture => !IsDisposed && _canStartCapture() && _getEngine() is not null;
+    public bool CanExportTrace => !IsDisposed && CanStartCapture
         && _captureStarted
         && _getEngine()?.CommandTrace.Length > 0;
-    public bool CanReplayTrace => CanStartCapture;
-    public int EntryCount => _getEngine()?.CommandTrace.Length ?? 0;
-    public bool LastReplaySucceeded => _lastReplaySucceeded;
+    public bool CanReplayTrace => !IsDisposed && CanStartCapture;
+    public int EntryCount => IsDisposed ? 0 : _getEngine()?.CommandTrace.Length ?? 0;
+    public bool LastReplaySucceeded => !IsDisposed && _lastReplaySucceeded;
     public string StatusText
     {
         get
         {
+            if (IsDisposed)
+            {
+                return OpenVisionLanguageService.T("Simulation.CommandTraceUnavailable");
+            }
+
             var traceEngine = _getEngine();
             if (traceEngine is null)
             {
@@ -130,7 +171,8 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
 
     internal bool TryExport(string path)
     {
-        if (!CanExportTrace
+        if (IsDisposed
+            || !CanExportTrace
             || string.IsNullOrWhiteSpace(path)
             || _getEngine() is not { } traceEngine)
         {
@@ -160,6 +202,11 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
 
     internal async Task<bool> TryReplayAsync(string path)
     {
+        if (IsDisposed)
+        {
+            return false;
+        }
+
         _lastReplaySucceeded = false;
         _lastReplayEntryCount = null;
         _lastReplayHash = null;
@@ -180,9 +227,13 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
 
         try
         {
-            var result = await new DeterministicSimulationCommandTraceReplayRunner()
-                .ReplayAsync(traceEngine, package)
+            var result = await _replay(traceEngine, package)
                 .ConfigureAwait(true);
+            if (IsDisposed)
+            {
+                return false;
+            }
+
             if (!result.IsSuccess)
             {
                 var detail = result.FailureReason
@@ -214,6 +265,11 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
+            if (IsDisposed)
+            {
+                return false;
+            }
+
             _setStatus(string.Format(
                 CultureInfo.CurrentCulture,
                 OpenVisionLanguageService.T("Simulation.CommandTraceReplayFailed"),
@@ -225,6 +281,11 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
 
     internal void Reset()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _captureStarted = false;
         _lastReplayEntryCount = null;
         _lastReplayHash = null;
@@ -232,10 +293,21 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
         RaiseTraceChanged();
     }
 
-    internal void NotifyRuntimeChanged() => RaiseTraceChanged();
+    internal void NotifyRuntimeChanged()
+    {
+        if (!IsDisposed)
+        {
+            RaiseTraceChanged();
+        }
+    }
 
     internal void InvalidateCommands()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _startCaptureCommand.RaiseCanExecuteChanged();
         _exportCommand.RaiseCanExecuteChanged();
         _replayCommand.RaiseCanExecuteChanged();
@@ -243,7 +315,7 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
 
     private void StartCapture()
     {
-        if (!CanStartCapture || _getEngine() is not { } traceEngine)
+        if (IsDisposed || !CanStartCapture || _getEngine() is not { } traceEngine)
         {
             return;
         }
@@ -262,6 +334,11 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
 
     private void Export(object? parameter)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (parameter is string path && !string.IsNullOrWhiteSpace(path))
         {
             TryExport(path);
@@ -274,6 +351,11 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
 
     private async Task ReplayAsync(object? parameter)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (parameter is string path && !string.IsNullOrWhiteSpace(path))
         {
             await TryReplayAsync(path);
@@ -286,6 +368,11 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
 
     private void RaiseTraceChanged()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         OnPropertyChanged(nameof(IsCaptureStarted));
         OnPropertyChanged(nameof(CanStartCapture));
         OnPropertyChanged(nameof(CanExportTrace));
@@ -295,6 +382,26 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase
         OnPropertyChanged(nameof(LastReplaySucceeded));
         InvalidateCommands();
     }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _captureStarted = false;
+        _lastReplayEntryCount = null;
+        _lastReplayHash = null;
+        _lastReplaySucceeded = false;
+    }
+
+    private static Task<DeterministicSimulationCommandTraceReplayResult> ReplayWithDefaultRunner(
+        FixedStepSimulationEngine engine,
+        DeterministicSimulationCommandTracePackage package) =>
+        new DeterministicSimulationCommandTraceReplayRunner().ReplayAsync(engine, package);
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     private static string ShortHash(string hash) =>
         hash.Length <= 12 ? hash : hash[..12];

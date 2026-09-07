@@ -15,7 +15,10 @@ public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
 {
     private readonly byte[] _sharedKey;
     private readonly TcpIntegrationOptions _options;
+    private readonly object _lifecycleGate = new();
     private TcpIntegrationServer? _server;
+    private bool _isStarting;
+    private bool _zeroSharedKeyWhenStartCompletes;
     private bool _disposed;
 
     public MachineIntegrationTcpExchange(
@@ -42,7 +45,16 @@ public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
 
     public string ExchangeRoot { get; }
 
-    public IPEndPoint? LocalEndpoint => _server?.LocalEndpoint;
+    public IPEndPoint? LocalEndpoint
+    {
+        get
+        {
+            lock (_lifecycleGate)
+            {
+                return _server?.LocalEndpoint;
+            }
+        }
+    }
 
     public event Action<TcpIntegrationTransferReceipt>? RequestCompleted;
 
@@ -51,48 +63,90 @@ public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
         int port,
         CancellationToken cancellationToken = default)
     {
-        ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(listenAddress);
-        if (_server is not null)
+        lock (_lifecycleGate)
         {
-            throw new InvalidOperationException(
-                "The Machine TCP integration listener is already started.");
+            ThrowIfDisposedLocked();
+            ArgumentNullException.ThrowIfNull(listenAddress);
+            if (_server is not null || _isStarting)
+            {
+                throw new InvalidOperationException(
+                    "The Machine TCP integration listener is already started.");
+            }
+
+            _isStarting = true;
         }
 
-        var server = new TcpIntegrationServer(
-            IntegrationApplicationIds.MachineStudio,
-            ExchangeRoot,
-            listenAddress,
-            port,
-            _sharedKey,
-            _options);
-        server.RequestCompleted += OnRequestCompleted;
+        TcpIntegrationServer? server = null;
         try
         {
+            server = new TcpIntegrationServer(
+                IntegrationApplicationIds.MachineStudio,
+                ExchangeRoot,
+                listenAddress,
+                port,
+                _sharedKey,
+                _options);
+            server.RequestCompleted += OnRequestCompleted;
             await server.StartAsync(cancellationToken).ConfigureAwait(false);
-            _server = server;
-            return server.LocalEndpoint
+            var endpoint = server.LocalEndpoint
                 ?? throw new InvalidOperationException(
                     "The Machine TCP integration listener has no local endpoint.");
+            lock (_lifecycleGate)
+            {
+                ThrowIfDisposedLocked();
+                _server = server;
+                server = null;
+                return endpoint;
+            }
         }
         catch
         {
-            server.RequestCompleted -= OnRequestCompleted;
-            await server.DisposeAsync().ConfigureAwait(false);
+            if (server is not null)
+            {
+                server.RequestCompleted -= OnRequestCompleted;
+                await server.DisposeAsync().ConfigureAwait(false);
+            }
+
             throw;
+        }
+        finally
+        {
+            bool zeroSharedKey;
+            lock (_lifecycleGate)
+            {
+                _isStarting = false;
+                zeroSharedKey = _zeroSharedKeyWhenStartCompletes;
+                _zeroSharedKeyWhenStartCompletes = false;
+            }
+
+            if (zeroSharedKey)
+            {
+                CryptographicOperations.ZeroMemory(_sharedKey);
+            }
         }
     }
 
     public async Task StopListeningAsync(CancellationToken cancellationToken = default)
     {
-        ThrowIfDisposed();
-        var server = _server;
+        TcpIntegrationServer? server;
+        lock (_lifecycleGate)
+        {
+            ThrowIfDisposedLocked();
+            if (_isStarting)
+            {
+                throw new InvalidOperationException(
+                    "The Machine TCP integration listener is still starting.");
+            }
+
+            server = _server;
+            _server = null;
+        }
+
         if (server is null)
         {
             return;
         }
 
-        _server = null;
         server.RequestCompleted -= OnRequestCompleted;
         try
         {
@@ -168,19 +222,43 @@ public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        TcpIntegrationServer? server;
+        bool zeroSharedKey;
+        lock (_lifecycleGate)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            server = _server;
+            _server = null;
+            zeroSharedKey = !_isStarting;
+            _zeroSharedKeyWhenStartCompletes = !zeroSharedKey;
         }
 
         try
         {
-            await StopListeningAsync().ConfigureAwait(false);
+            if (server is not null)
+            {
+                server.RequestCompleted -= OnRequestCompleted;
+                try
+                {
+                    await server.StopAsync().ConfigureAwait(false);
+                }
+                finally
+                {
+                    await server.DisposeAsync().ConfigureAwait(false);
+                }
+            }
         }
         finally
         {
-            CryptographicOperations.ZeroMemory(_sharedKey);
-            _disposed = true;
+            if (zeroSharedKey)
+            {
+                CryptographicOperations.ZeroMemory(_sharedKey);
+            }
         }
     }
 
@@ -203,9 +281,24 @@ public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
         return await operation(client, cancellationToken).ConfigureAwait(false);
     }
 
-    private void OnRequestCompleted(TcpIntegrationTransferReceipt receipt) =>
-        RequestCompleted?.Invoke(receipt);
+    private void OnRequestCompleted(TcpIntegrationTransferReceipt receipt)
+    {
+        lock (_lifecycleGate)
+        {
+            if (!_disposed)
+            {
+                RequestCompleted?.Invoke(receipt);
+            }
+        }
+    }
 
-    private void ThrowIfDisposed() =>
-        ObjectDisposedException.ThrowIf(_disposed, this);
+    private void ThrowIfDisposed()
+    {
+        lock (_lifecycleGate)
+        {
+            ThrowIfDisposedLocked();
+        }
+    }
+
+    private void ThrowIfDisposedLocked() => ObjectDisposedException.ThrowIf(_disposed, this);
 }

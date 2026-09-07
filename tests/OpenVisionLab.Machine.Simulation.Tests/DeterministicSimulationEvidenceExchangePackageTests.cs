@@ -3,6 +3,7 @@ using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Layout;
 using OpenVisionLab.Machine.Simulation.Scenarios;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Simulation.Tests;
@@ -11,8 +12,17 @@ public sealed class DeterministicSimulationEvidenceExchangePackageTests
 {
     private const string ProjectJson =
         "{\"schema\":\"1.2\",\"id\":\"exchange-fixture\",\"name\":\"Exchange fixture\"}";
-    private const string ProjectPath =
-        "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\pl-0025-portable-evidence\\exchange-fixture.ovmachine";
+    private static string EvidenceRoot => Path.Combine(
+        TestStorage.RootPath,
+        "pl-0025-portable-evidence");
+
+    private static string ProjectPath => Path.Combine(
+        EvidenceRoot,
+        "exchange-fixture.ovmachine");
+
+    private static string ImportedProjectPath => Path.Combine(
+        EvidenceRoot,
+        "imported.ovmachine");
 
     [Fact]
     public async Task Create_SaveLoad_RoundTripsPortableEvidenceWithoutSessionState()
@@ -36,7 +46,7 @@ public sealed class DeterministicSimulationEvidenceExchangePackageTests
         Assert.DoesNotContain("acknowledg", json, StringComparison.OrdinalIgnoreCase);
 
         var artifactPath = Path.Combine(
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\pl-0025-portable-evidence",
+            EvidenceRoot,
             "simulation-exchange-roundtrip.ovsim-evidence.json");
         DeterministicSimulationEvidenceExchangePackage.SaveToJson(exchange, artifactPath);
         var loaded = Assert.IsType<DeterministicSimulationEvidenceExchangePackage>(
@@ -51,14 +61,14 @@ public sealed class DeterministicSimulationEvidenceExchangePackageTests
             profile,
             "test-build"));
         Assert.True(loaded.TryGetPackages(
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\pl-0025-portable-evidence\\imported.ovmachine",
+            ImportedProjectPath,
             out var importedBatch,
             out var importedBaseline));
         Assert.True(batch.IsEquivalentTo(importedBatch));
         Assert.True(baseline.IsEquivalentTo(importedBaseline));
         Assert.All(importedBatch.Runs, run => Assert.EndsWith("imported.ovmachine", run.Result.ProjectPath));
         Assert.Equal(
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\pl-0025-portable-evidence\\imported.ovmachine",
+            ImportedProjectPath,
             importedBaseline!.ProjectPath);
     }
 

@@ -25,7 +25,7 @@ internal sealed record SimulationConditionScheduledFaultRecoveryContext(
     IList<ServoAxisComponent> Axes,
     DeterministicSignalHub SignalHub,
     DeterministicMachineLayout? MachineLayout,
-    IDictionary<SimulationFaultKey, SimulationFaultSnapshot> ActiveFaults,
+    SimulationFaultRuntime ActiveFaults,
     IReadOnlyDictionary<string, DeterministicSequenceExecutor> SequenceExecutors,
     SimulationFaultCommandHandler FaultCommandHandler,
     long CommandBoundaryTick,

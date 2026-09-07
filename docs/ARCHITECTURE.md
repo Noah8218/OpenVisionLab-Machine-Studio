@@ -247,6 +247,18 @@ runtime truth by comparing rendered frames. Presentation refresh may discard a
 stale visual snapshot, while the separate Event Journal path remains
 non-dropping.
 
+Long-running application workflows use concrete lifetime owners rather than
+sharing disposal state through the shell. ViewModels and workflow owners reject
+new work after disposal and re-check the lifetime gate after awaited operations
+before publishing status, results, notifications, or row updates. The
+`MainViewModel` remains the WPF composition owner and disposes its child
+workflows; `RecipeConnectionWorkbenchViewModel` likewise disposes its
+sequence-step preview and dry-run children in a defined order. This keeps
+Window/control-specific behavior in the WPF boundary while preventing late
+asynchronous callbacks from mutating a closed shell. These guards preserve the
+existing public command, recipe, project, and runtime contracts while making
+shutdown and repeated-command behavior independently testable.
+
 The Sequence editor mutates only authored `SequenceDefinition` values while the
 application is in Design mode. Field edits are continuously checked by the
 source-neutral `SequenceCompiler`; they do not advance or patch the current

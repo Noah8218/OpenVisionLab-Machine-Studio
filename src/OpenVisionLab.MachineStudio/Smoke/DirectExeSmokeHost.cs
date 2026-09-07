@@ -1,15 +1,12 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Axes;
@@ -25,7 +22,6 @@ using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Compilation;
 using OpenVisionLab.Machine.Simulation.Commissioning;
 using OpenVisionLab.Machine.Simulation.Engine;
-using OpenVisionLab.Machine.Simulation.FaultScenarios;
 using OpenVisionLab.Machine.Simulation.Faults;
 using OpenVisionLab.Machine.Simulation.Layout;
 using OpenVisionLab.Machine.Simulation.Scenarios;
@@ -47,45 +43,14 @@ using static OpenVisionLab.MachineStudio.SmokeVisualTreeQuery;
 
 namespace OpenVisionLab.MachineStudio;
 
-internal sealed class SmokeWorkflowReport
-{
-    public string Schema { get; init; } = "1.0";
-    public DateTimeOffset CapturedAtUtc { get; init; } = DateTimeOffset.UtcNow;
-    public required IReadOnlyDictionary<string, bool> Checks { get; init; }
-    public required IReadOnlyList<string> Failures { get; init; }
-    public SmokeMonitorEvidence? Monitor { get; init; }
-    public bool IsValid => Failures.Count == 0 && Checks.Values.All(value => value);
-
-    public void Save(string path)
-    {
-        var fullPath = Path.GetFullPath(path);
-        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-        File.WriteAllText(
-            fullPath,
-            JsonSerializer.Serialize(this, new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                WriteIndented = true
-            }));
-    }
-}
-
 internal static class DirectExeSmokeHost
 {
-    private const uint MouseEventMove = 0x0001;
-    private const uint MouseEventLeftDown = 0x0002;
-    private const uint MouseEventLeftUp = 0x0004;
-    private const byte VirtualKeyReturn = 0x0D;
-    private const byte VirtualKeyEscape = 0x1B;
-    private const uint KeyEventKeyUp = 0x0002;
-    private static bool _smokePointerHeld;
-    private static FrameworkElement? _smokePopupContent;
-
     public static bool IsRequested(IReadOnlyList<string> args) =>
         DirectExeSmokeArgumentParser.IsRequested(args);
 
     public static async Task RunAsync(string[] args)
     {
+        using var nativeInput = new SmokeNativeInput();
         var buildIdentityReportPath = GetArgumentValue(args, "--build-identity-report");
         if (!string.IsNullOrWhiteSpace(buildIdentityReportPath))
         {
@@ -95,171 +60,39 @@ internal static class DirectExeSmokeHost
             return;
         }
 
-        var performSmokePerf = HasArgument(args, "--smoke-perf");
-        var smokePerfSampleCount = ParseIntArgument(
-            GetArgumentValue(args, "--smoke-perf-samples"),
-            "--smoke-perf-samples",
-            defaultValue: 12,
-            min: 4,
-            max: 1000);
-        var smokePerfReportPath = GetArgumentValue(args, "--smoke-perf-report");
-        var startupPerfStopwatch = performSmokePerf ? Stopwatch.StartNew() : null;
+        var smokeOptions = DirectExeSmokeArgumentParser.ParseSmokeOptions(args);
+        var startupPerfStopwatch = smokeOptions.PerformSmokePerf ? Stopwatch.StartNew() : null;
 
-        var faultProjectPath = GetArgumentValue(args, "--fault-project");
-        var faultScenarioPath = GetArgumentValue(args, "--fault-scenario");
-        var faultReportPath = GetArgumentValue(args, "--fault-report");
         if (HasArgument(args, "--fault-project") ||
             HasArgument(args, "--fault-scenario") ||
             HasArgument(args, "--fault-report"))
         {
-            var exitCode = await RunFaultScenarioHeadlessAsync(
-                faultProjectPath,
-                faultScenarioPath,
-                faultReportPath);
+            var exitCode = await DirectExeFaultScenarioHost.RunAsync(args);
             Application.Current?.Shutdown(exitCode);
             return;
         }
 
-        var screenshotPath = GetArgumentValue(args, "--smoke-screenshot");
-        var layoutReportPath = GetArgumentValue(args, "--smoke-layout-report");
-        var sizeArg = GetArgumentValue(args, "--smoke-size") ?? "1280x760";
-        var dpiScalePercent = ParseDpiScalePercent(GetArgumentValue(args, "--smoke-dpi"));
-        var smokeLanguage = GetArgumentValue(args, "--smoke-language");
-        if (!string.IsNullOrWhiteSpace(smokeLanguage))
+        DirectExeSmokeArgumentParser.ValidateSmokeArguments(args);
+        if (!string.IsNullOrWhiteSpace(smokeOptions.SmokeLanguage))
         {
             OpenVisionLanguageService.SetLanguage(
-                smokeLanguage.Equals("en", StringComparison.OrdinalIgnoreCase)
+                smokeOptions.SmokeLanguage.Equals("en", StringComparison.OrdinalIgnoreCase)
                     ? OpenVisionLanguage.English
                     : OpenVisionLanguage.Korean,
                 save: false);
         }
-        var projectPath = GetArgumentValue(args, "--smoke-project");
-        var selectPath = GetArgumentValue(args, "--smoke-select");
-        var layoutSelectId = GetArgumentValue(args, "--smoke-layout-select");
-        var layoutSelectMany = GetArgumentValue(args, "--smoke-layout-select-many");
-        var layoutAlignment = GetArgumentValue(args, "--smoke-layout-align");
-        var layoutAlignmentReportPath = GetArgumentValue(args, "--smoke-layout-alignment-report");
-        var layoutHistoryReportPath = GetArgumentValue(args, "--smoke-layout-history-report");
-        var directSceneReportPath = GetArgumentValue(args, "--smoke-direct-scene-report");
-        var canvasNavigationReportPath = GetArgumentValue(args, "--smoke-canvas-navigation-report");
-        var directTransformReportPath = GetArgumentValue(args, "--smoke-direct-transform-report");
-        var multiTransformReportPath = GetArgumentValue(args, "--smoke-multi-transform-report");
-        var libraryDropReportPath = GetArgumentValue(args, "--smoke-library-drop-report");
-        var layerOrderReportPath = GetArgumentValue(args, "--smoke-layer-order-report");
-        var faultManagerReportPath = GetArgumentValue(args, "--smoke-fault-manager-report");
-        var faultManagerState = GetArgumentValue(args, "--smoke-fault-manager-state");
-        var runtimeDebuggerReportPath = GetArgumentValue(args, "--smoke-runtime-debugger-report");
-        var runtimeDebuggerState = GetArgumentValue(args, "--smoke-runtime-debugger-state");
-        var digitalIoCommissioningReportPath = GetArgumentValue(args, "--smoke-io-commissioning-report");
-        var digitalIoCommissioningState = GetArgumentValue(args, "--smoke-io-commissioning-state");
-        var analogIoAuthoringReportPath = GetArgumentValue(args, "--smoke-analog-authoring-report");
-        var analogIoAuthoringState = GetArgumentValue(args, "--smoke-analog-authoring-state");
-        var analogIoAuthoringSavePath = GetArgumentValue(args, "--smoke-analog-authoring-save");
-        var cameraCommissioningReportPath = GetArgumentValue(args, "--smoke-camera-commissioning-report");
-        var cameraCommissioningState = GetArgumentValue(args, "--smoke-camera-commissioning-state");
-        var integrationPanelState = GetArgumentValue(args, "--smoke-integration-panel-state");
-        var integrationExchangeRoot = GetArgumentValue(args, "--smoke-integration-exchange-root");
-        var integrationPanelReportPath = GetArgumentValue(args, "--smoke-integration-panel-report");
-        var editCameraImageSource = HasArgument(args, "--smoke-camera-source-edit");
-        var axisCommissioningReportPath = GetArgumentValue(args, "--smoke-axis-commissioning-report");
-        var axisCommissioningState = GetArgumentValue(args, "--smoke-axis-commissioning-state");
-        var multiAxisRecipeReportPath = GetArgumentValue(args, "--smoke-multi-axis-recipe-report");
-        var multiAxisRecipeSavePath = GetArgumentValue(args, "--smoke-multi-axis-recipe-save");
-        var multiAxisRecipeState = GetArgumentValue(args, "--smoke-multi-axis-recipe-state");
-        var axisTuningState = GetArgumentValue(args, "--smoke-axis-tuning-state");
-        var cylinderCommissioningReportPath = GetArgumentValue(args, "--smoke-cylinder-commissioning-report");
-        var cylinderCommissioningState = GetArgumentValue(args, "--smoke-cylinder-commissioning-state");
-        var conveyorCommissioningReportPath = GetArgumentValue(args, "--smoke-conveyor-commissioning-report");
-        var conveyorCommissioningState = GetArgumentValue(args, "--smoke-conveyor-commissioning-state");
-        var sensorCommissioningReportPath = GetArgumentValue(args, "--smoke-sensor-commissioning-report");
-        var sensorCommissioningState = GetArgumentValue(args, "--smoke-sensor-commissioning-state");
-        var layoutClickId = GetArgumentValue(args, "--smoke-click-layout");
-        var layoutPropertyState = GetArgumentValue(args, "--smoke-layout-property-state");
-        var editMenuState = GetArgumentValue(args, "--smoke-edit-menu-state");
-        var directSceneGestureState = GetArgumentValue(args, "--smoke-direct-scene-gesture-state");
-        var globalCommandState = GetArgumentValue(args, "--smoke-command-state");
-        var startupChoiceState = GetArgumentValue(args, "--smoke-startup-choice-state");
-        var recipeGalleryState = GetArgumentValue(args, "--smoke-recipe-gallery-state");
-        var recipeGalleryCopyPath = GetArgumentValue(args, "--smoke-recipe-gallery-copy");
-        var recipeGalleryReportPath = GetArgumentValue(args, "--smoke-recipe-gallery-report");
-        var recipeGalleryCompatibilityReportPath = GetArgumentValue(
-            args,
-            "--smoke-recipe-gallery-compatibility-report");
-        var recipeGalleryBaselineReportPath = GetArgumentValue(
-            args,
-            "--smoke-recipe-gallery-baseline-report");
-        var recipeGalleryCurrentReportPath = GetArgumentValue(
-            args,
-            "--smoke-recipe-gallery-current-report");
-        var recipeGalleryExpectFailure = HasArgument(args, "--smoke-recipe-gallery-expect-failure");
-        var connectionWorkbenchReportPath = GetArgumentValue(args, "--smoke-connection-workbench-report");
-        var connectionWorkbenchSavePath = GetArgumentValue(args, "--smoke-connection-workbench-save");
-        var connectionWorkbenchState = GetArgumentValue(args, "--smoke-connection-workbench-state");
-        var cameraFirstUseReportPath = GetArgumentValue(args, "--smoke-camera-first-use-report");
-        var cameraFirstUseSavePath = GetArgumentValue(args, "--smoke-camera-first-use-save");
-        var cameraFirstUseState = GetArgumentValue(args, "--smoke-camera-first-use-state");
-        var projectSafetyReportPath = GetArgumentValue(args, "--smoke-project-safety-report");
-        var projectSafetySavePath = GetArgumentValue(args, "--smoke-project-safety-save");
-        var unsavedDialogScreenshotPath = GetArgumentValue(args, "--smoke-unsaved-dialog-screenshot");
-        var projectOpenFailureDialogScreenshotPath = GetArgumentValue(
-            args,
-            "--smoke-project-open-failure-dialog-screenshot");
-        var evidenceDrawerState = GetArgumentValue(args, "--smoke-evidence-state");
-        var leftToolTab = GetArgumentValue(args, "--smoke-left-tool-tab");
-        var libraryCardState = GetArgumentValue(args, "--smoke-library-card-state");
-        var libraryDefaultAddKind = GetArgumentValue(args, "--smoke-library-default-add");
-        var documentTab = GetArgumentValue(args, "--smoke-document-tab");
-        var sequenceState = GetArgumentValue(args, "--smoke-sequence-state");
-        var pickPlaceState = GetArgumentValue(args, "--smoke-pick-place-state");
-        var roundTripSavePath = GetArgumentValue(args, "--smoke-roundtrip-save");
-        var roundTripReportPath = GetArgumentValue(args, "--smoke-roundtrip-report");
-        var verifyRoundTrip = HasArgument(args, "--smoke-roundtrip-verify");
-        var useRunLayout = HasArgument(args, "--smoke-run-layout");
-        var startSimulation = HasArgument(args, "--smoke-start-simulation");
-        var testConditionScenario = HasArgument(args, "--smoke-test-condition-scenario");
-        var testAxisFaultScenario = HasArgument(args, "--smoke-test-axis-fault-scenario");
-        var axisFaultPersistencePath = GetArgumentValue(args, "--smoke-axis-fault-persistence");
-        var testScenarioSettingsState = GetArgumentValue(args, "--smoke-test-scenario-settings-state");
-        var testScenarioFaultKind = GetArgumentValue(args, "--smoke-test-scenario-fault-kind");
-        var showTestScenarioSettings = HasArgument(args, "--smoke-test-scenario-settings")
-            || !string.IsNullOrWhiteSpace(testScenarioSettingsState);
-        var testScenarioBatch = HasArgument(args, "--smoke-test-scenario-batch");
-        var scenarioEvidenceExchangePath = GetArgumentValue(
-            args,
-            "--smoke-scenario-evidence-exchange");
-        var scenarioEvidenceExchangeState = GetArgumentValue(
-            args,
-            "--smoke-scenario-evidence-state") ?? "normal";
-        var unifiedCommissioningEvidencePath = GetArgumentValue(
-            args,
-            "--smoke-unified-commissioning-evidence");
-        var unifiedCommissioningEvidenceState = GetArgumentValue(
-            args,
-            "--smoke-unified-evidence-state") ?? "normal";
-        var commandTracePath = GetArgumentValue(args, "--smoke-command-trace");
-        var commandTraceState = GetArgumentValue(args, "--smoke-command-trace-state") ?? "normal";
-        var saveBatchPersistence = HasArgument(args, "--smoke-batch-persistence-save");
-        var verifyBatchPersistence = HasArgument(args, "--smoke-batch-persistence-verify");
-        var verifyStaleBatchPersistence = HasArgument(args, "--smoke-batch-persistence-stale");
-        var cylinderFaultTargetId = GetArgumentValue(args, "--smoke-cylinder-fault");
-        var (width, height) = ParseSize(sizeArg);
-
-        DirectExeSmokeArgumentParser.ValidateSmokeArguments(args);
-        var cameraFirstUseRequested = DirectExeSmokeArgumentParser.IsCameraFirstUseRequested(args);
-        var cameraFirstUseAppliedState = DirectExeSmokeArgumentParser.IsCameraFirstUseAppliedState(args);
+        var (width, height) = smokeOptions.WindowSize;
 
         var initialProjectLoad = DirectExeSmokeProjectLoader.Load(
-            projectPath,
-            cameraFirstUseRequested,
-            startupChoiceState);
+            smokeOptions.ProjectPath,
+            smokeOptions.CameraFirstUseRequested,
+            smokeOptions.StartupChoiceState);
         var initialProject = initialProjectLoad.Project;
         var initialProjectPath = initialProjectLoad.InitialProjectPath;
         var startupSamplePath = initialProjectLoad.StartupSamplePath;
 
         var vm = new MainViewModel(initialProject, initialProjectPath, startupSamplePath);
-        var isSmokeRun = args.Any(argument =>
-            argument.StartsWith("--smoke-", StringComparison.OrdinalIgnoreCase));
-        if (isSmokeRun)
+        if (smokeOptions.IsSmokeRun)
         {
             vm.UnsavedProjectPrompt = () => UnsavedProjectDecision.Discard;
         }
@@ -272,33 +105,34 @@ internal static class DirectExeSmokeHost
             WindowStartupLocation = WindowStartupLocation.CenterScreen
         };
 
-        if (isSmokeRun)
+        if (smokeOptions.IsSmokeRun)
         {
             SmokeDpiTestHook.PlaceOnTestMonitor(window, width, height);
         }
 
         window.Show();
-        SmokeDpiTestHook.Apply(window, dpiScalePercent, width, height);
-        if (useRunLayout)
+        SmokeDpiTestHook.Apply(window, smokeOptions.DpiScalePercent, width, height);
+        if (smokeOptions.UseRunLayout)
         {
             vm.IsRunMode = true;
         }
 
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         await Task.Delay(250);
-        var uiInteraction = CreateUiInteraction(window);
+        var windowCapture = new SmokeWindowCapture();
+        var uiInteraction = CreateUiInteraction(window, windowCapture, nativeInput);
 
-        if (!string.IsNullOrWhiteSpace(analogIoAuthoringState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.AnalogIoAuthoringState))
         {
             var analogAuthoringReport = await SmokeAnalogIoAuthoringVerifier.VerifyAsync(
                 window,
                 vm,
-                analogIoAuthoringState,
-                analogIoAuthoringSavePath,
-                screenshotPath,
+                smokeOptions.AnalogIoAuthoringState,
+                smokeOptions.AnalogIoAuthoringSavePath,
+                smokeOptions.ScreenshotPath,
                 root => FindVisualDescendant<RightToolRegionView>(root),
-                CaptureWindow);
-            analogAuthoringReport.Save(analogIoAuthoringReportPath!);
+                windowCapture.Capture);
+            analogAuthoringReport.Save(smokeOptions.AnalogIoAuthoringReportPath!);
             Console.WriteLine(
                 $"Analog I/O authoring smoke " +
                 $"{(analogAuthoringReport.IsValid ? "passed" : "failed")}. ");
@@ -307,15 +141,15 @@ internal static class DirectExeSmokeHost
                 Console.Error.WriteLine($"  - {failure}");
             }
 
-            ReleaseSmokePointer();
+            nativeInput.ReleasePointer();
             Application.Current?.Shutdown(analogAuthoringReport.IsValid ? 0 : 25);
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(startupChoiceState)
-            && !startupChoiceState.Equals("idle", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.StartupChoiceState)
+            && !smokeOptions.StartupChoiceState.Equals("idle", StringComparison.OrdinalIgnoreCase))
         {
-            var buttonName = startupChoiceState.StartsWith("sample", StringComparison.OrdinalIgnoreCase)
+            var buttonName = smokeOptions.StartupChoiceState.StartsWith("sample", StringComparison.OrdinalIgnoreCase)
                 ? "StartSampleButton"
                 : "StartBlankLayoutButton";
             var button = FindVisualDescendant<Button>(
@@ -324,26 +158,26 @@ internal static class DirectExeSmokeHost
                 ?? throw new InvalidOperationException("Startup choice button was not available.");
             button.Focus();
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            MovePointerToCenter(button);
+            nativeInput.MovePointerToCenter(button);
             await Task.Delay(100);
             AssertSmoke(button.IsMouseOver, "Startup choice button did not enter hover state.");
-            if (startupChoiceState.EndsWith("pressed", StringComparison.OrdinalIgnoreCase))
+            if (smokeOptions.StartupChoiceState.EndsWith("pressed", StringComparison.OrdinalIgnoreCase))
             {
-                mouse_event(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
-                _smokePointerHeld = true;
+                nativeInput.PressLeftButton();
+                nativeInput.MarkPointerHeld();
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 AssertSmoke(button.IsPressed, "Startup choice button did not enter pointer-down state.");
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(commandTracePath)
-            || HasArgument(args, "--smoke-command-trace-state"))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.CommandTracePath)
+            || smokeOptions.CommandTraceStateSpecified)
         {
             await SmokeRuntimeEvidenceVerifier.VerifyCommandTraceAsync(
                 window,
                 vm,
-                commandTracePath,
-                commandTraceState,
+                smokeOptions.CommandTracePath,
+                smokeOptions.CommandTraceState,
                 uiInteraction);
         }
 
@@ -375,60 +209,60 @@ internal static class DirectExeSmokeHost
         SmokeCameraFirstUseReport? cameraFirstUseReport = null;
         SmokeProjectSafetyReport? projectSafetyReport = null;
 
-        if (!string.IsNullOrWhiteSpace(recipeGalleryState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.RecipeGalleryState))
         {
             recipeGalleryReport = await SmokeRecipeGalleryVerifier.VerifyAsync(
                 window,
                 vm,
-                recipeGalleryState,
+                smokeOptions.RecipeGalleryState,
                 initialProject,
-                recipeGalleryCopyPath,
-                recipeGalleryCompatibilityReportPath,
-                recipeGalleryBaselineReportPath,
-                recipeGalleryCurrentReportPath,
-                recipeGalleryExpectFailure,
+                smokeOptions.RecipeGalleryCopyPath,
+                smokeOptions.RecipeGalleryCompatibilityReportPath,
+                smokeOptions.RecipeGalleryBaselineReportPath,
+                smokeOptions.RecipeGalleryCurrentReportPath,
+                smokeOptions.RecipeGalleryExpectFailure,
                 (root, predicate) => FindVisualDescendant<Button>(root, predicate),
                 () =>
                 {
                     window.Activate();
-                    SetForegroundWindow(new WindowInteropHelper(window).Handle);
+                    nativeInput.ActivateWindow(window);
                 },
-                MovePointerToCenter,
-                (flags, dx, dy, data, extraInfo) => mouse_event(flags, dx, dy, data, extraInfo),
-                () => _smokePointerHeld = true);
-            if (!string.IsNullOrWhiteSpace(recipeGalleryReportPath))
+                nativeInput.MovePointerToCenter,
+                nativeInput.SendMouseEvent,
+                nativeInput.MarkPointerHeld);
+            if (!string.IsNullOrWhiteSpace(smokeOptions.RecipeGalleryReportPath))
             {
-                recipeGalleryReport.Save(recipeGalleryReportPath);
+                recipeGalleryReport.Save(smokeOptions.RecipeGalleryReportPath);
             }
 
             Console.WriteLine(
                 $"Recipe gallery smoke {(recipeGalleryReport.IsValid ? "passed" : "failed")}.");
         }
 
-        if (cameraFirstUseRequested)
+        if (smokeOptions.CameraFirstUseRequested)
         {
-            var effectiveCameraFirstUseState = cameraFirstUseState ?? "applied";
+            var effectiveCameraFirstUseState = smokeOptions.CameraFirstUseState ?? "applied";
             cameraFirstUseReport = await SmokeCameraFirstUseVerifier.VerifyAsync(
                 window,
                 vm,
                 effectiveCameraFirstUseState,
-                cameraFirstUseSavePath,
+                smokeOptions.CameraFirstUseSavePath,
                 root => FindVisualDescendant<RecipeConnectionWorkbenchView>(root),
                 (root, predicate) => FindVisualDescendant<Button>(root, predicate),
                 (root, predicate) => FindVisualDescendant<Border>(root, predicate),
                 () =>
                 {
                     window.Activate();
-                    SetForegroundWindow(new WindowInteropHelper(window).Handle);
+                    nativeInput.ActivateWindow(window);
                 },
-                MovePointerToCenter,
-                (flags, dx, dy, data, extraInfo) => mouse_event(flags, dx, dy, data, extraInfo),
-                () => _smokePointerHeld = true,
-                popup => _smokePopupContent = popup,
-                ReleaseSmokePointer);
-            if (!string.IsNullOrWhiteSpace(cameraFirstUseReportPath))
+                nativeInput.MovePointerToCenter,
+                nativeInput.SendMouseEvent,
+                nativeInput.MarkPointerHeld,
+                windowCapture.SetPopupContent,
+                nativeInput.ReleasePointer);
+            if (!string.IsNullOrWhiteSpace(smokeOptions.CameraFirstUseReportPath))
             {
-                cameraFirstUseReport.Save(cameraFirstUseReportPath);
+                cameraFirstUseReport.Save(smokeOptions.CameraFirstUseReportPath);
             }
 
             Console.WriteLine(
@@ -436,464 +270,82 @@ internal static class DirectExeSmokeHost
                 $"{(cameraFirstUseReport.IsValid ? "passed" : "failed")}.");
         }
 
-        if (!string.IsNullOrWhiteSpace(connectionWorkbenchReportPath)
-            && !(connectionWorkbenchState?.StartsWith("station-skeleton-", StringComparison.OrdinalIgnoreCase) ?? false)
-            && !(connectionWorkbenchState?.StartsWith("load-lock-", StringComparison.OrdinalIgnoreCase) ?? false)
-            && !(connectionWorkbenchState?.StartsWith("semantic-setup-", StringComparison.OrdinalIgnoreCase) ?? false)
-            && !(connectionWorkbenchState?.StartsWith("process-block-", StringComparison.OrdinalIgnoreCase) ?? false))
-        {
-            connectionWorkbenchDefaultReport = await SmokeConnectionWorkbenchVerifier.VerifyAsync(
-                window,
-                vm,
-                initialProject!,
-                connectionWorkbenchSavePath!,
-                (root, predicate) => FindVisualDescendant<TextBox>(root, predicate));
-            connectionWorkbenchDefaultReport.Save(connectionWorkbenchReportPath);
-            Console.WriteLine(
-                $"Connection workbench smoke {(connectionWorkbenchDefaultReport.IsValid ? "passed" : "failed")}.");
-        }
-        if (!string.IsNullOrWhiteSpace(documentTab))
+        connectionWorkbenchDefaultReport = await DirectExeConnectionWorkbenchWorkflow.VerifyDefaultAsync(
+            window,
+            vm,
+            initialProject,
+            smokeOptions.ConnectionWorkbenchState,
+            smokeOptions.ConnectionWorkbenchReportPath,
+            smokeOptions.ConnectionWorkbenchSavePath);
+        if (!string.IsNullOrWhiteSpace(smokeOptions.DocumentTab))
         {
             var document = FindVisualDescendant<SceneDocumentView>(window)
                 ?? throw new InvalidOperationException("Scene document view was not available.");
             var tabs = FindVisualDescendant<TabControl>(document)
                 ?? throw new InvalidOperationException("Document tabs were not available.");
-            var localizedDocumentTab = documentTab switch
+            var localizedDocumentTab = smokeOptions.DocumentTab switch
             {
                 "Machine Layout" => OpenVisionLanguageService.T("Shell.MachineLayout"),
                 "Simulation Workspace" => OpenVisionLanguageService.T("Shell.SimulationWorkspace"),
                 "Sequence" => OpenVisionLanguageService.T("Shell.Sequence"),
                 "Connections" => OpenVisionLanguageService.T("Connections.Tab"),
-                _ => documentTab
+                _ => smokeOptions.DocumentTab
             };
             var tab = tabs.Items.OfType<TabItem>().FirstOrDefault(item =>
-                string.Equals(item.Header?.ToString(), documentTab, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(item.Header?.ToString(), smokeOptions.DocumentTab, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(
                     item.Header?.ToString(),
                     localizedDocumentTab,
                     StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidOperationException(
-                    $"Document tab '{documentTab}' was not available.");
+                    $"Document tab '{smokeOptions.DocumentTab}' was not available.");
             tab.IsSelected = true;
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             await Task.Delay(100);
         }
 
-        if (!string.IsNullOrWhiteSpace(connectionWorkbenchState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.ConnectionWorkbenchState))
         {
-            if (SmokeStationSkeletonVerifier.RequiresProjectPreparation(connectionWorkbenchState))
-            {
-                await SmokeStationSkeletonVerifier.PrepareProjectAsync(window, vm, initialProject);
-            }
-
-            vm.SelectedDocumentTabIndex = 1;
-            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            var workbench = FindVisualDescendant<RecipeConnectionWorkbenchView>(window)
-                ?? throw new InvalidOperationException("Connection workbench was not available.");
-            var addStageButton = FindVisualDescendant<Button>(
-                workbench,
-                candidate => string.Equals(
-                    candidate.Name,
-                    "AddConnectionStageButton",
-                    StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("Axis + stage button was not available.");
-            var addRotaryStageButton = FindVisualDescendant<Button>(
-                workbench,
-                candidate => string.Equals(
-                    candidate.Name,
-                    "AddConnectionRotaryStageButton",
-                    StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("Rotary axis + stage button was not available.");
-            var readinessButton = FindVisualDescendant<Button>(
-                workbench,
-                candidate => string.Equals(
-                    candidate.Name,
-                    "ValidateSimulationReadinessButton",
-                    StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("Simulation readiness button was not available.");
-            var dryRunButton = FindVisualDescendant<Button>(
-                workbench,
-                candidate => string.Equals(
-                    candidate.Name,
-                    "RunRecipeDryRunButton",
-                    StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("Recipe dry-run button was not available.");
-            var checkpointTemplateButton = FindVisualDescendant<Button>(
-                workbench,
-                candidate => string.Equals(
-                    candidate.Name,
-                    "PreviewRecipeCheckpointTemplateButton",
-                    StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("Recipe checkpoint template button was not available.");
-            var stationSkeletonButton = FindVisualDescendant<Button>(
-                workbench,
-                candidate => string.Equals(
-                    candidate.Name,
-                    "PreviewSemiconductorStationButton",
-                    StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("Semiconductor station button was not available.");
-            var processBlockButton = FindVisualDescendant<Button>(
-                workbench,
-                candidate => string.Equals(
-                    candidate.Name,
-                    "PreviewProcessBlockComposerButton",
-                    StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("Process block composer button was not available.");
-            var loadLockSetupButton = FindVisualDescendant<Button>(
-                workbench,
-                candidate => string.Equals(
-                    candidate.Name,
-                    "PreviewLoadLockSetupButton",
-                    StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("Load-lock setup button was not available.");
-            var waferHandlerSetupButton = FindVisualDescendant<Button>(workbench, candidate => string.Equals(candidate.Name, "PreviewWaferHandlerSetupButton", StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("Wafer-handler setup button was not available.");
-            var prealignerSetupButton = FindVisualDescendant<Button>(workbench, candidate => string.Equals(candidate.Name, "PreviewPrealignerSetupButton", StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("Pre-aligner setup button was not available.");
-            var inspectionHandoffSetupButton = FindVisualDescendant<Button>(workbench, candidate => string.Equals(candidate.Name, "PreviewInspectionHandoffSetupButton", StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("Inspection handoff setup button was not available.");
-            var inspectionSortSetupButton = FindVisualDescendant<Button>(workbench, candidate => string.Equals(candidate.Name, "PreviewInspectionSortSetupButton", StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("Inspection sort setup button was not available.");
-            var ohtSetupButton = FindVisualDescendant<Button>(workbench, candidate => string.Equals(candidate.Name, "PreviewOhtSetupButton", StringComparison.Ordinal))
-                ?? throw new InvalidOperationException("OHT setup button was not available.");
-
-            if (SmokeStationSkeletonVerifier.IsSupportedState(connectionWorkbenchState))
-            {
-                var stationResult = await SmokeStationSkeletonVerifier.VerifyAsync(
-                    window,
-                    vm,
-                    connectionWorkbenchState,
-                    initialProject,
-                    workbench,
-                    stationSkeletonButton,
-                    connectionWorkbenchSavePath,
-                    (root, predicate) => FindVisualDescendant<Border>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<Button>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<TextBox>(root, predicate),
-                    () =>
-                    {
-                        window.Activate();
-                        SetForegroundWindow(new WindowInteropHelper(window).Handle);
-                    },
-                    MovePointerToCenter,
-                    (flags, dx, dy, data, extraInfo) => mouse_event(flags, dx, dy, data, extraInfo),
-                    () => _smokePointerHeld = true);
-                if (connectionWorkbenchState.Equals("station-skeleton-applied", StringComparison.OrdinalIgnoreCase)
-                    && !string.IsNullOrWhiteSpace(connectionWorkbenchReportPath))
-                {
-                    stationSkeletonReport = stationResult;
-                    stationSkeletonReport.Save(connectionWorkbenchReportPath);
-                }
-
-                var stationReportRequested = connectionWorkbenchState.Equals(
-                    "station-skeleton-applied",
-                    StringComparison.OrdinalIgnoreCase)
-                    && !string.IsNullOrWhiteSpace(connectionWorkbenchReportPath);
-                if (!stationResult.IsValid && !stationReportRequested)
-                {
-                    throw new InvalidOperationException(
-                        stationResult.Failures.FirstOrDefault()
-                        ?? "Station skeleton smoke failed.");
-                }
-            }
-            else if (connectionWorkbenchState.StartsWith("load-lock-", StringComparison.OrdinalIgnoreCase))
-            {
-                var loadLockResult = await SmokeLoadLockSetupVerifier.VerifyAsync(
-                    window,
-                    vm,
-                    connectionWorkbenchState,
-                    initialProject!,
-                    workbench,
-                    loadLockSetupButton,
-                    connectionWorkbenchSavePath,
-                    (root, predicate) => FindVisualDescendant<Border>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<Button>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<TextBox>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<ComboBox>(root, predicate),
-                    () =>
-                    {
-                        window.Activate();
-                        SetForegroundWindow(new WindowInteropHelper(window).Handle);
-                    },
-                    MovePointerToCenter,
-                    (flags, dx, dy, data, extraInfo) => mouse_event(flags, dx, dy, data, extraInfo),
-                    () => _smokePointerHeld = true,
-                    popup => _smokePopupContent = popup);
-                if (connectionWorkbenchState.Equals("load-lock-applied", StringComparison.OrdinalIgnoreCase)
-                    && !string.IsNullOrWhiteSpace(connectionWorkbenchReportPath))
-                {
-                    loadLockSetupReport = loadLockResult;
-                    loadLockSetupReport.Save(connectionWorkbenchReportPath);
-                }
-
-                var loadLockReportRequested = connectionWorkbenchState.Equals(
-                    "load-lock-applied",
-                    StringComparison.OrdinalIgnoreCase)
-                    && !string.IsNullOrWhiteSpace(connectionWorkbenchReportPath);
-                if (!loadLockResult.IsValid && !loadLockReportRequested)
-                {
-                    throw new InvalidOperationException(
-                        loadLockResult.Failures.FirstOrDefault()
-                        ?? "Load-lock setup smoke failed.");
-                }
-            }
-            else if (SmokeSemanticSetupVerifier.IsSupportedState(connectionWorkbenchState))
-            {
-                await SmokeSemanticSetupVerifier.VerifyAsync(
-                    window,
-                    vm,
-                    connectionWorkbenchState,
-                    initialProject,
-                    workbench,
-                    (root, predicate) => FindVisualDescendant<FrameworkElement>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<Button>(root, predicate),
-                    connectionWorkbenchSavePath);
-            }
-            else if (SmokeProcessBlockProposalVerifier.IsSupportedState(connectionWorkbenchState))
-            {
-                await SmokeProcessBlockProposalVerifier.VerifyAsync(
-                    window,
-                    vm,
-                    connectionWorkbenchState,
-                    initialProject,
-                    workbench,
-                    processBlockButton,
-                    (root, predicate) => FindVisualDescendant<Border>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<Button>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<CheckBox>(root, predicate),
-                    () =>
-                    {
-                        window.Activate();
-                        SetForegroundWindow(new WindowInteropHelper(window).Handle);
-                    },
-                    MovePointerToCenter,
-                    (flags, dx, dy, data, extraInfo) => mouse_event(flags, dx, dy, data, extraInfo),
-                    () => _smokePointerHeld = true);
-            }
-            else if (SmokeProcessBlockApplicationVerifier.IsSupportedState(connectionWorkbenchState))
-            {
-                var applicationContext = await SmokeProcessBlockPreparation.PrepareAsync(
-                    window,
-                    vm,
-                    initialProject,
-                    workbench,
-                    (root, predicate) => FindVisualDescendant<Border>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<Button>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<CheckBox>(root, predicate));
-                var applicationResult = await SmokeProcessBlockApplicationVerifier.VerifyAsync(
-                    window,
-                    vm,
-                    connectionWorkbenchState,
-                    applicationContext,
-                    connectionWorkbenchSavePath,
-                    !string.IsNullOrWhiteSpace(connectionWorkbenchReportPath),
-                    MovePointerToCenter,
-                    (flags, dx, dy, data, extraInfo) => mouse_event(flags, dx, dy, data, extraInfo),
-                    () => _smokePointerHeld = true);
-                if (applicationResult.Report is not null
-                    && !string.IsNullOrWhiteSpace(connectionWorkbenchReportPath))
-                {
-                    connectionWorkbenchReport = applicationResult.Report;
-                    connectionWorkbenchReport.Save(connectionWorkbenchReportPath);
-                }
-            }
-            else if (SmokeProcessBlockEditVerifier.IsSupportedState(connectionWorkbenchState))
-            {
-                var editPreviewContext = await SmokeProcessBlockPreparation.PrepareAsync(
-                    window,
-                    vm,
-                    initialProject,
-                    workbench,
-                    (root, predicate) => FindVisualDescendant<Border>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<Button>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<CheckBox>(root, predicate));
-                var editAppliedContext = await SmokeProcessBlockPreparation.ApplyAndRecognizeAsync(
-                    window,
-                    vm,
-                    editPreviewContext);
-                var editResult = await SmokeProcessBlockEditVerifier.VerifyAsync(
-                    window,
-                    vm,
-                    connectionWorkbenchState,
-                    editAppliedContext,
-                    connectionWorkbenchSavePath,
-                    !string.IsNullOrWhiteSpace(connectionWorkbenchReportPath));
-                if (editResult.Report is not null
-                    && !string.IsNullOrWhiteSpace(connectionWorkbenchReportPath))
-                {
-                    connectionWorkbenchReport = editResult.Report;
-                    connectionWorkbenchReport.Save(connectionWorkbenchReportPath);
-                }
-            }
-            else if (SmokeProcessBlockTimeoutVerifier.IsSupportedState(connectionWorkbenchState))
-            {
-                var timeoutPreviewContext = await SmokeProcessBlockPreparation.PrepareAsync(
-                    window,
-                    vm,
-                    initialProject,
-                    workbench,
-                    (root, predicate) => FindVisualDescendant<Border>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<Button>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<CheckBox>(root, predicate));
-                var timeoutAppliedContext = await SmokeProcessBlockPreparation.ApplyAndRecognizeAsync(
-                    window,
-                    vm,
-                    timeoutPreviewContext);
-                var timeoutResult = await SmokeProcessBlockTimeoutVerifier.VerifyAsync(
-                    window,
-                    vm,
-                    connectionWorkbenchState,
-                    timeoutAppliedContext,
-                    connectionWorkbenchSavePath,
-                    !string.IsNullOrWhiteSpace(connectionWorkbenchReportPath),
-                    (root, predicate) => FindVisualDescendant<TextBox>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<Button>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<ItemsControl>(root, predicate),
-                    MovePointerToCenter,
-                    (flags, dx, dy, data, extraInfo) => mouse_event(flags, dx, dy, data, extraInfo),
-                    () => _smokePointerHeld = true);
-                if (timeoutResult.Report is not null
-                    && !string.IsNullOrWhiteSpace(connectionWorkbenchReportPath))
-                {
-                    connectionWorkbenchReport = timeoutResult.Report;
-                    connectionWorkbenchReport.Save(connectionWorkbenchReportPath);
-                }
-            }
-            else if (SmokeProcessBlockStepStatusVerifier.IsSupportedState(connectionWorkbenchState))
-            {
-                var stepStatusPreviewContext = await SmokeProcessBlockPreparation.PrepareAsync(
-                    window,
-                    vm,
-                    initialProject,
-                    workbench,
-                    (root, predicate) => FindVisualDescendant<Border>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<Button>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<CheckBox>(root, predicate));
-                var stepStatusAppliedContext = SmokeProcessBlockStepStatusVerifier.RequiresAppliedContext(
-                    connectionWorkbenchState)
-                    ? await SmokeProcessBlockPreparation.ApplyAndRecognizeAsync(
-                        window,
-                        vm,
-                        stepStatusPreviewContext)
-                    : null;
-                var stepStatusResult = await SmokeProcessBlockStepStatusVerifier.VerifyAsync(
-                    window,
-                    vm,
-                    connectionWorkbenchState,
-                    workbench,
-                    stepStatusPreviewContext,
-                    stepStatusAppliedContext,
-                    connectionWorkbenchSavePath,
-                    !string.IsNullOrWhiteSpace(connectionWorkbenchReportPath),
-                    (root, predicate) => FindVisualDescendant<Button>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<ListBox>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<RadioButton>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<TextBlock>(root, predicate),
-                    MovePointerToCenter,
-                    (flags, dx, dy, data, extraInfo) => mouse_event(flags, dx, dy, data, extraInfo),
-                    () => _smokePointerHeld = true);
-                if (stepStatusResult.Report is not null
-                    && !string.IsNullOrWhiteSpace(connectionWorkbenchReportPath))
-                {
-                    connectionWorkbenchReport = stepStatusResult.Report;
-                    connectionWorkbenchReport.Save(connectionWorkbenchReportPath);
-                }
-            }
-            else if (SmokeRecipeDryRunStateVerifier.IsSupportedState(connectionWorkbenchState))
-            {
-                await SmokeRecipeDryRunStateVerifier.ApplyAsync(
-                    window,
-                    vm,
-                    initialProject,
-                    workbench,
-                    dryRunButton,
-                    connectionWorkbenchState,
-                    connectionWorkbenchSavePath,
-                    uiInteraction);
-            }
-            else if (SmokeRecipeConnectionStateVerifier.IsSupportedState(connectionWorkbenchState))
-            {
-                await SmokeRecipeConnectionStateVerifier.ApplyAsync(
-                    window,
-                    vm,
-                    workbench,
-                    addStageButton,
-                    addRotaryStageButton,
-                    readinessButton,
-                    dryRunButton,
-                    stationSkeletonButton,
-                    processBlockButton,
-                    loadLockSetupButton,
-                    checkpointTemplateButton,
-                    connectionWorkbenchState,
-                    uiInteraction);
-            }
-            else if (SmokeProcessBlockSequenceStateVerifier.IsSupportedState(connectionWorkbenchState))
-            {
-                connectionWorkbenchReport = await SmokeProcessBlockSequenceStateVerifier.ApplyAsync(
-                    window,
-                    vm,
-                    initialProject,
-                    workbench,
-                    processBlockButton,
-                    projectPath,
-                    connectionWorkbenchState,
-                    connectionWorkbenchReportPath,
-                    connectionWorkbenchSavePath,
-                    uiInteraction,
-                    (root, predicate) => FindVisualDescendant<Border>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<CheckBox>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<ListBox>(root, predicate));
-            }
-            else if (SmokeRecipeCheckpointStateVerifier.IsSupportedState(connectionWorkbenchState))
-            {
-                await SmokeRecipeCheckpointStateVerifier.ApplyAsync(
-                    window,
-                    vm,
-                    initialProject,
-                    workbench,
-                    addStageButton,
-                    checkpointTemplateButton,
-                    connectionWorkbenchState,
-                    connectionWorkbenchSavePath,
-                    uiInteraction,
-                    (root, predicate) => FindVisualDescendant<Border>(root, predicate),
-                    (root, predicate) => FindVisualDescendant<ListBox>(root, predicate));
-            }
-            else
-            {
-                throw new ArgumentException(
-                    $"Unsupported --smoke-connection-workbench-state '{connectionWorkbenchState}'. " +
-                    "Expected a supported connection-workbench smoke state, including dry-run, dry-run-playback, or dry-run-wafer-handler-fault-playback.");
-            }
+            var connectionWorkbenchResult = await DirectExeConnectionWorkbenchWorkflow.ApplyAsync(
+                window,
+                vm,
+                initialProject,
+                smokeOptions.ProjectPath,
+                smokeOptions.ConnectionWorkbenchState,
+                smokeOptions.ConnectionWorkbenchReportPath,
+                smokeOptions.ConnectionWorkbenchSavePath,
+                uiInteraction);
+            loadLockSetupReport = connectionWorkbenchResult.LoadLockSetupReport;
+            stationSkeletonReport = connectionWorkbenchResult.StationSkeletonReport;
+            connectionWorkbenchReport = connectionWorkbenchResult.WorkflowReport;
         }
 
-        if (!string.IsNullOrWhiteSpace(leftToolTab))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.LeftToolTab))
         {
             var leftTools = FindVisualDescendant<LeftToolRegionView>(window)
                 ?? throw new InvalidOperationException("Left tool region was not available.");
             var tabs = FindVisualDescendant<TabControl>(leftTools)
                 ?? throw new InvalidOperationException("Left tool tabs were not available.");
-            var localizedLeftToolTab = leftToolTab switch
+            var localizedLeftToolTab = smokeOptions.LeftToolTab switch
             {
                 "Project" => OpenVisionLanguageService.T("Shell.Project"),
                 "Library" => OpenVisionLanguageService.T("Shell.Library"),
-                _ => leftToolTab
+                _ => smokeOptions.LeftToolTab
             };
             var tab = tabs.Items.OfType<TabItem>().FirstOrDefault(item =>
-                string.Equals(item.Header?.ToString(), leftToolTab, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(item.Header?.ToString(), smokeOptions.LeftToolTab, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(
                     item.Header?.ToString(),
                     localizedLeftToolTab,
                     StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidOperationException(
-                    $"Left tool tab '{leftToolTab}' was not available.");
+                    $"Left tool tab '{smokeOptions.LeftToolTab}' was not available.");
             tab.IsSelected = true;
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             await Task.Delay(100);
         }
 
-        if (!string.IsNullOrWhiteSpace(libraryCardState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.LibraryCardState))
         {
             var leftTools = FindVisualDescendant<LeftToolRegionView>(window)
                 ?? throw new InvalidOperationException("Left tool region was not available.");
@@ -922,41 +374,41 @@ internal static class DirectExeSmokeHost
             var firstCard = cards[0];
             firstCard.Focus();
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            MovePointerToCenter(firstCard);
+            nativeInput.MovePointerToCenter(firstCard);
             await Task.Delay(100);
             AssertSmoke(firstCard.IsMouseOver, "The layout library card did not enter hover state.");
-            if (libraryCardState.Equals("pressed", StringComparison.OrdinalIgnoreCase))
+            if (smokeOptions.LibraryCardState.Equals("pressed", StringComparison.OrdinalIgnoreCase))
             {
-                mouse_event(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
-                _smokePointerHeld = true;
+                nativeInput.PressLeftButton();
+                nativeInput.MarkPointerHeld();
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 AssertSmoke(firstCard.IsPressed, "The layout library card did not enter pointer-down state.");
             }
-            else if (!libraryCardState.Equals("hover", StringComparison.OrdinalIgnoreCase))
+            else if (!smokeOptions.LibraryCardState.Equals("hover", StringComparison.OrdinalIgnoreCase))
             {
                 throw new ArgumentException(
-                    $"Unsupported --smoke-library-card-state '{libraryCardState}'. Expected hover or pressed.");
+                    $"Unsupported --smoke-library-card-state '{smokeOptions.LibraryCardState}'. Expected hover or pressed.");
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(libraryDefaultAddKind))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.LibraryDefaultAddKind))
         {
-            if (!Enum.TryParse<LayoutComponentKind>(libraryDefaultAddKind, ignoreCase: true, out var kind) ||
+            if (!Enum.TryParse<LayoutComponentKind>(smokeOptions.LibraryDefaultAddKind, ignoreCase: true, out var kind) ||
                 !vm.TryAddLayoutComponent(kind))
             {
                 throw new ArgumentException(
-                    $"Unsupported or unavailable --smoke-library-default-add '{libraryDefaultAddKind}'.");
+                    $"Unsupported or unavailable --smoke-library-default-add '{smokeOptions.LibraryDefaultAddKind}'.");
             }
 
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         }
 
-        if (!string.IsNullOrWhiteSpace(sequenceState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.SequenceState))
         {
-            await SmokeSequenceStateVerifier.ApplyAsync(window, vm, sequenceState, uiInteraction);
+            await SmokeSequenceStateVerifier.ApplyAsync(window, vm, smokeOptions.SequenceState, uiInteraction);
         }
 
-        if (!string.IsNullOrWhiteSpace(roundTripSavePath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.RoundTripSavePath))
         {
             var stage = vm.Layout.Items.Single(item =>
                 string.Equals(item.Id, RoundTripStageId, StringComparison.Ordinal));
@@ -1004,8 +456,8 @@ internal static class DirectExeSmokeHost
                     $"Edited axis tuning was invalid: {axisEditor.ValidationMessage}");
             }
 
-            await vm.SaveProjectAsync(roundTripSavePath);
-            if (!await vm.OpenProjectAsync(roundTripSavePath))
+            await vm.SaveProjectAsync(smokeOptions.RoundTripSavePath);
+            if (!await vm.OpenProjectAsync(smokeOptions.RoundTripSavePath))
             {
                 throw new InvalidOperationException("Saved project could not be reloaded.");
             }
@@ -1013,13 +465,13 @@ internal static class DirectExeSmokeHost
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             roundTripReport = SmokeProjectRoundTripVerifier.CreateReport(
                 "SaveReload",
-                roundTripSavePath,
+                smokeOptions.RoundTripSavePath,
                 window,
                 vm);
         }
-        else if (verifyRoundTrip)
+        else if (smokeOptions.VerifyRoundTrip)
         {
-            if (string.IsNullOrWhiteSpace(projectPath))
+            if (string.IsNullOrWhiteSpace(smokeOptions.ProjectPath))
             {
                 throw new ArgumentException(
                     "--smoke-project is required with --smoke-roundtrip-verify.");
@@ -1027,14 +479,14 @@ internal static class DirectExeSmokeHost
 
             roundTripReport = SmokeProjectRoundTripVerifier.CreateReport(
                 "Reopen",
-                projectPath,
+                smokeOptions.ProjectPath,
                 window,
                 vm);
         }
 
         if (roundTripReport is not null)
         {
-            roundTripReport.Save(roundTripReportPath!);
+            roundTripReport.Save(smokeOptions.RoundTripReportPath!);
             Console.WriteLine(
                 $"Project round trip {roundTripReport.Phase} " +
                 $"{(roundTripReport.IsValid ? "passed" : "failed")}.");
@@ -1044,9 +496,9 @@ internal static class DirectExeSmokeHost
             }
         }
 
-        if (!string.IsNullOrEmpty(selectPath))
+        if (!string.IsNullOrEmpty(smokeOptions.SelectPath))
         {
-            var selected = SelectNode(vm.ProjectTree, selectPath);
+            var selected = SelectNode(vm.ProjectTree, smokeOptions.SelectPath);
             if (selected is not null)
             {
                 selected.IsSelected = true;
@@ -1054,15 +506,15 @@ internal static class DirectExeSmokeHost
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         }
 
-        if (!string.IsNullOrWhiteSpace(layoutSelectId))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.LayoutSelectId))
         {
-            vm.Layout.Select(layoutSelectId);
+            vm.Layout.Select(smokeOptions.LayoutSelectId);
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         }
 
-        if (!string.IsNullOrWhiteSpace(layoutSelectMany))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.LayoutSelectMany))
         {
-            var selectionIds = layoutSelectMany.Split(
+            var selectionIds = smokeOptions.LayoutSelectMany.Split(
                 ',',
                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             if (selectionIds.Length < 2)
@@ -1074,142 +526,142 @@ internal static class DirectExeSmokeHost
             SelectLayoutItemsThroughScene(window, vm, selectionIds);
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
-            if (!string.IsNullOrWhiteSpace(layoutAlignmentReportPath))
+            if (!string.IsNullOrWhiteSpace(smokeOptions.LayoutAlignmentReportPath))
             {
                 layoutAlignmentReport = SmokeLayoutAlignmentVerifier.Verify(
                     vm.Layout,
                     selectionIds,
-                    layoutAlignment ?? nameof(LayoutSelectionAlignment.HorizontalCenter));
-                layoutAlignmentReport.Save(layoutAlignmentReportPath);
+                    smokeOptions.LayoutAlignment ?? nameof(LayoutSelectionAlignment.HorizontalCenter));
+                layoutAlignmentReport.Save(smokeOptions.LayoutAlignmentReportPath);
             }
-            else if (!string.IsNullOrWhiteSpace(layoutAlignment))
+            else if (!string.IsNullOrWhiteSpace(smokeOptions.LayoutAlignment))
             {
-                if (!Enum.TryParse(layoutAlignment, out LayoutSelectionAlignment alignment))
+                if (!Enum.TryParse(smokeOptions.LayoutAlignment, out LayoutSelectionAlignment alignment))
                 {
                     throw new ArgumentException(
-                        $"Unsupported --smoke-layout-align '{layoutAlignment}'.");
+                        $"Unsupported --smoke-layout-align '{smokeOptions.LayoutAlignment}'.");
                 }
                 vm.Layout.AlignSelection(alignment);
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(axisTuningState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.AxisTuningState))
         {
-            await SmokeAxisTuningStateVerifier.ApplyAsync(window, vm, axisTuningState, uiInteraction);
+            await SmokeAxisTuningStateVerifier.ApplyAsync(window, vm, smokeOptions.AxisTuningState, uiInteraction);
         }
 
-        if (!string.IsNullOrWhiteSpace(layoutPropertyState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.LayoutPropertyState))
         {
-            if (string.IsNullOrWhiteSpace(layoutSelectId) && string.IsNullOrWhiteSpace(layoutSelectMany))
+            if (string.IsNullOrWhiteSpace(smokeOptions.LayoutSelectId) && string.IsNullOrWhiteSpace(smokeOptions.LayoutSelectMany))
             {
                 throw new ArgumentException(
                     "--smoke-layout-property-state requires a layout selection.");
             }
 
-            await SmokeLayoutPropertyStateVerifier.ApplyAsync(window, vm, layoutPropertyState, uiInteraction);
+            await SmokeLayoutPropertyStateVerifier.ApplyAsync(window, vm, smokeOptions.LayoutPropertyState, uiInteraction);
         }
 
-        if (!string.IsNullOrWhiteSpace(layoutHistoryReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.LayoutHistoryReportPath))
         {
-            layoutHistoryReport = await SmokeLayoutHistoryVerifier.VerifyAsync(vm, layoutHistoryReportPath);
-            layoutHistoryReport.Save(layoutHistoryReportPath);
+            layoutHistoryReport = await SmokeLayoutHistoryVerifier.VerifyAsync(vm, smokeOptions.LayoutHistoryReportPath);
+            layoutHistoryReport.Save(smokeOptions.LayoutHistoryReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(directSceneReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.DirectSceneReportPath))
         {
             directSceneReport = await SmokeDirectSceneAuthoringVerifier.VerifyAsync(
                 window,
                 vm,
-                directSceneReportPath,
+                smokeOptions.DirectSceneReportPath,
                 root => FindVisualDescendant<MachineSceneViewport>(root));
-            directSceneReport.Save(directSceneReportPath);
+            directSceneReport.Save(smokeOptions.DirectSceneReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(canvasNavigationReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.CanvasNavigationReportPath))
         {
             canvasNavigationReport = await SmokeCanvasNavigationVerifier.VerifyAsync(
                 window,
                 vm,
                 root => FindVisualDescendant<MachineSceneViewport>(root),
                 root => FindVisualDescendant<SceneDocumentView>(root));
-            canvasNavigationReport.Save(canvasNavigationReportPath);
+            canvasNavigationReport.Save(smokeOptions.CanvasNavigationReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(directTransformReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.DirectTransformReportPath))
         {
             directTransformReport = await SmokeDirectTransformVerifier.VerifyAsync(
                 window,
                 vm,
-                directTransformReportPath,
+                smokeOptions.DirectTransformReportPath,
                 root => FindVisualDescendant<MachineSceneViewport>(root),
                 root => FindVisualDescendant<RightToolRegionView>(root));
-            directTransformReport.Save(directTransformReportPath);
+            directTransformReport.Save(smokeOptions.DirectTransformReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(multiTransformReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.MultiTransformReportPath))
         {
             multiTransformReport = await SmokeMultiSelectionTransformVerifier.VerifyAsync(
                 window,
                 vm,
-                multiTransformReportPath,
+                smokeOptions.MultiTransformReportPath,
                 root => FindVisualDescendant<MachineSceneViewport>(root));
-            multiTransformReport.Save(multiTransformReportPath);
+            multiTransformReport.Save(smokeOptions.MultiTransformReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(libraryDropReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.LibraryDropReportPath))
         {
             libraryDropReport = await SmokeLibraryDropVerifier.VerifyAsync(
                 window,
                 vm,
-                libraryDropReportPath,
+                smokeOptions.LibraryDropReportPath,
                 root => FindVisualDescendant<MachineSceneViewport>(root));
-            libraryDropReport.Save(libraryDropReportPath);
+            libraryDropReport.Save(smokeOptions.LibraryDropReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(layerOrderReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.LayerOrderReportPath))
         {
             layerOrderReport = await SmokeLayerOrderVerifier.VerifyAsync(
                 window,
                 vm,
-                layerOrderReportPath,
+                smokeOptions.LayerOrderReportPath,
                 root => FindVisualDescendant<MachineSceneViewport>(root),
                 root => FindVisualDescendant<RightToolRegionView>(root),
                 (root, predicate) => FindVisualDescendant<Button>(root, predicate),
                 (root, predicate) => FindVisualDescendant<Border>(root, predicate));
-            layerOrderReport.Save(layerOrderReportPath);
+            layerOrderReport.Save(smokeOptions.LayerOrderReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(editMenuState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.EditMenuState))
         {
             var editMenuPopup = await SmokeEditMenuStateVerifier.ApplyAsync(
                 window,
                 vm,
-                editMenuState,
+                smokeOptions.EditMenuState,
                 uiInteraction);
             if (editMenuPopup is not null)
             {
-                _smokePopupContent = editMenuPopup;
+                windowCapture.SetPopupContent(editMenuPopup);
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(directSceneGestureState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.DirectSceneGestureState))
         {
-            await ApplyDirectSceneGestureStateAsync(window, directSceneGestureState);
+            await ApplyDirectSceneGestureStateAsync(window, smokeOptions.DirectSceneGestureState, nativeInput);
         }
 
-        if (!string.IsNullOrWhiteSpace(layoutClickId))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.LayoutClickId))
         {
             var viewport = FindVisualDescendant<MachineSceneViewport>(window)
                 ?? throw new InvalidOperationException("Machine scene viewport was not available.");
-            var point = viewport.GetItemCenter(layoutClickId)
+            var point = viewport.GetItemCenter(smokeOptions.LayoutClickId)
                 ?? throw new InvalidOperationException(
-                    $"Layout item '{layoutClickId}' was not visible in the machine scene.");
+                    $"Layout item '{smokeOptions.LayoutClickId}' was not visible in the machine scene.");
             if (!viewport.SelectItemAt(point)
                 || vm.Layout.SelectedItem is not { } selectedLayoutItem
-                || !string.Equals(selectedLayoutItem.Id, layoutClickId, StringComparison.Ordinal))
+                || !string.Equals(selectedLayoutItem.Id, smokeOptions.LayoutClickId, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
-                    $"Scene hit test did not select layout item '{layoutClickId}'.");
+                    $"Scene hit test did not select layout item '{smokeOptions.LayoutClickId}'.");
             }
 
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
@@ -1217,7 +669,7 @@ internal static class DirectExeSmokeHost
         }
 
         var globalCommandSmokeHandled = false;
-        if (startSimulation)
+        if (smokeOptions.StartSimulation)
         {
             vm.IsRunMode = true;
             for (var attempt = 0; attempt < 20 && !vm.RunCommand.CanExecute(null); attempt++)
@@ -1230,7 +682,7 @@ internal static class DirectExeSmokeHost
                 throw new InvalidOperationException("Simulation ON was unavailable during the smoke run.");
             }
 
-            if (string.Equals(globalCommandState, "abort", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(smokeOptions.GlobalCommandState, "abort", StringComparison.OrdinalIgnoreCase))
             {
                 vm.StepCommand.Execute(null);
                 for (var attempt = 0;
@@ -1249,7 +701,7 @@ internal static class DirectExeSmokeHost
                 await SmokeGlobalCommandStateVerifier.ApplyAsync(window, vm, "abort", uiInteraction);
                 globalCommandSmokeHandled = true;
             }
-            else if (string.Equals(globalCommandState, "retry", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(smokeOptions.GlobalCommandState, "retry", StringComparison.OrdinalIgnoreCase))
             {
                 vm.StepCommand.Execute(null);
                 var faultedState = OpenVisionLanguageService.T("Equipment.State.Faulted");
@@ -1279,263 +731,36 @@ internal static class DirectExeSmokeHost
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(pickPlaceState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.PickPlaceState))
         {
-            if (!startSimulation)
+            if (!smokeOptions.StartSimulation)
             {
                 throw new ArgumentException(
                     "--smoke-pick-place-state requires --smoke-start-simulation.");
             }
 
-            await SmokePickAndPlaceStateVerifier.ApplyAsync(window, vm, pickPlaceState);
+            await SmokePickAndPlaceStateVerifier.ApplyAsync(window, vm, smokeOptions.PickPlaceState);
         }
 
-        if (testConditionScenario)
+        if (smokeOptions.TestConditionScenario)
         {
-            if (!startSimulation)
-            {
-                throw new ArgumentException(
-                    "--smoke-test-condition-scenario requires --smoke-start-simulation.");
-            }
-
-            vm.SimulationWorkspace.IsScheduledFaultEnabled = false;
-            for (var attempt = 0; attempt < 20 && !vm.StartTestScenarioCommand.CanExecute(null); attempt++)
-            {
-                await Task.Delay(50);
-            }
-
-            if (!vm.StartTestScenarioCommand.CanExecute(null))
-            {
-                throw new InvalidOperationException("Test Scenario start was unavailable during the smoke run.");
-            }
-
-            vm.StartTestScenarioCommand.Execute(null);
-            for (var attempt = 0; attempt < 20 && !vm.ConditionScenario.IsActive; attempt++)
-            {
-                await Task.Delay(50);
-            }
-
-            if (!vm.ConditionScenario.IsActive)
-            {
-                throw new InvalidOperationException("Test Scenario did not become active in the runtime snapshot.");
-            }
-
-            vm.PauseCommand.Execute(null);
-            for (var attempt = 0; attempt < 20 && vm.IsRunning; attempt++)
-            {
-                await Task.Delay(50);
-            }
-
-            var pausedScenarioTick = vm.ConditionScenario.ExecutedTicks;
-            vm.StepCommand.Execute(null);
-            for (var attempt = 0; attempt < 20 && vm.ConditionScenario.ExecutedTicks <= pausedScenarioTick; attempt++)
-            {
-                await Task.Delay(50);
-            }
-
-            if (vm.ConditionScenario.ExecutedTicks != pausedScenarioTick + 1)
-            {
-                throw new InvalidOperationException(
-                    $"Test Scenario Step advanced {vm.ConditionScenario.ExecutedTicks - pausedScenarioTick} ticks; expected exactly one.");
-            }
-
-            vm.ReplayTestScenarioCommand.Execute(null);
-            for (var attempt = 0; attempt < 20 && vm.ConditionScenario.ExecutedTicks != 0; attempt++)
-            {
-                await Task.Delay(50);
-            }
-
-            if (!vm.ConditionScenario.IsActive || vm.ConditionScenario.ExecutedTicks != 0)
-            {
-                throw new InvalidOperationException("Test Scenario Replay did not restore the initial active state.");
-            }
-
-            vm.ResetCommand.Execute(null);
-            for (var attempt = 0; attempt < 20 && vm.ConditionScenario.IsConfigured; attempt++)
-            {
-                await Task.Delay(50);
-            }
-
-            if (!vm.ConditionScenario.IsConfigured
-                || vm.ConditionScenario.IsActive
-                || vm.ConditionScenario.ExecutedTicks != 0)
-            {
-                throw new InvalidOperationException(
-                    "Test Scenario Reset did not restore the declared initial state.");
-            }
-
-            Console.WriteLine("Test Scenario smoke passed: start, pause, one-step, replay, reset.");
-            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            await SmokeTestScenarioRuntimeVerifier.VerifyConditionScenarioAsync(
+                window,
+                vm,
+                smokeOptions.StartSimulation);
         }
 
-        if (testAxisFaultScenario)
+        if (smokeOptions.TestAxisFaultScenario)
         {
-            if (!startSimulation)
-            {
-                throw new ArgumentException(
-                    "--smoke-test-axis-fault-scenario requires --smoke-start-simulation.");
-            }
-            if (vm.ConditionScenario.IsConfigured)
-            {
-                throw new InvalidOperationException(
-                    "Persisted Test Scenario settings started without an explicit action.");
-            }
-
-            vm.SimulationWorkspace.ScenarioTargetId = "x";
-            vm.SimulationWorkspace.ScenarioDurationCycles = 2_000;
-            vm.SimulationWorkspace.IsScheduledFaultEnabled = true;
-            vm.SimulationWorkspace.ScheduledFaultKind = SimulationFaultKind.AxisMotionBlocked;
-            vm.SimulationWorkspace.ScheduledFaultTargetId = "x";
-            vm.SimulationWorkspace.ScheduledFaultInjectTick = 50;
-            vm.SimulationWorkspace.ScheduledFaultHoldTicks = 3;
-            vm.SimulationWorkspace.RestartSequenceAfterFault = true;
-            var recoverySequenceId = vm.RecoverySequences.FirstOrDefault()?.Id
-                ?? throw new InvalidOperationException(
-                    "Axis fault Test Scenario requires an authored recovery sequence.");
-            vm.SimulationWorkspace.RecoverySequenceId = recoverySequenceId;
-            for (var attempt = 0; attempt < 40 && !vm.StartTestScenarioCommand.CanExecute(null); attempt++)
-            {
-                await Task.Delay(50);
-            }
-            if (!vm.StartTestScenarioCommand.CanExecute(null))
-            {
-                throw new InvalidOperationException("Axis fault Test Scenario start was unavailable.");
-            }
-
-            vm.StartTestScenarioCommand.Execute(null);
-            for (var attempt = 0; attempt < 40 && !vm.ConditionScenario.IsActive; attempt++)
-            {
-                await Task.Delay(25);
-            }
-            for (var attempt = 0;
-                 attempt < 40
-                 && !vm.IsRunning;
-                 attempt++)
-            {
-                await Task.Delay(25);
-            }
-            if (!vm.PauseCommand.CanExecute(null))
-            {
-                throw new InvalidOperationException("Axis fault Test Scenario did not enter RealTime mode.");
-            }
-            vm.PauseCommand.Execute(null);
-            for (var attempt = 0;
-                 attempt < 40
-                 && vm.IsRunning;
-                 attempt++)
-            {
-                await Task.Delay(25);
-            }
-            if (!vm.ConditionScenario.IsActive
-                || vm.ConditionScenario.ExecutedTicks > 50
-                || vm.IsRunning)
-            {
-                throw new InvalidOperationException(
-                    "Axis fault Test Scenario could not be paused before its injection tick.");
-            }
-
-            while (vm.ConditionScenario.ExecutedTicks <= 50)
-            {
-                var before = vm.ConditionScenario.ExecutedTicks;
-                vm.StepCommand.Execute(null);
-                for (var attempt = 0;
-                     attempt < 20 && vm.ConditionScenario.ExecutedTicks == before;
-                     attempt++)
-                {
-                    await Task.Delay(10);
-                }
-                if (vm.ConditionScenario.ExecutedTicks != before + 1)
-                {
-                    throw new InvalidOperationException("Axis fault scenario Step was not exactly one Tick.");
-                }
-            }
-
-            var faultSnapshot = vm.SceneSnapshots.Latest ?? throw new InvalidOperationException(
-                "Axis fault scenario did not publish a snapshot.");
-            AssertSmoke(
-                faultSnapshot.Faults.Any(fault =>
-                    fault.Kind == SimulationFaultKind.AxisMotionBlocked && fault.TargetId == "x"),
-                "Scheduled AxisMotionBlocked fault was not present in the immutable snapshot.");
-            long pausedFaultTick = vm.ConditionScenario.ExecutedTicks;
-            await Task.Delay(50);
-            AssertSmoke(
-                vm.ConditionScenario.ExecutedTicks == pausedFaultTick,
-                "Axis fault schedule advanced while paused.");
-
-            while (vm.ConditionScenario.ExecutedTicks <= 53)
-            {
-                var before = vm.ConditionScenario.ExecutedTicks;
-                vm.StepCommand.Execute(null);
-                for (var attempt = 0;
-                     attempt < 20 && vm.ConditionScenario.ExecutedTicks == before;
-                     attempt++)
-                {
-                    await Task.Delay(10);
-                }
-            }
-            AssertSmoke(
-                (vm.SceneSnapshots.Latest?.Faults.Count ?? 0) == 0,
-                "Scheduled axis fault did not clear after the authored hold ticks.");
-
-            vm.StopTestScenarioCommand.Execute(null);
-            for (var attempt = 0;
-                 attempt < 40 && (vm.ConditionScenario.IsActive || vm.IsRunning);
-                 attempt++)
-            {
-                await Task.Delay(25);
-            }
-            AssertSmoke(
-                !vm.ConditionScenario.IsActive && !vm.IsRunning,
-                "Stopping an axis fault Test Scenario did not stop its owned run.");
-
-            vm.ReplayTestScenarioCommand.Execute(null);
-            for (var attempt = 0;
-                 attempt < 40 && (!vm.ConditionScenario.IsActive || !vm.IsRunning);
-                 attempt++)
-            {
-                await Task.Delay(25);
-            }
-            AssertSmoke(
-                vm.ConditionScenario.IsActive && vm.IsRunning,
-                "Axis fault Test Scenario replay did not restore the active initial run.");
-
-            vm.ResetCommand.Execute(null);
-            for (var attempt = 0; attempt < 40 && vm.ConditionScenario.IsActive; attempt++)
-            {
-                await Task.Delay(25);
-            }
-            AssertSmoke(
-                vm.ConditionScenario.IsConfigured
-                && !vm.ConditionScenario.IsActive
-                && vm.ConditionScenario.ExecutedTicks == 0
-                && (vm.SceneSnapshots.Latest?.Faults.Count ?? 0) == 0,
-                "Reset did not restore the authored initial scenario and fault state.");
-            if (!string.IsNullOrWhiteSpace(axisFaultPersistencePath))
-            {
-                Directory.CreateDirectory(
-                    Path.GetDirectoryName(Path.GetFullPath(axisFaultPersistencePath))!);
-                await vm.SaveProjectAsync(axisFaultPersistencePath);
-                AssertSmoke(
-                    await vm.OpenProjectAsync(axisFaultPersistencePath),
-                    "Saved axis fault Test Scenario project could not be reopened.");
-                AssertSmoke(
-                    vm.SimulationWorkspace.IsScheduledFaultEnabled
-                    && vm.SimulationWorkspace.ScheduledFaultKind == SimulationFaultKind.AxisMotionBlocked
-                    && vm.SimulationWorkspace.ScheduledFaultTargetId == "x"
-                    && vm.SimulationWorkspace.ScheduledFaultInjectTick == 50
-                    && vm.SimulationWorkspace.ScheduledFaultHoldTicks == 3
-                    && vm.SimulationWorkspace.RestartSequenceAfterFault
-                    && vm.SimulationWorkspace.RecoverySequenceId == recoverySequenceId
-                    && !vm.ConditionScenario.IsConfigured,
-                    "Axis fault settings did not round-trip without auto-running.");
-            }
-            Console.WriteLine(
-                "Axis fault Test Scenario smoke passed: explicit start, pause, exact Step, clear, recovery, reset, persistence.");
+            await SmokeTestScenarioRuntimeVerifier.VerifyAxisFaultScenarioAsync(
+                vm,
+                smokeOptions.StartSimulation,
+                smokeOptions.AxisFaultPersistencePath);
         }
 
-        if (showTestScenarioSettings)
+        if (smokeOptions.ShowTestScenarioSettings)
         {
-            if (!useRunLayout)
+            if (!smokeOptions.UseRunLayout)
             {
                 throw new ArgumentException(
                     "--smoke-test-scenario-settings requires --smoke-run-layout.");
@@ -1558,7 +783,7 @@ internal static class DirectExeSmokeHost
                 OpenVisionLab.MachineStudio.View.Inspector.RightToolRegionView>(window)
                 ?? throw new InvalidOperationException("Run inspector was unavailable.");
 
-            var settingsState = testScenarioSettingsState ?? "normal";
+            var settingsState = smokeOptions.TestScenarioSettingsState ?? "normal";
             vm.SimulationWorkspace.RequireAutomaticCycleCompleted = true;
             vm.SimulationWorkspace.MinimumCompletedCycles = 1;
             vm.SimulationWorkspace.RequireNoActiveFaults = true;
@@ -1574,13 +799,13 @@ internal static class DirectExeSmokeHost
             vm.SimulationWorkspace.IsScheduledFaultEnabled = !settingsState.Equals(
                 "disabled",
                 StringComparison.OrdinalIgnoreCase);
-            vm.SimulationWorkspace.ScheduledFaultKind = testScenarioFaultKind?.ToLowerInvariant() switch
+            vm.SimulationWorkspace.ScheduledFaultKind = smokeOptions.TestScenarioFaultKind?.ToLowerInvariant() switch
             {
                 "input" => SimulationFaultKind.StuckDigitalInput,
                 "cylinder" => SimulationFaultKind.CylinderTravelBlocked,
                 null or "axis" => SimulationFaultKind.AxisMotionBlocked,
                 _ => throw new ArgumentException(
-                    $"Unsupported --smoke-test-scenario-fault-kind '{testScenarioFaultKind}'. " +
+                    $"Unsupported --smoke-test-scenario-fault-kind '{smokeOptions.TestScenarioFaultKind}'. " +
                     "Expected input, cylinder, or axis.")
             };
             vm.SimulationWorkspace.ScenarioDurationCycles = Math.Max(
@@ -1635,15 +860,15 @@ internal static class DirectExeSmokeHost
                     rightInspector.FinalEquipmentExpectedStateTextBox.Focus();
                     break;
                 case "hover":
-                    MovePointerToCenter(rightInspector.FinalEquipmentStateAssertionCheckBox);
+                    nativeInput.MovePointerToCenter(rightInspector.FinalEquipmentStateAssertionCheckBox);
                     break;
                 case "pressed":
                     window.Activate();
                     rightInspector.FinalEquipmentStateAssertionCheckBox.Focus();
                     await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                    MovePointerToCenter(rightInspector.FinalEquipmentStateAssertionCheckBox);
-                    mouse_event(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
-                    _smokePointerHeld = true;
+                    nativeInput.MovePointerToCenter(rightInspector.FinalEquipmentStateAssertionCheckBox);
+                    nativeInput.PressLeftButton();
+                    nativeInput.MarkPointerHeld();
                     break;
                 case "disabled":
                     if (rightInspector.ScheduledFaultTargetComboBox.IsEnabled
@@ -1676,7 +901,7 @@ internal static class DirectExeSmokeHost
                         throw new InvalidOperationException("Assertion equipment popup did not open.");
                     }
                     var windowRoot = PresentationSource.FromVisual(window)?.RootVisual;
-                    _smokePopupContent = PresentationSource.CurrentSources
+                    windowCapture.SetPopupContent(PresentationSource.CurrentSources
                         .Cast<PresentationSource>()
                         .Select(source => source.RootVisual)
                         .OfType<FrameworkElement>()
@@ -1684,8 +909,8 @@ internal static class DirectExeSmokeHost
                             !ReferenceEquals(root, windowRoot)
                             && root.IsVisible
                             && root.ActualWidth > 0
-                            && root.ActualHeight > 0)
-                        ?? throw new InvalidOperationException("Assertion equipment popup content was unavailable.");
+                        && root.ActualHeight > 0)
+                        ?? throw new InvalidOperationException("Assertion equipment popup content was unavailable."));
                     break;
                 default:
                     throw new ArgumentException(
@@ -1697,9 +922,9 @@ internal static class DirectExeSmokeHost
             Console.WriteLine($"Test Scenario settings smoke passed: {settingsState}.");
         }
 
-        if (testScenarioBatch)
+        if (smokeOptions.TestScenarioBatch)
         {
-            if (!useRunLayout)
+            if (!smokeOptions.UseRunLayout)
             {
                 throw new ArgumentException(
                     "--smoke-test-scenario-batch requires --smoke-run-layout.");
@@ -1708,11 +933,11 @@ internal static class DirectExeSmokeHost
             await SmokeScenarioBatchVerifier.VerifyAsync(
                 window,
                 vm,
-                projectPath,
-                scenarioEvidenceExchangePath,
-                scenarioEvidenceExchangeState,
-                unifiedCommissioningEvidencePath,
-                unifiedCommissioningEvidenceState,
+                smokeOptions.ProjectPath,
+                smokeOptions.ScenarioEvidenceExchangePath,
+                smokeOptions.ScenarioEvidenceExchangeState,
+                smokeOptions.UnifiedCommissioningEvidencePath,
+                smokeOptions.UnifiedCommissioningEvidenceState,
                 uiInteraction);
 
             var repeatValidationAnchor = FindVisualDescendant<TextBlock>(
@@ -1740,31 +965,31 @@ internal static class DirectExeSmokeHost
             await Task.Delay(100);
         }
 
-        if (saveBatchPersistence)
+        if (smokeOptions.SaveBatchPersistence)
         {
-            if (!useRunLayout || string.IsNullOrWhiteSpace(projectPath))
+            if (!smokeOptions.UseRunLayout || string.IsNullOrWhiteSpace(smokeOptions.ProjectPath))
             {
                 throw new ArgumentException(
                     "--smoke-batch-persistence-save requires --smoke-run-layout and --smoke-project.");
             }
 
-            await SmokeBatchPersistenceVerifier.VerifySaveAndReloadAsync(vm, projectPath);
+            await SmokeBatchPersistenceVerifier.VerifySaveAndReloadAsync(vm, smokeOptions.ProjectPath);
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         }
 
-        if (verifyBatchPersistence && !vm.HasRestoredBatchArtifacts)
+        if (smokeOptions.VerifyBatchPersistence && !vm.HasRestoredBatchArtifacts)
         {
             throw new InvalidOperationException(
                 "Saved batch evidence did not restore in a new application process.");
         }
 
-        if (verifyStaleBatchPersistence && !vm.RejectedStaleBatchArtifacts)
+        if (smokeOptions.VerifyStaleBatchPersistence && !vm.RejectedStaleBatchArtifacts)
         {
             throw new InvalidOperationException(
                 "Changed project or scenario evidence was not rejected as stale.");
         }
 
-        if (saveBatchPersistence || verifyBatchPersistence || verifyStaleBatchPersistence)
+        if (smokeOptions.SaveBatchPersistence || smokeOptions.VerifyBatchPersistence || smokeOptions.VerifyStaleBatchPersistence)
         {
             vm.IsRunMode = true;
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
@@ -1791,14 +1016,14 @@ internal static class DirectExeSmokeHost
             await Task.Delay(100);
         }
 
-        if (!string.IsNullOrWhiteSpace(cylinderFaultTargetId))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.CylinderFaultTargetId))
         {
             vm.FaultManager.SelectedKind = vm.FaultManager.AvailableKinds.Single(option =>
                 option.Kind == SimulationFaultKind.CylinderTravelBlocked);
             vm.FaultManager.SelectedTarget = vm.FaultManager.Targets.FirstOrDefault(target =>
-                string.Equals(target.Id, cylinderFaultTargetId, StringComparison.Ordinal))
+                string.Equals(target.Id, smokeOptions.CylinderFaultTargetId, StringComparison.Ordinal))
                 ?? throw new InvalidOperationException(
-                    $"Cylinder fault target '{cylinderFaultTargetId}' was not available.");
+                    $"Cylinder fault target '{smokeOptions.CylinderFaultTargetId}' was not available.");
             if (!vm.FaultManager.InjectCommand.CanExecute(null))
             {
                 throw new InvalidOperationException("Cylinder fault injection was unavailable.");
@@ -1808,7 +1033,7 @@ internal static class DirectExeSmokeHost
             for (var attempt = 0;
                  attempt < 20 && !vm.FaultManager.ActiveFaults.Any(fault =>
                      fault.Kind == SimulationFaultKind.CylinderTravelBlocked
-                     && string.Equals(fault.TargetId, cylinderFaultTargetId, StringComparison.Ordinal));
+                     && string.Equals(fault.TargetId, smokeOptions.CylinderFaultTargetId, StringComparison.Ordinal));
                  attempt++)
             {
                 await Task.Delay(50);
@@ -1816,7 +1041,7 @@ internal static class DirectExeSmokeHost
 
             if (!vm.FaultManager.ActiveFaults.Any(fault =>
                     fault.Kind == SimulationFaultKind.CylinderTravelBlocked
-                    && string.Equals(fault.TargetId, cylinderFaultTargetId, StringComparison.Ordinal)))
+                    && string.Equals(fault.TargetId, smokeOptions.CylinderFaultTargetId, StringComparison.Ordinal)))
             {
                 throw new InvalidOperationException("Cylinder fault was not published in a runtime snapshot.");
             }
@@ -1824,7 +1049,7 @@ internal static class DirectExeSmokeHost
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         }
 
-        if (!string.IsNullOrWhiteSpace(runtimeDebuggerReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.RuntimeDebuggerReportPath))
         {
             runtimeDebuggerReport = await SmokeRuntimeDebuggerVerifier.VerifyAsync(
                 window,
@@ -1833,198 +1058,198 @@ internal static class DirectExeSmokeHost
                 targetWindow =>
                 {
                     targetWindow.Activate();
-                    SetForegroundWindow(new WindowInteropHelper(targetWindow).Handle);
+                    nativeInput.ActivateWindow(targetWindow);
                 },
-                MovePointerToCenter,
+                nativeInput.MovePointerToCenter,
                 () =>
                 {
-                    mouse_event(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
-                    _smokePointerHeld = true;
+                    nativeInput.PressLeftButton();
+                    nativeInput.MarkPointerHeld();
                 },
-                ReleaseSmokePointer,
-                runtimeDebuggerState);
-            runtimeDebuggerReport.Save(runtimeDebuggerReportPath);
+                nativeInput.ReleasePointer,
+                smokeOptions.RuntimeDebuggerState);
+            runtimeDebuggerReport.Save(smokeOptions.RuntimeDebuggerReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(faultManagerReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.FaultManagerReportPath))
         {
             faultManagerReport = await SmokeFaultManagerVerifier.VerifyAsync(
                 window,
                 vm,
                 root => FindVisualDescendant<RightToolRegionView>(root),
                 activeSection => SmokeFaultManagerVerifier.ScrollIntoViewAsync(window, activeSection));
-            faultManagerReport.Save(faultManagerReportPath);
+            faultManagerReport.Save(smokeOptions.FaultManagerReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(faultManagerState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.FaultManagerState))
         {
             await SmokeFaultManagerVerifier.ApplyStateAsync(
                 window,
                 vm,
-                faultManagerState,
+                smokeOptions.FaultManagerState,
                 uiInteraction);
         }
 
-        if (!string.IsNullOrWhiteSpace(digitalIoCommissioningReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.DigitalIoCommissioningReportPath))
         {
             digitalIoCommissioningReport = await SmokeDigitalIoCommissioningVerifier.VerifyAsync(
                 window,
                 vm,
-                projectPath,
+                smokeOptions.ProjectPath,
                 () => SmokeDigitalIoCommissioningVerifier.ScrollIntoViewAsync(window));
-            digitalIoCommissioningReport.Save(digitalIoCommissioningReportPath);
+            digitalIoCommissioningReport.Save(smokeOptions.DigitalIoCommissioningReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(digitalIoCommissioningState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.DigitalIoCommissioningState))
         {
             await SmokeDigitalIoCommissioningVerifier.ApplyStateAsync(
                 window,
                 vm,
-                digitalIoCommissioningState,
+                smokeOptions.DigitalIoCommissioningState,
                 uiInteraction);
         }
 
-        if (!string.IsNullOrWhiteSpace(cameraCommissioningReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.CameraCommissioningReportPath))
         {
             cameraCommissioningReport = await SmokeCameraCommissioningVerifier.VerifyAsync(
                 window,
                 vm,
-                projectPath,
-                editCameraImageSource,
+                smokeOptions.ProjectPath,
+                smokeOptions.EditCameraImageSource,
                 () => SmokeCameraCommissioningVerifier.ScrollIntoViewAsync(window));
-            cameraCommissioningReport.Save(cameraCommissioningReportPath);
+            cameraCommissioningReport.Save(smokeOptions.CameraCommissioningReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(cameraCommissioningState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.CameraCommissioningState))
         {
             await SmokeCameraCommissioningVerifier.ApplyStateAsync(
                 window,
                 vm,
-                cameraCommissioningState,
+                smokeOptions.CameraCommissioningState,
                 uiInteraction);
         }
 
-        if (!string.IsNullOrWhiteSpace(integrationPanelState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.IntegrationPanelState))
         {
             integrationPanelReport = await SmokeIntegrationResultVerifier.VerifyAsync(
                 window,
                 vm,
-                integrationPanelState,
-                integrationExchangeRoot,
+                smokeOptions.IntegrationPanelState,
+                smokeOptions.IntegrationExchangeRoot,
                 root => FindVisualDescendant<RightToolRegionView>(root));
-            if (!string.IsNullOrWhiteSpace(integrationPanelReportPath))
+            if (!string.IsNullOrWhiteSpace(smokeOptions.IntegrationPanelReportPath))
             {
-                integrationPanelReport.Save(integrationPanelReportPath);
+                integrationPanelReport.Save(smokeOptions.IntegrationPanelReportPath);
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(axisCommissioningReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.AxisCommissioningReportPath))
         {
             axisCommissioningReport = await SmokeAxisCommissioningVerifier.VerifyAsync(
                 window,
                 vm,
                 root => FindVisualDescendant<RightToolRegionView>(root),
                 () => SmokeAxisCommissioningVerifier.ScrollIntoViewAsync(window));
-            axisCommissioningReport.Save(axisCommissioningReportPath);
+            axisCommissioningReport.Save(smokeOptions.AxisCommissioningReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(axisCommissioningState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.AxisCommissioningState))
         {
             await SmokeAxisCommissioningVerifier.ApplyStateAsync(
                 window,
                 vm,
-                axisCommissioningState,
+                smokeOptions.AxisCommissioningState,
                 uiInteraction);
         }
 
-        if (!string.IsNullOrWhiteSpace(multiAxisRecipeReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.MultiAxisRecipeReportPath))
         {
             multiAxisRecipeReport = await SmokeMultiAxisCommissioningVerifier.VerifyAsync(
                 window,
                 vm,
-                multiAxisRecipeSavePath,
+                smokeOptions.MultiAxisRecipeSavePath,
                 root => FindVisualDescendant<MachineSceneViewport>(root));
-            multiAxisRecipeReport.Save(multiAxisRecipeReportPath);
+            multiAxisRecipeReport.Save(smokeOptions.MultiAxisRecipeReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(multiAxisRecipeState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.MultiAxisRecipeState))
         {
             await SmokeMultiAxisCommissioningVerifier.ApplyStateAsync(
                 window,
                 vm,
-                multiAxisRecipeState,
+                smokeOptions.MultiAxisRecipeState,
                 uiInteraction);
         }
 
-        if (!string.IsNullOrWhiteSpace(cylinderCommissioningReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.CylinderCommissioningReportPath))
         {
             cylinderCommissioningReport = await SmokeCylinderCommissioningVerifier.VerifyAsync(
                 window,
                 vm,
                 root => FindVisualDescendant<RightToolRegionView>(root),
                 () => SmokeCylinderCommissioningVerifier.ScrollIntoViewAsync(window));
-            cylinderCommissioningReport.Save(cylinderCommissioningReportPath);
+            cylinderCommissioningReport.Save(smokeOptions.CylinderCommissioningReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(cylinderCommissioningState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.CylinderCommissioningState))
         {
             await SmokeCylinderCommissioningVerifier.ApplyStateAsync(
                 window,
                 vm,
-                cylinderCommissioningState,
+                smokeOptions.CylinderCommissioningState,
                 uiInteraction);
         }
 
-        if (!string.IsNullOrWhiteSpace(conveyorCommissioningReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.ConveyorCommissioningReportPath))
         {
             conveyorCommissioningReport = await SmokeConveyorCommissioningVerifier.VerifyAsync(
                 window,
                 vm,
                 root => FindVisualDescendant<RightToolRegionView>(root),
                 () => SmokeConveyorCommissioningVerifier.ScrollIntoViewAsync(window));
-            conveyorCommissioningReport.Save(conveyorCommissioningReportPath);
+            conveyorCommissioningReport.Save(smokeOptions.ConveyorCommissioningReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(conveyorCommissioningState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.ConveyorCommissioningState))
         {
             await SmokeConveyorCommissioningVerifier.ApplyStateAsync(
                 window,
                 vm,
-                conveyorCommissioningState,
+                smokeOptions.ConveyorCommissioningState,
                 uiInteraction);
         }
 
-        if (!string.IsNullOrWhiteSpace(sensorCommissioningReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.SensorCommissioningReportPath))
         {
             sensorCommissioningReport = await SmokeSensorCommissioningVerifier.VerifyAsync(
                 window,
                 vm,
                 root => FindVisualDescendant<RightToolRegionView>(root),
                 () => SmokeSensorCommissioningVerifier.ScrollIntoViewAsync(window));
-            sensorCommissioningReport.Save(sensorCommissioningReportPath);
+            sensorCommissioningReport.Save(smokeOptions.SensorCommissioningReportPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(sensorCommissioningState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.SensorCommissioningState))
         {
             await SmokeSensorCommissioningVerifier.ApplyStateAsync(
                 window,
                 vm,
-                sensorCommissioningState,
+                smokeOptions.SensorCommissioningState,
                 uiInteraction);
         }
 
-        if (!string.IsNullOrWhiteSpace(evidenceDrawerState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.EvidenceDrawerState))
         {
             await SmokeEvidenceDrawerStateVerifier.ApplyAsync(
                 window,
                 vm,
-                evidenceDrawerState,
+                smokeOptions.EvidenceDrawerState,
                 uiInteraction);
         }
 
-        if (!string.IsNullOrWhiteSpace(globalCommandState) && !globalCommandSmokeHandled)
+        if (!string.IsNullOrWhiteSpace(smokeOptions.GlobalCommandState) && !globalCommandSmokeHandled)
         {
-            await SmokeGlobalCommandStateVerifier.ApplyAsync(window, vm, globalCommandState, uiInteraction);
+            await SmokeGlobalCommandStateVerifier.ApplyAsync(window, vm, smokeOptions.GlobalCommandState, uiInteraction);
         }
 
         if (vm.SelectedEquipmentStatus is { } selectedEquipmentStatus)
@@ -2034,50 +1259,44 @@ internal static class DirectExeSmokeHost
                 $"{selectedEquipmentStatus.StateText} | {selectedEquipmentStatus.ConditionText}");
         }
 
-        if (!string.IsNullOrWhiteSpace(projectSafetyReportPath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.ProjectSafetyReportPath))
         {
             projectSafetyReport = await SmokeProjectSafetyVerifier.VerifyAsync(
                 window,
                 vm,
-                projectSafetySavePath!,
-                unsavedDialogScreenshotPath,
-                projectOpenFailureDialogScreenshotPath,
-                dpiScalePercent,
+                smokeOptions.ProjectSafetySavePath!,
+                smokeOptions.UnsavedDialogScreenshotPath,
+                smokeOptions.ProjectOpenFailureDialogScreenshotPath,
+                smokeOptions.DpiScalePercent,
                 (root, predicate) => FindVisualDescendant<TextBlock>(root, predicate),
                 (root, predicate) => FindVisualDescendant<Button>(root, predicate),
                 target =>
                 {
                     target.Activate();
-                    SetForegroundWindow(new WindowInteropHelper(target).Handle);
+                    nativeInput.ActivateWindow(target);
                 },
-                MovePointerToCenter,
-                (flags, dx, dy, data, extraInfo) => mouse_event(flags, dx, dy, data, extraInfo),
-                () => _smokePointerHeld = true,
+                nativeInput.MovePointerToCenter,
+                nativeInput.SendMouseEvent,
+                nativeInput.MarkPointerHeld,
                 (x, y) =>
-                {
-                    SetCursorPos(x, y);
-                },
+                    nativeInput.SetCursorPosition(x, y),
                 Mouse.Synchronize,
-                ReleaseSmokePointer,
+                nativeInput.ReleasePointer,
                 (target, dpi, targetWidth, targetHeight) =>
                     SmokeDpiTestHook.Apply(target, dpi, targetWidth, targetHeight),
                 SmokeDpiTestHook.CaptureMonitorEvidence,
-                CaptureWindow,
-                key =>
-                {
-                    keybd_event(key, 0, 0, UIntPtr.Zero);
-                    keybd_event(key, 0, KeyEventKeyUp, UIntPtr.Zero);
-                });
-            if (!string.IsNullOrWhiteSpace(projectSafetyReportPath))
+                windowCapture.Capture,
+                nativeInput.SendKey);
+            if (!string.IsNullOrWhiteSpace(smokeOptions.ProjectSafetyReportPath))
             {
-                projectSafetyReport.Save(projectSafetyReportPath);
+                projectSafetyReport.Save(smokeOptions.ProjectSafetyReportPath);
             }
 
             Console.WriteLine(
                 $"Project safety smoke {(projectSafetyReport.IsValid ? "passed" : "failed")}.");
         }
 
-        if (!string.IsNullOrWhiteSpace(unifiedCommissioningEvidencePath))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.UnifiedCommissioningEvidencePath))
         {
             var unifiedEvidenceAnchor = FindVisualDescendant<TextBlock>(
                 window,
@@ -2090,17 +1309,17 @@ internal static class DirectExeSmokeHost
         }
 
         SmokeLayoutReport? layoutReport = null;
-        if (!string.IsNullOrEmpty(layoutReportPath))
+        if (!string.IsNullOrEmpty(smokeOptions.LayoutReportPath))
         {
             layoutReport = SmokeLayoutValidator.Validate(
                 window,
                 width,
                 height,
-                dpiScalePercent);
-            layoutReport.Save(layoutReportPath);
+                smokeOptions.DpiScalePercent);
+            layoutReport.Save(smokeOptions.LayoutReportPath);
             Console.WriteLine(
                 $"Layout validation {(layoutReport.IsValid ? "passed" : "failed")}: " +
-                $"{sizeArg} at {dpiScalePercent}% DPI.");
+                $"{smokeOptions.SizeArgument} at {smokeOptions.DpiScalePercent}% DPI.");
             foreach (var failure in layoutReport.Failures)
             {
                 Console.Error.WriteLine($"  - {failure}");
@@ -2108,20 +1327,20 @@ internal static class DirectExeSmokeHost
         }
 
         SmokePerformanceReport? smokePerfReport = null;
-        if (performSmokePerf)
+        if (smokeOptions.PerformSmokePerf)
         {
             smokePerfReport = await SmokePerformanceVerifier.MeasureAsync(
                 window,
                 vm,
-                sizeArg,
-                dpiScalePercent,
+                smokeOptions.SizeArgument,
+                smokeOptions.DpiScalePercent,
                 startupToIdleMs ?? 0,
-                smokePerfSampleCount,
-                smokePerfSampleCount);
+                smokeOptions.SmokePerfSampleCount,
+                smokeOptions.SmokePerfSampleCount);
 
-            if (!string.IsNullOrWhiteSpace(smokePerfReportPath))
+            if (!string.IsNullOrWhiteSpace(smokeOptions.SmokePerfReportPath))
             {
-                smokePerfReport.Save(smokePerfReportPath);
+                smokePerfReport.Save(smokeOptions.SmokePerfReportPath);
             }
 
             Console.WriteLine(
@@ -2135,14 +1354,14 @@ internal static class DirectExeSmokeHost
                 $"{smokePerfReport.SteadyInteractionP95Ms:F2} ms");
         }
 
-        if (!string.IsNullOrEmpty(screenshotPath))
+        if (!string.IsNullOrEmpty(smokeOptions.ScreenshotPath))
         {
-            CaptureWindow(window, screenshotPath);
+            windowCapture.Capture(window, smokeOptions.ScreenshotPath);
         }
 
-        if (!string.IsNullOrEmpty(screenshotPath) ||
-            !string.IsNullOrEmpty(layoutReportPath) ||
-            !string.IsNullOrEmpty(smokePerfReportPath) ||
+        if (!string.IsNullOrEmpty(smokeOptions.ScreenshotPath) ||
+            !string.IsNullOrEmpty(smokeOptions.LayoutReportPath) ||
+            !string.IsNullOrEmpty(smokeOptions.SmokePerfReportPath) ||
             roundTripReport is not null ||
             layoutAlignmentReport is not null ||
             layoutHistoryReport is not null ||
@@ -2169,10 +1388,10 @@ internal static class DirectExeSmokeHost
             connectionWorkbenchReport is not null ||
             cameraFirstUseReport is not null ||
             projectSafetyReport is not null ||
-            performSmokePerf)
+            smokeOptions.PerformSmokePerf)
         {
-            if (string.Equals(cameraFirstUseState, "pressed", StringComparison.OrdinalIgnoreCase)
-                && _smokePointerHeld)
+            if (string.Equals(smokeOptions.CameraFirstUseState, "pressed", StringComparison.OrdinalIgnoreCase)
+                && nativeInput.IsPointerHeld)
             {
                 var workbench = FindVisualDescendant<RecipeConnectionWorkbenchView>(window);
                 var cancelTarget = workbench is null
@@ -2181,111 +1400,53 @@ internal static class DirectExeSmokeHost
                         string.Equals(candidate.Name, "AddConnectionStageButton", StringComparison.Ordinal));
                 if (cancelTarget is not null)
                 {
-                    MovePointerToCenter(cancelTarget);
+                    nativeInput.MovePointerToCenter(cancelTarget);
                     await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 }
             }
-            ReleaseSmokePointer();
+            var smokePointerWasHeld = nativeInput.IsPointerHeld;
+            nativeInput.ReleasePointer();
+            if (smokePointerWasHeld)
+            {
+                await window.Dispatcher.InvokeAsync(Mouse.Synchronize, DispatcherPriority.Input);
+                await Task.Delay(50);
+            }
 
-            var exitCode = layoutReport is { IsValid: false }
-                ? 3
-                : roundTripReport is { IsValid: false }
-                    ? 4
-                    : layoutAlignmentReport is { IsValid: false }
-                        ? 5
-                    : layoutHistoryReport is { IsValid: false }
-                            ? 6
-                        : directSceneReport is { IsValid: false }
-                            ? 7
-                        : canvasNavigationReport is { IsValid: false }
-                            ? 8
-                        : directTransformReport is { IsValid: false }
-                            ? 9
-                        : multiTransformReport is { IsValid: false }
-                            ? 10
-                        : libraryDropReport is { IsValid: false }
-                            ? 11
-                        : layerOrderReport is { IsValid: false }
-                            ? 12
-                        : runtimeDebuggerReport is { IsValid: false }
-                            ? 23
-                        : faultManagerReport is { IsValid: false }
-                            ? 13
-                        : cameraCommissioningReport is { IsValid: false }
-                            ? 18
-                        : integrationPanelReport is { IsValid: false }
-                            ? 26
-                        : axisCommissioningReport is { IsValid: false }
-                            ? 14
-                        : multiAxisRecipeReport is { IsValid: false }
-                            ? 19
-                        : cylinderCommissioningReport is { IsValid: false }
-                            ? 15
-                        : conveyorCommissioningReport is { IsValid: false }
-                            ? 16
-                        : sensorCommissioningReport is { IsValid: false }
-                            ? 17
-                        : recipeGalleryReport is { IsValid: false }
-                            ? 20
-                        : loadLockSetupReport is { IsValid: false }
-                            ? 21
-                        : stationSkeletonReport is { IsValid: false }
-                            ? 21
-                        : connectionWorkbenchDefaultReport is { IsValid: false }
-                            ? 21
-                        : connectionWorkbenchReport is { IsValid: false }
-                            ? 21
-                        : cameraFirstUseReport is { IsValid: false }
-                            ? 24
-                        : projectSafetyReport is { IsValid: false }
-                            ? 22
-                        : 0;
+            var exitCode = DirectExeSmokeFailurePolicy.SelectExitCode(
+                new DirectExeSmokeFailureCheck(layoutReport?.IsValid ?? true, 3),
+                new DirectExeSmokeFailureCheck(roundTripReport?.IsValid ?? true, 4),
+                new DirectExeSmokeFailureCheck(layoutAlignmentReport?.IsValid ?? true, 5),
+                new DirectExeSmokeFailureCheck(layoutHistoryReport?.IsValid ?? true, 6),
+                new DirectExeSmokeFailureCheck(directSceneReport?.IsValid ?? true, 7),
+                new DirectExeSmokeFailureCheck(canvasNavigationReport?.IsValid ?? true, 8),
+                new DirectExeSmokeFailureCheck(directTransformReport?.IsValid ?? true, 9),
+                new DirectExeSmokeFailureCheck(multiTransformReport?.IsValid ?? true, 10),
+                new DirectExeSmokeFailureCheck(libraryDropReport?.IsValid ?? true, 11),
+                new DirectExeSmokeFailureCheck(layerOrderReport?.IsValid ?? true, 12),
+                new DirectExeSmokeFailureCheck(runtimeDebuggerReport?.IsValid ?? true, 23),
+                new DirectExeSmokeFailureCheck(faultManagerReport?.IsValid ?? true, 13),
+                new DirectExeSmokeFailureCheck(cameraCommissioningReport?.IsValid ?? true, 18),
+                new DirectExeSmokeFailureCheck(integrationPanelReport?.IsValid ?? true, 26),
+                new DirectExeSmokeFailureCheck(axisCommissioningReport?.IsValid ?? true, 14),
+                new DirectExeSmokeFailureCheck(multiAxisRecipeReport?.IsValid ?? true, 19),
+                new DirectExeSmokeFailureCheck(cylinderCommissioningReport?.IsValid ?? true, 15),
+                new DirectExeSmokeFailureCheck(conveyorCommissioningReport?.IsValid ?? true, 16),
+                new DirectExeSmokeFailureCheck(sensorCommissioningReport?.IsValid ?? true, 17),
+                new DirectExeSmokeFailureCheck(recipeGalleryReport?.IsValid ?? true, 20),
+                new DirectExeSmokeFailureCheck(loadLockSetupReport?.IsValid ?? true, 21),
+                new DirectExeSmokeFailureCheck(stationSkeletonReport?.IsValid ?? true, 21),
+                new DirectExeSmokeFailureCheck(connectionWorkbenchDefaultReport?.IsValid ?? true, 21),
+                new DirectExeSmokeFailureCheck(connectionWorkbenchReport?.IsValid ?? true, 21),
+                new DirectExeSmokeFailureCheck(cameraFirstUseReport?.IsValid ?? true, 24),
+                new DirectExeSmokeFailureCheck(projectSafetyReport?.IsValid ?? true, 22));
             Application.Current.Shutdown(exitCode);
         }
     }
 
-
-
-
-    private static async Task<int> RunFaultScenarioHeadlessAsync(
-        string? projectPath,
-        string? scenarioPath,
-        string? reportPath)
-    {
-        if (string.IsNullOrWhiteSpace(projectPath))
-        {
-            Console.Error.WriteLine("Missing --fault-project argument.");
-            return 2;
-        }
-
-        if (string.IsNullOrWhiteSpace(scenarioPath))
-        {
-            Console.Error.WriteLine("Missing --fault-scenario argument.");
-            return 2;
-        }
-
-        var runner = new DeterministicFaultScenarioHeadlessRunner();
-        var report = await runner.RunAsync(projectPath, scenarioPath, reportPath);
-        if (!report.IsSuccess)
-        {
-            Console.Error.WriteLine($"Fault-scenario replay failed: {report.FailureReason}");
-            foreach (var error in report.CompilationErrors)
-            {
-                Console.Error.WriteLine($"  - {error}");
-            }
-
-            return 1;
-        }
-
-            Console.WriteLine(
-                $"Fault-scenario replay succeeded: " +
-                $"{report.ReplayResult?.CommandResults.Count ?? 0} actions, " +
-                $"{report.ReplayResult?.SnapshotHistory.Count ?? 0} snapshots, " +
-                $"{report.ReplayResult?.EventHistory.Count ?? 0} events.");
-            return 0;
-        }
-
-    private static SmokeUiInteraction CreateUiInteraction(ShellWindow window) =>
+    private static SmokeUiInteraction CreateUiInteraction(
+        ShellWindow window,
+        SmokeWindowCapture windowCapture,
+        SmokeNativeInput nativeInput) =>
         new()
         {
             FindTextBlock = (root, predicate) => FindVisualDescendant<TextBlock>(root, predicate),
@@ -2293,74 +1454,22 @@ internal static class DirectExeSmokeHost
             ActivateWindow = () =>
             {
                 window.Activate();
-                SetForegroundWindow(new WindowInteropHelper(window).Handle);
+                nativeInput.ActivateWindow(window);
             },
-            MovePointerToCenter = MovePointerToCenter,
-            MouseEvent = (flags, dx, dy, data, extraInfo) => mouse_event(flags, dx, dy, data, extraInfo),
-            SetCursorPosition = (x, y) => SetCursorPos(x, y),
-            GetCursorPosition = () =>
-            {
-                GetCursorPos(out var point);
-                return (point.X, point.Y);
-            },
-            SetPopupContent = popup => _smokePopupContent = popup,
-            MarkSmokePointerHeld = () => _smokePointerHeld = true,
-            ReleaseSmokePointer = ReleaseSmokePointer,
-            CheckPointerOwnership = target =>
-            {
-                var isOwned = IsPointerOwnedByWindow(target, out var diagnostic);
-                return (isOwned, diagnostic);
-            }
+            MovePointerToCenter = nativeInput.MovePointerToCenter,
+            MouseEvent = nativeInput.SendMouseEvent,
+            SetCursorPosition = nativeInput.SetCursorPosition,
+            GetCursorPosition = nativeInput.GetCursorPosition,
+            SetPopupContent = windowCapture.SetPopupContent,
+            MarkSmokePointerHeld = nativeInput.MarkPointerHeld,
+            ReleaseSmokePointer = nativeInput.ReleasePointer,
+            CheckPointerOwnership = nativeInput.CheckPointerOwnership
         };
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetCursorPos(int x, int y);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetCursorPos(out NativePoint point);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct NativePoint
-    {
-        public int X;
-        public int Y;
-    }
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetForegroundWindow();
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr WindowFromPoint(NativePoint point);
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
-
-    private const uint GetAncestorRoot = 2;
-
-    [DllImport("user32.dll")]
-    private static extern void mouse_event(
-        uint dwFlags,
-        uint dx,
-        uint dy,
-        uint dwData,
-        UIntPtr dwExtraInfo);
-
-    [DllImport("user32.dll")]
-    private static extern void keybd_event(
-        byte virtualKey,
-        byte scanCode,
-        uint flags,
-        UIntPtr extraInfo);
 
     private static async Task ApplyDirectSceneGestureStateAsync(
         ShellWindow window,
-        string state)
+        string state,
+        SmokeNativeInput nativeInput)
     {
         var viewport = FindVisualDescendant<MachineSceneViewport>(window)
             ?? throw new InvalidOperationException("Machine scene viewport was not available.");
@@ -2398,9 +1507,9 @@ internal static class DirectExeSmokeHost
         var end = viewport.PointToScreen(new Point(
             Math.Max(24, viewport.ActualWidth * 0.72),
             Math.Max(24, viewport.ActualHeight * 0.74)));
-        SetCursorPos((int)Math.Round(start.X), (int)Math.Round(start.Y));
-        mouse_event(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
-        _smokePointerHeld = true;
+        nativeInput.SetCursorPosition((int)Math.Round(start.X), (int)Math.Round(start.Y));
+        nativeInput.PressLeftButton();
+        nativeInput.MarkPointerHeld();
         viewport.RaiseEvent(new MouseButtonEventArgs(
             Mouse.PrimaryDevice,
             Environment.TickCount,
@@ -2410,7 +1519,7 @@ internal static class DirectExeSmokeHost
         });
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         await Task.Delay(50);
-        SetCursorPos((int)Math.Round(end.X), (int)Math.Round(end.Y));
+        nativeInput.SetCursorPosition((int)Math.Round(end.X), (int)Math.Round(end.Y));
         viewport.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, Environment.TickCount)
         {
             RoutedEvent = Mouse.MouseMoveEvent
@@ -2423,55 +1532,12 @@ internal static class DirectExeSmokeHost
         await Task.Delay(150);
     }
 
-
-    private static void MovePointerToCenter(FrameworkElement element)
-    {
-        var point = element.PointToScreen(new Point(
-            Math.Max(1, element.ActualWidth / 2),
-            Math.Max(1, element.ActualHeight / 2)));
-        SetCursorPos((int)Math.Round(point.X), (int)Math.Round(point.Y));
-        Mouse.Synchronize();
-    }
-
-    private static bool IsPointerOwnedByWindow(Window window, out string diagnostic)
-    {
-        if (!GetCursorPos(out var cursorPosition))
-        {
-            diagnostic = "GetCursorPos failed.";
-            return false;
-        }
-
-        var targetWindow = new WindowInteropHelper(window).Handle;
-        var pointerWindow = GetAncestor(WindowFromPoint(cursorPosition), GetAncestorRoot);
-        var foregroundWindow = GetAncestor(GetForegroundWindow(), GetAncestorRoot);
-        var isOwned = targetWindow != IntPtr.Zero
-            && pointerWindow == targetWindow
-            && foregroundWindow == targetWindow;
-        diagnostic =
-            $"Target=0x{targetWindow.ToInt64():X}, " +
-            $"PointerRoot=0x{pointerWindow.ToInt64():X}, " +
-            $"ForegroundRoot=0x{foregroundWindow.ToInt64():X}, " +
-            $"Cursor=({cursorPosition.X},{cursorPosition.Y}).";
-        return isOwned;
-    }
-
     private static void AssertSmoke(bool condition, string message)
     {
         if (!condition)
         {
             throw new InvalidOperationException(message);
         }
-    }
-
-    public static void ReleaseSmokePointer()
-    {
-        if (!_smokePointerHeld)
-        {
-            return;
-        }
-
-        mouse_event(MouseEventLeftUp, 0, 0, 0, UIntPtr.Zero);
-        _smokePointerHeld = false;
     }
 
     private static void SelectLayoutItemsThroughScene(
@@ -2505,67 +1571,6 @@ internal static class DirectExeSmokeHost
         {
             throw new InvalidOperationException("Scene Ctrl/Shift selection did not match the requested set.");
         }
-    }
-
-    private static void CaptureWindow(Window window, string path)
-    {
-        var fullPath = Path.GetFullPath(path);
-        var directory = Path.GetDirectoryName(fullPath);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        var dpi = VisualTreeHelper.GetDpi(window);
-        var width = checked((int)Math.Round(window.ActualWidth * dpi.DpiScaleX));
-        var height = checked((int)Math.Round(window.ActualHeight * dpi.DpiScaleY));
-        if (width < 1 || height < 1)
-        {
-            width = checked((int)Math.Round(window.Width * dpi.DpiScaleX));
-            height = checked((int)Math.Round(window.Height * dpi.DpiScaleY));
-        }
-
-        var rendered = new RenderTargetBitmap(
-            width,
-            height,
-            dpi.PixelsPerInchX,
-            dpi.PixelsPerInchY,
-            PixelFormats.Pbgra32);
-        rendered.Render(window);
-
-        BitmapSource bitmap = rendered;
-        if (_smokePopupContent is { IsVisible: true, ActualWidth: > 0, ActualHeight: > 0 } popup)
-        {
-            var windowOrigin = window.PointToScreen(new Point(0, 0));
-            var popupOrigin = popup.PointToScreen(new Point(0, 0));
-            var compositeVisual = new DrawingVisual();
-            using (var drawing = compositeVisual.RenderOpen())
-            {
-                drawing.DrawImage(rendered, new Rect(0, 0, window.ActualWidth, window.ActualHeight));
-                drawing.DrawRectangle(
-                    new VisualBrush(popup),
-                    null,
-                    new Rect(
-                        (popupOrigin.X - windowOrigin.X) / dpi.DpiScaleX,
-                        (popupOrigin.Y - windowOrigin.Y) / dpi.DpiScaleY,
-                        popup.ActualWidth,
-                        popup.ActualHeight));
-            }
-
-            var composite = new RenderTargetBitmap(
-                width,
-                height,
-                dpi.PixelsPerInchX,
-                dpi.PixelsPerInchY,
-                PixelFormats.Pbgra32);
-            composite.Render(compositeVisual);
-            bitmap = composite;
-        }
-
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var stream = File.Create(fullPath);
-        encoder.Save(stream);
     }
 
 }

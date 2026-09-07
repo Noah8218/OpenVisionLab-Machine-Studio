@@ -5,6 +5,7 @@ using OpenVisionLab.Machine.Simulation.Camera;
 using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Scenarios;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Simulation.Tests;
@@ -23,7 +24,10 @@ public sealed class DeterministicSimulationCommandTraceTests
 
         var package = engine.CreateCommandTracePackage();
         var json = DeterministicSimulationCommandTracePackage.SaveToJson(package);
-        var path = @"D:\OpenVisionLab-TestData\OpenVisionLab-Machine-Studio\pl-0026-command-trace\trace-roundtrip.json";
+        var path = Path.Combine(
+            TestStorage.RootPath,
+            "pl-0026-command-trace",
+            "trace-roundtrip.json");
         DeterministicSimulationCommandTracePackage.SaveToJson(package, path);
         var restored = DeterministicSimulationCommandTracePackage.LoadFromJson(path);
 
@@ -38,6 +42,41 @@ public sealed class DeterministicSimulationCommandTraceTests
         Assert.DoesNotContain("issuedAt", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("RuntimeDebugger", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("acknowledg", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CommandCodec_RoundTripsTypedArgumentsWithoutEngineState()
+    {
+        var command = new MoveAbsoluteCommand("x", 12.5);
+
+        Assert.True(
+            DeterministicSimulationCommandTraceCommandCodec.TrySerializeArguments(
+                command,
+                out var arguments,
+                out var replayabilityReason),
+            replayabilityReason);
+        Assert.True(
+            DeterministicSimulationCommandTraceCommandCodec.TryCreateCommand(
+                nameof(MoveAbsoluteCommand),
+                arguments,
+                out var restored,
+                out var error),
+            error);
+
+        var restoredMove = Assert.IsType<MoveAbsoluteCommand>(restored);
+        Assert.Equal(command.AxisId, restoredMove.AxisId);
+        Assert.Equal(command.TargetPosition, restoredMove.TargetPosition);
+    }
+
+    [Fact]
+    public void CommandCodec_ReportsNonReplayableRealTimeCommands()
+    {
+        Assert.False(
+            DeterministicSimulationCommandTraceCommandCodec.TrySerializeArguments(
+                new PlayCommand(),
+                out _,
+                out var replayabilityReason));
+        Assert.Contains("real-time", replayabilityReason, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

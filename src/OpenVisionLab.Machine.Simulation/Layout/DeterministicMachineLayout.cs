@@ -21,6 +21,8 @@ public sealed class DeterministicMachineLayout
         new Dictionary<string, VirtualCameraSnapshot>(StringComparer.Ordinal);
     private readonly MachineLayoutRuntimeConfiguration _configuration;
     private readonly DeterministicSignalHub _signalHub;
+    private readonly MachineLayoutSignalBindingValidator _signalBindingValidator;
+    private readonly MachineLayoutRuntimeResetter _runtimeResetter;
     private readonly Dictionary<string, LayoutComponentRuntimeState> _componentsById;
     private readonly LayoutComponentRuntimeState[] _orderedComponents;
     private readonly DigitalSensorRuntimeState[] _orderedSensors;
@@ -42,6 +44,7 @@ public sealed class DeterministicMachineLayout
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _signalHub = signalHub ?? throw new ArgumentNullException(nameof(signalHub));
+        _signalBindingValidator = new MachineLayoutSignalBindingValidator(_signalHub);
 
         _orderedComponents = configuration.Components
             .Select(CreateState)
@@ -104,8 +107,27 @@ public sealed class DeterministicMachineLayout
             handoff => handoff.Configuration.TransportConveyorComponentId,
             StringComparer.Ordinal);
 
-        InitializeWorkpieceCarrierPositions();
-        ValidateSignalBindings();
+        _runtimeResetter = new MachineLayoutRuntimeResetter(
+            _componentsById,
+            _orderedComponents,
+            _orderedWorkpieces,
+            _orderedLoadLocks,
+            _orderedWaferHandlers,
+            _orderedInspectionSortRouters,
+            _orderedInspectionHandoffs,
+            _orderedOhtHandoffs,
+            _orderedPrealigners);
+        _runtimeResetter.InitializeWorkpieceCarrierPositions();
+        _signalBindingValidator.Validate(
+            _orderedSensors,
+            _orderedCylinders,
+            _orderedConveyors,
+            _orderedLoadLocks,
+            _orderedWaferHandlers,
+            _orderedInspectionSortRouters,
+            _orderedInspectionHandoffs,
+            _orderedOhtHandoffs,
+            _orderedPrealigners);
     }
 
     public string Id => _configuration.Id;
@@ -212,14 +234,31 @@ public sealed class DeterministicMachineLayout
     /// Restores component poses and actuator state, clears sensor delay
     /// history, and restores simulation-owned feedback to reset values.
     /// </summary>
-    public void Reset()
-    {
-        foreach (var component in _orderedComponents)
-        {
-            component.Reset();
-        }
-        InitializeWorkpieceCarrierPositions();
+    public void Reset() => _runtimeResetter.Reset(ResetSimulationOwnedSignals);
 
+    public ReadOnlyCollection<LayoutComponentSnapshot> CaptureSnapshots() =>
+        new(CaptureSnapshotsCore());
+
+    public ReadOnlyCollection<LoadLockSnapshot> CaptureLoadLockSnapshots() =>
+        new(CaptureLoadLockSnapshotsCore());
+
+    public ReadOnlyCollection<WaferHandlerSnapshot> CaptureWaferHandlerSnapshots() =>
+        new(CaptureWaferHandlerSnapshotsCore());
+
+    public ReadOnlyCollection<InspectionSortRouterSnapshot> CaptureInspectionSortRouterSnapshots() =>
+        new(CaptureInspectionSortRouterSnapshotsCore());
+
+    public ReadOnlyCollection<InspectionHandoffSnapshot> CaptureInspectionHandoffSnapshots() =>
+        new(CaptureInspectionHandoffSnapshotsCore());
+
+    public ReadOnlyCollection<OhtHandoffSnapshot> CaptureOhtHandoffSnapshots() =>
+        new(CaptureOhtHandoffSnapshotsCore());
+
+    public ReadOnlyCollection<PrealignerSnapshot> CapturePrealignerSnapshots() =>
+        new(CapturePrealignerSnapshotsCore());
+
+    private void ResetSimulationOwnedSignals()
+    {
         foreach (var sensor in _orderedSensors)
         {
             SignalWriteResult write = _signalHub.SetDigitalInput(
@@ -245,303 +284,6 @@ public sealed class DeterministicMachineLayout
                     cylinder.CylinderConfiguration.RetractedSensorChannelId,
                     true,
                     SignalWriteOwner.SimulationComponent));
-        }
-
-        foreach (var loadLock in _orderedLoadLocks)
-        {
-            loadLock.Reset();
-        }
-
-        foreach (var handler in _orderedWaferHandlers)
-        {
-            handler.Reset();
-        }
-
-        foreach (var sorter in _orderedInspectionSortRouters)
-        {
-            sorter.Reset();
-        }
-
-        foreach (var handoff in _orderedInspectionHandoffs)
-        {
-            handoff.Reset();
-        }
-
-        foreach (var handoff in _orderedOhtHandoffs)
-        {
-            handoff.Reset();
-        }
-
-        foreach (var prealigner in _orderedPrealigners)
-        {
-            prealigner.Reset();
-        }
-    }
-
-    public ReadOnlyCollection<LayoutComponentSnapshot> CaptureSnapshots() =>
-        new(CaptureSnapshotsCore());
-
-    public ReadOnlyCollection<LoadLockSnapshot> CaptureLoadLockSnapshots() =>
-        new(CaptureLoadLockSnapshotsCore());
-
-    public ReadOnlyCollection<WaferHandlerSnapshot> CaptureWaferHandlerSnapshots() =>
-        new(CaptureWaferHandlerSnapshotsCore());
-
-    public ReadOnlyCollection<InspectionSortRouterSnapshot> CaptureInspectionSortRouterSnapshots() =>
-        new(CaptureInspectionSortRouterSnapshotsCore());
-
-    public ReadOnlyCollection<InspectionHandoffSnapshot> CaptureInspectionHandoffSnapshots() =>
-        new(CaptureInspectionHandoffSnapshotsCore());
-
-    public ReadOnlyCollection<OhtHandoffSnapshot> CaptureOhtHandoffSnapshots() =>
-        new(CaptureOhtHandoffSnapshotsCore());
-
-    public ReadOnlyCollection<PrealignerSnapshot> CapturePrealignerSnapshots() =>
-        new(CapturePrealignerSnapshotsCore());
-
-    private void InitializeWorkpieceCarrierPositions()
-    {
-        foreach (var workpiece in _orderedWorkpieces)
-        {
-            var conveyor = (ConveyorRuntimeState)_componentsById[
-                workpiece.WorkpieceConfiguration.ConveyorComponentId];
-            workpiece.UpdateCarrierPosition(conveyor);
-        }
-    }
-
-    private void ValidateSignalBindings()
-    {
-        foreach (var sensor in _orderedSensors)
-        {
-            SignalReadResult read = _signalHub.ReadDigitalSignal(
-                sensor.SensorConfiguration.OutputChannelId);
-            if (!read.IsAccepted || read.Kind != ChannelKind.DigitalInput)
-            {
-                throw new ArgumentException(
-                    $"Sensor '{sensor.Configuration.Id}' output '{sensor.SensorConfiguration.OutputChannelId}' " +
-                    "must identify a configured DigitalInput channel.",
-                    nameof(_signalHub));
-            }
-        }
-
-        foreach (var cylinder in _orderedCylinders)
-        {
-            ValidateCylinderSignal(
-                cylinder,
-                cylinder.CylinderConfiguration.ExtendCommandChannelId,
-                ChannelKind.DigitalOutput,
-                "extend command");
-            ValidateCylinderSignal(
-                cylinder,
-                cylinder.CylinderConfiguration.ExtendedSensorChannelId,
-                ChannelKind.DigitalInput,
-                "extended sensor");
-            ValidateCylinderSignal(
-                cylinder,
-                cylinder.CylinderConfiguration.RetractedSensorChannelId,
-                ChannelKind.DigitalInput,
-                "retracted sensor");
-        }
-
-        foreach (var conveyor in _orderedConveyors)
-        {
-            ValidateConveyorSignal(
-                conveyor,
-                conveyor.ConveyorConfiguration.RunCommandChannelId,
-                "run command");
-            ValidateConveyorSignal(
-                conveyor,
-                conveyor.ConveyorConfiguration.ReverseCommandChannelId,
-                "reverse command");
-        }
-
-        foreach (var loadLock in _orderedLoadLocks)
-        {
-            ValidateLoadLockSignal(
-                loadLock,
-                loadLock.Configuration.EvacuateCommandChannelId,
-                ChannelKind.DigitalOutput,
-                "evacuate command");
-            ValidateLoadLockSignal(
-                loadLock,
-                loadLock.Configuration.VentCommandChannelId,
-                ChannelKind.DigitalOutput,
-                "vent command");
-            ValidateLoadLockSignal(
-                loadLock,
-                loadLock.Configuration.VacuumReadySensorChannelId,
-                ChannelKind.DigitalInput,
-                "vacuum-ready sensor");
-            ValidateLoadLockSignal(
-                loadLock,
-                loadLock.Configuration.AtmosphereReadySensorChannelId,
-                ChannelKind.DigitalInput,
-                "atmosphere-ready sensor");
-        }
-
-        foreach (var handler in _orderedWaferHandlers)
-        {
-            ValidateWaferHandlerSignal(handler, handler.Configuration.SourcePresentSensorChannelId, ChannelKind.DigitalInput);
-            ValidateWaferHandlerSignal(handler, handler.Configuration.GateOpenSensorChannelId, ChannelKind.DigitalInput);
-            ValidateWaferHandlerSignal(handler, handler.Configuration.PickCommandChannelId, ChannelKind.DigitalOutput);
-            ValidateWaferHandlerSignal(handler, handler.Configuration.PlaceCommandChannelId, ChannelKind.DigitalOutput);
-            ValidateWaferHandlerSignal(handler, handler.Configuration.HoldingFeedbackChannelId, ChannelKind.DigitalInput);
-            ValidateWaferHandlerSignal(handler, handler.Configuration.PlacedFeedbackChannelId, ChannelKind.DigitalInput);
-        }
-
-        foreach (var sorter in _orderedInspectionSortRouters)
-        {
-            ValidateInspectionSortRouterSignal(sorter, sorter.Configuration.PassRunCommandChannelId, ChannelKind.DigitalOutput);
-            ValidateInspectionSortRouterSignal(sorter, sorter.Configuration.NgRunCommandChannelId, ChannelKind.DigitalOutput);
-            ValidateInspectionSortRouterSignal(sorter, sorter.Configuration.PassRoutedFeedbackChannelId, ChannelKind.DigitalInput);
-            ValidateInspectionSortRouterSignal(sorter, sorter.Configuration.NgRoutedFeedbackChannelId, ChannelKind.DigitalInput);
-        }
-
-        foreach (var handoff in _orderedInspectionHandoffs)
-        {
-            ValidateInspectionHandoffSignal(handoff, handoff.Configuration.InspectionPositionSensorChannelId, ChannelKind.DigitalInput);
-            ValidateInspectionHandoffSignal(handoff, handoff.Configuration.ResultAcceptedCommandChannelId, ChannelKind.DigitalOutput);
-            ValidateInspectionHandoffSignal(handoff, handoff.Configuration.InspectionReadyFeedbackChannelId, ChannelKind.DigitalInput);
-            ValidateInspectionHandoffSignal(handoff, handoff.Configuration.InspectionCompleteFeedbackChannelId, ChannelKind.DigitalInput);
-        }
-
-        foreach (var handoff in _orderedOhtHandoffs)
-        {
-            ValidateOhtHandoffSignal(handoff, handoff.Configuration.ForwardCommandChannelId, ChannelKind.DigitalOutput);
-            ValidateOhtHandoffSignal(handoff, handoff.Configuration.ReverseCommandChannelId, ChannelKind.DigitalOutput);
-            ValidateOhtHandoffSignal(handoff, handoff.Configuration.RouteAvailableSensorChannelId, ChannelKind.DigitalInput);
-            ValidateOhtHandoffSignal(handoff, handoff.Configuration.VehicleDockedSensorChannelId, ChannelKind.DigitalInput);
-            ValidateOhtHandoffSignal(handoff, handoff.Configuration.LoadPortReadySensorChannelId, ChannelKind.DigitalInput);
-            ValidateOhtHandoffSignal(handoff, handoff.Configuration.CarrierReceivedSensorChannelId, ChannelKind.DigitalInput);
-            ValidateOhtHandoffSignal(handoff, handoff.Configuration.HandoffReadyFeedbackChannelId, ChannelKind.DigitalInput);
-            ValidateOhtHandoffSignal(handoff, handoff.Configuration.CarrierTransferredFeedbackChannelId, ChannelKind.DigitalInput);
-        }
-
-        foreach (var prealigner in _orderedPrealigners)
-        {
-            ValidatePrealignerSignal(prealigner, prealigner.Configuration.WaferPresentSensorChannelId, ChannelKind.DigitalInput);
-            ValidatePrealignerSignal(prealigner, prealigner.Configuration.AlignmentAcceptedCommandChannelId, ChannelKind.DigitalOutput);
-            ValidatePrealignerSignal(prealigner, prealigner.Configuration.AlignmentReadyFeedbackChannelId, ChannelKind.DigitalInput);
-            ValidatePrealignerSignal(prealigner, prealigner.Configuration.AlignmentCompleteFeedbackChannelId, ChannelKind.DigitalInput);
-        }
-    }
-
-    private void ValidateCylinderSignal(
-        PneumaticCylinderRuntimeState cylinder,
-        string channelId,
-        ChannelKind expectedKind,
-        string role)
-    {
-        SignalReadResult read = _signalHub.ReadDigitalSignal(channelId);
-        if (!read.IsAccepted || read.Kind != expectedKind)
-        {
-            throw new ArgumentException(
-                $"Cylinder '{cylinder.Configuration.Id}' {role} '{channelId}' " +
-                $"must identify a configured {expectedKind} channel.",
-                nameof(_signalHub));
-        }
-    }
-
-    private void ValidateConveyorSignal(
-        ConveyorRuntimeState conveyor,
-        string channelId,
-        string role)
-    {
-        SignalReadResult read = _signalHub.ReadDigitalSignal(channelId);
-        if (!read.IsAccepted || read.Kind != ChannelKind.DigitalOutput)
-        {
-            throw new ArgumentException(
-                $"Conveyor '{conveyor.Configuration.Id}' {role} '{channelId}' " +
-                "must identify a configured DigitalOutput channel.",
-                nameof(_signalHub));
-        }
-    }
-
-    private void ValidateLoadLockSignal(
-        LoadLockRuntimeState loadLock,
-        string channelId,
-        ChannelKind expectedKind,
-        string role)
-    {
-        SignalReadResult read = _signalHub.ReadDigitalSignal(channelId);
-        if (!read.IsAccepted || read.Kind != expectedKind)
-        {
-            throw new ArgumentException(
-                $"Load-lock '{loadLock.Configuration.Id}' {role} '{channelId}' " +
-                $"must identify a configured {expectedKind} channel.",
-                nameof(_signalHub));
-        }
-
-
-    }
-
-    private void ValidateWaferHandlerSignal(
-        WaferHandlerRuntimeState handler,
-        string channelId,
-        ChannelKind expectedKind)
-    {
-        SignalReadResult read = _signalHub.ReadDigitalSignal(channelId);
-        if (!read.IsAccepted || read.Kind != expectedKind)
-        {
-            throw new ArgumentException(
-                $"Wafer-handler '{handler.Configuration.Id}' signal '{channelId}' must identify a configured {expectedKind} channel.",
-                nameof(_signalHub));
-        }
-    }
-
-    private void ValidateInspectionSortRouterSignal(
-        InspectionSortRouterRuntimeState sorter,
-        string channelId,
-        ChannelKind expectedKind)
-    {
-        SignalReadResult read = _signalHub.ReadDigitalSignal(channelId);
-        if (!read.IsAccepted || read.Kind != expectedKind)
-        {
-            throw new ArgumentException(
-                $"Inspection sorter '{sorter.Configuration.Id}' signal '{channelId}' must identify a configured {expectedKind} channel.",
-                nameof(_signalHub));
-        }
-    }
-
-    private void ValidateOhtHandoffSignal(
-        OhtHandoffRuntimeState handoff,
-        string channelId,
-        ChannelKind expectedKind)
-    {
-        SignalReadResult read = _signalHub.ReadDigitalSignal(channelId);
-        if (!read.IsAccepted || read.Kind != expectedKind)
-        {
-            throw new ArgumentException(
-                $"OHT handoff '{handoff.Configuration.Id}' signal '{channelId}' must identify a configured {expectedKind} channel.",
-                nameof(_signalHub));
-        }
-    }
-
-    private void ValidateInspectionHandoffSignal(
-        InspectionHandoffRuntimeState handoff,
-        string channelId,
-        ChannelKind expectedKind)
-    {
-        SignalReadResult read = _signalHub.ReadDigitalSignal(channelId);
-        if (!read.IsAccepted || read.Kind != expectedKind)
-        {
-            throw new ArgumentException(
-                $"Inspection handoff '{handoff.Configuration.Id}' signal '{channelId}' must identify a configured {expectedKind} channel.",
-                nameof(_signalHub));
-        }
-    }
-
-    private void ValidatePrealignerSignal(
-        PrealignerRuntimeState prealigner,
-        string channelId,
-        ChannelKind expectedKind)
-    {
-        SignalReadResult read = _signalHub.ReadDigitalSignal(channelId);
-        if (!read.IsAccepted || read.Kind != expectedKind)
-        {
-            throw new ArgumentException(
-                $"Pre-aligner '{prealigner.Configuration.Id}' signal '{channelId}' must identify a configured {expectedKind} channel.",
-                nameof(_signalHub));
         }
     }
 

@@ -119,6 +119,38 @@ public sealed class RecipeSequenceStepPreviewViewModelTests
         Assert.True(isReady);
     }
 
+    [Fact]
+    public async Task DisposeSuppressesLatePreviewResultAndIsIdempotent()
+    {
+        var row = CreateRow();
+        var resultSource = new TaskCompletionSource<SequenceStepPreviewResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var result = new SequenceStepPreviewResult(
+            SequenceStepPreviewOutcome.Completed,
+            SequenceStepAction.Wait,
+            "signal-x",
+            1,
+            10,
+            null,
+            "preview complete");
+        using var viewModel = CreateViewModel(
+            () => true,
+            () => true,
+            (_, _, _) => resultSource.Task);
+
+        viewModel.PreviewSequenceStepCommand.Execute(row);
+        Assert.False(viewModel.PreviewSequenceStepCommand.CanExecute(row));
+
+        viewModel.Dispose();
+        viewModel.Dispose();
+        resultSource.SetResult(result);
+        await WaitForAsync(() => resultSource.Task.IsCompletedSuccessfully);
+        await Task.Yield();
+
+        Assert.False(row.HasPreviewResult);
+        Assert.False(viewModel.PreviewSequenceStepCommand.CanExecute(row));
+    }
+
     private static RecipeSequenceStepPreviewViewModel CreateViewModel(
         Func<bool> isEditable,
         Func<bool> isReady,

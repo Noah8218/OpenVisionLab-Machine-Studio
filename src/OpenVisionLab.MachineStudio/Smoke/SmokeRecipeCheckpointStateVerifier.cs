@@ -3,8 +3,6 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Input;
 using System.Windows.Threading;
 using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Layouts;
@@ -19,9 +17,6 @@ namespace OpenVisionLab.MachineStudio;
 
 internal static class SmokeRecipeCheckpointStateVerifier
 {
-    private const uint MouseEventMove = 0x0001;
-    private const uint MouseEventLeftDown = 0x0002;
-
     public static bool IsSupportedState(string? state) => state?.ToLowerInvariant() is
         "checkpoint-coverage"
         or "checkpoint-template-focus"
@@ -64,7 +59,16 @@ internal static class SmokeRecipeCheckpointStateVerifier
             }
             vm.RecipeConnections.Load(project, vm.Layout.SelectedItem?.Id);
         }
-        switch (connectionWorkbenchState.ToLowerInvariant())
+        var normalizedState = connectionWorkbenchState.ToLowerInvariant();
+        if (normalizedState is "checkpoint-coverage" or "checkpoint-template-existing")
+        {
+            var checkpointFixture = CreateExistingCheckpointFixture(
+                initialProject
+                ?? throw new InvalidOperationException("A project is required for checkpoint coverage smoke."));
+            vm.RecipeConnections.Load(checkpointFixture, vm.Layout.SelectedItem?.Id);
+        }
+
+        switch (normalizedState)
         {
         case "checkpoint-coverage":
             var checkpointCoverageText = interaction.FindTextBlock(
@@ -88,12 +92,10 @@ internal static class SmokeRecipeCheckpointStateVerifier
                 "Checkpoint coverage display caused an unintended run.");
             break;
         case "checkpoint-template-focus":
-            interaction.ActivateWindow();
-            checkpointTemplateButton.Focus();
-            Keyboard.Focus(checkpointTemplateButton);
-            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            AssertSmoke(
-                checkpointTemplateButton.IsKeyboardFocused,
+            await SmokeButtonPointerState.FocusAsync(
+                window,
+                checkpointTemplateButton,
+                interaction,
                 "Checkpoint template button did not receive focus.");
             break;
         case "checkpoint-template-existing":
@@ -212,53 +214,36 @@ internal static class SmokeRecipeCheckpointStateVerifier
                 break;
             }
 
-            interaction.ActivateWindow();
-            for (var attempt = 0; attempt < 10 && !window.IsActive; attempt++)
-            {
-                await Task.Delay(50);
-                interaction.ActivateWindow();
-            }
-            AssertSmoke(window.IsActive, "Machine Studio did not become active for checkpoint Apply pointer testing.");
             var checkpointTargetButton = connectionWorkbenchState.StartsWith(
-                    "checkpoint-template-cancel-",
-                    StringComparison.OrdinalIgnoreCase)
+                "checkpoint-template-cancel-",
+                StringComparison.OrdinalIgnoreCase)
                 ? templateCancelButton
                 : templateApplyButton;
-            checkpointTargetButton.BringIntoView();
-            checkpointTargetButton.UpdateLayout();
-            checkpointTargetButton.Focus();
-            Keyboard.Focus(checkpointTargetButton);
-            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            AssertSmoke(
-                checkpointTargetButton.IsKeyboardFocused,
+            await SmokeButtonPointerState.FocusAsync(
+                window,
+                checkpointTargetButton,
+                interaction,
                 "Checkpoint template target button did not receive focus.");
             if (connectionWorkbenchState.EndsWith("-focus", StringComparison.OrdinalIgnoreCase))
             {
                 break;
             }
 
-            interaction.MovePointerToCenter(checkpointTargetButton);
-            Mouse.Capture(checkpointTargetButton, CaptureMode.SubTree);
-            Mouse.Synchronize();
-            await Task.Delay(200);
-            AssertSmoke(
-                checkpointTargetButton.IsMouseOver,
-                "Checkpoint template target button did not enter hover state.");
             if (connectionWorkbenchState.EndsWith("-pressed", StringComparison.OrdinalIgnoreCase))
             {
-                interaction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
-                interaction.MarkSmokePointerHeld();
-                checkpointTargetButton.RaiseEvent(new MouseButtonEventArgs(
-                    Mouse.PrimaryDevice,
-                    Environment.TickCount,
-                    MouseButton.Left)
-                {
-                    RoutedEvent = Mouse.MouseDownEvent
-                });
-                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                AssertSmoke(
-                    checkpointTargetButton.IsPressed,
+                await SmokeButtonPointerState.HoverThenPressAsync(
+                    window,
+                    checkpointTargetButton,
+                    interaction,
+                    () => "Checkpoint template target button did not enter hover state.",
                     "Checkpoint template target button did not enter pointer-down state.");
+            }
+            else
+            {
+                await SmokeButtonPointerState.HoverAsync(
+                    checkpointTargetButton,
+                    interaction,
+                    () => "Checkpoint template target button did not enter hover state.");
             }
             break;
         case "preview":
@@ -312,31 +297,42 @@ internal static class SmokeRecipeCheckpointStateVerifier
                 && candidate.IsVisible
                 && candidate.IsEnabled)
                 ?? throw new InvalidOperationException("No enabled step preview button was visible.");
-            interaction.ActivateWindow();
-            previewButton.BringIntoView();
-            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            previewButton.UpdateLayout();
-            previewButton.Focus();
-            Keyboard.Focus(previewButton);
-            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            AssertSmoke(previewButton.IsKeyboardFocused, "Step preview button did not receive focus.");
-            interaction.MovePointerToCenter(previewButton);
-            await Task.Delay(200);
-            AssertSmoke(previewButton.IsMouseOver, "Step preview button did not enter hover state.");
+            await SmokeButtonPointerState.FocusAsync(
+                window,
+                previewButton,
+                interaction,
+                "Step preview button did not receive focus.");
             if (connectionWorkbenchState.Equals("preview-pressed", StringComparison.OrdinalIgnoreCase))
             {
-                interaction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
-                interaction.MarkSmokePointerHeld();
-                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                AssertSmoke(previewButton.IsPressed, "Step preview button did not enter pointer-down state.");
+                await SmokeButtonPointerState.HoverThenPressAsync(
+                    window,
+                    previewButton,
+                    interaction,
+                    () => "Step preview button did not enter hover state.",
+                    "Step preview button did not enter pointer-down state.");
+            }
+            else
+            {
+                await SmokeButtonPointerState.HoverAsync(
+                    previewButton,
+                    interaction,
+                    () => "Step preview button did not enter hover state.");
             }
             break;
         case "add-step":
             AssertSmoke(
                 vm.TryAddLayoutComponent(LayoutComponentKind.LinearStage),
                 "A stage could not be added for target-step evidence.");
-            var targetRow = vm.RecipeConnections.Rows.First(row =>
-                row.ComponentId == vm.Layout.SelectedItem?.Id);
+            var targetComponentId = vm.Layout.SelectedItem?.Id;
+            var addStepFixture = CreateStrictLinearSequenceFixture(
+                initialProject
+                ?? throw new InvalidOperationException("A project is required for target-step smoke."));
+            vm.RecipeConnections.Load(addStepFixture, targetComponentId);
+            var targetRow = vm.RecipeConnections.Rows.FirstOrDefault(row =>
+                row.ComponentId == targetComponentId);
+            AssertSmoke(
+                targetRow is { IsValid: true, CanAddSequenceStep: true },
+                "The added stage did not expose a valid unused target-step model state.");
             vm.RecipeConnections.SelectedRow = targetRow;
             var rows = findListBox(workbench, candidate =>
                 string.Equals(candidate.Name, "ConnectionRowsListBox", StringComparison.Ordinal))
@@ -370,6 +366,87 @@ internal static class SmokeRecipeCheckpointStateVerifier
                         $"Unsupported --smoke-connection-workbench-state '{connectionWorkbenchState}'. " +
                         "Expected a supported connection-workbench smoke state, including dry-run, dry-run-playback, or dry-run-wafer-handler-fault-playback.");
         }
+    }
+
+    private static MachineProjectDocument CreateExistingCheckpointFixture(MachineProjectDocument source)
+    {
+        var store = new ProjectDocumentStore();
+        var fixture = store.Load(store.Serialize(source));
+        var sequenceId = fixture.Simulation.AutomaticRun?.SequenceId
+            ?? fixture.Sequences.FirstOrDefault()?.Id
+            ?? throw new InvalidOperationException("A sequence was required for checkpoint coverage smoke.");
+        var sequence = fixture.Sequences.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, sequenceId, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException("The checkpoint coverage sequence was not available.");
+        var fixtureStepIds = new[]
+        {
+            "cycle-active-on",
+            "extend-stopper",
+            "wait-stopper-extended",
+            "conveyor-forward",
+            "conveyor-run-forward",
+            "move-station",
+            "wait-station-position",
+            "wait-station-sensor",
+            "conveyor-stop-at-station",
+            "retract-stopper",
+            "wait-stopper-retracted",
+            "complete"
+        };
+        var steps = fixtureStepIds.Select(stepId => sequence.Steps.FirstOrDefault(step =>
+                string.Equals(step.Id, stepId, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException(
+                $"The checkpoint coverage fixture step '{stepId}' was not available.")).ToList();
+        for (var index = 0; index < steps.Count; index++)
+        {
+            var step = steps[index];
+            step.NextStepId = index + 1 < steps.Count ? steps[index + 1].Id : null;
+            step.ErrorStepId = null;
+            step.FailureStepId = null;
+            step.ExpectedTargetId = null;
+            step.ExpectedState = null;
+        }
+
+        SetCheckpoint(steps, "wait-stopper-extended", "cylinder-1", "Extended");
+        SetCheckpoint(steps, "wait-station-sensor", "sensor-1", "Detected");
+        SetCheckpoint(steps, "wait-station-position", "x", "Idle");
+        SetCheckpoint(steps, "conveyor-stop-at-station", "conveyor-1", "Stopped");
+        SetCheckpoint(steps, "wait-stopper-retracted", "cylinder-1", "Retracted");
+        sequence.Steps = steps;
+        return fixture;
+    }
+
+    private static MachineProjectDocument CreateStrictLinearSequenceFixture(MachineProjectDocument source)
+    {
+        var store = new ProjectDocumentStore();
+        var fixture = store.Load(store.Serialize(source));
+        var sequenceId = fixture.Simulation.AutomaticRun?.SequenceId
+            ?? fixture.Sequences.FirstOrDefault()?.Id
+            ?? throw new InvalidOperationException("A sequence was required for target-step smoke.");
+        var sequence = fixture.Sequences.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, sequenceId, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException("The target-step sequence was not available.");
+        var steps = sequence.Steps.ToList();
+        for (var index = 0; index < steps.Count; index++)
+        {
+            steps[index].NextStepId = index + 1 < steps.Count ? steps[index + 1].Id : null;
+            steps[index].ErrorStepId = null;
+            steps[index].FailureStepId = null;
+        }
+
+        sequence.Steps = steps;
+        return fixture;
+    }
+
+    private static void SetCheckpoint(
+        IReadOnlyList<SequenceStepDefinition> steps,
+        string stepId,
+        string targetId,
+        string state)
+    {
+        var step = steps.First(candidate => string.Equals(candidate.Id, stepId, StringComparison.Ordinal));
+        step.ExpectedTargetId = targetId;
+        step.ExpectedState = state;
     }
 
     private static void AssertSmoke(bool condition, string message)

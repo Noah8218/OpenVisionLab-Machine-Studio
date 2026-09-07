@@ -17,6 +17,8 @@ internal sealed class SmokeProcessBlockContext
     public required ProjectDocumentStore Store { get; init; }
     public required string ProjectBefore { get; init; }
     public required SimulationSnapshot? RuntimeBefore { get; init; }
+    public required int InitialRecipeStepCount { get; init; }
+    public required int ProposedStepCount { get; init; }
     public required Border Panel { get; init; }
     public required Button ApplyButton { get; init; }
     public required CheckBox LoadBlockCheckBox { get; init; }
@@ -44,6 +46,7 @@ internal static class SmokeProcessBlockPreparation
         var store = new ProjectDocumentStore();
         var projectBefore = store.SerializeForEvidence(project);
         var runtimeBefore = vm.SceneSnapshots.Latest;
+        var initialRecipeStepCount = vm.RecipeConnections.RecipeStepCount;
         vm.RecipeConnections.ProcessBlocks.PreviewProcessBlockCommand.Execute(null);
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         var panel = findBorder(
@@ -53,6 +56,7 @@ internal static class SmokeProcessBlockPreparation
                     "SemiconductorProcessBlockPreview",
                     StringComparison.Ordinal))
             ?? throw new InvalidOperationException("Process block preview was not available.");
+        var proposedStepCount = vm.RecipeConnections.ProcessBlocks.ProcessBlockItems.Count;
         var applyButton = findButton(
                 workbench,
                 candidate => string.Equals(
@@ -90,6 +94,8 @@ internal static class SmokeProcessBlockPreparation
             Store = store,
             ProjectBefore = projectBefore,
             RuntimeBefore = runtimeBefore,
+            InitialRecipeStepCount = initialRecipeStepCount,
+            ProposedStepCount = proposedStepCount,
             Panel = panel,
             ApplyButton = applyButton,
             LoadBlockCheckBox = loadBlockCheckBox
@@ -104,10 +110,10 @@ internal static class SmokeProcessBlockPreparation
         vm.RecipeConnections.ProcessBlocks.ApplyProcessBlockCommand.Execute(null);
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         Check(
-            vm.RecipeConnections.RecipeStepCount == 25
+            vm.RecipeConnections.RecipeStepCount == context.InitialRecipeStepCount + context.ProposedStepCount
             && vm.IsDesignMode
             && !vm.IsRunning,
-            "The editable plan setup did not create the stopped 25-step recipe.");
+            "The editable plan setup did not create the expected stopped recipe.");
 
         var projectAfterApply = context.Store.SerializeForEvidence(context.Project);
         vm.RecipeConnections.ProcessBlocks.PreviewProcessBlockCommand.Execute(null);

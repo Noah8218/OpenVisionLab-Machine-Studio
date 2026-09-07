@@ -3,7 +3,6 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
 using OpenVisionLab;
@@ -19,9 +18,6 @@ namespace OpenVisionLab.MachineStudio;
 
 internal static class SmokeProcessBlockSequenceStateVerifier
 {
-    private const uint MouseEventMove = 0x0001;
-    private const uint MouseEventLeftDown = 0x0002;
-
     public static bool IsSupportedState(string? state) => state?.ToLowerInvariant() is
         "process-block-step-open"
         or "process-block-step-return"
@@ -199,33 +195,16 @@ internal static class SmokeProcessBlockSequenceStateVerifier
                         ((RelayCommand)vm.NextProcessPlanReviewStepCommand).RaiseCanExecuteChanged();
                         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
-                        interaction.ActivateWindow();
-                        nextReviewButton.BringIntoView();
-                        nextReviewButton.Focus();
-                        Keyboard.Focus(nextReviewButton);
-                        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                        AssertSmoke(
-                            nextReviewButton.IsKeyboardFocused,
+                        await SmokeButtonPointerState.FocusAsync(
+                            window,
+                            nextReviewButton,
+                            interaction,
                             "Next filtered-step review did not expose keyboard focus.");
-                        interaction.MovePointerToCenter(nextReviewButton);
-                        Mouse.Capture(nextReviewButton, CaptureMode.SubTree);
-                        Mouse.Synchronize();
-                        await Task.Delay(200);
-                        AssertSmoke(
-                            nextReviewButton.IsMouseOver,
-                            "Next filtered-step review did not enter hover state.");
-                        interaction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
-                        interaction.MarkSmokePointerHeld();
-                        nextReviewButton.RaiseEvent(new MouseButtonEventArgs(
-                            Mouse.PrimaryDevice,
-                            Environment.TickCount,
-                            MouseButton.Left)
-                        {
-                            RoutedEvent = Mouse.MouseDownEvent
-                        });
-                        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                        AssertSmoke(
-                            nextReviewButton.IsPressed,
+                        await SmokeButtonPointerState.HoverThenPressAsync(
+                            window,
+                            nextReviewButton,
+                            interaction,
+                            () => "Next filtered-step review did not enter hover state.",
                             "Next filtered-step review did not enter pointer-down state.");
                         AssertSmoke(
                             reviewSourceAfterEdit == processStore.SerializeForEvidence(processProject)
@@ -312,29 +291,19 @@ internal static class SmokeProcessBlockSequenceStateVerifier
                         if (connectionWorkbenchState.Equals("process-block-step-return-focus", StringComparison.OrdinalIgnoreCase)
                             || connectionWorkbenchState.Equals("process-block-step-return-pressed", StringComparison.OrdinalIgnoreCase))
                         {
-                            interaction.ActivateWindow();
-                            returnButton.Focus();
-                            Keyboard.Focus(returnButton);
-                            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                            AssertSmoke(returnButton.IsKeyboardFocused, "Return-to-process-plan button did not receive focus.");
+                            await SmokeButtonPointerState.FocusAsync(
+                                window,
+                                returnButton,
+                                interaction,
+                                "Return-to-process-plan button did not receive focus.");
                             if (connectionWorkbenchState.Equals("process-block-step-return-pressed", StringComparison.OrdinalIgnoreCase))
                             {
-                                interaction.MovePointerToCenter(returnButton);
-                                Mouse.Capture(returnButton, CaptureMode.SubTree);
-                                Mouse.Synchronize();
-                                await Task.Delay(200);
-                                AssertSmoke(returnButton.IsMouseOver, "Return-to-process-plan button did not enter hover state.");
-                                interaction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
-                                interaction.MarkSmokePointerHeld();
-                                returnButton.RaiseEvent(new MouseButtonEventArgs(
-                                    Mouse.PrimaryDevice,
-                                    Environment.TickCount,
-                                    MouseButton.Left)
-                                {
-                                    RoutedEvent = Mouse.MouseDownEvent
-                                });
-                                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                                AssertSmoke(returnButton.IsPressed, "Return-to-process-plan button did not enter pointer-down state.");
+                                await SmokeButtonPointerState.HoverThenPressAsync(
+                                    window,
+                                    returnButton,
+                                    interaction,
+                                    () => "Return-to-process-plan button did not enter hover state.",
+                                    "Return-to-process-plan button did not enter pointer-down state.");
                             }
                             break;
                         }
@@ -508,13 +477,16 @@ internal static class SmokeProcessBlockSequenceStateVerifier
                             candidate.Id,
                             sequenceId,
                             StringComparison.Ordinal));
-                        allBundledTargetsExact &= preview.Steps.Count == 13
+                        HashSet<string> managedSequenceStepIds = sequence is null
+                            ? []
+                            : sequence.Steps
+                                .Where(step => step.Id.StartsWith("process-block.", StringComparison.Ordinal))
+                                .Select(step => step.Id)
+                                .ToHashSet(StringComparer.Ordinal);
+                        allBundledTargetsExact &= sequence is not null
+                            && preview.Steps.Count == managedSequenceStepIds.Count
                             && preview.Steps.All(step => step.Status == SemiconductorProcessBlockStepStatus.Existing)
-                            && sequence is not null
-                            && preview.Steps.All(entry => sequence.Steps.Any(step => string.Equals(
-                                step.Id,
-                                entry.StepId,
-                                StringComparison.Ordinal)));
+                            && managedSequenceStepIds.SetEquals(preview.Steps.Select(entry => entry.StepId));
                     }
                     AssertSmoke(
                         allBundledTargetsExact,

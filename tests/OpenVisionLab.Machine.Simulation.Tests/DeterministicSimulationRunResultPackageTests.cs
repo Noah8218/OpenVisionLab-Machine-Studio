@@ -6,12 +6,22 @@ using OpenVisionLab.Machine.Simulation.Layout;
 using OpenVisionLab.Machine.Simulation.Scenarios;
 using OpenVisionLab.Machine.Simulation.Snapshots;
 using OpenVisionLab.Machine.Simulation.Workpieces;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Simulation.Tests;
 
 public sealed class DeterministicSimulationRunResultPackageTests
 {
+    private static string ProjectPath => Path.Combine(
+        TestStorage.RootPath,
+        "goal2-fixture.ovmachine");
+
+    private static string ArtifactRoot => Path.Combine(
+        TestStorage.RootPath,
+        "artifacts",
+        "20260812-goal2-closeout");
+
     [Fact]
     public async Task FromReplay_IsDeterministicAndRoundTripsAsOneRunPackage()
     {
@@ -23,7 +33,7 @@ public sealed class DeterministicSimulationRunResultPackageTests
         var firstPackage = DeterministicSimulationRunResultPackage.FromReplay(
             "package-fixture",
             "Package fixture",
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\goal2-fixture.ovmachine",
+            ProjectPath,
             projectJson,
             TimeSpan.FromMilliseconds(5),
             profile,
@@ -31,7 +41,7 @@ public sealed class DeterministicSimulationRunResultPackageTests
         var secondPackage = DeterministicSimulationRunResultPackage.FromReplay(
             "package-fixture",
             "Package fixture",
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\goal2-fixture.ovmachine",
+            ProjectPath,
             projectJson,
             TimeSpan.FromMilliseconds(5),
             profile,
@@ -52,7 +62,7 @@ public sealed class DeterministicSimulationRunResultPackageTests
         Assert.NotEqual(firstPackage.EventHash, string.Empty);
 
         var artifactPath = Path.Combine(
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\artifacts\\20260812-goal2-closeout",
+            ArtifactRoot,
             "deterministic-run-result-package.json");
         DeterministicSimulationRunResultPackage.SaveToJson(firstPackage, artifactPath);
         var loaded = Assert.IsType<DeterministicSimulationRunResultPackage>(
@@ -265,7 +275,7 @@ public sealed class DeterministicSimulationRunResultPackageTests
         DeterministicSimulationRunResultPackage.FromReplay(
             "package-fixture",
             "Package fixture",
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\goal2-fixture.ovmachine",
+            ProjectPath,
             "{\"schema\":\"1.2\",\"id\":\"package-fixture\",\"name\":\"Package fixture\"}",
             TimeSpan.FromMilliseconds(5),
             profile,

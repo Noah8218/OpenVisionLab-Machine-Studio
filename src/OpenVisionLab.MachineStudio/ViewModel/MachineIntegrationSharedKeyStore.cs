@@ -22,6 +22,7 @@ internal sealed class MachineIntegrationSharedKeyStore : IDisposable
     internal const string EnvironmentVariableName = "OPENVISIONLAB_TCP_SHARED_KEY";
 
     private readonly Func<string?> _environmentValueProvider;
+    private readonly object _lifecycleGate = new();
     private byte[]? _sessionKey;
     private MachineIntegrationSharedKeyStatus? _sessionStatus;
     private bool _disposed;
@@ -33,59 +34,71 @@ internal sealed class MachineIntegrationSharedKeyStore : IDisposable
     {
         get
         {
-            ThrowIfDisposed();
-            return _sessionStatus ?? GetEnvironmentStatus();
+            lock (_lifecycleGate)
+            {
+                ThrowIfDisposedLocked();
+                return _sessionStatus ?? GetEnvironmentStatus();
+            }
         }
     }
 
     public MachineIntegrationSharedKeyStatus SetSessionKey(string? encodedKey)
     {
-        ThrowIfDisposed();
-        ClearSessionKey();
-        _sessionStatus = null;
-        if (string.IsNullOrWhiteSpace(encodedKey))
+        lock (_lifecycleGate)
         {
-            return Status;
-        }
+            ThrowIfDisposedLocked();
+            ClearSessionKeyLocked();
+            _sessionStatus = null;
+            if (string.IsNullOrWhiteSpace(encodedKey))
+            {
+                return _sessionStatus ?? GetEnvironmentStatus();
+            }
 
-        _sessionStatus = Decode(encodedKey, session: true, out _sessionKey);
-        return _sessionStatus.Value;
+            _sessionStatus = Decode(encodedKey, session: true, out _sessionKey);
+            return _sessionStatus.Value;
+        }
     }
 
     public byte[]? TryAcquire()
     {
-        ThrowIfDisposed();
-        if (_sessionStatus is { } sessionStatus)
+        lock (_lifecycleGate)
         {
-            return sessionStatus == MachineIntegrationSharedKeyStatus.SessionReady
-                ? _sessionKey?.ToArray()
-                : null;
-        }
+            ThrowIfDisposedLocked();
+            if (_sessionStatus is { } sessionStatus)
+            {
+                return sessionStatus == MachineIntegrationSharedKeyStatus.SessionReady
+                    ? _sessionKey?.ToArray()
+                    : null;
+            }
 
-        var status = Decode(_environmentValueProvider(), session: false, out var key);
-        if (status == MachineIntegrationSharedKeyStatus.EnvironmentReady)
-        {
-            return key;
-        }
+            var status = Decode(_environmentValueProvider(), session: false, out var key);
+            if (status == MachineIntegrationSharedKeyStatus.EnvironmentReady)
+            {
+                return key;
+            }
 
-        if (key is not null)
-        {
-            CryptographicOperations.ZeroMemory(key);
-        }
+            if (key is not null)
+            {
+                CryptographicOperations.ZeroMemory(key);
+            }
 
-        return null;
+            return null;
+        }
     }
 
     public void Dispose()
     {
-        if (_disposed)
+        lock (_lifecycleGate)
         {
-            return;
-        }
+            if (_disposed)
+            {
+                return;
+            }
 
-        _disposed = true;
-        ClearSessionKey();
-        _sessionStatus = null;
+            _disposed = true;
+            ClearSessionKeyLocked();
+            _sessionStatus = null;
+        }
     }
 
     private MachineIntegrationSharedKeyStatus GetEnvironmentStatus()
@@ -99,7 +112,7 @@ internal sealed class MachineIntegrationSharedKeyStore : IDisposable
         return status;
     }
 
-    private void ClearSessionKey()
+    private void ClearSessionKeyLocked()
     {
         if (_sessionKey is not null)
         {
@@ -148,6 +161,5 @@ internal sealed class MachineIntegrationSharedKeyStore : IDisposable
     private static string? ReadEnvironmentValue() =>
         Environment.GetEnvironmentVariable(EnvironmentVariableName);
 
-    private void ThrowIfDisposed() =>
-        ObjectDisposedException.ThrowIf(_disposed, this);
+    private void ThrowIfDisposedLocked() => ObjectDisposedException.ThrowIf(_disposed, this);
 }

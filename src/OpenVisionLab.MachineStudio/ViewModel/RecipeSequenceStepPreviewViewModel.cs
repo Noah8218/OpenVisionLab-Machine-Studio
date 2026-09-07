@@ -6,13 +6,14 @@ using OpenVisionLab.Machine.Simulation.Snapshots;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
-public sealed class RecipeSequenceStepPreviewViewModel : ViewModelBase
+public sealed class RecipeSequenceStepPreviewViewModel : ViewModelBase, IDisposable
 {
     private readonly Func<string, string, string, Task<SequenceStepPreviewResult>> _previewSequenceStep;
     private readonly Func<bool> _isEditable;
     private readonly Func<bool> _isReady;
     private readonly Func<RecipeConnectionRowViewModel, bool> _isCurrentRow;
     private readonly AsyncRelayCommand _previewSequenceStepCommand;
+    private int _disposed;
 
     public RecipeSequenceStepPreviewViewModel(
         Func<string, string, string, Task<SequenceStepPreviewResult>> previewSequenceStep,
@@ -26,17 +27,29 @@ public sealed class RecipeSequenceStepPreviewViewModel : ViewModelBase
         _isCurrentRow = isCurrentRow;
         _previewSequenceStepCommand = new AsyncRelayCommand(
             PreviewSequenceStepAsync,
-            parameter => _isEditable()
+            parameter => !IsDisposed
+                         && _isEditable()
                          && _isReady()
                          && parameter is RecipeConnectionRowViewModel { CanPreviewSequenceStep: true });
     }
 
     public ICommand PreviewSequenceStepCommand => _previewSequenceStepCommand;
 
-    public void RefreshCanExecute() => _previewSequenceStepCommand.RaiseCanExecuteChanged();
+    public void RefreshCanExecute()
+    {
+        if (!IsDisposed)
+        {
+            _previewSequenceStepCommand.RaiseCanExecuteChanged();
+        }
+    }
 
     private async Task PreviewSequenceStepAsync(object? parameter)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (parameter is not RecipeConnectionRowViewModel
             {
                 FirstSequenceId: { } sequenceId,
@@ -47,7 +60,7 @@ public sealed class RecipeSequenceStepPreviewViewModel : ViewModelBase
         }
 
         var result = await _previewSequenceStep(sequenceId, stepId, row.ComponentId);
-        if (!_isCurrentRow(row) || !_isReady())
+        if (IsDisposed || !_isCurrentRow(row) || !_isReady())
         {
             return;
         }
@@ -105,4 +118,8 @@ public sealed class RecipeSequenceStepPreviewViewModel : ViewModelBase
 
     private static string Format(string key, params object[] args) =>
         string.Format(CultureInfo.CurrentCulture, OpenVisionLanguageService.T(key), args);
+
+    public void Dispose() => Interlocked.Exchange(ref _disposed, 1);
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

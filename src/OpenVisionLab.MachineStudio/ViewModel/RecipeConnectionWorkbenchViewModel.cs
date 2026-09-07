@@ -130,7 +130,7 @@ public sealed record SemiconductorManagedTimeoutAdjustmentItemPresentation(
     string StepText,
     string DetailText);
 
-public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
+public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase, IDisposable
 {
     private readonly Action<string?> _selectComponent;
     private readonly Action<string, string> _openSequenceStep;
@@ -146,6 +146,7 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
     private RecipeConnectionRowViewModel? _selectedRow;
     private bool _isSynchronizingSelection;
     private bool _isEditable = true;
+    private int _disposed;
     public RecipeCheckpointTemplateViewModel CheckpointTemplate { get; }
     public StationSkeletonSetupViewModel StationSetups { get; }
     public SemanticEquipmentSetupViewModel SemanticSetups { get; }
@@ -213,10 +214,11 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
             row => Rows.Contains(row));
         _openSequenceStepCommand = new RelayCommand(
             OpenSequenceStep,
-            parameter => IsEditable && CanOpenSequenceStep(parameter));
+            parameter => !IsDisposed && IsEditable && CanOpenSequenceStep(parameter));
         _addSequenceStepCommand = new RelayCommand(
             AddSequenceStep,
-            parameter => IsEditable
+            parameter => !IsDisposed
+                         && IsEditable
                          && parameter is RecipeConnectionRowViewModel
                              {
                                  IsValid: true,
@@ -224,7 +226,7 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
                              });
         _createVirtualCameraWorkflowCommand = new RelayCommand(
             _ => CreateVirtualCameraWorkflow(),
-            _ => IsEditable && CanCreateVirtualCameraWorkflow);
+            _ => !IsDisposed && IsEditable && CanCreateVirtualCameraWorkflow);
         DryRun.PropertyChanged += OnDryRunPropertyChanged;
     }
 
@@ -244,7 +246,7 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
         get => _isEditable;
         set
         {
-            if (!SetProperty(ref _isEditable, value))
+            if (IsDisposed || !SetProperty(ref _isEditable, value))
             {
                 return;
             }
@@ -267,7 +269,7 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
         get => _selectedRow;
         set
         {
-            if (!SetProperty(ref _selectedRow, value) || _isSynchronizingSelection)
+            if (IsDisposed || !SetProperty(ref _selectedRow, value) || _isSynchronizingSelection)
             {
                 return;
             }
@@ -329,6 +331,11 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
         string? selectedComponentId = null,
         bool preserveReadiness = false)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _project = project ?? throw new ArgumentNullException(nameof(project));
         DryRun.Load(project, preserveReadiness);
         CheckpointTemplate.Load(project);
@@ -368,6 +375,11 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
 
     public void RefreshDefinitionPreservingProcessBlockPlan(string? selectedComponentId = null)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         ProcessBlocks.RefreshDefinitionPreservingPlan(
             () => Load(_project ?? throw new InvalidOperationException("No project is loaded."), selectedComponentId),
             selectedComponentId);
@@ -375,6 +387,11 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
 
     public void SynchronizeSelection(string? componentId)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var wasSynchronizingSelection = _isSynchronizingSelection;
         _isSynchronizingSelection = true;
         try
@@ -390,6 +407,11 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
 
     public void RefreshLocalization()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (_project is not null)
         {
             CheckpointTemplate.RefreshLocalization(() =>
@@ -405,6 +427,11 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
 
     private void OpenSequenceStep(object? parameter)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         switch (parameter)
         {
             case RecipeConnectionRowViewModel
@@ -427,6 +454,11 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
 
     private void CreateVirtualCameraWorkflow()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (!_applyVirtualCameraWorkflow())
         {
             return;
@@ -445,6 +477,11 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
 
     private void AddSequenceStep(object? parameter)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (parameter is RecipeConnectionRowViewModel { SequenceTargetId: { } targetId })
         {
             _addSequenceStep(targetId);
@@ -493,7 +530,7 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
 
     private int ApplyCheckpointTemplate(RepresentativeRecipeCheckpointTemplatePreview preview)
     {
-        if (_project is null)
+        if (IsDisposed || _project is null)
         {
             return 0;
         }
@@ -545,9 +582,23 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase
 
     private void OnDryRunPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
-        if (args.PropertyName is nameof(RecipeDryRunViewModel.ReadinessPassed))
+        if (!IsDisposed && args.PropertyName is nameof(RecipeDryRunViewModel.ReadinessPassed))
         {
             SequenceStepPreview.RefreshCanExecute();
         }
     }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        DryRun.PropertyChanged -= OnDryRunPropertyChanged;
+        SequenceStepPreview.Dispose();
+        DryRun.Dispose();
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

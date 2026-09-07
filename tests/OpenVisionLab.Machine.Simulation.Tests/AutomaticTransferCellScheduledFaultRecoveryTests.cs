@@ -10,6 +10,7 @@ using OpenVisionLab.Machine.Simulation.Faults;
 using OpenVisionLab.Machine.Simulation.Layout;
 using OpenVisionLab.Machine.Simulation.Scenarios;
 using OpenVisionLab.Machine.Simulation.Snapshots;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Simulation.Tests;
@@ -81,7 +82,8 @@ public sealed class AutomaticTransferCellScheduledFaultRecoveryTests
         Assert.Equal(3, reopened.Simulation.TestScenarioAssertions.Count);
 
         string artifactDirectory = Path.Combine(
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\artifacts",
+            TestStorage.RootPath,
+            "artifacts",
             "20260813-project-scenario-assertions");
         string baselinePath = Path.Combine(artifactDirectory, "accepted-baseline.json");
         string resultPath = Path.Combine(artifactDirectory, "batch-result.json");
@@ -134,7 +136,8 @@ public sealed class AutomaticTransferCellScheduledFaultRecoveryTests
         Assert.True(first.Package.HasValidEvidenceHash());
 
         string artifactPath = Path.Combine(
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\artifacts",
+            TestStorage.RootPath,
+            "artifacts",
             faultCase.ArtifactDirectory,
             faultCase.ArtifactFileName);
         DeterministicSimulationRunResultPackage.SaveToJson(first.Package, artifactPath);

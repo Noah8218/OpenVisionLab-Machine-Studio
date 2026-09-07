@@ -2,12 +2,22 @@ using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Layout;
 using OpenVisionLab.Machine.Simulation.Scenarios;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Simulation.Tests;
 
 public sealed class DeterministicSimulationBatchResultPackageTests
 {
+    private static string ArtifactRoot => Path.Combine(
+        TestStorage.RootPath,
+        "artifacts",
+        "20260810-goal3-batch");
+
+    private static string ProjectPath => Path.Combine(
+        TestStorage.RootPath,
+        "batch-fixture.ovmachine");
+
     private const string ProjectJson =
         "{\"schema\":\"1.2\",\"id\":\"batch-fixture\",\"name\":\"Batch fixture\"}";
 
@@ -39,7 +49,7 @@ public sealed class DeterministicSimulationBatchResultPackageTests
         Assert.Equal(first.EvidenceHash, second.EvidenceHash);
 
         var artifactPath = Path.Combine(
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\artifacts\\20260810-goal3-batch",
+            ArtifactRoot,
             "deterministic-batch-result-package.json");
         DeterministicSimulationBatchResultPackage.SaveToJson(first, artifactPath);
         var loaded = Assert.IsType<DeterministicSimulationBatchResultPackage>(
@@ -112,7 +122,7 @@ public sealed class DeterministicSimulationBatchResultPackageTests
         DeterministicSimulationBatchResultPackage.SaveToJson(
             result,
             Path.Combine(
-                "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\artifacts\\20260810-goal3-batch",
+                ArtifactRoot,
                 "exact-first-mismatch.json"));
     }
 
@@ -153,7 +163,7 @@ public sealed class DeterministicSimulationBatchResultPackageTests
             (_, cancellationToken) => RunPackageAsync(CreateProfile(seed: 42), cancellationToken));
         var incomplete = complete with { IsComplete = false, IsSuccess = false };
         var artifactPath = Path.Combine(
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\artifacts\\20260810-goal3-batch",
+            ArtifactRoot,
             "accepted-batch.json");
 
         DeterministicSimulationBatchResultPackage.SaveToJson(complete, artifactPath);
@@ -269,7 +279,7 @@ public sealed class DeterministicSimulationBatchResultPackageTests
         return DeterministicSimulationRunResultPackage.FromReplay(
             "batch-fixture",
             "Batch fixture",
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\batch-fixture.ovmachine",
+            ProjectPath,
             ProjectJson,
             TimeSpan.FromMilliseconds(5),
             profile,

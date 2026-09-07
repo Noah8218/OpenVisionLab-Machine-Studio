@@ -45,7 +45,7 @@ public sealed class SimulationConditionScenarioStopHandlerTests
                 scheduledFaultActive: true,
                 profile: CreateProfile(),
                 signalHub: CreateSignalHub("di.sensor"),
-                activeFaults: new Dictionary<SimulationFaultKey, SimulationFaultSnapshot>()));
+                activeFaults: new SimulationFaultRuntime()));
 
         Assert.True(outcome.Result.IsAccepted, outcome.Result.Detail);
         Assert.False(outcome.State!.ScenarioActive);
@@ -65,7 +65,7 @@ public sealed class SimulationConditionScenarioStopHandlerTests
                 scheduledFaultActive: false,
                 profile: CreateProfile(),
                 signalHub: CreateSignalHub("di.sensor"),
-                activeFaults: new Dictionary<SimulationFaultKey, SimulationFaultSnapshot>()));
+                activeFaults: new SimulationFaultRuntime()));
 
         Assert.False(outcome.Result.IsAccepted);
         Assert.Equal(
@@ -80,7 +80,7 @@ public sealed class SimulationConditionScenarioStopHandlerTests
         bool scheduledFaultActive,
         DeterministicConditionScenarioProfile profile,
         DeterministicSignalHub signalHub,
-        IDictionary<SimulationFaultKey, SimulationFaultSnapshot> activeFaults) =>
+        SimulationFaultRuntime activeFaults) =>
         new(
             scenarioActive,
             profile,
@@ -122,16 +122,17 @@ public sealed class SimulationConditionScenarioStopHandlerTests
                 InjectTick: 2,
                 HoldTicks: 2));
 
-    private static Dictionary<SimulationFaultKey, SimulationFaultSnapshot> ActiveFaults() =>
-        new()
-        {
-            [new(SimulationFaultKind.StuckDigitalInput, "di.sensor")] = new(
-                SimulationFaultKind.StuckDigitalInput,
-                "di.sensor",
-                false,
-                3,
-                TimeSpan.FromMilliseconds(15))
-        };
+    private static SimulationFaultRuntime ActiveFaults()
+    {
+        var runtime = new SimulationFaultRuntime();
+        runtime.Add(new SimulationFaultSnapshot(
+            SimulationFaultKind.StuckDigitalInput,
+            "di.sensor",
+            false,
+            3,
+            TimeSpan.FromMilliseconds(15)));
+        return runtime;
+    }
 
     private static DeterministicSignalHub CreateSignalHub(params string[] channelIds) =>
         DeterministicSignalHub.Create(channelIds.Select(Channel).ToArray()).Hub!;

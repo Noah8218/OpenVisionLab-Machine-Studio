@@ -1,13 +1,16 @@
 using System.Collections.Immutable;
 using OpenVisionLab.Machine.Simulation.Scenarios;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Simulation.Tests;
 
 public sealed class DeterministicScenarioAssertionTests
 {
-    private const string ArtifactRoot =
-        "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\artifacts\\20260813-scenario-assertions";
+    private static string ArtifactRoot => Path.Combine(
+        TestStorage.RootPath,
+        "artifacts",
+        "20260813-scenario-assertions");
 
     [Fact]
     public async Task ConcreteRuns_EvaluateSnapshotAndEventAssertionsIntoSchema5Evidence()

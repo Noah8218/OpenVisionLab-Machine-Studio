@@ -52,6 +52,44 @@ public sealed class RuntimeDebuggerViewModelTests
     }
 
     [Fact]
+    public async Task Dispose_SuppressesLateOperationPublication_AndIsIdempotent()
+    {
+        OpenVisionLanguageService.Load();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var viewModel = new RuntimeDebuggerViewModel(async command =>
+        {
+            await gate.Task;
+            return Accepted(command);
+        });
+        viewModel.LoadProject(CreateProject(), resetSession: true);
+        viewModel.SetEnabled(true, invalidateCommands: true);
+        viewModel.ApplySnapshot(CreateSnapshot(new SequenceDebugSnapshot(
+            false,
+            null,
+            SequenceDebugPauseReason.None,
+            null,
+            [new SequenceBreakpointSnapshot("cycle", "on")])));
+        viewModel.SelectedBreakpoint = viewModel.Breakpoints.Single(item => item.StepId == "off");
+        var changedProperties = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        viewModel.ToggleBreakpointCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.IsOperationPending);
+
+        viewModel.Dispose();
+        viewModel.Dispose();
+        gate.SetResult();
+        await WaitUntilAsync(() => !viewModel.IsOperationPending);
+
+        Assert.Equal(
+            OpenVisionLanguageService.T("Debugger.ReadyHint"),
+            viewModel.OperationStatusText);
+        Assert.DoesNotContain(nameof(viewModel.OperationStatusText), changedProperties);
+        Assert.False(viewModel.ToggleBreakpointCommand.CanExecute(null));
+        Assert.False(viewModel.AddWatchCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void Snapshot_ProjectsBreakpointsWatchesAndRecoveryAlarms()
     {
         OpenVisionLanguageService.Load();

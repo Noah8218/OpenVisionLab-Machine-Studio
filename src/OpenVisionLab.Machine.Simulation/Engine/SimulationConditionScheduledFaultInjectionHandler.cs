@@ -13,7 +13,7 @@ internal sealed record SimulationConditionScheduledFaultInjectionContext(
     IList<ServoAxisComponent> Axes,
     DeterministicSignalHub SignalHub,
     DeterministicMachineLayout? MachineLayout,
-    IDictionary<SimulationFaultKey, SimulationFaultSnapshot> ActiveFaults,
+    SimulationFaultRuntime ActiveFaults,
     SimulationFaultCommandHandler FaultCommandHandler,
     long CommandBoundaryTick,
     TimeSpan CommandBoundaryTime);

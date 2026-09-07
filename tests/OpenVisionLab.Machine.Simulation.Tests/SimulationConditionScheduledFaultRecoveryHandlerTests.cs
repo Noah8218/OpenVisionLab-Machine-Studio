@@ -18,15 +18,7 @@ public sealed class SimulationConditionScheduledFaultRecoveryHandlerTests
     {
         var signalHub = CreateSignalHub("di.sensor");
         Assert.True(signalHub.SetDigitalInputOverride("di.sensor", false).IsAccepted);
-        var activeFaults = new Dictionary<SimulationFaultKey, SimulationFaultSnapshot>
-        {
-            [new(SimulationFaultKind.StuckDigitalInput, "di.sensor")] = new(
-                SimulationFaultKind.StuckDigitalInput,
-                "di.sensor",
-                false,
-                3,
-                TimeSpan.FromMilliseconds(15))
-        };
+        var activeFaults = ActiveFaults();
         var state = ActiveState(AutomaticRunActive: false, InterruptedAutomaticRun: false);
         var outcome = new SimulationConditionScheduledFaultRecoveryHandler().Apply(
             CreateContext(
@@ -101,7 +93,7 @@ public sealed class SimulationConditionScheduledFaultRecoveryHandlerTests
                 restartSequence: false,
                 ActiveState(AutomaticRunActive: false, InterruptedAutomaticRun: true),
                 CreateSignalHub("di.sensor"),
-                new Dictionary<SimulationFaultKey, SimulationFaultSnapshot>()));
+                new SimulationFaultRuntime()));
 
         Assert.Null(outcome.State);
         var operationEvent = Assert.Single(outcome.Events!);
@@ -114,7 +106,7 @@ public sealed class SimulationConditionScheduledFaultRecoveryHandlerTests
         bool restartSequence,
         SimulationConditionScheduledFaultRecoveryState state,
         DeterministicSignalHub signalHub,
-        IDictionary<SimulationFaultKey, SimulationFaultSnapshot> activeFaults,
+        SimulationFaultRuntime activeFaults,
         IReadOnlyDictionary<string, DeterministicSequenceExecutor>? sequenceExecutors = null) =>
         new(
             schedule,
@@ -145,16 +137,17 @@ public sealed class SimulationConditionScheduledFaultRecoveryHandlerTests
             automaticRunWaitingForRepeat,
             automaticRunRemainingDelayTicks);
 
-    private static Dictionary<SimulationFaultKey, SimulationFaultSnapshot> ActiveFaults() =>
-        new()
-        {
-            [new(SimulationFaultKind.StuckDigitalInput, "di.sensor")] = new(
-                SimulationFaultKind.StuckDigitalInput,
-                "di.sensor",
-                false,
-                3,
-                TimeSpan.FromMilliseconds(15))
-        };
+    private static SimulationFaultRuntime ActiveFaults()
+    {
+        var runtime = new SimulationFaultRuntime();
+        runtime.Add(new SimulationFaultSnapshot(
+            SimulationFaultKind.StuckDigitalInput,
+            "di.sensor",
+            false,
+            3,
+            TimeSpan.FromMilliseconds(15)));
+        return runtime;
+    }
 
     private static DeterministicSignalHub CreateSignalHub(params string[] channelIds) =>
         DeterministicSignalHub.Create(channelIds.Select(Channel).ToArray()).Hub!;

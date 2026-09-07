@@ -20,7 +20,7 @@ public sealed record ActiveSimulationFaultItem(
     bool? ForcedValue,
     long ActivatedTick);
 
-public sealed class FaultManagerViewModel : ViewModelBase
+public sealed class FaultManagerViewModel : ViewModelBase, IDisposable
 {
     private static readonly IReadOnlyList<SimulationFaultKindOption> KindOptions =
     [
@@ -52,6 +52,7 @@ public sealed class FaultManagerViewModel : ViewModelBase
     private ICommand? _injectCommand;
     private ICommand? _clearSelectedCommand;
     private ICommand? _clearAllCommand;
+    private int _disposed;
 
     public FaultManagerViewModel(
         Func<SimulationCommand, Task<SimulationCommandResult>> dispatch)
@@ -69,7 +70,7 @@ public sealed class FaultManagerViewModel : ViewModelBase
         get => _selectedKind;
         set
         {
-            if (value is null)
+            if (IsDisposed || value is null)
             {
                 return;
             }
@@ -89,7 +90,7 @@ public sealed class FaultManagerViewModel : ViewModelBase
         get => _selectedTarget;
         set
         {
-            if (SetProperty(ref _selectedTarget, value))
+            if (!IsDisposed && SetProperty(ref _selectedTarget, value))
             {
                 CommandManager.InvalidateRequerySuggested();
             }
@@ -101,7 +102,7 @@ public sealed class FaultManagerViewModel : ViewModelBase
         get => _selectedForcedValue;
         set
         {
-            if (value is not null)
+            if (!IsDisposed && value is not null)
             {
                 SetProperty(ref _selectedForcedValue, value);
             }
@@ -113,7 +114,7 @@ public sealed class FaultManagerViewModel : ViewModelBase
         get => _selectedActiveFault;
         set
         {
-            if (SetProperty(ref _selectedActiveFault, value))
+            if (!IsDisposed && SetProperty(ref _selectedActiveFault, value))
             {
                 CommandManager.InvalidateRequerySuggested();
             }
@@ -128,7 +129,7 @@ public sealed class FaultManagerViewModel : ViewModelBase
 
     internal void SetEnabled(bool value, bool invalidateCommands)
     {
-        if (SetProperty(ref _isEnabled, value) && invalidateCommands)
+        if (!IsDisposed && SetProperty(ref _isEnabled, value) && invalidateCommands)
         {
             CommandManager.InvalidateRequerySuggested();
         }
@@ -136,6 +137,11 @@ public sealed class FaultManagerViewModel : ViewModelBase
 
     internal void InvalidateCommands()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         (_injectCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         (_clearSelectedCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         (_clearAllCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
@@ -167,7 +173,13 @@ public sealed class FaultManagerViewModel : ViewModelBase
     public string OperationStatusText
     {
         get => _operationStatusText;
-        private set => SetProperty(ref _operationStatusText, value);
+        private set
+        {
+            if (!IsDisposed)
+            {
+                SetProperty(ref _operationStatusText, value);
+            }
+        }
     }
 
     public ICommand InjectCommand => _injectCommand ??= new AsyncRelayCommand(
@@ -176,14 +188,19 @@ public sealed class FaultManagerViewModel : ViewModelBase
 
     public ICommand ClearSelectedCommand => _clearSelectedCommand ??= new AsyncRelayCommand(
         _ => RunOperationAsync(ClearSelectedAsync),
-        _ => IsEnabled && !_isOperationPending && SelectedActiveFault is not null);
+        _ => !IsDisposed && IsEnabled && !_isOperationPending && SelectedActiveFault is not null);
 
     public ICommand ClearAllCommand => _clearAllCommand ??= new AsyncRelayCommand(
         _ => RunOperationAsync(ClearAllAsync),
-        _ => IsEnabled && !_isOperationPending && ActiveFaults.Count > 0);
+        _ => !IsDisposed && IsEnabled && !_isOperationPending && ActiveFaults.Count > 0);
 
     public void RefreshLocalization()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         OnPropertyChanged(nameof(AvailableKinds));
         OnPropertyChanged(nameof(ForcedValueOptions));
         OnPropertyChanged(nameof(TargetSelectionHelpText));
@@ -201,7 +218,7 @@ public sealed class FaultManagerViewModel : ViewModelBase
         get => _isOperationPending;
         private set
         {
-            if (SetProperty(ref _isOperationPending, value))
+            if (!IsDisposed && SetProperty(ref _isOperationPending, value))
             {
                 CommandManager.InvalidateRequerySuggested();
             }
@@ -211,6 +228,11 @@ public sealed class FaultManagerViewModel : ViewModelBase
     public void ApplySnapshot(SimulationSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _latestSnapshot = snapshot;
         var hadActiveFaults = ActiveFaults.Count > 0;
 
@@ -263,6 +285,11 @@ public sealed class FaultManagerViewModel : ViewModelBase
 
     private void RefreshTargets()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var previousTargetId = SelectedTarget?.Id;
         Targets.Clear();
         if (_latestSnapshot is not null)
@@ -284,7 +311,7 @@ public sealed class FaultManagerViewModel : ViewModelBase
 
     private bool CanInject()
     {
-        if (!IsEnabled || IsOperationPending || SelectedTarget is null)
+        if (IsDisposed || !IsEnabled || IsOperationPending || SelectedTarget is null)
         {
             return false;
         }
@@ -296,6 +323,11 @@ public sealed class FaultManagerViewModel : ViewModelBase
 
     private async Task InjectAsync()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var target = SelectedTarget;
         if (target is null)
         {
@@ -314,6 +346,11 @@ public sealed class FaultManagerViewModel : ViewModelBase
 
     private async Task ClearSelectedAsync()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var fault = SelectedActiveFault;
         if (fault is null)
         {
@@ -328,11 +365,26 @@ public sealed class FaultManagerViewModel : ViewModelBase
 
     private async Task ClearAllAsync()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var activeFaults = ActiveFaults.ToArray();
         var clearedCount = 0;
         foreach (var fault in activeFaults)
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             var result = await _dispatch(new ClearSimulationFaultCommand(fault.Kind, fault.TargetId));
+            if (IsDisposed)
+            {
+                return;
+            }
+
             if (!result.IsAccepted)
             {
                 OperationStatusText = Format(
@@ -350,7 +402,7 @@ public sealed class FaultManagerViewModel : ViewModelBase
 
     private async Task RunOperationAsync(Func<Task> operation)
     {
-        if (IsOperationPending)
+        if (IsDisposed || IsOperationPending)
         {
             return;
         }
@@ -362,9 +414,23 @@ public sealed class FaultManagerViewModel : ViewModelBase
         }
         finally
         {
-            IsOperationPending = false;
+            if (IsDisposed)
+            {
+                _isOperationPending = false;
+            }
+            else
+            {
+                IsOperationPending = false;
+            }
         }
     }
+
+    public void Dispose()
+    {
+        Interlocked.Exchange(ref _disposed, 1);
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     private static string FormatKind(SimulationFaultKind kind) => kind switch
     {

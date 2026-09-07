@@ -7,6 +7,41 @@ namespace OpenVisionLab.MachineStudio.Tests;
 public sealed class SemiconductorRecipeGalleryViewModelTests
 {
     [Fact]
+    public async Task DisposeSuppressesLateCopyAndDisablesCommands()
+    {
+        var copyStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCopy = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var viewModel = new SemiconductorRecipeGalleryViewModel(
+            (_, _) =>
+            {
+                copyStarted.SetResult(true);
+                return releaseCopy.Task;
+            },
+            () => null,
+            () => null,
+            () => null);
+
+        Assert.True(viewModel.HasItems);
+        Task<bool> copyTask = viewModel.CreateCopyToAsync("ignored.ovmachine");
+        await copyStarted.Task;
+        Assert.True(viewModel.IsBusy);
+
+        viewModel.Dispose();
+        viewModel.Dispose();
+        releaseCopy.SetResult(true);
+
+        Assert.False(await copyTask);
+        Assert.False(viewModel.IsBusy);
+        Assert.False(viewModel.OpenCommand.CanExecute(null));
+        Assert.False(viewModel.CloseCommand.CanExecute(null));
+        Assert.False(viewModel.CreateCopyCommand.CanExecute(null));
+        Assert.False(viewModel.ValidateAllCommand.CanExecute(null));
+        Assert.False(viewModel.SaveCompatibilityReportCommand.CanExecute(null));
+        Assert.False(viewModel.CompareCompatibilityReportsCommand.CanExecute(null));
+        Assert.False(viewModel.CloseCompatibilityComparisonCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task CompatibilityCommandsUseInjectedSelectorsAndPreserveCancellation()
     {
         var root = Path.Combine(

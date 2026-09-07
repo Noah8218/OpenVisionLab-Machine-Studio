@@ -1,7 +1,5 @@
 using System.IO;
 using System.Linq;
-using System.Windows;
-using System.Windows.Input;
 using System.Windows.Threading;
 using OpenVisionLab.Machine.Sequence.Authoring;
 using OpenVisionLab.Machine.Simulation.Sequences;
@@ -17,8 +15,6 @@ internal sealed class SmokeProcessBlockApplicationResult
 
 internal static class SmokeProcessBlockApplicationVerifier
 {
-    private const uint MouseEventLeftDown = 0x0002;
-
     public static bool IsSupportedState(string? state) => state?.ToLowerInvariant() is
         "process-block-apply-focus"
         or "process-block-apply-pressed"
@@ -31,9 +27,7 @@ internal static class SmokeProcessBlockApplicationVerifier
         SmokeProcessBlockContext context,
         string? savePath,
         bool createReport,
-        Action<FrameworkElement> movePointerToCenter,
-        Action<uint, uint, uint, uint, UIntPtr> mouseEvent,
-        Action markSmokePointerHeld)
+        SmokeUiInteraction interaction)
     {
         var normalizedState = applicationState.ToLowerInvariant();
         if (!IsSupportedState(normalizedState))
@@ -46,13 +40,14 @@ internal static class SmokeProcessBlockApplicationVerifier
 
         if (normalizedState == "process-block-applied")
         {
+            var expectedRecipeStepCount = context.InitialRecipeStepCount + context.ProposedStepCount;
             vm.RecipeConnections.ProcessBlocks.ApplyProcessBlockCommand.Execute(null);
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             Check(
-                vm.RecipeConnections.RecipeStepCount == 25
+                vm.RecipeConnections.RecipeStepCount == expectedRecipeStepCount
                 && vm.IsDesignMode
                 && !vm.IsRunning,
-                "Five process blocks did not produce the expected stopped 25-step recipe.");
+                $"Five process blocks did not produce the expected stopped {expectedRecipeStepCount}-step recipe.");
 
             vm.RecipeConnections.ValidateSimulationReadinessCommand.Execute(null);
             vm.RecipeConnections.RunRecipeDryRunCommand.Execute(null);
@@ -67,8 +62,8 @@ internal static class SmokeProcessBlockApplicationVerifier
             Check(
                 vm.RecipeConnections.ReadinessPassed == true
                 && vm.RecipeConnections.RecipeDryRunResult?.Outcome == RecipeDryRunOutcome.Completed
-                && vm.RecipeConnections.RecipeDryRunTimeline.Count == 25,
-                "The composed 25-step recipe did not pass readiness and bounded dry run.");
+                && vm.RecipeConnections.RecipeDryRunTimeline.Count == expectedRecipeStepCount,
+                $"The composed {expectedRecipeStepCount}-step recipe did not pass readiness and bounded dry run.");
 
             var bundledProcessRecipes = Directory.EnumerateFiles(
                     Path.Combine(AppContext.BaseDirectory, "Samples", "SemiconductorRecipes"),
@@ -103,7 +98,7 @@ internal static class SmokeProcessBlockApplicationVerifier
                     await vm.OpenProjectAsync(fullSavePath),
                     "The composed process-block project did not reopen.");
                 Check(
-                    vm.RecipeConnections.RecipeStepCount == 25
+                    vm.RecipeConnections.RecipeStepCount == expectedRecipeStepCount
                     && vm.IsDesignMode
                     && !vm.IsRunning,
                     "Reopened process blocks were not retained safely.");
@@ -135,37 +130,19 @@ internal static class SmokeProcessBlockApplicationVerifier
             };
         }
 
-        window.Activate();
-        context.ApplyButton.BringIntoView();
-        context.ApplyButton.UpdateLayout();
-        context.ApplyButton.Focus();
-        Keyboard.Focus(context.ApplyButton);
-        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-        Check(
-            context.ApplyButton.IsKeyboardFocused,
+        await SmokeButtonPointerState.FocusAsync(
+            window,
+            context.ApplyButton,
+            interaction,
             "Process block Apply button did not receive focus.");
 
         if (normalizedState == "process-block-apply-pressed")
         {
-            movePointerToCenter(context.ApplyButton);
-            Mouse.Capture(context.ApplyButton, CaptureMode.SubTree);
-            Mouse.Synchronize();
-            await Task.Delay(200);
-            Check(
-                context.ApplyButton.IsMouseOver,
-                "Process block Apply button did not enter hover state.");
-            mouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
-            markSmokePointerHeld();
-            context.ApplyButton.RaiseEvent(new MouseButtonEventArgs(
-                Mouse.PrimaryDevice,
-                Environment.TickCount,
-                MouseButton.Left)
-            {
-                RoutedEvent = Mouse.MouseDownEvent
-            });
-            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            Check(
-                context.ApplyButton.IsPressed,
+            await SmokeButtonPointerState.HoverThenPressAsync(
+                window,
+                context.ApplyButton,
+                interaction,
+                () => "Process block Apply button did not enter hover state.",
                 "Process block Apply button did not enter pointer-down state.");
         }
 

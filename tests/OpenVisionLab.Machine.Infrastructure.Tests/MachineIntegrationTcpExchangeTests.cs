@@ -4,6 +4,7 @@ using System.Text;
 using OpenVisionLab.Integration.Contracts;
 using OpenVisionLab.Integration.Transport.Tcp;
 using OpenVisionLab.Machine.Infrastructure.Integration;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Infrastructure.Tests;
@@ -68,12 +69,46 @@ public sealed class MachineIntegrationTcpExchangeTests
         Assert.Empty(receiver.DiscoverTransactions());
     }
 
+    [Fact]
+    public async Task ConcurrentStartsReserveOneServer()
+    {
+        using var fixture = new TcpFixture();
+        var key = SHA256.HashData(Encoding.UTF8.GetBytes("machine-tcp-concurrency-key"));
+        await using var receiver = new MachineIntegrationTcpExchange(fixture.ReceiverRoot, key);
+
+        var first = receiver.StartListeningAsync(IPAddress.Loopback, 0);
+        var second = receiver.StartListeningAsync(IPAddress.Loopback, 0);
+
+        var firstException = await Record.ExceptionAsync(() => first);
+        var secondException = await Record.ExceptionAsync(() => second);
+
+        Assert.Equal(1, (firstException is null ? 1 : 0) + (secondException is null ? 1 : 0));
+        Assert.IsType<InvalidOperationException>(firstException ?? secondException);
+        Assert.NotNull(receiver.LocalEndpoint);
+
+        await receiver.StopListeningAsync();
+    }
+
+    [Fact]
+    public async Task DisposedExchangeRejectsNewListenerStart()
+    {
+        using var fixture = new TcpFixture();
+        var key = SHA256.HashData(Encoding.UTF8.GetBytes("machine-tcp-post-dispose-key"));
+        await using var receiver = new MachineIntegrationTcpExchange(fixture.ReceiverRoot, key);
+
+        await receiver.DisposeAsync();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(() =>
+            receiver.StartListeningAsync(IPAddress.Loopback, 0));
+        Assert.Null(receiver.LocalEndpoint);
+    }
+
     private sealed class TcpFixture : IDisposable
     {
         public TcpFixture()
         {
             Root = Path.Combine(
-                "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio",
+                TestStorage.RootPath,
                 "machine-integration-tcp-tests",
                 Guid.NewGuid().ToString("N"));
             SenderRoot = Path.Combine(Root, "sender");

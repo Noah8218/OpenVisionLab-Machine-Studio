@@ -857,7 +857,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             System.Globalization.CultureInfo.CurrentCulture,
             OpenVisionLanguageService.T("Simulation.ScenarioHealth"),
             RuntimeProjection.ConditionScenario.HealthScore);
-    public bool CanStartTestScenario => IsRunMode
+    public bool CanStartTestScenario => !_disposed
+        && IsRunMode
         && !_isApplyingProject
         && !IsValidationBusy
         && !_runtimeDefinitionDirty
@@ -865,8 +866,12 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         && !string.IsNullOrWhiteSpace(SimulationWorkspace.ScenarioTargetId)
         && SimulationWorkspace.IsScheduledFaultConfigurationValid
         && SimulationWorkspace.IsAssertionConfigurationValid;
-    public bool CanStopTestScenario => IsRunMode && !IsValidationBusy && RuntimeProjection.ConditionScenario.IsActive;
-    public bool CanReplayTestScenario => IsRunMode
+    public bool CanStopTestScenario => !_disposed
+        && IsRunMode
+        && !IsValidationBusy
+        && RuntimeProjection.ConditionScenario.IsActive;
+    public bool CanReplayTestScenario => !_disposed
+        && IsRunMode
         && !_isApplyingProject
         && !IsValidationBusy
         && !_runtimeDefinitionDirty
@@ -3584,11 +3589,22 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         _selectionSynchronization.Dispose();
         SimulationWorkspace.PropertyChanged -= OnSimulationWorkspacePropertyChanged;
         RecipeConnections.ProcessBlocks.ProcessBlockPreviewClosed -= OnProcessBlockPreviewClosed;
+        RecipeConnections.Dispose();
         _processPlanReview.PropertyChanged -= OnProcessPlanReviewPropertyChanged;
         _simulationCommandTrace.PropertyChanged -= OnSimulationCommandTracePropertyChanged;
+        AxisCommissioning.Dispose();
+        DigitalIo.Dispose();
+        FaultManager.Dispose();
+        RuntimeDebugger.Dispose();
+        SemiconductorRecipes.Dispose();
         _layoutAuthoringHistory.Dispose();
+        Layout.Dispose();
         SequenceEditor.DefinitionChanged -= OnSequenceDefinitionChanged;
+        SequenceEditor.Dispose();
         DryRunPlayback.PropertyChanged -= OnDryRunPlaybackPropertyChanged;
+        _simulationCommandTrace.Dispose();
+        _visionExecutionEvidence.Dispose();
+        _simulationScenarioExecutionCoordinator.Dispose();
         Integration.Dispose();
 
         var shutdownTask = ShutdownAsync(cancellationToken: CancellationToken.None);

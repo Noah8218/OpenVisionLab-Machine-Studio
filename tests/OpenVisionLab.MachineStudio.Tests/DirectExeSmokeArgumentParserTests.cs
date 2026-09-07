@@ -147,4 +147,80 @@ public sealed class DirectExeSmokeArgumentParserTests
                 new[] { "--smoke-analog-authoring-save", "analog.ovmachine" }));
         Assert.Contains("save-reload", authoringException.Message);
     }
+
+    [Fact]
+    public void ParseSmokeOptionsMapsTypedValuesAndDerivedFlags()
+    {
+        var options = DirectExeSmokeArgumentParser.ParseSmokeOptions(
+            new[]
+            {
+                "--smoke-perf",
+                "--smoke-perf-samples", "24",
+                "--smoke-perf-report", "perf.json",
+                "--smoke-screenshot", "screen.png",
+                "--smoke-size", "1920x1040",
+                "--smoke-dpi", "150",
+                "--smoke-language", "en",
+                "--smoke-project", "project.ovmachine",
+                "--smoke-layout-select", "layout-1",
+                "--smoke-layout-select-many", "layout-1,layout-2",
+                "--smoke-layout-align", "HorizontalCenter",
+                "--smoke-direct-scene-gesture-state", "drag",
+                "--smoke-command-trace", "trace.json",
+                "--smoke-command-trace-state", "normal",
+                "--smoke-run-layout",
+                "--smoke-start-simulation",
+                "--smoke-camera-first-use-state", "keyboard-space",
+                "--smoke-test-scenario-settings-state", "valid",
+                "--smoke-test-scenario-batch",
+                "--smoke-unified-evidence-state", "replay",
+                "--smoke-batch-persistence-verify",
+                "--smoke-cylinder-fault", "cylinder-1"
+            });
+
+        Assert.True(options.PerformSmokePerf);
+        Assert.Equal(24, options.SmokePerfSampleCount);
+        Assert.Equal("perf.json", options.SmokePerfReportPath);
+        Assert.Equal("screen.png", options.ScreenshotPath);
+        Assert.Equal("1920x1040", options.SizeArgument);
+        Assert.Equal((1920, 1040), options.WindowSize);
+        Assert.Equal(150, options.DpiScalePercent);
+        Assert.Equal("en", options.SmokeLanguage);
+        Assert.Equal("project.ovmachine", options.ProjectPath);
+        Assert.Equal("layout-1", options.LayoutSelectId);
+        Assert.Equal("layout-1,layout-2", options.LayoutSelectMany);
+        Assert.Equal("HorizontalCenter", options.LayoutAlignment);
+        Assert.Equal("drag", options.DirectSceneGestureState);
+        Assert.Equal("trace.json", options.CommandTracePath);
+        Assert.Equal("normal", options.CommandTraceState);
+        Assert.True(options.CommandTraceStateSpecified);
+        Assert.True(options.UseRunLayout);
+        Assert.True(options.StartSimulation);
+        Assert.True(options.CameraFirstUseRequested);
+        Assert.Equal("valid", options.TestScenarioSettingsState);
+        Assert.True(options.ShowTestScenarioSettings);
+        Assert.True(options.TestScenarioBatch);
+        Assert.Equal("replay", options.UnifiedCommissioningEvidenceState);
+        Assert.True(options.VerifyBatchPersistence);
+        Assert.Equal("cylinder-1", options.CylinderFaultTargetId);
+        Assert.True(options.IsSmokeRun);
+    }
+
+    [Fact]
+    public void ParseSmokeOptionsPreservesDefaults()
+    {
+        var options = DirectExeSmokeArgumentParser.ParseSmokeOptions(Array.Empty<string>());
+
+        Assert.False(options.PerformSmokePerf);
+        Assert.Equal(12, options.SmokePerfSampleCount);
+        Assert.Equal("1280x760", options.SizeArgument);
+        Assert.Equal((1280, 760), options.WindowSize);
+        Assert.Equal(100, options.DpiScalePercent);
+        Assert.Equal("normal", options.CommandTraceState);
+        Assert.Equal("normal", options.ScenarioEvidenceExchangeState);
+        Assert.Equal("normal", options.UnifiedCommissioningEvidenceState);
+        Assert.False(options.CommandTraceStateSpecified);
+        Assert.False(options.CameraFirstUseRequested);
+        Assert.False(options.IsSmokeRun);
+    }
 }

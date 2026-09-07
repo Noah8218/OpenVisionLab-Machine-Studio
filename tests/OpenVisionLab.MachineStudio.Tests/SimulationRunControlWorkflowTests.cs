@@ -56,6 +56,28 @@ public sealed class SimulationRunControlWorkflowTests
         Assert.False(state.IsRunning);
     }
 
+    [Fact]
+    public async Task DisposePreventsQueuedCommandFromExecuting()
+    {
+        using var engine = new RecordingSimulationEngine();
+        var state = CreateState();
+        using var workflow = CreateWorkflow(engine, () => state, value => state = state with
+        {
+            IsRunning = value
+        });
+
+        var run = workflow.RunAsync();
+        await engine.FirstCommandSeen.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var pause = workflow.PauseAsync();
+
+        workflow.Dispose();
+        engine.ReleaseFirstCommand();
+        await Task.WhenAll(run, pause);
+
+        var command = Assert.Single(engine.Commands);
+        Assert.IsType<PlayCommand>(command);
+    }
+
     private static SimulationRunControlWorkflow CreateWorkflow(
         RecordingSimulationEngine engine,
         Func<SimulationRunControlState> getState,

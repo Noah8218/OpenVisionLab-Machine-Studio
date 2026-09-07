@@ -3,7 +3,6 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
 using OpenVisionLab;
@@ -18,9 +17,6 @@ namespace OpenVisionLab.MachineStudio;
 
 internal static class SmokeRecipeConnectionStateVerifier
 {
-    private const uint MouseEventMove = 0x0001;
-    private const uint MouseEventLeftDown = 0x0002;
-
     public static bool IsSupportedState(string? state) => state?.ToLowerInvariant() is
         "normal"
         or "focus"
@@ -62,48 +58,46 @@ internal static class SmokeRecipeConnectionStateVerifier
                 "No visible linked Sequence step action was available.");
             break;
         case "focus":
-            interaction.ActivateWindow();
-            addRotaryStageButton.Focus();
-            Keyboard.Focus(addRotaryStageButton);
-            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            AssertSmoke(addRotaryStageButton.IsKeyboardFocused, "Rotary axis + stage button did not receive focus.");
+            await SmokeButtonPointerState.FocusAsync(
+                window,
+                addRotaryStageButton,
+                interaction,
+                "Rotary axis + stage button did not receive focus.");
             break;
         case "hover":
         case "pressed":
             window.Topmost = true;
-            interaction.ActivateWindow();
-            addRotaryStageButton.BringIntoView();
-            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            addRotaryStageButton.UpdateLayout();
-            addRotaryStageButton.Focus();
-            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            var rotaryButtonCenter = addRotaryStageButton.PointToScreen(new Point(
-                addRotaryStageButton.ActualWidth / 2,
-                addRotaryStageButton.ActualHeight / 2));
-            interaction.SetCursorPosition(
-                (int)Math.Round(rotaryButtonCenter.X - addRotaryStageButton.ActualWidth),
-                (int)Math.Round(rotaryButtonCenter.Y));
-            Mouse.Synchronize();
-            await Task.Delay(50);
-            interaction.MovePointerToCenter(addRotaryStageButton);
-            interaction.MouseEvent(MouseEventMove, 1, 0, 0, UIntPtr.Zero);
-            await Task.Delay(200);
-            var cursorPosition = interaction.GetCursorPosition();
-            var cursorInButton = addRotaryStageButton.PointFromScreen(
-                new Point(cursorPosition.X, cursorPosition.Y));
-            AssertSmoke(
-                addRotaryStageButton.IsMouseOver,
-                $"Rotary axis + stage button did not enter hover state. " +
-                $"Cursor=({cursorPosition.X},{cursorPosition.Y}), " +
-                $"button=({cursorInButton.X:F1},{cursorInButton.Y:F1})/" +
-                $"{addRotaryStageButton.ActualWidth:F1}x{addRotaryStageButton.ActualHeight:F1}, " +
-                $"direct={Mouse.DirectlyOver?.GetType().Name ?? "null"}.");
+            await SmokeButtonPointerState.FocusAsync(
+                window,
+                addRotaryStageButton,
+                interaction,
+                "Rotary axis + stage button did not receive focus.");
+            Func<string> hoverFailureMessage = () =>
+            {
+                var cursorPosition = interaction.GetCursorPosition();
+                var cursorInButton = addRotaryStageButton.PointFromScreen(
+                    new Point(cursorPosition.X, cursorPosition.Y));
+                return $"Rotary axis + stage button did not enter hover state. " +
+                    $"Cursor=({cursorPosition.X},{cursorPosition.Y}), " +
+                    $"button=({cursorInButton.X:F1},{cursorInButton.Y:F1})/" +
+                    $"{addRotaryStageButton.ActualWidth:F1}x{addRotaryStageButton.ActualHeight:F1}, " +
+                    $"direct={Mouse.DirectlyOver?.GetType().Name ?? "null"}.";
+            };
             if (connectionWorkbenchState.Equals("pressed", StringComparison.OrdinalIgnoreCase))
             {
-                interaction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
-                interaction.MarkSmokePointerHeld();
-                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                AssertSmoke(addRotaryStageButton.IsPressed, "Rotary axis + stage button did not enter pointer-down state.");
+                await SmokeButtonPointerState.HoverThenPressAsync(
+                    window,
+                    addRotaryStageButton,
+                    interaction,
+                    hoverFailureMessage,
+                    "Rotary axis + stage button did not enter pointer-down state.");
+            }
+            else
+            {
+                await SmokeButtonPointerState.HoverAsync(
+                    addRotaryStageButton,
+                    interaction,
+                    hoverFailureMessage);
             }
             break;
         case "disabled":

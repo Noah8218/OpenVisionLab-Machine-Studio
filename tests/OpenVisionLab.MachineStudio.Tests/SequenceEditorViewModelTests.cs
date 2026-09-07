@@ -91,6 +91,39 @@ public sealed class SequenceEditorViewModelTests
                 .AvailableTargets.Select(target => target.Id));
     }
 
+    [Fact]
+    public void ReloadingAndDisposingEditorDetachesRemovedStepEvents()
+    {
+        var project = new MachineProjectDocument
+        {
+            Id = "step-lifetime-project",
+            Name = "Step lifetime project",
+            Sequences =
+            [
+                CompleteSequence("first"),
+                CompleteSequence("second")
+            ]
+        };
+
+        var editor = new SequenceEditorViewModel();
+        editor.Load(project);
+        SequenceStepEditorItem previousStep = Assert.Single(editor.Steps);
+        var definitionChangedCount = 0;
+        editor.DefinitionChanged += (_, _) => definitionChangedCount++;
+
+        editor.SelectSequence("second");
+        previousStep.Name = "Detached after reload";
+
+        Assert.Equal(0, definitionChangedCount);
+        SequenceStepEditorItem currentStep = Assert.Single(editor.Steps);
+
+        editor.Dispose();
+        currentStep.Name = "Detached after dispose";
+
+        Assert.Empty(editor.Steps);
+        Assert.Equal(0, definitionChangedCount);
+    }
+
     private static SequenceDefinition SequenceWithCall(string id, string targetId) => new()
     {
         Id = id,

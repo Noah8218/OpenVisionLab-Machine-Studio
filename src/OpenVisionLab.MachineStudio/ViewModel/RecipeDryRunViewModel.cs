@@ -34,7 +34,7 @@ public sealed record RecipeDryRunEquipmentStatePresentation(
     bool IsPrealigner = false,
     bool IsFault = false);
 
-public sealed class RecipeDryRunViewModel : ViewModelBase
+public sealed class RecipeDryRunViewModel : ViewModelBase, IDisposable
 {
     private readonly Func<string?> _validateSimulationReadiness;
     private readonly Func<string, Task<RecipeDryRunResult>> _runRecipeDryRun;
@@ -57,6 +57,7 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
     private string _recipeDryRunStatusText = string.Empty;
     private string _recipeDryRunDetailText = string.Empty;
     private string _recipeDryRunIssueText = string.Empty;
+    private int _disposed;
 
     public RecipeDryRunViewModel(
         Func<string?> validateSimulationReadiness,
@@ -74,19 +75,20 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
         _resolveComponentId = resolveComponentId;
         _validateSimulationReadinessCommand = new RelayCommand(
             _ => ValidateSimulationReadiness(),
-            _ => IsEditable);
+            _ => !IsDisposed && IsEditable);
         _runRecipeDryRunCommand = new AsyncRelayCommand(
             RunRecipeDryRunAsync,
-            _ => IsEditable
+            _ => !IsDisposed
+                 && IsEditable
                  && ReadinessPassed == true
                  && !IsRecipeDryRunRunning
                  && ResolveRecipeSequenceId() is not null);
         _openRecipeDryRunStepCommand = new RelayCommand(
             OpenRecipeDryRunStep,
-            parameter => IsEditable && parameter is RecipeDryRunStepPresentation);
+            parameter => !IsDisposed && IsEditable && parameter is RecipeDryRunStepPresentation);
         _playRecipeDryRunStepCommand = new RelayCommand(
             PlayRecipeDryRunStep,
-            parameter => IsEditable && parameter is RecipeDryRunStepPresentation);
+            parameter => !IsDisposed && IsEditable && parameter is RecipeDryRunStepPresentation);
     }
 
     public ObservableCollection<RecipeDryRunStepPresentation> Timeline { get; } = new();
@@ -101,7 +103,7 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
         get => _isEditable;
         set
         {
-            if (!SetProperty(ref _isEditable, value))
+            if (IsDisposed || !SetProperty(ref _isEditable, value))
             {
                 return;
             }
@@ -150,7 +152,7 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
         get => _selectedRecipeDryRunStep;
         set
         {
-            if (!SetProperty(ref _selectedRecipeDryRunStep, value))
+            if (IsDisposed || !SetProperty(ref _selectedRecipeDryRunStep, value))
             {
                 return;
             }
@@ -177,6 +179,11 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
     public void Load(MachineProjectDocument project, bool preserveReadiness = false)
     {
         ArgumentNullException.ThrowIfNull(project);
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var readinessPassed = preserveReadiness ? _readinessPassed : null;
         var readinessError = preserveReadiness ? _readinessError : null;
         _project = project;
@@ -190,6 +197,11 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
 
     private void ValidateSimulationReadiness()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _readinessError = _validateSimulationReadiness();
         _readinessPassed = _readinessError is null;
         RaiseReadinessChanged();
@@ -197,6 +209,11 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
 
     private async Task RunRecipeDryRunAsync(object? parameter)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var sequenceId = ResolveRecipeSequenceId();
         if (sequenceId is null)
         {
@@ -208,7 +225,7 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
         try
         {
             var result = await _runRecipeDryRun(sequenceId);
-            if (revision != _definitionRevision || ReadinessPassed != true)
+            if (IsDisposed || revision != _definitionRevision || ReadinessPassed != true)
             {
                 return;
             }
@@ -217,12 +234,24 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
         }
         finally
         {
-            IsRecipeDryRunRunning = false;
+            if (IsDisposed)
+            {
+                _isRecipeDryRunRunning = false;
+            }
+            else
+            {
+                IsRecipeDryRunRunning = false;
+            }
         }
     }
 
     private void OpenRecipeDryRunStep(object? parameter)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (parameter is RecipeDryRunStepPresentation step)
         {
             SelectedRecipeDryRunStep = step;
@@ -232,6 +261,11 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
 
     private void PlayRecipeDryRunStep(object? parameter)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (parameter is RecipeDryRunStepPresentation step)
         {
             SelectedRecipeDryRunStep = step;
@@ -245,6 +279,11 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
 
     private void ApplyRecipeDryRun(RecipeDryRunResult result)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         RecipeDryRunResult = result;
         RecipeDryRunStatusText = OpenVisionLanguageService.T(result.Outcome switch
         {
@@ -414,6 +453,11 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
 
     private void ClearRecipeDryRun()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         RecipeDryRunResult = null;
         RecipeDryRunStatusText = string.Empty;
         RecipeDryRunDetailText = string.Empty;
@@ -440,6 +484,11 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
 
     private void RaiseReadinessChanged()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         OnPropertyChanged(nameof(ReadinessPassed));
         OnPropertyChanged(nameof(ReadinessStatusText));
         OnPropertyChanged(nameof(ReadinessDetailText));
@@ -448,6 +497,11 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
 
     private void RaiseCommandsCanExecuteChanged()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _validateSimulationReadinessCommand.RaiseCanExecuteChanged();
         _runRecipeDryRunCommand.RaiseCanExecuteChanged();
         _openRecipeDryRunStepCommand.RaiseCanExecuteChanged();
@@ -529,4 +583,12 @@ public sealed class RecipeDryRunViewModel : ViewModelBase
         OpenVisionLanguageService.T(snapshot.IsWaferPresent
             ? "Connections.PrealignerWaferPresent"
             : "Connections.PrealignerWaferAbsent"));
+
+    public void Dispose()
+    {
+        Interlocked.Exchange(ref _disposed, 1);
+        _isRecipeDryRunRunning = false;
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

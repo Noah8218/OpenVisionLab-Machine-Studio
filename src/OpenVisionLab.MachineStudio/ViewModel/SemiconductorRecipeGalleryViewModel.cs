@@ -220,10 +220,10 @@ public sealed class RecipePackCompatibilityComparisonItemViewModel : ViewModelBa
     }
 }
 
-public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
+public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase, IDisposable
 {
     private readonly SemiconductorRecipeGalleryCatalog _catalog = new();
-    private readonly SemiconductorRecipeGalleryValidationWorkflow _validationWorkflow = new();
+    private readonly SemiconductorRecipeGalleryValidationSession _validationSession = new();
     private readonly Func<SemiconductorRecipeGalleryItemViewModel, string?, Task<bool>> _createCopy;
     private readonly Func<string?> _selectCompatibilityReportSavePath;
     private readonly Func<string?> _selectBaselineCompatibilityReportPath;
@@ -239,6 +239,7 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
     private bool _isOpen;
     private bool _isBusy;
     private bool _isComparisonOpen;
+    private int _disposed;
     private string _errorMessage = string.Empty;
     private int _validatedCount;
     private int _passedCount;
@@ -273,33 +274,33 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
         _selectCompatibilityReportSavePath = selectCompatibilityReportSavePath ?? throw new ArgumentNullException(nameof(selectCompatibilityReportSavePath));
         _selectBaselineCompatibilityReportPath = selectBaselineCompatibilityReportPath ?? throw new ArgumentNullException(nameof(selectBaselineCompatibilityReportPath));
         _selectCurrentCompatibilityReportPath = selectCurrentCompatibilityReportPath ?? throw new ArgumentNullException(nameof(selectCurrentCompatibilityReportPath));
-        OpenCommand = new RelayCommand(_ => Open());
+        OpenCommand = new RelayCommand(_ => Open(), _ => !IsDisposed);
         _closeCommand = new RelayCommand(
             _ => Close(),
-            _ => !IsBusy,
+            _ => !IsDisposed && !IsBusy,
             useCommandManagerRequery: false);
         CloseCommand = _closeCommand;
         _createCopyCommand = new AsyncRelayCommand(
             _ => CreateCopyAsync(null),
-            _ => SelectedItem is not null && !IsBusy,
+            _ => !IsDisposed && SelectedItem is not null && !IsBusy,
             exception => ErrorMessage = exception.Message,
             useCommandManagerRequery: false);
         _validateAllCommand = new AsyncRelayCommand(
             _ => ValidateAllAsync(),
-            _ => HasItems && !IsBusy,
+            _ => !IsDisposed && HasItems && !IsBusy,
             exception => ErrorMessage = exception.Message,
             useCommandManagerRequery: false);
         _saveCompatibilityReportCommand = new RelayCommand(
             _ => SaveCompatibilityReportWithDialog(),
-            _ => CanSaveCompatibilityReport,
+            _ => !IsDisposed && CanSaveCompatibilityReport,
             useCommandManagerRequery: false);
         _compareCompatibilityReportsCommand = new RelayCommand(
             _ => CompareCompatibilityReportsWithDialogs(),
-            _ => !IsBusy,
+            _ => !IsDisposed && !IsBusy,
             useCommandManagerRequery: false);
         _closeCompatibilityComparisonCommand = new RelayCommand(
             _ => CloseCompatibilityComparison(),
-            _ => IsComparisonOpen && !IsBusy,
+            _ => !IsDisposed && IsComparisonOpen && !IsBusy,
             useCommandManagerRequery: false);
         CreateCopyCommand = _createCopyCommand;
         ValidateAllCommand = _validateAllCommand;
@@ -317,6 +318,11 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
         get => _selectedItem;
         set
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             if (SetProperty(ref _selectedItem, value))
             {
                 OnPropertyChanged(nameof(HasSelection));
@@ -338,6 +344,11 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
         get => _isBusy;
         private set
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             if (SetProperty(ref _isBusy, value))
             {
                 _createCopyCommand.RaiseCanExecuteChanged();
@@ -370,6 +381,11 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
         get => _errorMessage;
         private set
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             if (SetProperty(ref _errorMessage, value))
             {
                 OnPropertyChanged(nameof(HasError));
@@ -455,7 +471,8 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
     public bool CanSaveCompatibilityReport => HasItems
         && ValidatedCount == Items.Count
         && Items.All(item => item.HasValidationResult)
-        && !IsBusy;
+        && !IsBusy
+        && !IsDisposed;
     public ICommand OpenCommand { get; }
     public ICommand CloseCommand { get; }
     public ICommand CreateCopyCommand { get; }
@@ -466,6 +483,11 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 
     public void Open()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         CloseCompatibilityComparison();
         Reload();
         IsOpen = true;
@@ -473,12 +495,22 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 
     public void Close()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         CloseCompatibilityComparison();
         IsOpen = false;
     }
 
     public void RefreshLocalization()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (IsOpen)
         {
             Reload();
@@ -499,11 +531,23 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 
     internal Task ValidateAllForSmokeAsync() => ValidateAllAsync();
 
-    internal void SaveCompatibilityReport(string path) =>
+    internal void SaveCompatibilityReport(string path)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         CreateCompatibilityReport().Save(path);
+    }
 
     internal bool TryCompareCompatibilityReports(string baselinePath, string currentPath)
     {
+        if (IsDisposed)
+        {
+            return false;
+        }
+
         try
         {
             ErrorMessage = string.Empty;
@@ -532,6 +576,11 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 
     private void Reload()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var selectedFileName = SelectedItem?.FileName;
         Items.Clear();
         ErrorMessage = string.Empty;
@@ -601,7 +650,7 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 
     private async Task ValidateAllAsync()
     {
-        if (IsBusy || !HasItems)
+        if (IsDisposed || IsBusy || !HasItems)
         {
             return;
         }
@@ -622,59 +671,14 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 
         try
         {
-            foreach (var item in Items)
-            {
-                item.MarkValidationRunning();
-                var validation = await _validationWorkflow.ValidateAsync(item.SourcePath);
-                string failureStep = validation.FailureStage switch
-                {
-                    SemiconductorRecipeGalleryValidationFailureStage.Load =>
-                        OpenVisionLanguageService.T("Gallery.ValidationLoadStage"),
-                    SemiconductorRecipeGalleryValidationFailureStage.SequenceMissing =>
-                        OpenVisionLanguageService.T("Gallery.ValidationCompileStage"),
-                    SemiconductorRecipeGalleryValidationFailureStage.Compile
-                        when string.IsNullOrWhiteSpace(validation.FailureStepId) =>
-                        OpenVisionLanguageService.T("Gallery.ValidationCompileStage"),
-                    _ => validation.FailureStepId ?? string.Empty
-                };
-                string detail = validation.FailureStage
-                    == SemiconductorRecipeGalleryValidationFailureStage.SequenceMissing
-                    ? OpenVisionLanguageService.T("Gallery.ValidationSequenceMissing")
-                    : validation.Detail;
-                bool passed = validation.IsPassed;
-                item.MarkValidationCompleted(
-                    passed,
-                    BuildIdentity.Current,
-                    BuildIdentity.Compact,
-                    BuildIdentity.SourceCommit,
-                    BuildIdentity.SourceState,
-                    BuildIdentity.IsExactCommit,
-                    failureStep,
-                    detail);
-                ValidatedCount++;
-                if (passed)
-                {
-                    PassedCount++;
-                }
-                else
-                {
-                    FailedCount++;
-                    OnPropertyChanged(nameof(HasFirstFailure));
-                    if (string.IsNullOrWhiteSpace(FirstFailureRecipeName))
-                    {
-                        FirstFailureRecipeName = item.DisplayName;
-                        FirstFailureStepId = failureStep;
-                        FirstFailureDetail = detail;
-                        SelectedItem = item;
-                    }
-                }
+            await _validationSession.ValidateAsync(
+                Items,
+                OnGalleryItemValidated,
+                UpdateValidationProgress);
 
-                ValidationProgressText = string.Format(
-                    CultureInfo.CurrentCulture,
-                    OpenVisionLanguageService.T("Gallery.ValidationProgressFormat"),
-                    ValidatedCount,
-                    Items.Count);
-                _saveCompatibilityReportCommand.RaiseCanExecuteChanged();
+            if (IsDisposed)
+            {
+                return;
             }
 
             ValidationSummary = FailedCount == 0
@@ -693,12 +697,73 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
         }
         finally
         {
-            IsBusy = false;
+            if (IsDisposed)
+            {
+                _isBusy = false;
+            }
+            else
+            {
+                IsBusy = false;
+            }
         }
+    }
+
+    private void OnGalleryItemValidated(SemiconductorRecipeGalleryItemValidationOutcome outcome)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        outcome.Item.MarkValidationCompleted(
+            outcome.IsPassed,
+            BuildIdentity.Current,
+            BuildIdentity.Compact,
+            BuildIdentity.SourceCommit,
+            BuildIdentity.SourceState,
+            BuildIdentity.IsExactCommit,
+            outcome.FailureStep,
+            outcome.Detail);
+        ValidatedCount++;
+        if (outcome.IsPassed)
+        {
+            PassedCount++;
+            return;
+        }
+
+        FailedCount++;
+        OnPropertyChanged(nameof(HasFirstFailure));
+        if (string.IsNullOrWhiteSpace(FirstFailureRecipeName))
+        {
+            FirstFailureRecipeName = outcome.Item.DisplayName;
+            FirstFailureStepId = outcome.FailureStep;
+            FirstFailureDetail = outcome.Detail;
+            SelectedItem = outcome.Item;
+        }
+    }
+
+    private void UpdateValidationProgress(int validatedCount, int itemCount)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        ValidationProgressText = string.Format(
+            CultureInfo.CurrentCulture,
+            OpenVisionLanguageService.T("Gallery.ValidationProgressFormat"),
+            validatedCount,
+            itemCount);
+        _saveCompatibilityReportCommand.RaiseCanExecuteChanged();
     }
 
     private void ResetValidationSummary()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         ValidatedCount = 0;
         PassedCount = 0;
         FailedCount = 0;
@@ -739,6 +804,11 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 
     private void SaveCompatibilityReportWithDialog()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (_selectCompatibilityReportSavePath() is not { } path)
         {
             return;
@@ -756,6 +826,11 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 
     private void CompareCompatibilityReportsWithDialogs()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (_selectBaselineCompatibilityReportPath() is not { } baselinePath)
         {
             return;
@@ -774,6 +849,11 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
         string baselineReportName,
         string currentReportName)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _compatibilityComparison = comparison;
         _baselineReportName = baselineReportName;
         _currentReportName = currentReportName;
@@ -799,6 +879,11 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 
     private void CloseCompatibilityComparison()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _compatibilityComparison = null;
         ComparisonItems.Clear();
         _baselineReportName = string.Empty;
@@ -844,7 +929,7 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
 
     private async Task<bool> CreateCopyAsync(string? destinationPath)
     {
-        if (SelectedItem is null || IsBusy)
+        if (IsDisposed || SelectedItem is null || IsBusy)
         {
             return false;
         }
@@ -854,6 +939,11 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
         try
         {
             var created = await _createCopy(SelectedItem, destinationPath);
+            if (IsDisposed)
+            {
+                return false;
+            }
+
             if (created)
             {
                 Close();
@@ -863,12 +953,37 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase
         }
         catch (Exception exception)
         {
-            ErrorMessage = exception.Message;
+            if (!IsDisposed)
+            {
+                ErrorMessage = exception.Message;
+            }
+
             return false;
         }
         finally
         {
-            IsBusy = false;
+            if (IsDisposed)
+            {
+                _isBusy = false;
+            }
+            else
+            {
+                IsBusy = false;
+            }
         }
     }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _isBusy = false;
+        _isOpen = false;
+        _isComparisonOpen = false;
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

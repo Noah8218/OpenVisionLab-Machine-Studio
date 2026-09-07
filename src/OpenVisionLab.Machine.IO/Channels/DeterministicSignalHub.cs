@@ -16,12 +16,12 @@ namespace OpenVisionLab.Machine.IO.Channels;
 public sealed class DeterministicSignalHub
 {
     private readonly object _sync = new();
-    private readonly Dictionary<string, SignalState> _signalsById;
+    private readonly Dictionary<string, DeterministicSignalState> _signalsById;
     private readonly string[] _orderedChannelIds;
     private long _revision;
     private SignalHubSnapshot? _snapshot;
 
-    private DeterministicSignalHub(Dictionary<string, SignalState> signalsById)
+    private DeterministicSignalHub(Dictionary<string, DeterministicSignalState> signalsById)
     {
         _signalsById = signalsById;
         _orderedChannelIds = signalsById.Keys.OrderBy(id => id, StringComparer.Ordinal).ToArray();
@@ -38,7 +38,7 @@ public sealed class DeterministicSignalHub
         }
 
         ChannelDefinition[] authoredDefinitions = definitions.ToArray();
-        var signalsById = new Dictionary<string, SignalState>(StringComparer.Ordinal);
+        var signalsById = new Dictionary<string, DeterministicSignalState>(StringComparer.Ordinal);
 
         foreach (ChannelDefinition? definition in authoredDefinitions)
         {
@@ -81,7 +81,7 @@ public sealed class DeterministicSignalHub
 
             if (!signalsById.TryAdd(
                     definition.Id,
-                    new SignalState(
+                    new DeterministicSignalState(
                         definition.Id,
                         definition.Name ?? string.Empty,
                         definition.Kind,
@@ -121,7 +121,7 @@ public sealed class DeterministicSignalHub
                         interlockId ?? definition.Id);
                 }
 
-                if (!signalsById.TryGetValue(interlockId, out SignalState? interlock))
+                if (!signalsById.TryGetValue(interlockId, out DeterministicSignalState? interlock))
                 {
                     return SignalHubCreationResult.Rejected(
                         SignalHubErrorCode.InterlockChannelNotFound,
@@ -136,7 +136,7 @@ public sealed class DeterministicSignalHub
                 }
             }
 
-            SignalState output = signalsById[definition.Id];
+            DeterministicSignalState output = signalsById[definition.Id];
             output.SetInterlockIds(interlockIds);
             if (output.IsOn && interlockIds.Any(id => !signalsById[id].IsOn))
             {
@@ -222,7 +222,7 @@ public sealed class DeterministicSignalHub
                     _revision);
             }
 
-            if (!_signalsById.TryGetValue(channelId, out SignalState? signal))
+            if (!_signalsById.TryGetValue(channelId, out DeterministicSignalState? signal))
             {
                 return SignalReadResult.Rejected(
                     SignalHubErrorCode.ChannelNotFound,
@@ -253,7 +253,7 @@ public sealed class DeterministicSignalHub
                     _revision);
             }
 
-            if (!_signalsById.TryGetValue(channelId, out SignalState? signal))
+            if (!_signalsById.TryGetValue(channelId, out DeterministicSignalState? signal))
             {
                 return AnalogSignalReadResult.Rejected(
                     SignalHubErrorCode.ChannelNotFound,
@@ -321,7 +321,7 @@ public sealed class DeterministicSignalHub
                 return OverrideRejected(SignalHubErrorCode.ChannelIdRequired, channelId);
             }
 
-            if (!_signalsById.TryGetValue(channelId, out SignalState? signal))
+            if (!_signalsById.TryGetValue(channelId, out DeterministicSignalState? signal))
             {
                 return OverrideRejected(SignalHubErrorCode.ChannelNotFound, channelId);
             }
@@ -393,7 +393,7 @@ public sealed class DeterministicSignalHub
                     firstChannelId,
                     firstValue,
                     owner,
-                    out SignalState? firstSignal,
+                    out DeterministicSignalState? firstSignal,
                     out SignalHubErrorCode firstError))
             {
                 return DigitalOutputPairWriteResult.Rejected(
@@ -416,7 +416,7 @@ public sealed class DeterministicSignalHub
                     secondChannelId,
                     secondValue,
                     owner,
-                    out SignalState? secondSignal,
+                    out DeterministicSignalState? secondSignal,
                     out SignalHubErrorCode secondError))
             {
                 return DigitalOutputPairWriteResult.Rejected(
@@ -471,7 +471,7 @@ public sealed class DeterministicSignalHub
                     _revision);
             }
 
-            if (!_signalsById.TryGetValue(channelId, out SignalState? signal))
+            if (!_signalsById.TryGetValue(channelId, out DeterministicSignalState? signal))
             {
                 return AnalogSignalWriteResult.Rejected(
                     SignalHubErrorCode.ChannelNotFound,
@@ -550,7 +550,7 @@ public sealed class DeterministicSignalHub
     {
         lock (_sync)
         {
-            SignalState? signal;
+            DeterministicSignalState? signal;
             if (requestedKind == ChannelKind.DigitalOutput)
             {
                 if (!TryValidateDigitalOutputWrite(
@@ -650,7 +650,7 @@ public sealed class DeterministicSignalHub
         string? channelId,
         bool value,
         SignalWriteOwner owner,
-        out SignalState? signal,
+        out DeterministicSignalState? signal,
         out SignalHubErrorCode errorCode)
     {
         signal = null;
@@ -691,7 +691,7 @@ public sealed class DeterministicSignalHub
     private bool DeactivateOutputsInterlockedBy(string inputId)
     {
         bool changed = false;
-        foreach (SignalState signal in _signalsById.Values)
+        foreach (DeterministicSignalState signal in _signalsById.Values)
         {
             if (signal.Kind != ChannelKind.DigitalOutput
                 || !signal.InterlockIds.Contains(inputId, StringComparer.Ordinal)
@@ -728,65 +728,4 @@ public sealed class DeterministicSignalHub
     private static bool IsAnalogKind(ChannelKind kind) =>
         kind is ChannelKind.AnalogInput or ChannelKind.AnalogOutput;
 
-    private sealed class SignalState
-    {
-        public SignalState(string id, string name, ChannelKind kind, double value)
-        {
-            Id = id;
-            Name = name;
-            Kind = kind;
-            InitialValue = value;
-            NominalValue = value;
-            Value = value;
-        }
-
-        public string Id { get; }
-        public string Name { get; }
-        public ChannelKind Kind { get; }
-        public double InitialValue { get; }
-        public double NominalValue { get; private set; }
-        public bool? OverrideValue { get; private set; }
-        public double Value { get; private set; }
-        public bool IsOn => Value == 1d;
-        public IReadOnlyList<string> InterlockIds { get; private set; } = Array.Empty<string>();
-
-        public void SetInterlockIds(IEnumerable<string> interlockIds) =>
-            InterlockIds = Array.AsReadOnly(interlockIds.ToArray());
-
-        public void SetNominalValue(bool value)
-            => SetNominalValue(value ? 1d : 0d);
-
-        public void SetNominalValue(double value)
-        {
-            NominalValue = value;
-            Value = OverrideValue is bool forced
-                ? forced ? 1d : 0d
-                : NominalValue;
-        }
-
-        public void SetOverride(bool? forcedValue)
-        {
-            OverrideValue = forcedValue;
-            Value = OverrideValue is bool forced
-                ? forced ? 1d : 0d
-                : NominalValue;
-        }
-
-        public bool Reset()
-        {
-            bool stateChanged = NominalValue != InitialValue
-                || OverrideValue.HasValue
-                || Value != InitialValue;
-            NominalValue = InitialValue;
-            OverrideValue = null;
-            Value = InitialValue;
-            return stateChanged;
-        }
-
-        public DigitalSignalSnapshot CaptureDigital() =>
-            new(Id, Name, Kind, IsOn, NominalValue == 1d, OverrideValue);
-
-        public AnalogSignalSnapshot CaptureAnalog() =>
-            new(Id, Name, Kind, Value, NominalValue);
-    }
 }

@@ -26,8 +26,7 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
     private readonly Action<DeterministicCommissioningMismatch> _navigateToMismatch;
     private readonly Action<bool> _notifyParentPresentationChanged;
     private readonly Action<Exception> _onCommandException;
-    private CancellationTokenSource? _validationCancellation;
-    private Task? _validationTask;
+    private readonly AsyncOperationLifetime _validationLifetime = new();
     private DeterministicCommissioningResultHistoryEntry? _selectedHistoryEntry;
     private DeterministicCommissioningBaselineComparison? _baselineComparison;
     private bool _isValidationRunning;
@@ -218,7 +217,7 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
     internal bool RejectedStaleResult =>
         _artifactStore.State == MultiAxisCommissioningArtifactState.StaleRejected;
     internal bool HasLatestResult => LatestResult is not null;
-    internal Task? ValidationTask => _validationTask;
+    internal Task? ValidationTask => _validationLifetime.CurrentTask;
 
     public void Reset()
     {
@@ -297,16 +296,7 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
 
     internal void RefreshLocalization() => RaiseChanged(invalidateCommands: false);
 
-    internal void CancelValidation()
-    {
-        try
-        {
-            _validationCancellation?.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-        }
-    }
+    internal void CancelValidation() => _validationLifetime.Cancel();
 
     internal void InvalidateCommands()
     {
@@ -316,30 +306,7 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
         RaiseCanExecuteChanged(NavigateToMismatchCommand);
     }
 
-    private Task RunValidationTask()
-    {
-        var task = RunValidationTrackedAsync();
-        _validationTask = task;
-        return task;
-    }
-
-    private async Task RunValidationTrackedAsync()
-    {
-        var cancellation = new CancellationTokenSource();
-        _validationCancellation = cancellation;
-        try
-        {
-            await ValidateAsync(cancellation.Token);
-        }
-        finally
-        {
-            if (ReferenceEquals(_validationCancellation, cancellation))
-            {
-                _validationCancellation = null;
-            }
-            cancellation.Dispose();
-        }
-    }
+    private Task RunValidationTask() => _validationLifetime.Start(ValidateAsync);
 
     private async Task ValidateAsync(CancellationToken cancellationToken)
     {
@@ -513,6 +480,6 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
         }
 
         _disposed = true;
-        CancelValidation();
+        _validationLifetime.Dispose();
     }
 }

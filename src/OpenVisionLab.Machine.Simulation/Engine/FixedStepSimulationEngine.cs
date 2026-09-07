@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Collections.Immutable;
 using System.Threading.Channels;
 using OpenVisionLab.Machine.Core.Channels;
@@ -24,66 +23,40 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
     private readonly SimulationSettings _settings;
     private readonly SimulationClock _clock;
     private readonly Channel<SimulationCommand> _commandChannel;
-    private readonly Channel<SimulationEvent> _eventChannel;
+    private readonly SimulationEventPublisher _eventPublisher;
     private readonly LatestSnapshotStore _snapshotStore;
+    private readonly SimulationEngineLifecycle _lifecycle;
+    private readonly SimulationPhysicalRuntimeTick _physicalRuntimeTick;
     private readonly List<ServoAxisComponent> _axes = new();
     private readonly DeterministicSimulationCommandTraceStore _commandTraceStore = new();
     private readonly List<DeterministicVirtualCamera> _cameras = new();
-    private readonly Dictionary<string, DeterministicSequenceExecutor> _sequenceExecutors =
-        new(StringComparer.Ordinal);
-    private readonly Dictionary<string, CompiledSequence> _compiledSequences =
-        new(StringComparer.Ordinal);
-    private readonly DeterministicSequenceDebugState _sequenceDebugState = new();
+    private readonly SimulationSequenceRuntime _sequenceRuntime = new();
     private readonly SimulationRuntimeConfigurationBuilder _runtimeConfigurationBuilder;
+    private readonly SimulationConditionScenarioRuntime _conditionScenarioRuntime = new();
+    private readonly SimulationAutomaticRunRuntime _automaticRunRuntime = new();
     private readonly SimulationManualControlCommandHandler _manualControlCommandHandler = new();
     private readonly SimulationFaultCommandHandler _faultCommandHandler = new();
     private readonly SimulationConditionScheduledFaultRecoveryHandler _conditionScheduledFaultRecoveryHandler = new();
     private readonly SimulationConditionScheduledFaultInjectionHandler _conditionScheduledFaultInjectionHandler = new();
-    private readonly SimulationConditionScenarioProgressHandler _conditionScenarioProgressHandler = new();
     private readonly SimulationConditionScenarioStopHandler _conditionScenarioStopHandler = new();
     private readonly SimulationConditionScenarioCommandHandler _conditionScenarioCommandHandler = new();
     private readonly SimulationAutomaticRunCommandHandler _automaticRunCommandHandler = new();
     private readonly SimulationAutomaticRunCycleHandler _automaticRunCycleHandler = new();
     private readonly SimulationSequenceCommandHandler _sequenceCommandHandler = new();
     private readonly SimulationRunControlCommandHandler _runControlCommandHandler = new();
-    private readonly Dictionary<SimulationFaultKey, SimulationFaultSnapshot> _activeFaults = new();
-    private readonly CancellationTokenSource _stopCts = new();
-    private readonly TaskCompletionSource<SimulationEngineTerminationResult> _termination =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly object _lifecycleLock = new();
+    private readonly SimulationFaultRuntime _faultRuntime = new();
     private readonly Action<SimulationEngineFaultPoint>? _faultInjector;
     private double _timeScale;
     private DeterministicSignalHub _signalHub;
     private DeterministicMachineLayout? _machineLayout;
     private DeterministicPickPlaceWorkpiece? _pickPlaceWorkpiece;
-    private SimulationSnapshot _latestSnapshot;
-    private Task? _runTask;
     private SimulationRunMode _runMode = SimulationRunMode.Paused;
     private SimulationControlOwner _controlOwner = SimulationControlOwner.Definition;
     private string? _activeSequenceId;
-    private AutomaticRunConfiguration? _automaticRunConfiguration;
-    private DeterministicConditionScenarioProfile? _conditionScenarioProfile;
-    private DeterministicConditionStateMachine? _conditionStateMachine;
-    private bool _automaticRunActive;
-    private bool _conditionScenarioActive;
-    private bool _conditionScheduledFaultActive;
-    private bool _conditionScheduledFaultInterruptedAutomaticRun;
-    private bool _automaticRunWaitingForRepeat;
-    private long _automaticRunCompletedCycleCount;
-    private int _automaticRunRemainingDelayTicks;
-    private int _automaticRunRepeatDelayTicks;
     private int _pendingSteps;
-    private long _conditionScenarioExecutedTicks;
-    private DeterministicConditionTransition? _conditionLastTransition;
     private long _tickIndex;
-    private long _eventIndex;
     private long _commandBoundaryTick;
     private TimeSpan _commandBoundaryTime;
-    private EngineLifecycleState _lifecycleState = EngineLifecycleState.Created;
-    private SimulationEngineTerminationOutcome _requestedTermination =
-        SimulationEngineTerminationOutcome.Normal;
-    private SimulationEngineTerminationResult? _terminalResult;
-    private CancellationTokenRegistration _startCancellationRegistration;
     private SimulationCommand? _currentCommand;
     private string? _operationContext;
     private bool _disposed;
@@ -126,23 +99,27 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
                 SingleReader = true,
                 SingleWriter = false
             });
-        _eventChannel = Channel.CreateBounded<SimulationEvent>(
-            new BoundedChannelOptions(settings.EventBufferCapacity)
-            {
-                FullMode = BoundedChannelFullMode.DropOldest,
-                SingleReader = true,
-                SingleWriter = true
-            });
-        _snapshotStore = new LatestSnapshotStore();
+        _eventPublisher = new SimulationEventPublisher(settings.EventBufferCapacity);
         _signalHub = DeterministicSignalHub.Create(Array.Empty<ChannelDefinition>()).Hub!;
-        _latestSnapshot = CreateSnapshot();
+        _snapshotStore = new LatestSnapshotStore(CreateSnapshot());
+        _physicalRuntimeTick = new SimulationPhysicalRuntimeTick(EmitPhysicalRuntimeEvent);
+        _lifecycle = new SimulationEngineLifecycle(
+            _commandChannel,
+            _eventPublisher,
+            _snapshotStore,
+            (outcome, exception) => CreateTerminationResult(
+                outcome,
+                exception,
+                _currentCommand?.CommandId,
+                _operationContext),
+            () => CurrentSnapshot);
     }
 
-    public SimulationSnapshot CurrentSnapshot => Volatile.Read(ref _latestSnapshot);
+    public SimulationSnapshot CurrentSnapshot => _snapshotStore.Current;
     public TimeSpan FixedStep => _settings.FixedStep;
     public ChannelReader<SimulationSnapshot> SnapshotReader => _snapshotStore.Reader;
-    public ChannelReader<SimulationEvent> EventReader => _eventChannel.Reader;
-    public Task<SimulationEngineTerminationResult> Termination => _termination.Task;
+    public ChannelReader<SimulationEvent> EventReader => _eventPublisher.Reader;
+    public Task<SimulationEngineTerminationResult> Termination => _lifecycle.Termination;
 
     public ImmutableArray<DeterministicSimulationCommandTraceEntry> CommandTrace => _commandTraceStore.Snapshot();
 
@@ -159,7 +136,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(axis);
-        if (_runTask is not null)
+        if (_lifecycle.HasStarted)
         {
             throw new InvalidOperationException("Axes cannot be added directly after the engine starts.");
         }
@@ -170,104 +147,25 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         }
 
         _axes.Add(axis);
-        Volatile.Write(ref _latestSnapshot, CreateSnapshot());
+        _snapshotStore.SetCurrent(CreateSnapshot());
     }
 
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_lifecycleLock)
-        {
-            if (_lifecycleState == EngineLifecycleState.Running)
-            {
-                return Task.CompletedTask;
-            }
-
-            if (_lifecycleState != EngineLifecycleState.Created)
-            {
-                throw new InvalidOperationException("A stopped simulation engine cannot be restarted.");
-            }
-
-            _requestedTermination = SimulationEngineTerminationOutcome.Normal;
-            _lifecycleState = EngineLifecycleState.Running;
-            _runTask = Task.Run(() => RunLoop(_stopCts.Token));
-            if (cancellationToken.CanBeCanceled)
-            {
-                _startCancellationRegistration = cancellationToken.Register(
-                    static state => ((FixedStepSimulationEngine)state!).RequestCancellation(),
-                    this);
-            }
-        }
-
-        return Task.CompletedTask;
+        return _lifecycle.StartAsync(RunLoop, cancellationToken);
     }
 
-    public async Task StopAsync(CancellationToken cancellationToken = default)
-    {
-        lock (_lifecycleLock)
-        {
-            if (_lifecycleState == EngineLifecycleState.Created)
-            {
-                _requestedTermination = SimulationEngineTerminationOutcome.Stopped;
-                _terminalResult = CreateTerminationResult(
-                    SimulationEngineTerminationOutcome.Stopped,
-                    exception: null,
-                    _currentCommand?.CommandId,
-                    _operationContext);
-                _lifecycleState = EngineLifecycleState.Stopped;
-                _commandChannel.Writer.TryComplete();
-                _snapshotStore.Complete();
-                _eventChannel.Writer.TryComplete();
-                _termination.TrySetResult(_terminalResult);
-            }
-            else if (_lifecycleState == EngineLifecycleState.Running)
-            {
-                _requestedTermination = SimulationEngineTerminationOutcome.Stopped;
-                _lifecycleState = EngineLifecycleState.Stopping;
-                _commandChannel.Writer.TryComplete();
-                _stopCts.Cancel();
-            }
-        }
+    public Task StopAsync(CancellationToken cancellationToken = default) =>
+        _lifecycle.StopAsync(cancellationToken);
 
-        await _termination.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    public async Task<SimulationCommandResult> EnqueueCommandAsync(
+    public Task<SimulationCommandResult> EnqueueCommandAsync(
         SimulationCommand command,
         CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(command);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        SimulationCommandErrorCode? lifecycleError;
-        lock (_lifecycleLock)
-        {
-            lifecycleError = _lifecycleState switch
-            {
-                EngineLifecycleState.Created => SimulationCommandErrorCode.EngineNotStarted,
-                EngineLifecycleState.Running => null,
-                EngineLifecycleState.Faulted => SimulationCommandErrorCode.EngineFaulted,
-                _ => SimulationCommandErrorCode.EngineStopped
-            };
-        }
-
-        if (lifecycleError.HasValue)
-        {
-            return CompleteLifecycleRejection(command, lifecycleError.Value);
-        }
-
-        try
-        {
-            await _commandChannel.Writer.WriteAsync(command, cancellationToken).ConfigureAwait(false);
-        }
-        catch (ChannelClosedException)
-        {
-            return CompleteLifecycleRejection(command, GetClosedChannelError());
-        }
-
-        return await command.Completion.WaitAsync(cancellationToken).ConfigureAwait(false);
+        return _lifecycle.EnqueueCommandAsync(command, cancellationToken);
     }
 
     private async Task RunLoop(CancellationToken cancellationToken)
@@ -275,7 +173,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var timing = new SimulationRunLoopTiming(_settings.FixedStep, _settings.MaxCatchUpTicks);
         timing.Reset(stopwatch.Elapsed);
-        var pendingCommands = new List<PendingCommand>();
+        var pendingCommands = new List<PendingSimulationCommand>();
         SimulationEngineTerminationResult? termination = null;
 
         try
@@ -292,7 +190,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
                 {
                     _currentCommand = command;
                     _operationContext = "ApplyCommand";
-                    var pendingCommand = new PendingCommand(command);
+                    var pendingCommand = new PendingSimulationCommand(command);
                     pendingCommands.Add(pendingCommand);
                     InjectFault(SimulationEngineFaultPoint.BeforeCommandApplication);
                     pendingCommand.Result = ApplyCommand(command);
@@ -317,7 +215,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
                     }
 
                     _operationContext = "CommandCompletion";
-                    CompleteCommands(pendingCommands);
+                    _lifecycle.CompleteAppliedCommands(pendingCommands);
                     pendingCommands.Clear();
                     _operationContext = null;
                     timing.Reset(stopwatch.Elapsed);
@@ -369,7 +267,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
                     InjectFault(SimulationEngineFaultPoint.AfterSnapshotPublication);
                 }
                 _operationContext = "CommandCompletion";
-                CompleteCommands(pendingCommands);
+                _lifecycle.CompleteAppliedCommands(pendingCommands);
                 pendingCommands.Clear();
                 _operationContext = null;
 
@@ -383,7 +281,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             }
 
             termination = CreateTerminationResult(
-                GetRequestedTermination(),
+                _lifecycle.GetRequestedTermination(),
                 exception: null,
                 _currentCommand?.CommandId,
                 _operationContext);
@@ -391,7 +289,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             termination = CreateTerminationResult(
-                GetRequestedTermination(),
+                _lifecycle.GetRequestedTermination(),
                 exception: null,
                 _currentCommand?.CommandId,
                 _operationContext);
@@ -406,7 +304,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         }
         finally
         {
-            FinalizeRun(
+            _lifecycle.FinalizeRun(
                 termination ?? CreateTerminationResult(
                     SimulationEngineTerminationOutcome.Faulted,
                     new InvalidOperationException("The simulation engine terminated without a result."),
@@ -434,13 +332,13 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             case ResetCommand:
                 ResetRuntime();
                 result = Accept(command, "Runtime state reset to authored initial values.");
-                if (_conditionScenarioProfile is not null)
+                if (_conditionScenarioRuntime.Profile is not null)
                 {
                     EmitAtCommandBoundary(
                         "Condition",
                         "ConditionScenarioReset",
-                        $"Condition scenario '{_conditionScenarioProfile.ScenarioId}' reset to " +
-                        $"{_conditionScenarioProfile.InitialState} and stopped.",
+                        $"Condition scenario '{_conditionScenarioRuntime.Profile.ScenarioId}' reset to " +
+                        $"{_conditionScenarioRuntime.Profile.InitialState} and stopped.",
                         command.CommandId);
                 }
                 EmitAtCommandBoundary(
@@ -525,9 +423,9 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
                 _pendingSteps,
                 _activeSequenceId,
                 CurrentSequenceStepId(),
-                _compiledSequences,
-                _sequenceExecutors,
-                _sequenceDebugState,
+                _sequenceRuntime.CompiledSequences,
+                _sequenceRuntime.SequenceExecutors,
+                _sequenceRuntime.DebugState,
                 _commandBoundaryTick,
                 _commandBoundaryTime));
         if (outcome.RunMode.HasValue)
@@ -564,7 +462,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             ?? execution.Snapshot.ActiveSequenceId
             ?? rootSequenceId;
         var stepId = execution.CurrentStepId;
-        if (stepId is not null && _sequenceDebugState.IsBreakpoint(sequenceId, stepId))
+        if (stepId is not null && _sequenceRuntime.DebugState.IsBreakpoint(sequenceId, stepId))
         {
             PauseForSequenceDebug(
                 SequenceDebugPauseReason.Breakpoint,
@@ -577,7 +475,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             return;
         }
 
-        if (_sequenceDebugState.IsSemanticStepBoundary(execution, rootSequenceId))
+        if (_sequenceRuntime.DebugState.IsSemanticStepBoundary(execution, rootSequenceId))
         {
             PauseForSequenceDebug(
                 SequenceDebugPauseReason.SemanticStep,
@@ -596,7 +494,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         long eventTick,
         TimeSpan eventTime)
     {
-        var sequenceId = _sequenceDebugState.GetActiveSemanticStepSequenceId(_activeSequenceId);
+        var sequenceId = _sequenceRuntime.DebugState.GetActiveSemanticStepSequenceId(_activeSequenceId);
         if (sequenceId is null)
         {
             return;
@@ -626,8 +524,8 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         TimeSpan eventTime)
     {
         _runMode = SimulationRunMode.Paused;
-        _sequenceDebugState.ClearPendingSemanticStep();
-        _sequenceDebugState.SetPause(reason, stepId);
+        _sequenceRuntime.DebugState.ClearPendingSemanticStep();
+        _sequenceRuntime.DebugState.SetPause(reason, stepId);
         Emit(
             "Sequence",
             eventCode,
@@ -636,37 +534,28 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             simulationTime: eventTime);
     }
 
-    private string? CurrentSequenceStepId() =>
-        _activeSequenceId is not null
-        && _sequenceExecutors.TryGetValue(_activeSequenceId, out var executor)
-            ? executor.CaptureSnapshot().CurrentStepId
-            : null;
+    private string? CurrentSequenceStepId() => _sequenceRuntime.CurrentStepId(_activeSequenceId);
 
-    private void ClearSequenceDebugConfiguration() => _sequenceDebugState.Clear();
+    private void ClearSequenceDebugConfiguration() => _sequenceRuntime.DebugState.Clear();
 
     private SimulationCommandResult ApplyStopConditionScenario(SimulationCommand command)
     {
         var outcome = _conditionScenarioStopHandler.Apply(
             command,
             new SimulationConditionScenarioStopContext(
-                _conditionScenarioActive,
-                _conditionScenarioProfile,
-                _conditionScenarioExecutedTicks,
+                _conditionScenarioRuntime.IsActive,
+                _conditionScenarioRuntime.Profile,
+                _conditionScenarioRuntime.ExecutedTicks,
                 CreateConditionScheduledFaultRecoveryContext(
                     restartSequence: false,
                     command.CommandId),
                 _conditionScheduledFaultRecoveryHandler));
         if (outcome.State is { } state)
         {
-            _conditionScenarioActive = state.ScenarioActive;
-            _conditionLastTransition = state.LastTransition;
-            _conditionScheduledFaultActive = state.RecoveryState.ScheduledFaultActive;
-            _conditionScheduledFaultInterruptedAutomaticRun = state.RecoveryState.InterruptedAutomaticRun;
+            _conditionScenarioRuntime.ApplyStopState(state);
             _activeSequenceId = state.RecoveryState.ActiveSequenceId;
             _controlOwner = state.RecoveryState.ControlOwner;
-            _automaticRunActive = state.RecoveryState.AutomaticRunActive;
-            _automaticRunWaitingForRepeat = state.RecoveryState.AutomaticRunWaitingForRepeat;
-            _automaticRunRemainingDelayTicks = state.RecoveryState.AutomaticRunRemainingDelayTicks;
+            _automaticRunRuntime.ApplyRecoveryState(state.RecoveryState);
         }
 
         foreach (var operationEvent in outcome.Events ?? Array.Empty<SimulationConditionScenarioStopEvent>())
@@ -712,27 +601,18 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         {
             _timeScale = configuration.TimeScale.Value;
         }
-        _activeFaults.Clear();
-        ClearConditionScenarioState();
-        _compiledSequences.Clear();
-        foreach (var pair in runtime.CompiledSequences)
-        {
-            _compiledSequences.Add(pair.Key, pair.Value);
-        }
-        _sequenceExecutors.Clear();
-        foreach (var pair in runtime.SequenceExecutors)
-        {
-            _sequenceExecutors.Add(pair.Key, pair.Value);
-        }
-        _automaticRunConfiguration = configuration.AutomaticRun;
-        _automaticRunRepeatDelayTicks = runtime.AutomaticRunRepeatDelayTicks;
-        ResetAutomaticRunState();
+        _faultRuntime.Clear();
+        _conditionScenarioRuntime.Clear();
+        _sequenceRuntime.Configure(runtime.CompiledSequences, runtime.SequenceExecutors);
+        _automaticRunRuntime.Configure(
+            configuration.AutomaticRun,
+            runtime.AutomaticRunRepeatDelayTicks);
         _activeSequenceId = null;
         _controlOwner = SimulationControlOwner.Definition;
 
         var configurationSummary =
             $"Configured {_axes.Count} axis/axes, {configuration.Channels.Count} signal(s), " +
-            $"{_cameras.Count} camera(s), {_sequenceExecutors.Count} sequence(s), and " +
+            $"{_cameras.Count} camera(s), {_sequenceRuntime.SequenceExecutors.Count} sequence(s), and " +
             $"{configuration.Layout?.Components.Count ?? 0} layout component(s).";
         if (_pickPlaceWorkpiece is not null)
         {
@@ -769,13 +649,10 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         _signalHub = emptySignalHub;
         _machineLayout = null;
         _pickPlaceWorkpiece = null;
-        _activeFaults.Clear();
-        ClearConditionScenarioState();
-        _compiledSequences.Clear();
-        _sequenceExecutors.Clear();
-        _automaticRunConfiguration = null;
-        _automaticRunRepeatDelayTicks = 0;
-        ResetAutomaticRunState();
+        _faultRuntime.Clear();
+        _conditionScenarioRuntime.Clear();
+        _sequenceRuntime.ClearConfiguration();
+        _automaticRunRuntime.Configure(null, repeatDelayTicks: 0);
         _activeSequenceId = null;
         _controlOwner = SimulationControlOwner.Definition;
         EmitAtCommandBoundary(
@@ -793,13 +670,13 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             new SimulationManualControlContext(
                 _runMode,
                 _controlOwner,
-                _automaticRunActive,
+                _automaticRunRuntime.IsActive,
                 _axes,
                 _cameras,
-                _sequenceExecutors,
+                _sequenceRuntime.SequenceExecutors,
                 _signalHub,
                 _machineLayout,
-                _activeFaults,
+                _faultRuntime,
                 _commandBoundaryTick,
                 _commandBoundaryTime,
                 FormatSignal));
@@ -835,7 +712,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
                 _axes,
                 _signalHub,
                 _machineLayout,
-                _activeFaults,
+                _faultRuntime,
                 _commandBoundaryTick,
                 _commandBoundaryTime));
         foreach (var operationEvent in outcome.Events ?? Array.Empty<SimulationFaultCommandEvent>())
@@ -855,21 +732,15 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         var outcome = _conditionScenarioCommandHandler.Apply(
             command,
             new SimulationConditionScenarioCommandContext(
-                _conditionScenarioActive,
+                _conditionScenarioRuntime.IsActive,
                 CreateSnapshot(),
-                _sequenceExecutors,
-                _activeFaults,
+                _sequenceRuntime.SequenceExecutors,
+                _faultRuntime,
                 _commandBoundaryTick,
                 _commandBoundaryTime));
         if (outcome.State is { } state)
         {
-            _conditionScenarioProfile = state.Profile;
-            _conditionStateMachine = state.StateMachine;
-            _conditionScenarioExecutedTicks = 0;
-            _conditionLastTransition = null;
-            _conditionScheduledFaultActive = false;
-            _conditionScheduledFaultInterruptedAutomaticRun = false;
-            _conditionScenarioActive = state.IsActive;
+            _conditionScenarioRuntime.ApplyStartState(state);
         }
 
         foreach (var operationEvent in outcome.Events ?? Array.Empty<SimulationConditionScenarioCommandEvent>())
@@ -894,13 +765,13 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
                     _controlOwner,
                     _pendingSteps,
                     _activeSequenceId,
-                    _automaticRunActive,
-                    _automaticRunWaitingForRepeat,
-                    _automaticRunRemainingDelayTicks,
-                    _conditionScheduledFaultInterruptedAutomaticRun),
-                _sequenceExecutors,
-                _activeFaults,
-                _sequenceDebugState,
+                    _automaticRunRuntime.IsActive,
+                    _automaticRunRuntime.WaitingForRepeat,
+                    _automaticRunRuntime.RemainingDelayTicks,
+                    _conditionScenarioRuntime.ScheduledFaultInterruptedAutomaticRun),
+                _sequenceRuntime.SequenceExecutors,
+                _faultRuntime,
+                _sequenceRuntime.DebugState,
                 _commandBoundaryTick,
                 _commandBoundaryTime));
         if (outcome.State is { } state)
@@ -909,11 +780,9 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             _controlOwner = state.ControlOwner;
             _pendingSteps = state.PendingSteps;
             _activeSequenceId = state.ActiveSequenceId;
-            _automaticRunActive = state.AutomaticRunActive;
-            _automaticRunWaitingForRepeat = state.AutomaticRunWaitingForRepeat;
-            _automaticRunRemainingDelayTicks = state.AutomaticRunRemainingDelayTicks;
-            _conditionScheduledFaultInterruptedAutomaticRun =
-                state.ConditionScheduledFaultInterruptedAutomaticRun;
+            _automaticRunRuntime.ApplySequenceState(state);
+            _conditionScenarioRuntime.SetAutomaticRunInterruption(
+                state.ConditionScheduledFaultInterruptedAutomaticRun);
         }
 
         foreach (var operationEvent in outcome.Events ?? Array.Empty<SimulationSequenceCommandEvent>())
@@ -933,18 +802,14 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         var outcome = _automaticRunCommandHandler.Apply(
             command,
             new SimulationAutomaticRunCommandContext(
-                _automaticRunConfiguration,
-                new SimulationAutomaticRunCommandState(
+                _automaticRunRuntime.Configuration,
+                _automaticRunRuntime.CreateCommandState(
                     _runMode,
                     _controlOwner,
                     _pendingSteps,
-                    _activeSequenceId,
-                    _automaticRunActive,
-                    _automaticRunWaitingForRepeat,
-                    _automaticRunCompletedCycleCount,
-                    _automaticRunRemainingDelayTicks),
+                    _activeSequenceId),
                 _signalHub,
-                _sequenceExecutors,
+                _sequenceRuntime.SequenceExecutors,
                 _commandBoundaryTick,
                 _commandBoundaryTime));
         if (outcome.State is { } state)
@@ -953,10 +818,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             _controlOwner = state.ControlOwner;
             _pendingSteps = state.PendingSteps;
             _activeSequenceId = state.ActiveSequenceId;
-            _automaticRunActive = state.AutomaticRunActive;
-            _automaticRunWaitingForRepeat = state.AutomaticRunWaitingForRepeat;
-            _automaticRunCompletedCycleCount = state.AutomaticRunCompletedCycleCount;
-            _automaticRunRemainingDelayTicks = state.AutomaticRunRemainingDelayTicks;
+            _automaticRunRuntime.ApplyCommandState(state);
         }
 
         foreach (var operationEvent in outcome.Events ?? Array.Empty<SimulationAutomaticRunCommandEvent>())
@@ -978,142 +840,26 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
 
         AdvanceConditionScenario(eventTick, eventTime);
 
-        foreach (var axis in _axes)
-        {
-            var previousState = axis.State;
-            var driveAlarmWasActive = axis.DriveAlarmActive;
-            axis.Tick(_settings.FixedStep);
-            if (!driveAlarmWasActive && axis.DriveAlarmActive)
-            {
-                Emit(
-                    "Motion",
-                    "AxisDriveAlarmActivated",
-                    $"{axis.Id} following error {axis.FollowingError:F3} exceeded " +
-                    $"limit {axis.FollowingErrorLimit:F3}.",
-                    tickIndex: eventTick,
-                    simulationTime: eventTime);
-            }
-            if (previousState == AxisState.Moving && axis.State == AxisState.Idle)
-            {
-                Emit(
-                    "Motion",
-                    "AxisTargetReached",
-                    $"{axis.Id} reached {axis.Position:F3}.",
-                    tickIndex: eventTick,
-                    simulationTime: eventTime);
-            }
-        }
-
-        if (_machineLayout is not null)
-        {
-            var axisSnapshots = _axes.ToDictionary(
-                axis => axis.Id,
-                axis => axis.CreateSnapshot(),
-                StringComparer.Ordinal);
-            HashSet<string> blockedCylinderIds = _activeFaults.Values
-                .Where(fault => fault.Kind == SimulationFaultKind.CylinderTravelBlocked)
+        IReadOnlySet<string>? blockedCylinderIds = _machineLayout is null
+            ? null
+            : _faultRuntime.Values
+                    .Where(fault => fault.Kind == SimulationFaultKind.CylinderTravelBlocked)
                 .Select(fault => fault.TargetId)
                 .ToHashSet(StringComparer.Ordinal);
-            var cameraSnapshots = _cameras.ToDictionary(
-                camera => camera.Id,
-                camera => camera.CaptureSnapshot(),
-                StringComparer.Ordinal);
-            var layoutTick = _machineLayout.Tick(
-                axisSnapshots,
+        _physicalRuntimeTick.Advance(
+            new SimulationPhysicalRuntimeTickContext(
+                _settings.FixedStep,
+                eventTick,
+                eventTime,
+                _axes,
+                _machineLayout,
                 blockedCylinderIds,
-                cameraSnapshots);
-            foreach (var transition in layoutTick.Transitions)
-            {
-                Emit(
-                    "Sensor",
-                    transition.Kind == MachineLayoutTransitionKind.SensorActivated
-                        ? "SensorActivated"
-                        : "SensorDeactivated",
-                    $"{transition.ComponentId} wrote {transition.OutputChannelId} = " +
-                    $"{FormatSignal(transition.CurrentValue)}.",
-                    tickIndex: eventTick,
-                    simulationTime: eventTime);
-            }
-
-            foreach (var transition in layoutTick.CylinderStateTransitions)
-            {
-                Emit(
-                    "Cylinder",
-                    "CylinderStateChanged",
-                    $"{transition.ComponentId}: {transition.PreviousState} -> " +
-                    $"{transition.CurrentState} ({transition.MotionProgress:P0}).",
-                    tickIndex: eventTick,
-                    simulationTime: eventTime);
-            }
-
-            foreach (var transition in layoutTick.CylinderFeedbackTransitions)
-            {
-                Emit(
-                    "Cylinder",
-                    "CylinderFeedbackChanged",
-                    $"{transition.ComponentId} wrote {transition.ChannelId} = " +
-                    $"{FormatSignal(transition.CurrentValue)}.",
-                    tickIndex: eventTick,
-                    simulationTime: eventTime);
-            }
-
-            foreach (var transition in layoutTick.ConveyorStateTransitions)
-            {
-                Emit(
-                    "Conveyor",
-                    "ConveyorStateChanged",
-                    $"{transition.ComponentId}: " +
-                    $"{FormatConveyorState(transition.PreviousRunning, transition.PreviousDirection)} -> " +
-                    $"{FormatConveyorState(transition.CurrentRunning, transition.CurrentDirection)} " +
-                    $"at {transition.SpeedUnitsPerSecond:F3} units/s.",
-                    tickIndex: eventTick,
-                    simulationTime: eventTime);
-            }
-        }
-
-        foreach (var camera in _cameras)
-        {
-            var cameraTick = camera.Tick();
-            if (cameraTick.Transition == VirtualCameraTickTransition.ExposureCompleted)
-            {
-                Emit(
-                    "Camera",
-                    "CameraExposureCompleted",
-                    $"{camera.Id} exposure completed for {cameraTick.Snapshot.CurrentAcquisitionId}; transfer started.",
-                    tickIndex: eventTick,
-                    simulationTime: eventTime);
-            }
-            else if (cameraTick.Transition == VirtualCameraTickTransition.FrameReady)
-            {
-                var acquisition = cameraTick.CompletedAcquisition!;
-                Emit(
-                    "Camera",
-                    "CameraFrameReady",
-                    $"{camera.Id} frame {acquisition.AcquisitionId} is ready for recipe " +
-                    $"'{acquisition.RecipeId}'" +
-                    (acquisition.FrameEvidence is null
-                        ? "."
-                        : $"; SHA-256 {acquisition.FrameEvidence.ContentSha256}."),
-                    tickIndex: eventTick,
-                    simulationTime: eventTime);
-                Emit(
-                    "Vision",
-                    "VisionResultReady",
-                    acquisition.InspectionEvidence is { } inspection
-                        ? $"{acquisition.AcquisitionId} inspection {inspection.InspectionId} result = " +
-                          $"{inspection.Decision.ToString().ToUpperInvariant()}; " +
-                          $"metrics {FormatInspectionMetrics(inspection.Metrics)}."
-                        : $"{acquisition.AcquisitionId} placeholder result = " +
-                          $"{acquisition.Decision.ToString().ToUpperInvariant()}.",
-                    tickIndex: eventTick,
-                    simulationTime: eventTime);
-            }
-        }
+                _cameras));
 
         AdvanceAutomaticRunRepeat(eventTick, eventTime);
 
         if (_activeSequenceId is not null
-            && _sequenceExecutors.TryGetValue(_activeSequenceId, out var executor)
+            && _sequenceRuntime.SequenceExecutors.TryGetValue(_activeSequenceId, out var executor)
             && executor.CaptureSnapshot().Status == SequenceExecutionStatus.Running)
         {
             var context = new DeterministicSequenceRuntimeContext(
@@ -1183,37 +929,16 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         PublishSnapshot();
     }
 
-    private static string FormatInspectionMetrics(IReadOnlyDictionary<string, double> metrics) =>
-        metrics.Count == 0
-            ? "none"
-            : string.Join(
-                ", ",
-                metrics.Select(metric => string.Concat(
-                    metric.Key,
-                    "=",
-                    metric.Value.ToString("R", CultureInfo.InvariantCulture))));
-
     private void AdvanceConditionScenario(long eventTick, TimeSpan eventTime)
     {
-        if (!_conditionScenarioActive ||
-            _conditionScenarioProfile is null ||
-            _conditionStateMachine is null)
+        if (!_conditionScenarioRuntime.IsActive)
         {
             return;
         }
 
-        var scenarioTick = _conditionScenarioExecutedTicks;
+        var scenarioTick = _conditionScenarioRuntime.ExecutedTicks;
         AdvanceConditionScheduledFault(scenarioTick, eventTick, eventTime);
-        var outcome = _conditionScenarioProgressHandler.Apply(
-            new SimulationConditionScenarioProgressContext(
-                _conditionScenarioProfile,
-                _conditionStateMachine,
-                _conditionScenarioActive,
-                scenarioTick));
-        _conditionScenarioExecutedTicks = outcome.State.ExecutedTicks;
-        _conditionLastTransition = outcome.State.LastTransition;
-        _conditionScenarioActive = outcome.State.IsActive;
-        foreach (var operationEvent in outcome.Events ?? Array.Empty<SimulationConditionScenarioProgressEvent>())
+        foreach (var operationEvent in _conditionScenarioRuntime.Advance())
         {
             Emit(
                 operationEvent.Category,
@@ -1229,7 +954,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         long eventTick,
         TimeSpan eventTime)
     {
-        var schedule = _conditionScenarioProfile?.FaultRecovery;
+        var schedule = _conditionScenarioRuntime.Profile?.FaultRecovery;
         if (schedule is null)
         {
             return;
@@ -1246,18 +971,11 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
                     _axes,
                     _signalHub,
                     _machineLayout,
-                    _activeFaults,
+                    _faultRuntime,
                     _faultCommandHandler,
                     _commandBoundaryTick,
                     _commandBoundaryTime));
-            if (outcome.ScheduledFaultActive is { } scheduledFaultActive)
-            {
-                _conditionScheduledFaultActive = scheduledFaultActive;
-            }
-            if (outcome.ConditionScenarioActive is { } conditionScenarioActive)
-            {
-                _conditionScenarioActive = conditionScenarioActive;
-            }
+            _conditionScenarioRuntime.ApplyScheduledFaultInjectionOutcome(outcome);
             foreach (var operationEvent in outcome.Events ?? Array.Empty<SimulationConditionScheduledFaultInjectionEvent>())
             {
                 Emit(
@@ -1272,7 +990,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             return;
         }
 
-        if (_conditionScheduledFaultActive
+        if (_conditionScenarioRuntime.ScheduledFaultActive
             && scenarioTick == schedule.InjectTick + schedule.HoldTicks)
         {
             ClearConditionScheduledFault(eventTick, eventTime, restartSequence: true);
@@ -1285,8 +1003,8 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         bool restartSequence,
         string? commandId = null)
     {
-        var schedule = _conditionScenarioProfile?.FaultRecovery;
-        if (!_conditionScheduledFaultActive || schedule is null)
+        var schedule = _conditionScenarioRuntime.Profile?.FaultRecovery;
+        if (!_conditionScenarioRuntime.ScheduledFaultActive || schedule is null)
         {
             return;
         }
@@ -1297,13 +1015,12 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             CreateConditionScheduledFaultRecoveryContext(restartSequence, commandId));
         if (outcome.State is { } state)
         {
-            _conditionScheduledFaultActive = state.ScheduledFaultActive;
-            _conditionScheduledFaultInterruptedAutomaticRun = state.InterruptedAutomaticRun;
+            _conditionScenarioRuntime.ApplyScheduledFaultRecoveryState(
+                state.ScheduledFaultActive,
+                state.InterruptedAutomaticRun);
             _activeSequenceId = state.ActiveSequenceId;
             _controlOwner = state.ControlOwner;
-            _automaticRunActive = state.AutomaticRunActive;
-            _automaticRunWaitingForRepeat = state.AutomaticRunWaitingForRepeat;
-            _automaticRunRemainingDelayTicks = state.AutomaticRunRemainingDelayTicks;
+            _automaticRunRuntime.ApplyRecoveryState(state);
         }
 
         foreach (var operationEvent in outcome.Events ?? Array.Empty<SimulationConditionScheduledFaultRecoveryEvent>())
@@ -1322,22 +1039,22 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         bool restartSequence,
         string? commandId) =>
         new(
-            _conditionScenarioProfile?.FaultRecovery,
+            _conditionScenarioRuntime.Profile?.FaultRecovery,
             restartSequence,
             commandId,
             new SimulationConditionScheduledFaultRecoveryState(
-                _conditionScheduledFaultActive,
-                _conditionScheduledFaultInterruptedAutomaticRun,
+                _conditionScenarioRuntime.ScheduledFaultActive,
+                _conditionScenarioRuntime.ScheduledFaultInterruptedAutomaticRun,
                 _activeSequenceId,
                 _controlOwner,
-                _automaticRunActive,
-                _automaticRunWaitingForRepeat,
-                _automaticRunRemainingDelayTicks),
+                _automaticRunRuntime.IsActive,
+                _automaticRunRuntime.WaitingForRepeat,
+                _automaticRunRuntime.RemainingDelayTicks),
             _axes,
             _signalHub,
             _machineLayout,
-            _activeFaults,
-            _sequenceExecutors,
+            _faultRuntime,
+            _sequenceRuntime.SequenceExecutors,
             _faultCommandHandler,
             _commandBoundaryTick,
             _commandBoundaryTime);
@@ -1359,16 +1076,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
     }
 
     private SimulationAutomaticRunCycleContext CreateAutomaticRunCycleContext() =>
-        new(
-            _automaticRunConfiguration,
-            new SimulationAutomaticRunCycleState(
-                _activeSequenceId,
-                _automaticRunActive,
-                _automaticRunWaitingForRepeat,
-                _automaticRunCompletedCycleCount,
-                _automaticRunRemainingDelayTicks),
-            _sequenceExecutors,
-            _automaticRunRepeatDelayTicks);
+        _automaticRunRuntime.CreateCycleContext(_activeSequenceId, _sequenceRuntime.SequenceExecutors);
 
     private void ApplyAutomaticRunCycleOutcome(
         SimulationAutomaticRunCycleOutcome outcome,
@@ -1378,10 +1086,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         if (outcome.State is { } state)
         {
             _activeSequenceId = state.ActiveSequenceId;
-            _automaticRunActive = state.AutomaticRunActive;
-            _automaticRunWaitingForRepeat = state.AutomaticRunWaitingForRepeat;
-            _automaticRunCompletedCycleCount = state.AutomaticRunCompletedCycleCount;
-            _automaticRunRemainingDelayTicks = state.AutomaticRunRemainingDelayTicks;
+            _automaticRunRuntime.ApplyCycleState(state);
         }
 
         foreach (var operationEvent in outcome.Events ?? Array.Empty<SimulationAutomaticRunCycleEvent>())
@@ -1400,23 +1105,14 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         TimeSpan eventTime,
         string? detail = null)
     {
-        if (!_automaticRunActive)
+        if (!_automaticRunRuntime.IsActive)
         {
             return;
         }
 
-        var recovery = _conditionScenarioProfile?.FaultRecovery;
-        _conditionScheduledFaultInterruptedAutomaticRun =
-            _conditionScheduledFaultActive
-            && recovery?.RestartSequenceId is not null
-            && string.Equals(
-                _activeSequenceId,
-                recovery.RestartSequenceId,
-                StringComparison.Ordinal);
+        _conditionScenarioRuntime.CaptureAutomaticRunInterruption(_activeSequenceId);
 
-        _automaticRunActive = false;
-        _automaticRunWaitingForRepeat = false;
-        _automaticRunRemainingDelayTicks = 0;
+        _automaticRunRuntime.MarkFaulted();
         Emit(
             "AutomaticRun",
             "AutomaticRunFaulted",
@@ -1425,20 +1121,12 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             simulationTime: eventTime);
     }
 
-    private void ResetAutomaticRunState()
-    {
-        _automaticRunActive = false;
-        _automaticRunWaitingForRepeat = false;
-        _automaticRunCompletedCycleCount = 0;
-        _automaticRunRemainingDelayTicks = 0;
-    }
-
     private void ResetRuntime()
     {
         _runMode = SimulationRunMode.Paused;
         _pendingSteps = 0;
-        _sequenceDebugState.ClearPendingSemanticStep();
-        _sequenceDebugState.SetPause(SequenceDebugPauseReason.None, null);
+        _sequenceRuntime.DebugState.ClearPendingSemanticStep();
+        _sequenceRuntime.DebugState.SetPause(SequenceDebugPauseReason.None, null);
         _clock.Reset();
         _tickIndex = 0;
         foreach (var axis in _axes)
@@ -1449,73 +1137,40 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         {
             camera.Reset();
         }
-        _activeFaults.Clear();
+        _faultRuntime.Clear();
         _signalHub.Reset();
         _machineLayout?.Reset();
         _pickPlaceWorkpiece?.Reset();
-        foreach (var executor in _sequenceExecutors.Values)
-        {
-            executor.Reset();
-        }
-        ResetAutomaticRunState();
-        ResetConditionScenarioState();
+        _sequenceRuntime.ResetExecutors();
+        _automaticRunRuntime.Reset();
+        _conditionScenarioRuntime.Reset();
         _activeSequenceId = null;
         _controlOwner = SimulationControlOwner.Definition;
     }
 
-    private SimulationSnapshot CreateSnapshot()
-    {
-        var signals = _signalHub.CaptureSnapshot();
-        return new SimulationSnapshot(
-            _clock.Time,
-            _tickIndex,
-            _runMode,
-            _controlOwner,
-            _timeScale,
-            _axes.Select(axis => axis.CreateSnapshot()),
-            signals.Revision,
-            signals.Signals,
-            _sequenceExecutors
-                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                .Select(pair => pair.Value.CaptureSnapshot()),
-            _cameras
-                .OrderBy(camera => camera.Id, StringComparer.Ordinal)
-                .Select(camera => camera.CaptureSnapshot()),
-            new AutomaticRunSnapshot(
-                _automaticRunConfiguration is not null,
-                _automaticRunActive,
-                _automaticRunWaitingForRepeat,
-                _automaticRunCompletedCycleCount,
-                _automaticRunRemainingDelayTicks),
-            _machineLayout is null
-                ? Array.Empty<LayoutComponentSnapshot>()
-                : _machineLayout.CaptureSnapshots(),
-            _activeFaults.Values,
-            CreateConditionScenarioSnapshot(),
-            _pickPlaceWorkpiece is null
-                ? Array.Empty<PickPlaceWorkpieceSnapshot>()
-                : new[] { _pickPlaceWorkpiece.CaptureSnapshot() },
-            _machineLayout is null
-                ? Array.Empty<LoadLockSnapshot>()
-                : _machineLayout.CaptureLoadLockSnapshots(),
-            _machineLayout is null
-                ? Array.Empty<WaferHandlerSnapshot>()
-                : _machineLayout.CaptureWaferHandlerSnapshots(),
-            _machineLayout is null
-                ? Array.Empty<InspectionSortRouterSnapshot>()
-                : _machineLayout.CaptureInspectionSortRouterSnapshots(),
-            _machineLayout is null
-                ? Array.Empty<InspectionHandoffSnapshot>()
-                : _machineLayout.CaptureInspectionHandoffSnapshots(),
-            _machineLayout is null
-                ? Array.Empty<OhtHandoffSnapshot>()
-                : _machineLayout.CaptureOhtHandoffSnapshots(),
-            _machineLayout is null
-                ? Array.Empty<PrealignerSnapshot>()
-                : _machineLayout.CapturePrealignerSnapshots(),
-             _sequenceDebugState.CreateSnapshot(),
-             analogSignals: signals.AnalogSignals);
-    }
+    private SimulationSnapshot CreateSnapshot() =>
+        SimulationSnapshotFactory.Create(
+            new SimulationSnapshotFactoryContext(
+                _clock.Time,
+                _tickIndex,
+                _runMode,
+                _controlOwner,
+                _timeScale,
+                _axes,
+                _signalHub,
+                _sequenceRuntime.SequenceExecutors,
+                _cameras,
+                new AutomaticRunSnapshot(
+                    _automaticRunRuntime.Configuration is not null,
+                    _automaticRunRuntime.IsActive,
+                    _automaticRunRuntime.WaitingForRepeat,
+                    _automaticRunRuntime.CompletedCycleCount,
+                    _automaticRunRuntime.RemainingDelayTicks),
+                _machineLayout,
+                _faultRuntime.Values,
+                _conditionScenarioRuntime.CreateSnapshot(),
+                _pickPlaceWorkpiece,
+                _sequenceRuntime.DebugState.CreateSnapshot()));
 
     private void AdvancePickPlaceWorkpiece(long eventTick, TimeSpan eventTime)
     {
@@ -1551,58 +1206,21 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             simulationTime: eventTime);
     }
 
-    private DeterministicConditionScenarioSnapshot CreateConditionScenarioSnapshot()
-    {
-        if (_conditionScenarioProfile is null || _conditionStateMachine is null)
-        {
-            return DeterministicConditionScenarioSnapshot.NotConfigured;
-        }
-
-        return new DeterministicConditionScenarioSnapshot(
-            true,
-            _conditionScenarioActive,
-            _conditionScenarioProfile.ScenarioId,
-            _conditionScenarioProfile.TargetId,
-            _conditionScenarioProfile.Seed,
-            _conditionScenarioProfile.DurationTicks,
-            _conditionScenarioExecutedTicks,
-            _conditionScenarioProfile.InitialState,
-            _conditionStateMachine.State,
-            _conditionStateMachine.HealthScore,
-            _conditionLastTransition);
-    }
-
-    private void ResetConditionScenarioState()
-    {
-        _conditionScenarioActive = false;
-        _conditionScheduledFaultActive = false;
-        _conditionScheduledFaultInterruptedAutomaticRun = false;
-        _conditionScenarioExecutedTicks = 0;
-        _conditionLastTransition = null;
-        _conditionStateMachine = _conditionScenarioProfile is null
-            ? null
-            : new DeterministicConditionStateMachine(_conditionScenarioProfile);
-    }
-
-    private void ClearConditionScenarioState()
-    {
-        _conditionScenarioProfile = null;
-        _conditionStateMachine = null;
-        _conditionScenarioActive = false;
-        _conditionScheduledFaultActive = false;
-        _conditionScheduledFaultInterruptedAutomaticRun = false;
-        _conditionScenarioExecutedTicks = 0;
-        _conditionLastTransition = null;
-    }
-
     private void PublishSnapshot()
     {
         var snapshot = CreateSnapshot();
-        Volatile.Write(ref _latestSnapshot, snapshot);
-        _snapshotStore.Writer.TryWrite(snapshot);
+        _snapshotStore.Publish(snapshot);
     }
 
     private void EmitSequenceRuntimeEvent(
+        string category,
+        string code,
+        string message,
+        long tickIndex,
+        TimeSpan simulationTime) =>
+        Emit(category, code, message, tickIndex: tickIndex, simulationTime: simulationTime);
+
+    private void EmitPhysicalRuntimeEvent(
         string category,
         string code,
         string message,
@@ -1621,14 +1239,13 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         var previousOperation = _operationContext;
         _operationContext = "EventPublication";
         InjectFault(SimulationEngineFaultPoint.BeforeEventPublication);
-        _eventChannel.Writer.TryWrite(new SimulationEvent(
-            ++_eventIndex,
+        _eventPublisher.TryPublish(
             tickIndex ?? _tickIndex,
             simulationTime ?? _clock.Time,
             category,
             code,
             message,
-            commandId));
+            commandId);
         _operationContext = previousOperation;
     }
 
@@ -1647,56 +1264,6 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             _commandBoundaryTime);
     }
 
-    private void RequestCancellation()
-    {
-        lock (_lifecycleLock)
-        {
-            if (_lifecycleState != EngineLifecycleState.Running)
-            {
-                return;
-            }
-
-            _requestedTermination = SimulationEngineTerminationOutcome.Cancelled;
-            _lifecycleState = EngineLifecycleState.Stopping;
-            _commandChannel.Writer.TryComplete();
-            _stopCts.Cancel();
-        }
-    }
-
-    private void FinalizeRun(
-        SimulationEngineTerminationResult termination,
-        IReadOnlyCollection<PendingCommand> pendingCommands)
-    {
-        lock (_lifecycleLock)
-        {
-            _terminalResult = termination;
-            _lifecycleState = termination.Outcome == SimulationEngineTerminationOutcome.Faulted
-                ? EngineLifecycleState.Faulted
-                : EngineLifecycleState.Stopped;
-            _commandChannel.Writer.TryComplete();
-        }
-
-        CompletePendingCommands(pendingCommands, termination);
-        while (_commandChannel.Reader.TryRead(out var command))
-        {
-            command.TryComplete(CreateTerminalCommandResult(command, termination));
-        }
-
-        _snapshotStore.Complete();
-        _eventChannel.Writer.TryComplete();
-        _startCancellationRegistration.Dispose();
-        _startCancellationRegistration = default;
-        _termination.TrySetResult(termination);
-    }
-
-    private SimulationEngineTerminationOutcome GetRequestedTermination()
-    {
-        lock (_lifecycleLock)
-        {
-            return _requestedTermination;
-        }
-    }
-
     private SimulationEngineTerminationResult CreateTerminationResult(
         SimulationEngineTerminationOutcome outcome,
         Exception? exception,
@@ -1710,99 +1277,8 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             currentCommandId,
             operation);
 
-    private SimulationCommandErrorCode GetClosedChannelError()
-    {
-        lock (_lifecycleLock)
-        {
-            return _lifecycleState == EngineLifecycleState.Faulted
-                ? SimulationCommandErrorCode.EngineFaulted
-                : SimulationCommandErrorCode.EngineStopped;
-        }
-    }
-
-    private SimulationCommandResult CreateTerminalCommandResult(
-        SimulationCommand command,
-        SimulationEngineTerminationResult termination) =>
-        SimulationCommandResult.Rejected(
-            command,
-            termination.TickIndex,
-            termination.SimulationTime,
-            termination.Outcome == SimulationEngineTerminationOutcome.Faulted
-                ? SimulationCommandErrorCode.EngineFaulted
-                : SimulationCommandErrorCode.EngineStopped,
-            CreateTerminationDetail(termination));
-
-    private static void CompletePendingCommands(
-        IEnumerable<PendingCommand> pendingCommands,
-        SimulationEngineTerminationResult termination)
-    {
-        foreach (var pendingCommand in pendingCommands)
-        {
-            pendingCommand.Command.TryComplete(
-                SimulationCommandResult.Rejected(
-                    pendingCommand.Command,
-                    termination.TickIndex,
-                    termination.SimulationTime,
-                    termination.Outcome == SimulationEngineTerminationOutcome.Faulted
-                        ? SimulationCommandErrorCode.EngineFaulted
-                        : SimulationCommandErrorCode.EngineStopped,
-                    CreateTerminationDetail(termination)));
-        }
-    }
-
-    private static string CreateTerminationDetail(SimulationEngineTerminationResult termination)
-    {
-        if (termination.Outcome == SimulationEngineTerminationOutcome.Faulted)
-        {
-            var context = string.Join(
-                ", ",
-                new[]
-                {
-                    termination.Operation is null ? null : $"operation={termination.Operation}",
-                    termination.CurrentCommandId is null ? null : $"command={termination.CurrentCommandId}",
-                    $"tick={termination.TickIndex}",
-                    $"time={termination.SimulationTime}"
-                }.Where(value => value is not null));
-            return $"The simulation engine faulted ({context}): " +
-                (termination.Exception?.Message ?? "Unknown simulation engine failure.");
-        }
-
-        return termination.Outcome == SimulationEngineTerminationOutcome.Cancelled
-            ? "The simulation engine was cancelled before applying the command."
-            : "The simulation engine stopped before applying the command.";
-    }
-
     private void InjectFault(SimulationEngineFaultPoint faultPoint) =>
         _faultInjector?.Invoke(faultPoint);
-
-    private SimulationCommandResult CompleteLifecycleRejection(
-        SimulationCommand command,
-        SimulationCommandErrorCode errorCode)
-    {
-        var snapshot = CurrentSnapshot;
-        SimulationEngineTerminationResult? terminalResult;
-        lock (_lifecycleLock)
-        {
-            terminalResult = _terminalResult;
-        }
-
-        var detail = errorCode switch
-        {
-            SimulationCommandErrorCode.EngineNotStarted => "The simulation engine has not started.",
-            SimulationCommandErrorCode.EngineFaulted when terminalResult is not null =>
-                CreateTerminationDetail(terminalResult),
-            SimulationCommandErrorCode.EngineFaulted => "The simulation engine faulted.",
-            _ => "The simulation engine is stopped."
-        };
-        var result = SimulationCommandResult.Rejected(
-            command,
-            snapshot.TickIndex,
-            snapshot.SimulationTime,
-            errorCode,
-            detail);
-        command.TryComplete(result);
-        return result;
-    }
 
     private SimulationCommandResult Accept(SimulationCommand command, string detail) =>
         SimulationCommandResult.Accepted(command, _commandBoundaryTick, _commandBoundaryTime, detail);
@@ -1818,33 +1294,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             errorCode,
             detail);
 
-    private static void CompleteCommands(IEnumerable<PendingCommand> pendingCommands)
-    {
-        foreach (var pendingCommand in pendingCommands)
-        {
-            if (pendingCommand.Result is null)
-            {
-                throw new InvalidOperationException(
-                    $"Command '{pendingCommand.Command.CommandId}' has no simulation result.");
-            }
-
-            pendingCommand.Command.TryComplete(pendingCommand.Result);
-        }
-    }
-
     private static string FormatSignal(bool value) => value ? "ON" : "OFF";
-
-    private static string FormatConveyorState(bool isRunning, ConveyorDirection direction) =>
-        isRunning ? $"RUNNING {direction}" : $"STOPPED {direction}";
-
-    private enum EngineLifecycleState
-    {
-        Created,
-        Running,
-        Stopping,
-        Stopped,
-        Faulted
-    }
 
     public void Dispose()
     {
@@ -1853,17 +1303,8 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             return;
         }
 
-        StopAsync().GetAwaiter().GetResult();
+        _lifecycle.Dispose();
         _disposed = true;
-        _startCancellationRegistration.Dispose();
-        _startCancellationRegistration = default;
-        _stopCts.Dispose();
-    }
-
-    private sealed class PendingCommand(SimulationCommand command)
-    {
-        public SimulationCommand Command { get; } = command;
-        public SimulationCommandResult? Result { get; set; }
     }
 
 }

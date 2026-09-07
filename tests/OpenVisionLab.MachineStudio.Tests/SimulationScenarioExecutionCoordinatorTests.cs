@@ -155,6 +155,48 @@ public sealed class SimulationScenarioExecutionCoordinatorTests
         Assert.Contains("Test scenario replayed · CMD-", logs.Single().Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task DisposeSuppressesLateStartCompletionAndIsIdempotent()
+    {
+        OpenVisionLanguageService.Load();
+        using var workspace = new SimulationWorkspaceViewModel
+        {
+            ScenarioTargetId = "axis-1"
+        };
+        var commands = new List<SimulationCommand>();
+        var completion = new TaskCompletionSource<SimulationCommandResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var workflow = new SimulationScenarioWorkflow(command =>
+        {
+            commands.Add(command);
+            return completion.Task;
+        });
+        var statuses = new List<string>();
+        var logs = new List<(string Category, string Message)>();
+        var designModeValues = new List<bool>();
+        var runningValues = new List<bool>();
+        var coordinator = CreateCoordinator(
+            workflow,
+            workspace,
+            statuses,
+            logs,
+            designModeValues,
+            runningValues);
+
+        var startTask = coordinator.StartAsync();
+        await WaitForAsync(() => commands.Count == 1);
+
+        coordinator.Dispose();
+        coordinator.Dispose();
+        completion.SetResult(CreateAcceptedResult(commands[0]));
+        await startTask;
+
+        Assert.False(coordinator.OwnsRun);
+        Assert.Empty(statuses);
+        Assert.Empty(logs);
+        Assert.Empty(runningValues);
+    }
+
     private static SimulationScenarioExecutionCoordinator CreateCoordinator(
         SimulationScenarioWorkflow workflow,
         SimulationWorkspaceViewModel workspace,
@@ -192,5 +234,24 @@ public sealed class SimulationScenarioExecutionCoordinatorTests
                     isAccepted ? null : "rejected"));
         });
         return (workflow, commands);
+    }
+
+    private static SimulationCommandResult CreateAcceptedResult(SimulationCommand command) => new(
+        command.CommandId,
+        true,
+        0,
+        TimeSpan.Zero,
+        SimulationCommandErrorCode.None,
+        null);
+
+    private static async Task WaitForAsync(Func<bool> condition)
+    {
+        var timeout = DateTime.UtcNow.AddSeconds(5);
+        while (!condition() && DateTime.UtcNow < timeout)
+        {
+            await Task.Delay(20);
+        }
+
+        Assert.True(condition(), "The scenario command was not dispatched.");
     }
 }

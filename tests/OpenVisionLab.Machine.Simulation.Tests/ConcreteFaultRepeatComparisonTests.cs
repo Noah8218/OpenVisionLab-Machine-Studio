@@ -1,12 +1,15 @@
 using OpenVisionLab.Machine.Simulation.Scenarios;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Simulation.Tests;
 
 public sealed class ConcreteFaultRepeatComparisonTests
 {
-    private const string ArtifactRoot =
-        "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\artifacts\\20260813-cross-fault-repeat";
+    private static string ArtifactRoot => Path.Combine(
+        TestStorage.RootPath,
+        "artifacts",
+        "20260813-cross-fault-repeat");
 
     [Fact]
     public async Task DiCylinderAndAxis_RepeatsMatchAndChangedHoldLocatesFirstFaultTick()

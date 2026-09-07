@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Linq;
 using OpenVisionLab.Machine.Simulation.FaultScenarios;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Simulation.Tests;
@@ -152,27 +153,12 @@ public sealed class DeterministicFaultScenarioHeadlessRunnerTests
 
     private static string PrepareTestDataDirectory()
     {
-        var preferred = Path.Combine(
-            "D:\\",
-            "OpenVisionLab-TestData",
-            "OpenVisionLab-Machine-Studio",
+        var path = Path.Combine(
+            TestStorage.RootPath,
             "Simulation",
             "HeadlessRunnerTests");
-        try
-        {
-            Directory.CreateDirectory(preferred);
-            return preferred;
-        }
-        catch
-        {
-            var fallback = Path.Combine(
-                Path.GetTempPath(),
-                "OpenVisionLab-Machine-Studio",
-                "Simulation",
-                "HeadlessRunnerTests");
-            Directory.CreateDirectory(fallback);
-            return fallback;
-        }
+        Directory.CreateDirectory(path);
+        return path;
     }
 
     private static JsonDocument LoadReportDocument(string reportPath)

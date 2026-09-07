@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using OpenVisionLab.Integration.Contracts;
 using OpenVisionLab.Machine.Infrastructure.Integration;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Infrastructure.Tests;
@@ -408,7 +409,7 @@ public sealed class MachineIntegrationExchangeTests
         public ExchangeFixture()
         {
             Root = Path.Combine(
-                "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio",
+                TestStorage.RootPath,
                 "integration-adapter-tests",
                 Guid.NewGuid().ToString("N"));
             SourceRoot = Path.Combine(Root, "source");

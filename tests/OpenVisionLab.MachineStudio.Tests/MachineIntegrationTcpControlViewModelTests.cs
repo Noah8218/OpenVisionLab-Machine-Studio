@@ -83,6 +83,43 @@ public sealed class MachineIntegrationTcpControlViewModelTests
         await viewModel.StopTcpListenerAsync();
     }
 
+    [Fact]
+    public async Task DisposeSuppressesLateTcpOperationStatus()
+    {
+        using var fixture = new TestRoot();
+        var settingsStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSettings = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var statuses = new List<string>();
+        using var viewModel = new MachineIntegrationTcpControlViewModel(
+            () =>
+            {
+                settingsStarted.TrySetResult();
+                releaseSettings.Task.GetAwaiter().GetResult();
+                return new MachineIntegrationTcpSettings(
+                    fixture.ExchangeRoot,
+                    IPAddress.Loopback,
+                    0,
+                    IPAddress.Loopback.ToString(),
+                    45101);
+            },
+            () => null,
+            () => Task.CompletedTask,
+            statuses.Add);
+
+        viewModel.SetSessionSharedKey(CreateEncodedKey("tcp-control-dispose"));
+        var operation = Task.Run(() => viewModel.StartTcpListenerAsync());
+        await settingsStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var statusCountBeforeDispose = statuses.Count;
+
+        viewModel.Dispose();
+        releaseSettings.TrySetResult();
+        await operation;
+
+        Assert.Equal(statusCountBeforeDispose, statuses.Count);
+    }
+
     private static MachineIntegrationTcpControlViewModel CreateViewModel(TestRoot fixture) =>
         new(
             () => new MachineIntegrationTcpSettings(

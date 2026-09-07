@@ -11,7 +11,6 @@ using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Events;
 using OpenVisionLab.Machine.Simulation.Layout;
 using OpenVisionLab.Machine.Simulation.Snapshots;
-using OpenVisionLab.MachineStudio.Models.Simulation;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
@@ -67,22 +66,10 @@ public sealed class SequenceBreakpointItem : ViewModelBase
     }
 }
 
-public sealed record RuntimeTimelineItem(
-    long EventIndex,
-    long TickIndex,
-    string TimeText,
-    string Category,
-    string Code,
-    string Message)
+public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
 {
-    public string HeaderText => $"{TimeText} · tick {TickIndex}";
-}
-
-public sealed class RuntimeDebuggerViewModel : ViewModelBase
-{
-    private const int TimelineRetentionLimit = 200;
     private readonly Func<SimulationCommand, Task<SimulationCommandResult>> _dispatch;
-    private readonly List<SimulationEvent> _events = [];
+    private readonly RuntimeTimelineViewModel _timeline = new();
     private readonly RuntimeAlarmCollectionViewModel _alarmCollection;
     private readonly RuntimeDebuggerWatchTargetCatalog _watchTargetCatalog = new();
     private SimulationSnapshot? _latestSnapshot;
@@ -102,12 +89,13 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
     private ICommand? _addWatchCommand;
     private ICommand? _removeWatchCommand;
     private ICommand? _clearTimelineCommand;
+    private int _disposed;
 
     public RuntimeDebuggerViewModel(Func<SimulationCommand, Task<SimulationCommandResult>> dispatch)
     {
         _dispatch = dispatch ?? throw new ArgumentNullException(nameof(dispatch));
         _alarmCollection = new(
-            () => IsEnabled,
+            () => IsEnabled && !IsDisposed,
             SequenceName,
             status => OperationStatusText = status);
         _alarmCollection.PropertyChanged += OnAlarmCollectionPropertyChanged;
@@ -116,7 +104,7 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
     public ObservableCollection<SequenceBreakpointItem> Breakpoints { get; } = new();
     public ObservableCollection<RuntimeWatchTarget> WatchTargets { get; } = new();
     public ObservableCollection<RuntimeWatchItem> Watches { get; } = new();
-    public ObservableCollection<RuntimeTimelineItem> Timeline { get; } = new();
+    public ObservableCollection<RuntimeTimelineItem> Timeline => _timeline.Items;
     public ObservableCollection<RuntimeAlarmItem> Alarms => _alarmCollection.Alarms;
     public ObservableCollection<RuntimeAlarmItem> AlarmHistory => _alarmCollection.AlarmHistory;
 
@@ -125,6 +113,11 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
         get => _selectedWatchTarget;
         set
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             if (SetProperty(ref _selectedWatchTarget, value))
             {
                 InvalidateCommands();
@@ -137,6 +130,11 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
         get => _selectedWatch;
         set
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             if (SetProperty(ref _selectedWatch, value))
             {
                 InvalidateCommands();
@@ -149,6 +147,11 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
         get => _selectedBreakpoint;
         set
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             if (SetProperty(ref _selectedBreakpoint, value))
             {
                 OnPropertyChanged(nameof(BreakpointActionText));
@@ -159,7 +162,7 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
 
     public bool IsEnabled => _isEnabled;
     public bool IsOperationPending => _isOperationPending;
-    public bool HasTimeline => Timeline.Count > 0;
+    public bool HasTimeline => _timeline.HasItems;
     public bool HasAlarms => _alarmCollection.HasAlarms;
     public bool HasAlarmHistory => _alarmCollection.HasAlarmHistory;
     public bool HasWatches => Watches.Count > 0;
@@ -217,15 +220,18 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
     public string AlarmAcknowledgementSummaryText => _alarmCollection.AlarmAcknowledgementSummaryText;
     public string AlarmHistorySummaryText => _alarmCollection.AlarmHistorySummaryText;
 
-    public string TimelineSummaryText => string.Format(
-        CultureInfo.CurrentCulture,
-        T("Debugger.TimelineCount", "최근 이벤트 {0}/200건", "Latest {0}/200 events"),
-        Timeline.Count);
+    public string TimelineSummaryText => _timeline.SummaryText;
 
     public string OperationStatusText
     {
         get => _operationStatusText;
-        private set => SetProperty(ref _operationStatusText, value);
+        private set
+        {
+            if (!IsDisposed)
+            {
+                SetProperty(ref _operationStatusText, value);
+            }
+        }
     }
 
     public ICommand SemanticStepCommand => _semanticStepCommand ??= new AsyncRelayCommand(
@@ -235,22 +241,25 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
 
     public ICommand ToggleBreakpointCommand => _toggleBreakpointCommand ??= new AsyncRelayCommand(
         _ => RunOperationAsync(ToggleBreakpointAsync),
-        _ => IsEnabled && !_isOperationPending && SelectedBreakpoint is not null,
+        _ => !IsDisposed && IsEnabled && !_isOperationPending && SelectedBreakpoint is not null,
         useCommandManagerRequery: false);
 
     public ICommand AddWatchCommand => _addWatchCommand ??= new RelayCommand(
         _ => AddSelectedWatch(),
-        _ => IsEnabled && SelectedWatchTarget is not null && !Watches.Any(item => item.Target == SelectedWatchTarget),
+        _ => !IsDisposed
+            && IsEnabled
+            && SelectedWatchTarget is not null
+            && !Watches.Any(item => item.Target == SelectedWatchTarget),
         useCommandManagerRequery: false);
 
     public ICommand RemoveWatchCommand => _removeWatchCommand ??= new RelayCommand(
         _ => RemoveSelectedWatch(),
-        _ => SelectedWatch is not null,
+        _ => !IsDisposed && SelectedWatch is not null,
         useCommandManagerRequery: false);
 
     public ICommand ClearTimelineCommand => _clearTimelineCommand ??= new RelayCommand(
         _ => ClearTimeline(),
-        _ => Timeline.Count > 0,
+        _ => !IsDisposed && Timeline.Count > 0,
         useCommandManagerRequery: false);
 
     public ICommand AcknowledgeAlarmCommand => _alarmCollection.AcknowledgeAlarmCommand;
@@ -259,14 +268,18 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
     public void LoadProject(MachineProjectDocument project, bool resetSession)
     {
         ArgumentNullException.ThrowIfNull(project);
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var projectChanged = !string.Equals(_projectId, project.Id, StringComparison.Ordinal);
         _projectId = project.Id;
 
         if (resetSession || projectChanged)
         {
             Watches.Clear();
-            _events.Clear();
-            Timeline.Clear();
+            _timeline.Clear();
             _alarmCollection.Reset();
             _defaultWatchApplied = false;
             SelectedWatch = null;
@@ -309,6 +322,11 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
     public void ApplySnapshot(SimulationSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _latestSnapshot = snapshot;
         var enabledBreakpoints = snapshot.SequenceDebug.Breakpoints
             .Select(item => (item.SequenceId, item.StepId))
@@ -342,17 +360,22 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
     public void ApplyEvent(SimulationEvent runtimeEvent)
     {
         ArgumentNullException.ThrowIfNull(runtimeEvent);
-        _events.Insert(0, runtimeEvent);
-        if (_events.Count > TimelineRetentionLimit)
+        if (IsDisposed)
         {
-            _events.RemoveRange(TimelineRetentionLimit, _events.Count - TimelineRetentionLimit);
+            return;
         }
 
-        RebuildTimeline();
+        _timeline.Add(runtimeEvent);
+        RefreshTimelinePresentation();
     }
 
     public void SetEnabled(bool value, bool invalidateCommands)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (SetProperty(ref _isEnabled, value, nameof(IsEnabled)) && invalidateCommands)
         {
             InvalidateCommands();
@@ -361,6 +384,11 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
 
     public void InvalidateCommands()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         (_semanticStepCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         (_toggleBreakpointCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         (_addWatchCommand as RelayCommand)?.RaiseCanExecuteChanged();
@@ -371,7 +399,13 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
 
     public void RefreshLocalization()
     {
-        RebuildTimeline();
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        _timeline.RefreshLocalization();
+        RefreshTimelinePresentation();
         if (_latestSnapshot is not null)
         {
             foreach (var watch in Watches)
@@ -383,17 +417,33 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
         RefreshSnapshotPresentation();
     }
 
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _alarmCollection.PropertyChanged -= OnAlarmCollectionPropertyChanged;
+    }
+
     private SequenceExecutionSnapshot? ActiveSequence => _latestSnapshot?.Sequences
         .FirstOrDefault(sequence => sequence.Status == SequenceExecutionStatus.Running)
         ?? _latestSnapshot?.Sequences.FirstOrDefault();
 
-    private bool CanStepSequence() => IsEnabled
+    private bool CanStepSequence() => !IsDisposed
+        && IsEnabled
         && !_isOperationPending
         && _latestSnapshot?.RunMode == SimulationRunMode.Paused
         && ActiveSequence?.Status == SequenceExecutionStatus.Running;
 
     private async Task StepSequenceAsync()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (ActiveSequence is not { } sequence)
         {
             return;
@@ -406,6 +456,11 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
 
     private async Task ToggleBreakpointAsync()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (SelectedBreakpoint is not { } breakpoint)
         {
             return;
@@ -425,7 +480,7 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
 
     private async Task RunOperationAsync(Func<Task> operation)
     {
-        if (_isOperationPending)
+        if (IsDisposed || _isOperationPending)
         {
             return;
         }
@@ -437,13 +492,25 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
         }
         finally
         {
-            SetProperty(ref _isOperationPending, false, nameof(IsOperationPending));
-            InvalidateCommands();
+            if (IsDisposed)
+            {
+                _isOperationPending = false;
+            }
+            else
+            {
+                SetProperty(ref _isOperationPending, false, nameof(IsOperationPending));
+                InvalidateCommands();
+            }
         }
     }
 
     private void AddSelectedWatch()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (SelectedWatchTarget is not { } target || Watches.Any(item => item.Target == target))
         {
             return;
@@ -461,6 +528,11 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
 
     private void RemoveSelectedWatch()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (SelectedWatch is not { } item)
         {
             return;
@@ -473,11 +545,13 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
 
     private void ClearTimeline()
     {
-        _events.Clear();
-        Timeline.Clear();
-        OnPropertyChanged(nameof(HasTimeline));
-        OnPropertyChanged(nameof(TimelineSummaryText));
-        InvalidateCommands();
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        _timeline.Clear();
+        RefreshTimelinePresentation();
     }
 
     private void RefreshWatchTargets()
@@ -504,19 +578,8 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
             ?? WatchTargets.FirstOrDefault();
     }
 
-    private void RebuildTimeline()
+    private void RefreshTimelinePresentation()
     {
-        Timeline.Clear();
-        foreach (var item in _events)
-        {
-            Timeline.Add(new RuntimeTimelineItem(
-                item.EventIndex,
-                item.TickIndex,
-                item.SimulationTime.ToString(@"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture),
-                OpenVisionLanguageService.T($"Runtime.Category.{item.Category}", item.Category, item.Category),
-                item.Code,
-                SimulationLogEntry.LocalizeMessage(item.Message)));
-        }
         OnPropertyChanged(nameof(HasTimeline));
         OnPropertyChanged(nameof(TimelineSummaryText));
         InvalidateCommands();
@@ -561,11 +624,13 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase
 
     private void OnAlarmCollectionPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName is { } propertyName)
+        if (!IsDisposed && args.PropertyName is { } propertyName)
         {
             OnPropertyChanged(propertyName);
         }
     }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     private void RefreshSnapshotPresentation()
     {

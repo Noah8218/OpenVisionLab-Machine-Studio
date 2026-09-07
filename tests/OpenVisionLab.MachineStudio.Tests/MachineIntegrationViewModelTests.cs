@@ -6,6 +6,7 @@ using OpenVisionLab.Integration.Contracts;
 using OpenVisionLab.Integration.Transport.Tcp;
 using OpenVisionLab.Machine.Infrastructure.Integration;
 using OpenVisionLab.MachineStudio.ViewModel;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
@@ -130,6 +131,80 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
 
         Assert.Equal(fixture.ExchangeRoot, cancelledViewModel.ExchangeRoot);
         Assert.Equal(fixture.RecipePath, cancelledViewModel.InspectionRecipePath);
+    }
+
+    [Fact]
+    public void DisposedIntegrationCommandsCannotExecute()
+    {
+        using var fixture = new IntegrationFixture();
+        using var viewModel = fixture.CreateViewModel(
+            (_, _) => null,
+            (_, _) => true);
+
+        viewModel.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.InspectionRecipePath = fixture.RecipePath;
+        viewModel.TwoDConsumerVersion = "2.1.0";
+        viewModel.TwoDConsumerCommit = new string('2', 40);
+
+        Assert.True(viewModel.CanPublishTwoDImageHandoff);
+        Assert.True(viewModel.CanRefreshResults);
+
+        viewModel.Dispose();
+
+        Assert.False(viewModel.CanPublishTwoDImageHandoff);
+        Assert.False(viewModel.CanRefreshResults);
+        Assert.False(viewModel.PublishTwoDImageHandoffCommand.CanExecute(null));
+        Assert.False(viewModel.RefreshResultsCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task DisposeSuppressesLatePublishStatus()
+    {
+        using var fixture = new IntegrationFixture();
+        var requestStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var requestReturned = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRequest = 0;
+        var lateStatusChanges = 0;
+        using var viewModel = fixture.CreateViewModel(
+            (recipePath, consumer) =>
+            {
+                requestStarted.SetResult();
+                SpinWait.SpinUntil(() => Volatile.Read(ref releaseRequest) != 0);
+                requestReturned.SetResult();
+                return fixture.CreateRequest(
+                    recipePath,
+                    new IntegrationApplicationIdentity(
+                        IntegrationApplicationIds.MachineStudio,
+                        "1.0.0",
+                        new string('1', 40),
+                        IntegrationSourceState.Clean),
+                    consumer);
+            },
+            (_, _) => true);
+        viewModel.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.InspectionRecipePath = fixture.RecipePath;
+        viewModel.TwoDConsumerVersion = "2.1.0";
+        viewModel.TwoDConsumerCommit = new string('2', 40);
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (Volatile.Read(ref releaseRequest) == 2
+                && args.PropertyName == nameof(viewModel.StatusText))
+            {
+                Interlocked.Increment(ref lateStatusChanges);
+            }
+        };
+
+        _ = Task.Run(() => viewModel.PublishTwoDImageHandoffCommand.Execute(null));
+        await requestStarted.Task;
+        Volatile.Write(ref releaseRequest, 1);
+        await requestReturned.Task;
+        Volatile.Write(ref releaseRequest, 2);
+        viewModel.Dispose();
+
+        await WaitForAsync(() => MachineIntegrationExchange.DiscoverTransactions(fixture.ExchangeRoot).Count == 1);
+        Assert.Equal(0, Volatile.Read(ref lateStatusChanges));
     }
 
     [Fact]
@@ -487,7 +562,7 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
         public IntegrationFixture()
         {
             Root = Path.Combine(
-                "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio",
+                TestStorage.RootPath,
                 "machine-integration-viewmodel-tests",
                 Guid.NewGuid().ToString("N"));
             ExchangeRoot = Path.Combine(Root, "exchange");

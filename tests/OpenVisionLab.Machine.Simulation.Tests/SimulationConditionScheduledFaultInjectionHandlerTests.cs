@@ -14,7 +14,7 @@ public sealed class SimulationConditionScheduledFaultInjectionHandlerTests
     public void Apply_AtInjectionTickAddsFaultAndUsesGeneratedCommandIdentity()
     {
         var signalHub = CreateSignalHub("di.sensor");
-        var activeFaults = new Dictionary<SimulationFaultKey, SimulationFaultSnapshot>();
+        var activeFaults = new SimulationFaultRuntime();
         var outcome = new SimulationConditionScheduledFaultInjectionHandler().Apply(
             CreateContext(
                 new DeterministicFaultRecoverySchedule(
@@ -48,7 +48,7 @@ public sealed class SimulationConditionScheduledFaultInjectionHandlerTests
                     ForcedValue: true),
                 scenarioTick: 4,
                 CreateSignalHub("di.sensor"),
-                new Dictionary<SimulationFaultKey, SimulationFaultSnapshot>()));
+                new SimulationFaultRuntime()));
 
         Assert.False(outcome.ConditionScenarioActive);
         Assert.Null(outcome.ScheduledFaultActive);
@@ -61,7 +61,7 @@ public sealed class SimulationConditionScheduledFaultInjectionHandlerTests
     [Fact]
     public void Apply_OutsideInjectionTickDoesNotMutateFaultOrScenarioState()
     {
-        var activeFaults = new Dictionary<SimulationFaultKey, SimulationFaultSnapshot>();
+        var activeFaults = new SimulationFaultRuntime();
         var outcome = new SimulationConditionScheduledFaultInjectionHandler().Apply(
             CreateContext(
                 new DeterministicFaultRecoverySchedule(
@@ -84,7 +84,7 @@ public sealed class SimulationConditionScheduledFaultInjectionHandlerTests
         DeterministicFaultRecoverySchedule schedule,
         long scenarioTick,
         DeterministicSignalHub signalHub,
-        IDictionary<SimulationFaultKey, SimulationFaultSnapshot> activeFaults) =>
+        SimulationFaultRuntime activeFaults) =>
         new(
             schedule,
             scenarioTick,

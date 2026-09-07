@@ -36,8 +36,7 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
     private readonly Action<DeterministicSimulationBatchMismatch> _navigateToMismatch;
     private readonly Action<bool> _notifyParentPresentationChanged;
     private readonly Action<Exception> _onCommandException;
-    private CancellationTokenSource? _batchCancellation;
-    private Task? _batchTask;
+    private readonly AsyncOperationLifetime _batchLifetime = new();
     private bool _isBatchRunning;
     private bool _batchWasCanceled;
     private int _batchCompletedRuns;
@@ -168,7 +167,7 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
         _artifactStore.HasRestoredArtifacts;
     internal bool RejectedStaleBatchArtifacts =>
         _artifactStore.State == SimulationScenarioBatchArtifactState.StaleRejected;
-    internal Task? BatchTask => _batchTask;
+    internal Task? BatchTask => _batchLifetime.CurrentTask;
 
     public void Reset()
     {
@@ -309,16 +308,7 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
 
     internal void RefreshLocalization() => RaiseChanged(invalidateCommands: false);
 
-    internal void CancelBatch()
-    {
-        try
-        {
-            _batchCancellation?.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-        }
-    }
+    internal void CancelBatch() => _batchLifetime.Cancel();
 
     internal void InvalidateCommands()
     {
@@ -329,14 +319,9 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
         RaiseCanExecuteChanged(NavigateToMismatchCommand);
     }
 
-    private Task RunBatchTask()
-    {
-        var task = RunScenarioBatchAsync();
-        _batchTask = task;
-        return task;
-    }
+    private Task RunBatchTask() => _batchLifetime.Start(RunScenarioBatchAsync);
 
-    private async Task RunScenarioBatchAsync()
+    private async Task RunScenarioBatchAsync(CancellationToken cancellationToken)
     {
         if (!await _ensureRuntimeDefinitionApplied())
         {
@@ -375,9 +360,6 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
             repetitionCount,
             BuildIdentity.Current);
 
-        _batchCancellation?.Dispose();
-        var cancellation = new CancellationTokenSource();
-        _batchCancellation = cancellation;
         _batchWasCanceled = false;
         _batchCompletedRuns = 0;
         _artifactStore.SetLatestBatchResult(null);
@@ -408,7 +390,7 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
                     return result;
                 },
                 AcceptedBatchBaseline,
-                cancellation.Token);
+                cancellationToken);
             _artifactStore.SetLatestBatchResult(batchResult);
 
             _setStatus(batchResult.IsSuccess
@@ -420,7 +402,7 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
                     : FormatBatchMismatchLog(batchResult.FirstMismatch));
             PersistBatchArtifacts();
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             _batchWasCanceled = true;
             _setStatus(OpenVisionLanguageService.T("Simulation.BatchCanceled"));
@@ -429,11 +411,6 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
         finally
         {
             SetBatchRunning(false);
-            if (ReferenceEquals(_batchCancellation, cancellation))
-            {
-                _batchCancellation = null;
-            }
-            cancellation.Dispose();
             RaiseChanged();
         }
     }
@@ -568,6 +545,6 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
         }
 
         _disposed = true;
-        CancelBatch();
+        _batchLifetime.Dispose();
     }
 }

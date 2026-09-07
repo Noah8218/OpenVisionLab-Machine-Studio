@@ -11,7 +11,7 @@ internal sealed record SimulationFaultCommandContext(
     IList<ServoAxisComponent> Axes,
     DeterministicSignalHub SignalHub,
     DeterministicMachineLayout? MachineLayout,
-    IDictionary<SimulationFaultKey, SimulationFaultSnapshot> ActiveFaults,
+    SimulationFaultRuntime ActiveFaults,
     long CommandBoundaryTick,
     TimeSpan CommandBoundaryTime);
 
@@ -193,7 +193,7 @@ internal sealed class SimulationFaultCommandHandler
             injectFault.ForcedValue,
             context.CommandBoundaryTick,
             context.CommandBoundaryTime);
-        context.ActiveFaults.Add(key, snapshot);
+        context.ActiveFaults.Add(snapshot);
         return Accept(
             command,
             context,

@@ -41,7 +41,7 @@ public enum LayoutTransformHandle
     Rotation
 }
 
-public sealed class MachineLayoutViewModel : ViewModelBase
+public sealed class MachineLayoutViewModel : ViewModelBase, IDisposable
 {
     private readonly ObservableCollection<LayoutItem> _items = new();
     private LayoutItem? _selectedItem;
@@ -51,6 +51,7 @@ public sealed class MachineLayoutViewModel : ViewModelBase
     private bool _isEditable = true;
     private bool _isUpdatingSelection;
     private bool _isUpdatingDefinition;
+    private bool _disposed;
     private readonly LayoutSelectionEditingWorkflow _selectionEditingWorkflow = new();
 
     public ObservableCollection<LayoutItem> Items => _items;
@@ -101,13 +102,10 @@ public sealed class MachineLayoutViewModel : ViewModelBase
 
     public void Load(Machine.Core.Projects.MachineProjectDocument project)
     {
+        ThrowIfDisposed();
         CancelSelectionDrag();
         CancelSelectionTransform();
-        foreach (var item in _items)
-        {
-            item.DefinitionChanged -= OnItemDefinitionChanged;
-            item.PropertyChanged -= OnItemPropertyChanged;
-        }
+        DetachItemHandlers();
 
         _project = project ?? throw new ArgumentNullException(nameof(project));
         SelectedItem = null;
@@ -327,6 +325,21 @@ public sealed class MachineLayoutViewModel : ViewModelBase
         SelectedComponentEditor?.RefreshLocalization();
     }
 
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        CancelSelectionDrag();
+        CancelSelectionTransform();
+        DetachItemHandlers();
+        _selectedComponentEditor?.Dispose();
+        _selectedComponentEditor = null;
+    }
+
     private static IReadOnlyList<ComponentLibraryItem> CreateLibraryItems() =>
         new[]
         {
@@ -369,6 +382,7 @@ public sealed class MachineLayoutViewModel : ViewModelBase
 
     private void SetSelection(IEnumerable<LayoutItem> items, LayoutItem? primary)
     {
+        ThrowIfDisposed();
         var selected = items.Where(item => _items.Contains(item)).ToHashSet();
         if (primary is not null && !selected.Contains(primary))
         {
@@ -394,7 +408,7 @@ public sealed class MachineLayoutViewModel : ViewModelBase
 
     private void OnItemPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (_isUpdatingSelection || args.PropertyName != nameof(LayoutItem.IsSelected))
+        if (_disposed || _isUpdatingSelection || args.PropertyName != nameof(LayoutItem.IsSelected))
         {
             return;
         }
@@ -411,6 +425,11 @@ public sealed class MachineLayoutViewModel : ViewModelBase
 
     private void SetPrimarySelection(LayoutItem? value)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         if (!SetProperty(ref _selectedItem, value, nameof(SelectedItem)))
         {
             return;
@@ -464,7 +483,7 @@ public sealed class MachineLayoutViewModel : ViewModelBase
 
     private void OnItemDefinitionChanged(object? sender, EventArgs args)
     {
-        if (!_isUpdatingDefinition)
+        if (!_disposed && !_isUpdatingDefinition)
         {
             DefinitionChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -472,7 +491,27 @@ public sealed class MachineLayoutViewModel : ViewModelBase
 
     private void OnSelectedComponentDefinitionChanged()
     {
-        DefinitionChanged?.Invoke(this, EventArgs.Empty);
+        if (!_disposed)
+        {
+            DefinitionChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void DetachItemHandlers()
+    {
+        foreach (var item in _items)
+        {
+            item.DefinitionChanged -= OnItemDefinitionChanged;
+            item.PropertyChanged -= OnItemPropertyChanged;
+        }
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(MachineLayoutViewModel));
+        }
     }
 
     private static MachineLayoutDefinition? ResolveDefinition(

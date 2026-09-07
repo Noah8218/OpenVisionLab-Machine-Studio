@@ -7,6 +7,7 @@ using System.Text.Json;
 using OpenVisionLab.Integration.Contracts;
 using OpenVisionLab.Integration.Transport.Tcp;
 using OpenVisionLab.Machine.Infrastructure.Integration;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Infrastructure.Tests;
@@ -218,7 +219,7 @@ public sealed class MachineIntegrationTcpFailureRecoveryTests
         public TcpFixture()
         {
             Root = Path.Combine(
-                "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio",
+                TestStorage.RootPath,
                 "q6-failure-recovery",
                 Guid.NewGuid().ToString("N"));
             SourceRoot = Path.Combine(Root, "source");

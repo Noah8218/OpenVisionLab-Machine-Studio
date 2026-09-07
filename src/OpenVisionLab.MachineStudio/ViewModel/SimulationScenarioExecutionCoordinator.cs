@@ -11,7 +11,7 @@ namespace OpenVisionLab.MachineStudio.ViewModel;
 /// Target/profile authoring remains in <see cref="SimulationWorkspaceViewModel"/>;
 /// engine command orchestration remains in <see cref="SimulationScenarioWorkflow"/>.
 /// </summary>
-internal sealed class SimulationScenarioExecutionCoordinator
+internal sealed class SimulationScenarioExecutionCoordinator : IDisposable
 {
     private readonly SimulationScenarioWorkflow _workflow;
     private readonly SimulationWorkspaceViewModel _workspace;
@@ -21,6 +21,7 @@ internal sealed class SimulationScenarioExecutionCoordinator
     private readonly Action<bool> _setRunning;
     private readonly Action<string> _setStatus;
     private readonly Action<string, string> _log;
+    private int _disposed;
     private bool _ownsRun;
 
     internal SimulationScenarioExecutionCoordinator(
@@ -44,12 +45,17 @@ internal sealed class SimulationScenarioExecutionCoordinator
         _log = log ?? throw new ArgumentNullException(nameof(log));
     }
 
-    internal bool OwnsRun => _ownsRun;
+    internal bool OwnsRun => !IsDisposed && _ownsRun;
 
     internal async Task StartAsync()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var profile = await PrepareProfileAsync(exitDesignMode: true);
-        if (profile is null)
+        if (profile is null || IsDisposed)
         {
             return;
         }
@@ -57,6 +63,11 @@ internal sealed class SimulationScenarioExecutionCoordinator
         var result = await _workflow.StartAsync(
             profile,
             _getProject().Simulation.AutomaticRun is not null);
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (!result.IsAccepted)
         {
             HandleFailure(result);
@@ -68,8 +79,18 @@ internal sealed class SimulationScenarioExecutionCoordinator
 
     internal async Task StopAsync()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var wasOwned = _ownsRun;
         var result = await _workflow.StopAsync(wasOwned);
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (!result.IsAccepted)
         {
             var failureMessage = result.PauseResult is { } pauseResult
@@ -92,8 +113,13 @@ internal sealed class SimulationScenarioExecutionCoordinator
 
     internal async Task ReplayAsync()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var profile = await PrepareProfileAsync(exitDesignMode: false);
-        if (profile is null)
+        if (profile is null || IsDisposed)
         {
             return;
         }
@@ -101,6 +127,11 @@ internal sealed class SimulationScenarioExecutionCoordinator
         var result = await _workflow.ReplayAsync(
             profile,
             _getProject().Simulation.AutomaticRun is not null);
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (!result.IsAccepted)
         {
             HandleFailure(result);
@@ -113,7 +144,7 @@ internal sealed class SimulationScenarioExecutionCoordinator
     private async Task<DeterministicConditionScenarioProfile?> PrepareProfileAsync(
         bool exitDesignMode)
     {
-        if (!await _ensureRuntimeDefinitionApplied())
+        if (IsDisposed || !await _ensureRuntimeDefinitionApplied() || IsDisposed)
         {
             return null;
         }
@@ -135,6 +166,11 @@ internal sealed class SimulationScenarioExecutionCoordinator
 
     private void ApplySuccess(SimulationScenarioResult result, bool replay)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (result.StartCommand is not { } startCommand)
         {
             throw new InvalidOperationException(
@@ -160,6 +196,11 @@ internal sealed class SimulationScenarioExecutionCoordinator
 
     private void HandleFailure(SimulationScenarioResult result)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (result.ScheduledFaultResult is { } scheduledResult)
         {
             if (scheduledResult.FailureStage is not { } failureStage
@@ -214,4 +255,16 @@ internal sealed class SimulationScenarioExecutionCoordinator
 
     private static string ShortCommandId(SimulationCommand command) =>
         ShortCommandId(command.CommandId);
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _ownsRun = false;
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

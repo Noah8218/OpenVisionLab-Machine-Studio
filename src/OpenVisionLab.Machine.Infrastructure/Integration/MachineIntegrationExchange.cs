@@ -1,4 +1,3 @@
-using System.Text.Json;
 using OpenVisionLab.Integration.Contracts;
 
 namespace OpenVisionLab.Machine.Infrastructure.Integration;
@@ -18,9 +17,6 @@ public sealed record MachineIntegrationTransactionSummary(
 public static class MachineIntegrationExchange
 {
     public const long DefaultMinimumFreeSpaceBytes = 1_048_576;
-
-    private const string QuarantineDirectoryName = ".quarantine";
-    private const string QuarantineManifestFileName = "quarantine.json";
 
     public static IntegrationHandoffV2 PublishHandoff(
         string exchangeRoot,
@@ -73,10 +69,9 @@ public static class MachineIntegrationExchange
         var transactionsRoot = Path.Combine(
             root,
             IntegrationTransactionLayout.TransactionsDirectoryName);
-        EnsureDirectoryIsNotReparsePoint(root);
-        EnsureDirectoryIsNotReparsePoint(transactionsRoot);
-
-        var transactionDirectory = GetTransactionDirectory(root, handoff.TransactionId);
+        MachineIntegrationTransactionFileSystem.EnsureDirectoryIsNotReparsePoint(root);
+        MachineIntegrationTransactionFileSystem.EnsureDirectoryIsNotReparsePoint(transactionsRoot);
+        var transactionDirectory = MachineIntegrationTransactionFileSystem.GetTransactionDirectory(root, handoff.TransactionId);
         if (Directory.Exists(transactionDirectory)
             || File.Exists(transactionDirectory))
         {
@@ -86,7 +81,7 @@ public static class MachineIntegrationExchange
         }
 
         var handoffBytes = IntegrationContractJson.SerializeCanonical(handoff);
-        var declaredBytes = GetDeclaredBytes(artifacts);
+        var declaredBytes = MachineIntegrationTransactionFileSystem.GetDeclaredArtifactBytes(artifacts);
         var requiredFreeSpace = GetRequiredFreeSpace(
             declaredBytes,
             handoffBytes.LongLength,
@@ -95,7 +90,7 @@ public static class MachineIntegrationExchange
         cancellationToken.ThrowIfCancellationRequested();
 
         Directory.CreateDirectory(transactionsRoot);
-        EnsureDirectoryIsNotReparsePoint(transactionsRoot);
+        MachineIntegrationTransactionFileSystem.EnsureDirectoryIsNotReparsePoint(transactionsRoot);
 
         var stagingDirectory = Path.Combine(
             transactionsRoot,
@@ -153,7 +148,7 @@ public static class MachineIntegrationExchange
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            WriteMessage(
+            MachineIntegrationTransactionFileSystem.WriteMessage(
                 Path.Combine(
                     stagingDirectory,
                     IntegrationTransactionLayout.HandoffFileName),
@@ -171,7 +166,7 @@ public static class MachineIntegrationExchange
                     declaredBytes,
                     completedArtifacts,
                     artifacts.Count);
-                EnsureNoReparsePoints(stagingDirectory, artifact.RelativePath);
+                MachineIntegrationTransactionFileSystem.EnsureNoReparsePoints(stagingDirectory, artifact.RelativePath);
                 ThrowIfInvalid(IntegrationContractValidator.ValidateArtifactFile(
                     artifact,
                     stagingDirectory));
@@ -192,7 +187,7 @@ public static class MachineIntegrationExchange
         }
         catch (Exception exception)
         {
-            TryQuarantineStagingDirectory(
+            MachineIntegrationTransactionMaintenance.TryQuarantineStagingDirectory(
                 transactionsRoot,
                 stagingDirectory,
                 handoff,
@@ -207,48 +202,8 @@ public static class MachineIntegrationExchange
     }
 
     public static IReadOnlyList<MachineIntegrationTransactionSummary> DiscoverTransactions(
-        string exchangeRoot)
-    {
-        var root = Path.GetFullPath(RequireText(exchangeRoot, nameof(exchangeRoot)));
-        var transactionsRoot = Path.Combine(
-            root,
-            IntegrationTransactionLayout.TransactionsDirectoryName);
-        if (!Directory.Exists(transactionsRoot))
-        {
-            return [];
-        }
-
-        var transactions = new List<MachineIntegrationTransactionSummary>();
-        foreach (var directory in Directory.EnumerateDirectories(transactionsRoot))
-        {
-            if (!Guid.TryParse(Path.GetFileName(directory), out var transactionId))
-            {
-                continue;
-            }
-
-            var handoffPath = Path.Combine(
-                directory,
-                IntegrationTransactionLayout.HandoffFileName);
-            if (!File.Exists(handoffPath))
-            {
-                continue;
-            }
-
-            var handoff = ReadHandoffEnvelope(root, transactionId);
-            transactions.Add(new(
-                handoff,
-                File.Exists(Path.Combine(
-                    directory,
-                    IntegrationTransactionLayout.AcknowledgementFileName)),
-                File.Exists(Path.Combine(
-                    directory,
-                    IntegrationTransactionLayout.ResultFileName))));
-        }
-
-        return transactions
-            .OrderByDescending(transaction => transaction.Handoff.CreatedAtUtc)
-            .ToArray();
-    }
+        string exchangeRoot) =>
+        MachineIntegrationTransactionMaintenance.DiscoverTransactions(exchangeRoot);
 
     public static IntegrationHandoffV2 ReadHandoff(
         string exchangeRoot,
@@ -256,10 +211,10 @@ public static class MachineIntegrationExchange
     {
         var root = Path.GetFullPath(RequireText(exchangeRoot, nameof(exchangeRoot)));
         var handoff = ReadHandoffEnvelope(root, transactionId);
-        var transactionDirectory = GetTransactionDirectory(root, transactionId);
+        var transactionDirectory = MachineIntegrationTransactionFileSystem.GetTransactionDirectory(root, transactionId);
         foreach (var artifact in handoff.Context.Artifacts)
         {
-            EnsureNoReparsePoints(transactionDirectory, artifact.RelativePath);
+            MachineIntegrationTransactionFileSystem.EnsureNoReparsePoints(transactionDirectory, artifact.RelativePath);
             ThrowIfInvalid(IntegrationContractValidator.ValidateArtifactFile(
                 artifact,
                 transactionDirectory));
@@ -272,11 +227,11 @@ public static class MachineIntegrationExchange
         string exchangeRoot,
         Guid transactionId)
     {
-        var transactionDirectory = GetTransactionDirectory(
+        var transactionDirectory = MachineIntegrationTransactionFileSystem.GetTransactionDirectory(
             Path.GetFullPath(RequireText(exchangeRoot, nameof(exchangeRoot))),
             transactionId);
         var handoff = IntegrationContractJson.DeserializeHandoffV2(
-            ReadMessage(
+            MachineIntegrationTransactionFileSystem.ReadMessage(
                 transactionDirectory,
                 IntegrationTransactionLayout.HandoffFileName));
         if (handoff.TransactionId != transactionId)
@@ -295,9 +250,9 @@ public static class MachineIntegrationExchange
     {
         var root = Path.GetFullPath(RequireText(exchangeRoot, nameof(exchangeRoot)));
         var handoff = ReadHandoff(root, transactionId);
-        var transactionDirectory = GetTransactionDirectory(root, transactionId);
+        var transactionDirectory = MachineIntegrationTransactionFileSystem.GetTransactionDirectory(root, transactionId);
         var acknowledgement = IntegrationContractJson.DeserializeAcknowledgementV2(
-            ReadMessage(
+            MachineIntegrationTransactionFileSystem.ReadMessage(
                 transactionDirectory,
                 IntegrationTransactionLayout.AcknowledgementFileName));
         ThrowIfInvalid(IntegrationContractValidator.ValidateV2Sequence(
@@ -312,13 +267,13 @@ public static class MachineIntegrationExchange
     {
         var root = Path.GetFullPath(RequireText(exchangeRoot, nameof(exchangeRoot)));
         var handoff = ReadHandoff(root, transactionId);
-        var transactionDirectory = GetTransactionDirectory(root, transactionId);
+        var transactionDirectory = MachineIntegrationTransactionFileSystem.GetTransactionDirectory(root, transactionId);
         var acknowledgement = IntegrationContractJson.DeserializeAcknowledgementV2(
-            ReadMessage(
+            MachineIntegrationTransactionFileSystem.ReadMessage(
                 transactionDirectory,
                 IntegrationTransactionLayout.AcknowledgementFileName));
         var result = IntegrationContractJson.DeserializeResultV2(
-            ReadMessage(
+            MachineIntegrationTransactionFileSystem.ReadMessage(
                 transactionDirectory,
                 IntegrationTransactionLayout.ResultFileName));
         ThrowIfInvalid(IntegrationContractValidator.ValidateV2Sequence(
@@ -328,7 +283,7 @@ public static class MachineIntegrationExchange
 
         if (result.RunRecord is not null)
         {
-            EnsureNoReparsePoints(
+            MachineIntegrationTransactionFileSystem.EnsureNoReparsePoints(
                 transactionDirectory,
                 result.RunRecord.RelativePath);
             ThrowIfInvalid(IntegrationContractValidator.ValidateArtifactFile(
@@ -337,7 +292,7 @@ public static class MachineIntegrationExchange
         }
         foreach (var evidence in result.Evidence)
         {
-            EnsureNoReparsePoints(transactionDirectory, evidence.RelativePath);
+            MachineIntegrationTransactionFileSystem.EnsureNoReparsePoints(transactionDirectory, evidence.RelativePath);
             ThrowIfInvalid(IntegrationContractValidator.ValidateArtifactFile(
                 evidence,
                 transactionDirectory));
@@ -347,177 +302,30 @@ public static class MachineIntegrationExchange
     }
 
     public static IReadOnlyList<MachineIntegrationTransactionDiagnostic> DiagnoseTransactions(
-        string exchangeRoot)
-    {
-        var root = Path.GetFullPath(RequireText(exchangeRoot, nameof(exchangeRoot)));
-        var transactionsRoot = Path.Combine(
-            root,
-            IntegrationTransactionLayout.TransactionsDirectoryName);
-        if (!Directory.Exists(transactionsRoot))
-        {
-            return [];
-        }
-
-        EnsureDirectoryIsNotReparsePoint(root);
-        EnsureDirectoryIsNotReparsePoint(transactionsRoot);
-        var availableFreeBytes = TryGetAvailableFreeBytes(root);
-        var diagnostics = new List<MachineIntegrationTransactionDiagnostic>();
-        foreach (var directory in Directory.EnumerateDirectories(transactionsRoot))
-        {
-            var name = Path.GetFileName(directory);
-            if (string.Equals(
-                    name,
-                    QuarantineDirectoryName,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                EnsureDirectoryIsNotReparsePoint(directory);
-                foreach (var quarantineDirectory in Directory.EnumerateDirectories(directory))
-                {
-                    diagnostics.Add(DiagnoseQuarantineDirectory(
-                        quarantineDirectory,
-                        availableFreeBytes));
-                }
-
-                continue;
-            }
-
-            if (Guid.TryParse(name, out var transactionId))
-            {
-                diagnostics.Add(DiagnosePublishedDirectory(
-                    root,
-                    directory,
-                    transactionId,
-                    availableFreeBytes));
-                continue;
-            }
-
-            if (TryParseStagingDirectoryName(name, out transactionId))
-            {
-                diagnostics.Add(DiagnoseStagingDirectory(
-                    directory,
-                    transactionId,
-                    availableFreeBytes));
-                continue;
-            }
-
-            diagnostics.Add(CreateDiagnostic(
-                null,
-                MachineIntegrationTransactionState.Invalid,
-                directory,
-                availableFreeBytes,
-                detail: "Unknown transaction directory name."));
-        }
-
-        return diagnostics
-            .OrderByDescending(diagnostic => diagnostic.LastWriteTimeUtc)
-            .ToArray();
-    }
+        string exchangeRoot) =>
+        MachineIntegrationTransactionMaintenance.DiagnoseTransactions(exchangeRoot);
 
     public static MachineIntegrationCleanupReport CleanupStaging(
         string exchangeRoot,
         TimeSpan staleAfter,
         DateTimeOffset? nowUtc = null,
-        CancellationToken cancellationToken = default)
-    {
-        if (staleAfter < TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(staleAfter),
-                "The staging retention period cannot be negative.");
-        }
-
-        var root = Path.GetFullPath(RequireText(exchangeRoot, nameof(exchangeRoot)));
-        var transactionsRoot = Path.Combine(
-            root,
-            IntegrationTransactionLayout.TransactionsDirectoryName);
-        if (!Directory.Exists(transactionsRoot))
-        {
-            return new(0, 0, []);
-        }
-
-        EnsureDirectoryIsNotReparsePoint(root);
-        EnsureDirectoryIsNotReparsePoint(transactionsRoot);
-        var cutoff = (nowUtc ?? DateTimeOffset.UtcNow).ToUniversalTime() - staleAfter;
-        var scanned = 0;
-        var quarantined = 0;
-        foreach (var directory in Directory.EnumerateDirectories(transactionsRoot))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!TryParseStagingDirectoryName(
-                    Path.GetFileName(directory),
-                    out var transactionId))
-            {
-                continue;
-            }
-
-            scanned++;
-            if (GetLastWriteTimeUtc(directory) > cutoff)
-            {
-                continue;
-            }
-
-            var stagedHandoff = TryReadStagedHandoff(directory);
-            if (TryQuarantineStagingDirectory(
-                    transactionsRoot,
-                    directory,
-                    stagedHandoff,
-                    "stale-staging",
-                    null,
-                    null,
-                    GetReferencedArtifactBytes(
-                        directory,
-                        stagedHandoff?.Context.Artifacts),
-                    transactionId))
-            {
-                quarantined++;
-            }
-        }
-
-        return new(
-            scanned,
-            quarantined,
-            DiagnoseTransactions(root));
-    }
+        CancellationToken cancellationToken = default) =>
+        MachineIntegrationTransactionMaintenance.CleanupStaging(
+            exchangeRoot,
+            staleAfter,
+            nowUtc,
+            cancellationToken);
 
     public static int PurgeQuarantine(
         string exchangeRoot,
         TimeSpan retention,
         DateTimeOffset? nowUtc = null,
-        CancellationToken cancellationToken = default)
-    {
-        if (retention < TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(retention),
-                "The quarantine retention period cannot be negative.");
-        }
-
-        var root = Path.GetFullPath(RequireText(exchangeRoot, nameof(exchangeRoot)));
-        var quarantineRoot = GetQuarantineDirectory(root);
-        if (!Directory.Exists(quarantineRoot))
-        {
-            return 0;
-        }
-
-        EnsureDirectoryIsNotReparsePoint(root);
-        EnsureDirectoryIsNotReparsePoint(quarantineRoot);
-        var cutoff = (nowUtc ?? DateTimeOffset.UtcNow).ToUniversalTime() - retention;
-        var purged = 0;
-        foreach (var directory in Directory.EnumerateDirectories(quarantineRoot))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (GetLastWriteTimeUtc(directory) > cutoff)
-            {
-                continue;
-            }
-
-            EnsureDirectoryIsNotReparsePoint(directory);
-            Directory.Delete(directory, recursive: true);
-            purged++;
-        }
-
-        return purged;
-    }
+        CancellationToken cancellationToken = default) =>
+        MachineIntegrationTransactionMaintenance.PurgeQuarantine(
+            exchangeRoot,
+            retention,
+            nowUtc,
+            cancellationToken);
 
     private static async Task<long> CopyArtifactAsync(
         string sourcePath,
@@ -539,9 +347,9 @@ public static class MachineIntegrationExchange
                 source);
         }
 
-        var target = GetArtifactPath(transactionDirectory, artifact.RelativePath);
+        var target = MachineIntegrationTransactionFileSystem.GetArtifactPath(transactionDirectory, artifact.RelativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-        EnsureNoReparsePoints(transactionDirectory, artifact.RelativePath);
+        MachineIntegrationTransactionFileSystem.EnsureNoReparsePoints(transactionDirectory, artifact.RelativePath);
 
         await using var input = new FileStream(
             source,
@@ -631,24 +439,6 @@ public static class MachineIntegrationExchange
                 && upper[3] is >= '1' and <= '9');
     }
 
-    private static long GetDeclaredBytes(
-        IReadOnlyList<IntegrationArtifactReference> artifacts)
-    {
-        try
-        {
-            return artifacts.Aggregate(
-                0L,
-                (total, artifact) => checked(total + artifact.ByteLength));
-        }
-        catch (OverflowException exception)
-        {
-            throw new IntegrationContractException(
-                IntegrationErrorCode.InvalidArtifact,
-                "The declared artifact byte total is too large.",
-                exception);
-        }
-    }
-
     private static long GetRequiredFreeSpace(
         long declaredBytes,
         long handoffBytes,
@@ -669,39 +459,12 @@ public static class MachineIntegrationExchange
 
     private static void EnsureFreeSpace(string path, long requiredBytes)
     {
-        var availableBytes = TryGetAvailableFreeBytes(path);
+        var availableBytes = MachineIntegrationTransactionFileSystem.TryGetAvailableFreeBytes(path);
         if (availableBytes.HasValue && availableBytes.Value < requiredBytes)
         {
             throw new IntegrationContractException(
                 IntegrationErrorCode.InvalidState,
                 $"Insufficient free space for the transaction: required {requiredBytes} bytes, available {availableBytes.Value} bytes.");
-        }
-    }
-
-    private static long? TryGetAvailableFreeBytes(string path)
-    {
-        try
-        {
-            var volumeRoot = Path.GetPathRoot(Path.GetFullPath(path));
-            return string.IsNullOrEmpty(volumeRoot)
-                ? null
-                : new DriveInfo(volumeRoot).AvailableFreeSpace;
-        }
-        catch (IOException)
-        {
-            return null;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return null;
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
-        catch (NotSupportedException)
-        {
-            return null;
         }
     }
 
@@ -751,429 +514,6 @@ public static class MachineIntegrationExchange
         }
     }
 
-    private static bool TryQuarantineStagingDirectory(
-        string transactionsRoot,
-        string stagingDirectory,
-        IntegrationHandoffV2? handoff,
-        string reason,
-        Exception? exception,
-        IProgress<MachineIntegrationTransferProgress>? progress,
-        long materializedBytes,
-        Guid? transactionIdOverride = null)
-    {
-        if (!Directory.Exists(stagingDirectory))
-        {
-            return false;
-        }
-
-        var transactionId = handoff?.TransactionId
-            ?? transactionIdOverride
-            ?? (TryParseStagingDirectoryName(
-                    Path.GetFileName(stagingDirectory),
-                    out var parsedId)
-                ? parsedId
-                : Guid.NewGuid());
-        var quarantineRoot = Path.Combine(
-            transactionsRoot,
-            QuarantineDirectoryName);
-        try
-        {
-            Directory.CreateDirectory(quarantineRoot);
-            EnsureDirectoryIsNotReparsePoint(quarantineRoot);
-            var quarantineDirectory = Path.Combine(
-                quarantineRoot,
-                $"{transactionId:D}.{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}.{Guid.NewGuid():N}");
-            Directory.Move(stagingDirectory, quarantineDirectory);
-
-            var declaredBytes = handoff is null
-                ? 0
-                : GetDeclaredBytes(handoff.Context.Artifacts);
-            var manifest = new QuarantineManifest(
-                transactionId,
-                reason,
-                exception?.GetType().FullName,
-                exception?.Message,
-                DateTimeOffset.UtcNow,
-                handoff?.Context.Artifacts.Count ?? 0,
-                declaredBytes,
-                materializedBytes);
-            TryWriteQuarantineManifest(quarantineDirectory, manifest);
-            TryReportProgress(
-                progress,
-                transactionId,
-                MachineIntegrationTransferPhase.Quarantined,
-                null,
-                materializedBytes,
-                declaredBytes,
-                0,
-                manifest.ArtifactCount);
-            return true;
-        }
-        catch
-        {
-            // Keep the original publish or cleanup failure and leave staging in place for diagnosis.
-            return false;
-        }
-    }
-
-    private static void TryWriteQuarantineManifest(
-        string quarantineDirectory,
-        QuarantineManifest manifest)
-    {
-        try
-        {
-            WriteMessage(
-                Path.Combine(quarantineDirectory, QuarantineManifestFileName),
-                JsonSerializer.SerializeToUtf8Bytes(manifest));
-        }
-        catch
-        {
-            // The quarantined bytes remain the primary evidence if the manifest cannot be written.
-        }
-    }
-
-    private static MachineIntegrationTransactionDiagnostic DiagnosePublishedDirectory(
-        string root,
-        string directory,
-        Guid transactionId,
-        long? availableFreeBytes)
-    {
-        var state = MachineIntegrationTransactionState.Published;
-        var artifactCount = 0;
-        var declaredBytes = 0L;
-        var materializedBytes = 0L;
-        string? detail = null;
-        try
-        {
-            EnsureDirectoryIsNotReparsePoint(directory);
-            var handoff = ReadHandoffEnvelope(root, transactionId);
-            artifactCount = handoff.Context.Artifacts.Count;
-            declaredBytes = GetDeclaredBytes(handoff.Context.Artifacts);
-            materializedBytes = GetReferencedArtifactBytes(
-                directory,
-                handoff.Context.Artifacts);
-            foreach (var artifact in handoff.Context.Artifacts)
-            {
-                EnsureNoReparsePoints(directory, artifact.RelativePath);
-                ThrowIfInvalid(IntegrationContractValidator.ValidateArtifactFile(
-                    artifact,
-                    directory));
-            }
-        }
-        catch (Exception exception)
-        {
-            state = MachineIntegrationTransactionState.Invalid;
-            detail = DescribeException(exception);
-        }
-
-        return CreateDiagnostic(
-            transactionId,
-            state,
-            directory,
-            availableFreeBytes,
-            artifactCount,
-            declaredBytes,
-            materializedBytes,
-            detail);
-    }
-
-    private static MachineIntegrationTransactionDiagnostic DiagnoseStagingDirectory(
-        string directory,
-        Guid transactionId,
-        long? availableFreeBytes)
-    {
-        var handoff = TryReadStagedHandoff(directory);
-        var artifacts = handoff?.Context.Artifacts;
-        var detail = handoff is null
-            ? "Staging directory has no readable Handoff."
-            : "Transaction has not been atomically published.";
-        return CreateDiagnostic(
-            transactionId,
-            MachineIntegrationTransactionState.Staging,
-            directory,
-            availableFreeBytes,
-            artifacts?.Count ?? 0,
-            artifacts is null ? 0 : GetDeclaredBytes(artifacts),
-            GetReferencedArtifactBytes(directory, artifacts),
-            detail);
-    }
-
-    private static MachineIntegrationTransactionDiagnostic DiagnoseQuarantineDirectory(
-        string directory,
-        long? availableFreeBytes)
-    {
-        var manifest = TryReadQuarantineManifest(directory);
-        var transactionId = manifest?.TransactionId
-            ?? (TryParseQuarantineDirectoryName(
-                    Path.GetFileName(directory),
-                    out var parsedId)
-                ? parsedId
-                : null);
-        var detail = manifest is null
-            ? "Quarantine manifest is unavailable."
-            : string.IsNullOrWhiteSpace(manifest.Message)
-                ? manifest.Reason
-                : $"{manifest.Reason}: {manifest.Message}";
-        return CreateDiagnostic(
-            transactionId,
-            MachineIntegrationTransactionState.Quarantined,
-            directory,
-            availableFreeBytes,
-            manifest?.ArtifactCount ?? 0,
-            manifest?.DeclaredBytes ?? 0,
-            manifest?.MaterializedBytes ?? GetTotalFileBytes(directory),
-            detail);
-    }
-
-    private static MachineIntegrationTransactionDiagnostic CreateDiagnostic(
-        Guid? transactionId,
-        MachineIntegrationTransactionState state,
-        string directory,
-        long? availableFreeBytes,
-        int artifactCount = 0,
-        long declaredBytes = 0,
-        long materializedBytes = 0,
-        string? detail = null) =>
-        new(
-            transactionId,
-            state,
-            directory,
-            GetLastWriteTimeUtc(directory),
-            artifactCount,
-            declaredBytes,
-            materializedBytes,
-            availableFreeBytes,
-            detail);
-
-    private static IntegrationHandoffV2? TryReadStagedHandoff(string directory)
-    {
-        try
-        {
-            var path = Path.Combine(
-                directory,
-                IntegrationTransactionLayout.HandoffFileName);
-            return File.Exists(path)
-                ? IntegrationContractJson.DeserializeHandoffV2(File.ReadAllBytes(path))
-                : null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static QuarantineManifest? TryReadQuarantineManifest(string directory)
-    {
-        try
-        {
-            var path = Path.Combine(directory, QuarantineManifestFileName);
-            return File.Exists(path)
-                ? JsonSerializer.Deserialize<QuarantineManifest>(File.ReadAllBytes(path))
-                : null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static long GetReferencedArtifactBytes(
-        string transactionDirectory,
-        IReadOnlyList<IntegrationArtifactReference>? artifacts)
-    {
-        if (artifacts is null)
-        {
-            return 0;
-        }
-
-        var total = 0L;
-        foreach (var artifact in artifacts)
-        {
-            try
-            {
-                var path = GetArtifactPath(transactionDirectory, artifact.RelativePath);
-                EnsureNoReparsePoints(transactionDirectory, artifact.RelativePath);
-                if (File.Exists(path))
-                {
-                    total = checked(total + new FileInfo(path).Length);
-                }
-            }
-            catch
-            {
-                // Diagnostics report the bytes that can be safely observed.
-            }
-        }
-
-        return total;
-    }
-
-    private static long GetTotalFileBytes(string directory)
-    {
-        var total = 0L;
-        try
-        {
-            foreach (var path in Directory.EnumerateFiles(
-                         directory,
-                         "*",
-                         SearchOption.AllDirectories))
-            {
-                var info = new FileInfo(path);
-                if (info.Attributes.HasFlag(FileAttributes.ReparsePoint)
-                    || string.Equals(
-                        info.Name,
-                        QuarantineManifestFileName,
-                        StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                total = checked(total + info.Length);
-            }
-        }
-        catch
-        {
-            return total;
-        }
-
-        return total;
-    }
-
-    private static bool TryParseStagingDirectoryName(
-        string? name,
-        out Guid transactionId)
-    {
-        transactionId = Guid.Empty;
-        if (string.IsNullOrEmpty(name)
-            || name[0] != '.'
-            || !name.EndsWith(".staging", StringComparison.OrdinalIgnoreCase)
-            || name.Length < 1 + 36 + 1 + 1 + ".staging".Length)
-        {
-            return false;
-        }
-
-        if (!Guid.TryParseExact(name.Substring(1, 36), "D", out transactionId)
-            || name[37] != '.')
-        {
-            transactionId = Guid.Empty;
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool TryParseQuarantineDirectoryName(
-        string? name,
-        out Guid transactionId)
-    {
-        transactionId = Guid.Empty;
-        return !string.IsNullOrEmpty(name)
-            && name.Length >= 36
-            && Guid.TryParseExact(name[..36], "D", out transactionId);
-    }
-
-    private static DateTimeOffset GetLastWriteTimeUtc(string path) =>
-        new(new DirectoryInfo(path).LastWriteTimeUtc, TimeSpan.Zero);
-
-    private static string GetQuarantineDirectory(string exchangeRoot) =>
-        Path.Combine(
-            exchangeRoot,
-            IntegrationTransactionLayout.TransactionsDirectoryName,
-            QuarantineDirectoryName);
-
-    private static void EnsureDirectoryIsNotReparsePoint(string path)
-    {
-        var info = new DirectoryInfo(path);
-        if (info.Exists && info.Attributes.HasFlag(FileAttributes.ReparsePoint))
-        {
-            throw new IntegrationContractException(
-                IntegrationErrorCode.UnsafeArtifactPath,
-                "Exchange directories cannot be symbolic links or reparse points.");
-        }
-    }
-
-    private static string DescribeException(Exception exception) =>
-        string.IsNullOrWhiteSpace(exception.Message)
-            ? exception.GetType().Name
-            : $"{exception.GetType().Name}: {exception.Message}";
-
-    private static string GetArtifactPath(
-        string transactionDirectory,
-        string relativePath)
-    {
-        var root = Path.GetFullPath(transactionDirectory);
-        var path = Path.GetFullPath(
-            Path.Combine(
-                root,
-                relativePath.Replace('/', Path.DirectorySeparatorChar)));
-        var rootPrefix = root.TrimEnd(Path.DirectorySeparatorChar)
-                         + Path.DirectorySeparatorChar;
-        if (!path.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new IntegrationContractException(
-                IntegrationErrorCode.UnsafeArtifactPath,
-                "Artifact path escapes the transaction directory.");
-        }
-
-        return path;
-    }
-
-    private static void EnsureNoReparsePoints(
-        string transactionDirectory,
-        string relativePath)
-    {
-        var current = Path.GetFullPath(transactionDirectory);
-        EnsureDirectoryIsNotReparsePoint(current);
-
-        var segments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        for (var index = 0; index < segments.Length; index++)
-        {
-            current = Path.Combine(current, segments[index]);
-            FileSystemInfo entry = index == segments.Length - 1
-                ? new FileInfo(current)
-                : new DirectoryInfo(current);
-            if (entry.Exists && entry.Attributes.HasFlag(FileAttributes.ReparsePoint))
-            {
-                throw new IntegrationContractException(
-                    IntegrationErrorCode.UnsafeArtifactPath,
-                    "Artifact paths cannot traverse symbolic links or reparse points.");
-            }
-        }
-    }
-
-    private static string GetTransactionDirectory(
-        string exchangeRoot,
-        Guid transactionId)
-    {
-        if (transactionId == Guid.Empty)
-        {
-            throw new ArgumentException(
-                "Transaction identity cannot be empty.",
-                nameof(transactionId));
-        }
-
-        return Path.Combine(
-            exchangeRoot,
-            IntegrationTransactionLayout.TransactionsDirectoryName,
-            transactionId.ToString("D"));
-    }
-
-    private static byte[] ReadMessage(
-        string transactionDirectory,
-        string fileName) => File.ReadAllBytes(Path.Combine(transactionDirectory, fileName));
-
-    private static void WriteMessage(string path, byte[] bytes)
-    {
-        using var stream = new FileStream(
-            path,
-            FileMode.CreateNew,
-            FileAccess.Write,
-            FileShare.Read,
-            bufferSize: 4096,
-            options: FileOptions.SequentialScan);
-        stream.Write(bytes);
-        stream.Flush(flushToDisk: true);
-    }
-
     private static void RequireProducer(
         IntegrationApplicationIdentity producer,
         string expectedApplicationId)
@@ -1207,13 +547,4 @@ public static class MachineIntegrationExchange
             $"{issue.Field}: {issue.Message}");
     }
 
-    private sealed record QuarantineManifest(
-        Guid TransactionId,
-        string Reason,
-        string? ExceptionType,
-        string? Message,
-        DateTimeOffset QuarantinedAtUtc,
-        int ArtifactCount,
-        long DeclaredBytes,
-        long MaterializedBytes);
 }

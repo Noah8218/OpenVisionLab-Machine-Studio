@@ -52,48 +52,11 @@ public sealed record DeterministicSimulationBatchResultPackage(
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
     };
 
+    private static readonly DeterministicSimulationBatchResultComparer ResultComparer = new();
+
     public DeterministicSimulationBatchComparison CompareTo(
-        DeterministicSimulationBatchResultPackage? other)
-    {
-        if (other is null)
-        {
-            return new(false, "MissingBatch", "The comparison batch is missing.", null);
-        }
-
-        if (!string.Equals(BatchId, other.BatchId, StringComparison.Ordinal)
-            || !string.Equals(BuildIdentity, other.BuildIdentity, StringComparison.Ordinal)
-            || RequestedRuns != other.RequestedRuns)
-        {
-            return new(false, "BatchDefinitionMismatch", "Batch identity, build, or run count differs.", null);
-        }
-
-        if (CompletedRuns != other.CompletedRuns || IsComplete != other.IsComplete)
-        {
-            return new(false, "BatchCompletionMismatch", "Batch completion state differs.", null);
-        }
-
-        for (var index = 0; index < Math.Min(Runs.Length, other.Runs.Length); index++)
-        {
-            var runComparison = Runs[index].Result.CompareTo(other.Runs[index].Result);
-            if (!runComparison.IsMatch)
-            {
-                return new(
-                    false,
-                    runComparison.MismatchCode ?? "RunMismatch",
-                    runComparison.Detail ?? "Run evidence differs.",
-                    CreateMismatch(Runs[index].RunIndex, other.Runs[index].Result, runComparison));
-            }
-        }
-
-        if (Runs.Length != other.Runs.Length
-            || IsSuccess != other.IsSuccess
-            || !string.Equals(EvidenceHash, other.EvidenceHash, StringComparison.Ordinal))
-        {
-            return new(false, "BatchEvidenceMismatch", "Batch outcome or evidence hash differs.", FirstMismatch);
-        }
-
-        return new(true, null, null, null);
-    }
+        DeterministicSimulationBatchResultPackage? other) =>
+        ResultComparer.Compare(this, other);
 
     public bool IsEquivalentTo(DeterministicSimulationBatchResultPackage? other) =>
         CompareTo(other).IsMatch;
@@ -119,10 +82,10 @@ public sealed record DeterministicSimulationBatchResultPackage(
             run => !run.ReferenceComparison.IsMatch || !run.Result.IsSuccess);
         var expectedMismatch = firstFailure is null
             ? null
-            : CreateMismatch(
+            : DeterministicSimulationBatchResultComparer.CreateMismatch(
                 firstFailure.RunIndex,
                 firstFailure.Result,
-                EffectiveComparison(firstFailure));
+                DeterministicSimulationBatchResultComparer.EffectiveComparison(firstFailure));
         if (IsSuccess != (firstFailure is null) || FirstMismatch != expectedMismatch)
         {
             return false;
@@ -204,31 +167,6 @@ public sealed record DeterministicSimulationBatchResultPackage(
         }
     }
 
-    internal static DeterministicSimulationBatchMismatch CreateMismatch(
-        int runIndex,
-        DeterministicSimulationRunResultPackage result,
-        DeterministicSimulationRunComparison comparison)
-    {
-        var evidence = comparison.FirstMismatch;
-        return new(
-            runIndex,
-            comparison.MismatchCode ?? "RunMismatch",
-            comparison.Detail ?? result.FailureReason ?? "Run evidence differs.",
-            evidence?.EvidenceKind ?? "Run",
-            evidence?.TargetId ?? result.TargetId,
-            evidence?.TickIndex ?? result.ExecutedTicks,
-            result.EvidenceHash);
-    }
-
-    private static DeterministicSimulationRunComparison EffectiveComparison(
-        DeterministicSimulationBatchRunResult run) =>
-        run.ReferenceComparison.IsMatch
-            ? new DeterministicSimulationRunComparison(
-                false,
-                "RunFailed",
-                run.Result.FailureReason ?? "The run did not complete successfully.")
-            : run.ReferenceComparison;
-
     internal static string Hash(
         DeterministicSimulationBatchDefinition definition,
         string referenceEvidenceHash,
@@ -266,78 +204,3 @@ public sealed record DeterministicSimulationBatchComparison(
     string? MismatchCode,
     string? Detail,
     DeterministicSimulationBatchMismatch? FirstMismatch);
-
-/// <summary>
-/// Runs one deterministic repetition at a time and compares every result with
-/// either the accepted baseline or the first repetition.
-/// </summary>
-public sealed class DeterministicSimulationBatchRunner
-{
-    public async Task<DeterministicSimulationBatchResultPackage> RunAsync(
-        DeterministicSimulationBatchDefinition definition,
-        Func<int, CancellationToken, Task<DeterministicSimulationRunResultPackage>> runAsync,
-        DeterministicSimulationRunResultPackage? acceptedBaseline = null,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(definition);
-        ArgumentNullException.ThrowIfNull(runAsync);
-        if (string.IsNullOrWhiteSpace(definition.BatchId))
-        {
-            throw new ArgumentException("Batch id is required.", nameof(definition));
-        }
-
-        if (definition.RepetitionCount < 1)
-        {
-            throw new ArgumentOutOfRangeException(nameof(definition), "Repetition count must be positive.");
-        }
-
-        var normalized = definition with
-        {
-            BatchId = definition.BatchId.Trim(),
-            BuildIdentity = definition.BuildIdentity?.Trim() ?? string.Empty
-        };
-        var runs = ImmutableArray.CreateBuilder<DeterministicSimulationBatchRunResult>(
-            normalized.RepetitionCount);
-        DeterministicSimulationRunResultPackage? reference = acceptedBaseline;
-        DeterministicSimulationBatchMismatch? firstMismatch = null;
-
-        for (var runIndex = 1; runIndex <= normalized.RepetitionCount; runIndex++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var result = await runAsync(runIndex, cancellationToken).ConfigureAwait(false)
-                ?? throw new InvalidOperationException($"Batch run {runIndex} returned no result package.");
-            reference ??= result;
-            var comparison = reference.CompareTo(result);
-            runs.Add(new DeterministicSimulationBatchRunResult(runIndex, result, comparison));
-
-            if (firstMismatch is null && (!comparison.IsMatch || !result.IsSuccess))
-            {
-                var effectiveComparison = comparison.IsMatch
-                    ? new DeterministicSimulationRunComparison(
-                        false,
-                        "RunFailed",
-                        result.FailureReason ?? "The run did not complete successfully.")
-                    : comparison;
-                firstMismatch = DeterministicSimulationBatchResultPackage.CreateMismatch(
-                    runIndex,
-                    result,
-                    effectiveComparison);
-            }
-        }
-
-        var completedRuns = runs.ToImmutable();
-        var referenceHash = reference?.EvidenceHash ?? string.Empty;
-        return new DeterministicSimulationBatchResultPackage(
-            DeterministicSimulationBatchResultPackage.CurrentSchemaVersion,
-            normalized.BatchId,
-            normalized.BuildIdentity,
-            normalized.RepetitionCount,
-            completedRuns.Length,
-            IsComplete: true,
-            IsSuccess: firstMismatch is null,
-            referenceHash,
-            completedRuns,
-            firstMismatch,
-            DeterministicSimulationBatchResultPackage.Hash(normalized, referenceHash, completedRuns));
-    }
-}

@@ -35,6 +35,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     private bool _isBusy;
     private readonly MachineIntegrationResultObservationWorkflow _resultObservation;
     private string _statusText = string.Empty;
+    private readonly object _lifetimeGate = new();
     private bool _disposed;
 
     public MachineIntegrationViewModel(
@@ -86,10 +87,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             InvokeOnUiThreadAsync,
             exception =>
             {
-                if (!_disposed)
-                {
-                    StatusText = exception.Message;
-                }
+                TryPublish(() => StatusText = exception.Message);
             });
         _statusText = settingsLoad.Warning switch
         {
@@ -113,7 +111,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             RequireSavedTcpSettings,
             () => _resultObservation.LatestTransaction,
             RefreshResultsAsync,
-            status => StatusText = status);
+            status => TryPublish(() => StatusText = status));
         _tcpControl.PropertyChanged += OnTcpControlPropertyChanged;
 
         BrowseExchangeRootCommand = new RelayCommand(_ => BrowseExchangeRoot(), useCommandManagerRequery: false);
@@ -280,6 +278,11 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     {
         get
         {
+            if (IsDisposed)
+            {
+                return false;
+            }
+
             var consumer = TwoDConsumerIdentity;
             if (IsBusy
                 || consumer is null
@@ -294,7 +297,8 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     }
 
     public bool CanRefreshResults =>
-        !IsBusy
+        !IsDisposed
+        && !IsBusy
         && !string.IsNullOrWhiteSpace(_projectIdProvider())
         && Directory.Exists(ExchangeRoot.Trim());
 
@@ -560,12 +564,13 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
 
     private async Task PublishTwoDImageHandoffAsync()
     {
-        if (!CanPublishTwoDImageHandoff || TwoDConsumerIdentity is not { } consumer)
+        if (!CanPublishTwoDImageHandoff
+            || TwoDConsumerIdentity is not { } consumer
+            || !TryBeginOperation())
         {
             return;
         }
 
-        IsBusy = true;
         try
         {
             var request = _requestFactory(InspectionRecipePath.Trim(), consumer)
@@ -578,12 +583,15 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
                     ExchangeRoot.Trim(),
                     request)
                 .ConfigureAwait(true);
-            _resultObservation.RecordPublishedHandoff(handoff);
-            RaiseProjectionChanged();
-            StatusText = string.Format(
-                System.Globalization.CultureInfo.CurrentCulture,
-                L("HandoffPublished", "2D/Image Handoff 게시 완료: {0:D}", "2D/Image Handoff published: {0:D}"),
-                handoff.TransactionId);
+            TryPublish(() =>
+            {
+                _resultObservation.RecordPublishedHandoff(handoff);
+                RaiseProjectionChanged();
+                StatusText = string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    L("HandoffPublished", "2D/Image Handoff 게시 완료: {0:D}", "2D/Image Handoff published: {0:D}"),
+                    handoff.TransactionId);
+            });
         }
         catch (Exception exception) when (exception is IOException
             or UnauthorizedAccessException
@@ -591,22 +599,21 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             or InvalidOperationException
             or IntegrationContractException)
         {
-            StatusText = exception.Message;
+            TryPublish(() => StatusText = exception.Message);
         }
         finally
         {
-            IsBusy = false;
+            EndOperation();
         }
     }
 
     private async Task RefreshResultsAsync()
     {
-        if (_disposed || !CanRefreshResults)
+        if (!CanRefreshResults || !TryBeginOperation())
         {
             return;
         }
 
-        IsBusy = true;
         try
         {
             var transactionCount = await _resultObservation.RefreshAsync().ConfigureAwait(true);
@@ -615,11 +622,14 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            RaiseProjectionChanged();
-            StatusText = string.Format(
-                System.Globalization.CultureInfo.CurrentCulture,
-                L("ResultsRefreshed", "현재 프로젝트 거래 {0}개를 확인했습니다. 실행은 하지 않았습니다.", "Found {0} current-project transaction(s). No inspection was run."),
-                transactionCount.Value);
+            TryPublish(() =>
+            {
+                RaiseProjectionChanged();
+                StatusText = string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    L("ResultsRefreshed", "현재 프로젝트 거래 {0}개를 확인했습니다. 실행은 하지 않았습니다.", "Found {0} current-project transaction(s). No inspection was run."),
+                    transactionCount.Value);
+            });
         }
         catch (Exception exception) when (exception is IOException
             or UnauthorizedAccessException
@@ -627,11 +637,11 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             or InvalidOperationException
             or IntegrationContractException)
         {
-            StatusText = exception.Message;
+            TryPublish(() => StatusText = exception.Message);
         }
         finally
         {
-            IsBusy = false;
+            EndOperation();
         }
     }
 
@@ -670,7 +680,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     {
         if (args.PropertyName is { } propertyName)
         {
-            OnPropertyChanged(propertyName);
+            TryPublish(() => OnPropertyChanged(propertyName));
         }
     }
 
@@ -683,7 +693,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             : operation();
     }
 
-    private void HandleCommandException(Exception exception) => StatusText = exception.Message;
+    private void HandleCommandException(Exception exception) => TryPublish(() => StatusText = exception.Message);
 
     private MachineIntegrationTcpSettings RequireSavedTcpSettings()
     {
@@ -769,14 +779,68 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             ? english
             : korean;
 
+    private bool IsDisposed
+    {
+        get
+        {
+            lock (_lifetimeGate)
+            {
+                return _disposed;
+            }
+        }
+    }
+
+    private bool TryBeginOperation()
+    {
+        lock (_lifetimeGate)
+        {
+            if (_disposed)
+            {
+                return false;
+            }
+
+            IsBusy = true;
+            return true;
+        }
+    }
+
+    private void EndOperation()
+    {
+        lock (_lifetimeGate)
+        {
+            if (!_disposed)
+            {
+                IsBusy = false;
+            }
+        }
+    }
+
+    private bool TryPublish(Action action)
+    {
+        lock (_lifetimeGate)
+        {
+            if (_disposed)
+            {
+                return false;
+            }
+
+            action();
+            return true;
+        }
+    }
+
     public void Dispose()
     {
-        if (_disposed)
+        lock (_lifetimeGate)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
         }
 
-        _disposed = true;
         _tcpControl.PropertyChanged -= OnTcpControlPropertyChanged;
         _resultObservation.Dispose();
         _tcpControl.Dispose();

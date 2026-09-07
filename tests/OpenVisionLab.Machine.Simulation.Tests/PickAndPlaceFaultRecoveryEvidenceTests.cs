@@ -11,6 +11,7 @@ using OpenVisionLab.Machine.Simulation.Faults;
 using OpenVisionLab.Machine.Simulation.Scenarios;
 using OpenVisionLab.Machine.Simulation.Snapshots;
 using OpenVisionLab.Machine.Simulation.Workpieces;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Simulation.Tests;
@@ -45,7 +46,9 @@ public sealed class PickAndPlaceFaultRecoveryEvidenceTests
         Assert.NotEqual(string.Empty, first.Package.EventHash);
 
         var artifactPath = Path.Combine(
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\artifacts\\20260812-pick-place-axis-fault",
+            TestStorage.RootPath,
+            "artifacts",
+            "20260812-pick-place-axis-fault",
             "pick-place-axis-fault-recovery-package.json");
         DeterministicSimulationRunResultPackage.SaveToJson(first.Package, artifactPath);
         var loaded = Assert.IsType<DeterministicSimulationRunResultPackage>(
@@ -91,8 +94,10 @@ public sealed class PickAndPlaceFaultRecoveryEvidenceTests
         Assert.Equal(accepted.FaultClearedTick, mismatch.ObservedTickIndex);
         Assert.True(changedSchedule.HasValidEvidenceHash());
 
-        const string artifactRoot =
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio\\artifacts\\20260812-pick-place-axis-fault-batch";
+        string artifactRoot = Path.Combine(
+            TestStorage.RootPath,
+            "artifacts",
+            "20260812-pick-place-axis-fault-batch");
         string baselinePath = Path.Combine(artifactRoot, "accepted-run-baseline.json");
         string batchPath = Path.Combine(artifactRoot, "repeated-recovery-batch.json");
         string mismatchPath = Path.Combine(artifactRoot, "changed-clear-schedule-mismatch.json");

@@ -1,5 +1,8 @@
 using OpenVisionLab;
+using OpenVisionLab.Machine.Simulation.Engine;
+using OpenVisionLab.Machine.Simulation.Events;
 using OpenVisionLab.Machine.Simulation.Scenarios;
+using OpenVisionLab.Machine.Simulation.Snapshots;
 using OpenVisionLab.MachineStudio.ViewModel;
 using Xunit;
 
@@ -87,6 +90,61 @@ public sealed class VisionExecutionEvidenceViewModelTests
         {
             File.Delete($"{projectPath}.vision-result.json");
         }
+    }
+
+    [Fact]
+    public void Dispose_SuppressesLateRuntimeEvidenceAndParentNotification()
+    {
+        OpenVisionLanguageService.Load();
+        var projectPath = CreateProjectPath();
+        var notificationCount = 0;
+        using var viewModel = CreateViewModel(projectPath, [], () => notificationCount++);
+        var recorder = new DeterministicVisionExecutionRecorder(
+            ProjectId,
+            "Vision Project",
+            projectPath,
+            ProjectJson,
+            BuildIdentity,
+            FixedStep,
+            20,
+            "command-001",
+            CameraId,
+            RecipeId,
+            "acquisition-001",
+            "frame-001",
+            "inspection-001");
+        var snapshot = new SimulationSnapshot(
+            TimeSpan.Zero,
+            0,
+            SimulationRunMode.Paused,
+            SimulationControlOwner.Manual,
+            1,
+            [],
+            0,
+            [],
+            []);
+
+        viewModel.BeginCapture(recorder);
+        var notificationCountBeforeDispose = notificationCount;
+        viewModel.Dispose();
+        viewModel.Dispose();
+
+        viewModel.RecordEvent(
+            new SimulationEvent(
+                1,
+                20,
+                TimeSpan.FromTicks(FixedStep.Ticks * 20),
+                "Vision",
+                "VisionResultReady",
+                "late result",
+                null),
+            snapshot);
+
+        Assert.False(viewModel.IsCapturing);
+        Assert.False(viewModel.TryComplete(snapshot));
+        Assert.Null(viewModel.GetCurrentEvidence());
+        Assert.Equal(notificationCountBeforeDispose, notificationCount);
+        Assert.False(File.Exists($"{projectPath}.vision-result.json"));
     }
 
     private static VisionExecutionEvidenceViewModel CreateViewModel(

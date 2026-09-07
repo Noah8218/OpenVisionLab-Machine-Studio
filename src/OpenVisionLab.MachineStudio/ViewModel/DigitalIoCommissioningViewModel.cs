@@ -87,7 +87,7 @@ public sealed class DigitalIoSignalItemViewModel : ViewModelBase
         value ? "Shell.SignalOn" : "Shell.SignalOff");
 }
 
-public sealed class DigitalIoCommissioningViewModel : ViewModelBase
+public sealed class DigitalIoCommissioningViewModel : ViewModelBase, IDisposable
 {
     private readonly Func<SimulationCommand, Task<SimulationCommandResult>> _dispatch;
     private DigitalIoSignalItemViewModel? _selectedSignal;
@@ -102,6 +102,7 @@ public sealed class DigitalIoCommissioningViewModel : ViewModelBase
     private ICommand? _forceOnCommand;
     private ICommand? _forceOffCommand;
     private ICommand? _clearForceCommand;
+    private int _disposed;
 
     public DigitalIoCommissioningViewModel(
         Func<SimulationCommand, Task<SimulationCommandResult>> dispatch)
@@ -116,7 +117,7 @@ public sealed class DigitalIoCommissioningViewModel : ViewModelBase
         get => _selectedSignal;
         set
         {
-            if (SetProperty(ref _selectedSignal, value))
+            if (!IsDisposed && SetProperty(ref _selectedSignal, value))
             {
                 NotifySelectionChanged();
             }
@@ -156,7 +157,7 @@ public sealed class DigitalIoCommissioningViewModel : ViewModelBase
 
     internal void SetEnabled(bool value, bool invalidateCommands)
     {
-        if (SetProperty(ref _isEnabled, value))
+        if (!IsDisposed && SetProperty(ref _isEnabled, value))
         {
             NotifySelectionChanged(invalidateCommands);
         }
@@ -164,6 +165,11 @@ public sealed class DigitalIoCommissioningViewModel : ViewModelBase
 
     internal void InvalidateCommands()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         (_startManualControlCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         (_forceOnCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         (_forceOffCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
@@ -175,7 +181,7 @@ public sealed class DigitalIoCommissioningViewModel : ViewModelBase
         get => _isOperationPending;
         private set
         {
-            if (SetProperty(ref _isOperationPending, value))
+            if (!IsDisposed && SetProperty(ref _isOperationPending, value))
             {
                 NotifySelectionChanged();
             }
@@ -202,6 +208,10 @@ public sealed class DigitalIoCommissioningViewModel : ViewModelBase
     public void ApplySnapshot(SimulationSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
+        if (IsDisposed)
+        {
+            return;
+        }
 
         string? selectedId = SelectedSignal?.Id;
         var orderedSignals = snapshot.Signals
@@ -249,6 +259,11 @@ public sealed class DigitalIoCommissioningViewModel : ViewModelBase
 
     public void RefreshLocalization()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         foreach (var signal in Signals)
         {
             signal.RefreshLocalization();
@@ -257,14 +272,16 @@ public sealed class DigitalIoCommissioningViewModel : ViewModelBase
         NotifySelectionChanged();
     }
 
-    private bool CanStartManualControl() => IsEnabled
+    private bool CanStartManualControl() => !IsDisposed
+        && IsEnabled
         && !IsOperationPending
         && _runMode == SimulationRunMode.Paused
         && _controlOwner != SimulationControlOwner.Manual
         && !_automaticRunActive
         && !_sequenceRunActive;
 
-    private bool CanForceSelected() => IsEnabled
+    private bool CanForceSelected() => !IsDisposed
+        && IsEnabled
         && !IsOperationPending
         && _controlOwner == SimulationControlOwner.Manual
         && SelectedSignal?.IsInput == true
@@ -272,18 +289,35 @@ public sealed class DigitalIoCommissioningViewModel : ViewModelBase
 
     private Task SetForceAsync(bool? forcedValue) => SelectedSignal is null
         ? Task.CompletedTask
-        : DispatchAsync(new SetVirtualInputForceCommand(SelectedSignal.Id, forcedValue));
+        : IsDisposed
+            ? Task.CompletedTask
+            : DispatchAsync(new SetVirtualInputForceCommand(SelectedSignal.Id, forcedValue));
 
     private async Task DispatchAsync(SimulationCommand command)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         IsOperationPending = true;
         try
         {
-            await _dispatch(command);
+            if (!IsDisposed)
+            {
+                await _dispatch(command);
+            }
         }
         finally
         {
-            IsOperationPending = false;
+            if (IsDisposed)
+            {
+                _isOperationPending = false;
+            }
+            else
+            {
+                IsOperationPending = false;
+            }
         }
     }
 
@@ -318,6 +352,11 @@ public sealed class DigitalIoCommissioningViewModel : ViewModelBase
 
     private void NotifySelectionChanged(bool invalidateCommands = true)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         OnPropertyChanged(nameof(HasSelectedSignal));
         OnPropertyChanged(nameof(IsSelectedInput));
         OnPropertyChanged(nameof(IsSelectedFaulted));
@@ -333,4 +372,11 @@ public sealed class DigitalIoCommissioningViewModel : ViewModelBase
             CommandManager.InvalidateRequerySuggested();
         }
     }
+
+    public void Dispose()
+    {
+        Interlocked.Exchange(ref _disposed, 1);
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

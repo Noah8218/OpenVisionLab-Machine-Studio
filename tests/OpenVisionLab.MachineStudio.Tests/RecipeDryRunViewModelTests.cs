@@ -122,6 +122,37 @@ public sealed class RecipeDryRunViewModelTests
         Assert.Null(viewModel.ReadinessPassed);
     }
 
+    [Fact]
+    public async Task DisposeSuppressesLateResultAndDisablesCommands()
+    {
+        var project = LoadProject("AutomaticTransferCell.ovmachine");
+        var sequenceId = project.Sequences[0].Id;
+        var result = CreateResult(project, sequenceId);
+        var resultSource = new TaskCompletionSource<RecipeDryRunResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var viewModel = CreateViewModel(
+            () => null,
+            _ => resultSource.Task);
+
+        viewModel.Load(project);
+        viewModel.ValidateSimulationReadinessCommand.Execute(null);
+        viewModel.RunRecipeDryRunCommand.Execute(null);
+
+        Assert.True(viewModel.IsRecipeDryRunRunning);
+
+        viewModel.Dispose();
+        viewModel.Dispose();
+        resultSource.SetResult(result);
+        await Task.Yield();
+
+        Assert.False(viewModel.IsRecipeDryRunRunning);
+        Assert.Null(viewModel.RecipeDryRunResult);
+        Assert.False(viewModel.ValidateSimulationReadinessCommand.CanExecute(null));
+        Assert.False(viewModel.RunRecipeDryRunCommand.CanExecute(null));
+        Assert.False(viewModel.OpenRecipeDryRunStepCommand.CanExecute(null));
+        Assert.False(viewModel.PlayRecipeDryRunStepCommand.CanExecute(null));
+    }
+
     private static RecipeDryRunViewModel CreateViewModel(
         Func<string?> validateReadiness,
         Func<string, Task<RecipeDryRunResult>> runDryRun,
