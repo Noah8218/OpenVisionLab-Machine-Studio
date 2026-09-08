@@ -49,6 +49,31 @@ public class FixedStepSimulationEngineTests
             }));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Constructor_NonPositiveCanonicalJournalCapacity_IsRejected(
+        int canonicalJournalCapacity)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new FixedStepSimulationEngine(new SimulationSettings
+            {
+                CanonicalEventJournalCapacity = canonicalJournalCapacity
+            }));
+    }
+
+    [Fact]
+    public void Constructor_UsesConfiguredCanonicalJournalCapacity()
+    {
+        using var engine = new FixedStepSimulationEngine(new SimulationSettings
+        {
+            EventBufferCapacity = 1,
+            CanonicalEventJournalCapacity = 3
+        });
+
+        Assert.Equal(3, engine.EventJournal.Capacity);
+    }
+
     [Fact]
     public async Task CommandQueue_BackpressuresWithoutDroppingCommands()
     {

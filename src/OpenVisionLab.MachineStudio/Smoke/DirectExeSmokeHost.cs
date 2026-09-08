@@ -1149,13 +1149,13 @@ internal static class DirectExeSmokeHost
                 window,
                 vm,
                 root => FindVisualDescendant<RightToolRegionView>(root),
-                () => SmokeAxisCommissioningVerifier.ScrollIntoViewAsync(window));
+                () => SmokeAxisCommissioningStateVerifier.ScrollIntoViewAsync(window));
             axisCommissioningReport.Save(smokeOptions.AxisCommissioningReportPath);
         }
 
         if (!string.IsNullOrWhiteSpace(smokeOptions.AxisCommissioningState))
         {
-            await SmokeAxisCommissioningVerifier.ApplyStateAsync(
+            await SmokeAxisCommissioningStateVerifier.ApplyStateAsync(
                 window,
                 vm,
                 smokeOptions.AxisCommissioningState,
@@ -1174,7 +1174,7 @@ internal static class DirectExeSmokeHost
 
         if (!string.IsNullOrWhiteSpace(smokeOptions.MultiAxisRecipeState))
         {
-            await SmokeMultiAxisCommissioningVerifier.ApplyStateAsync(
+            await SmokeMultiAxisCommissioningStateVerifier.ApplyStateAsync(
                 window,
                 vm,
                 smokeOptions.MultiAxisRecipeState,

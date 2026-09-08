@@ -36,6 +36,13 @@ public sealed record DeterministicSimulationCommandTraceEntry(
             command,
             out var arguments,
             out var replayabilityReason);
+        if (command.ExpectedRuntime.HasValue)
+        {
+            // Keep arguments/results for diagnosis. A portable replay cannot infer
+            // the live session identity or silently drop this admission condition.
+            replayable = false;
+            replayabilityReason = "Runtime-bound commands require their original runtime identity and cannot be replayed portably.";
+        }
         return new(
             sequence,
             command.GetType().Name,
@@ -161,19 +168,7 @@ public sealed record DeterministicSimulationCommandTracePackage(
             Directory.CreateDirectory(directory);
         }
 
-        var temporaryPath = $"{fullPath}.{Guid.NewGuid():N}.tmp";
-        try
-        {
-            File.WriteAllText(temporaryPath, SaveToJson(package));
-            File.Move(temporaryPath, fullPath, overwrite: true);
-        }
-        finally
-        {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
-        }
+        AtomicEvidenceFile.Write(fullPath, temporaryPath => File.WriteAllText(temporaryPath, SaveToJson(package)));
     }
 
     public static DeterministicSimulationCommandTracePackage? LoadFromJson(string path)

@@ -63,7 +63,9 @@ internal static class SimulationSnapshotFactory
                 ? Array.Empty<PrealignerSnapshot>()
                 : context.MachineLayout.CapturePrealignerSnapshots(),
             context.SequenceDebug,
-            analogSignals: signals.AnalogSignals);
+            analogSignals: signals.AnalogSignals,
+            projectId: context.ProjectId,
+            runtimeGeneration: context.RuntimeGeneration);
     }
 }
 
@@ -82,4 +84,6 @@ internal sealed record SimulationSnapshotFactoryContext(
     IEnumerable<SimulationFaultSnapshot> ActiveFaults,
     DeterministicConditionScenarioSnapshot ConditionScenario,
     DeterministicPickPlaceWorkpiece? PickPlaceWorkpiece,
-    SequenceDebugSnapshot SequenceDebug);
+    SequenceDebugSnapshot SequenceDebug,
+    string? ProjectId = null,
+    long RuntimeGeneration = 0);

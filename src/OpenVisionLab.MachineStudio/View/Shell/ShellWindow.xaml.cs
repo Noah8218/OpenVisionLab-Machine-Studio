@@ -26,7 +26,7 @@ public partial class ShellWindow : MachineFluentWindow
 
         if (DataContext is global::OpenVisionLab.MachineStudio.ViewModel.MainViewModel viewModel)
         {
-            viewModel.IsCompactLayout = compact;
+            viewModel.Navigation.IsCompactLayout = compact;
         }
     }
 
@@ -93,12 +93,20 @@ public partial class ShellWindow : MachineFluentWindow
         _closeResolutionRunning = true;
         try
         {
-            if (await viewModel.TryResolveUnsavedChangesAsync())
+            var result = await viewModel.RequestCloseAsync();
+            if (result.IsApproved)
             {
-                await viewModel.ShutdownAsync();
                 _closeApproved = true;
                 Close();
             }
+            else
+            {
+                viewModel.PresentCloseResult(result);
+            }
+        }
+        catch (Exception exception)
+        {
+            viewModel.PresentCloseFailure(exception);
         }
         finally
         {

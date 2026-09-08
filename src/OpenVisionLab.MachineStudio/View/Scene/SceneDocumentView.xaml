@@ -8,7 +8,7 @@
              xmlns:project="clr-namespace:OpenVisionLab.MachineStudio.View.Project"
              xmlns:sequence="clr-namespace:OpenVisionLab.MachineStudio.View.Sequence"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
-    <TabControl SelectedIndex="{Binding SelectedDocumentTabIndex, Mode=TwoWay}">
+    <TabControl SelectedIndex="{Binding Navigation.SelectedDocumentTabIndex, Mode=TwoWay}">
         <TabItem Header="{loc:Loc Key=Shell.MachineLayout}">
             <Border Style="{StaticResource PanelSurfaceStyle}">
                 <Grid>
@@ -50,7 +50,7 @@
                         BorderBrush="{DynamicResource Border.Default}"
                         BorderThickness="1"
                         CornerRadius="8"
-                        Visibility="{Binding IsStartupChoiceVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        Visibility="{Binding Navigation.IsStartupChoiceVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <StackPanel>
                         <TextBlock HorizontalAlignment="Center"
                                    FontSize="20"
@@ -65,14 +65,14 @@
                         <Button x:Name="StartBlankLayoutButton"
                                 Height="42"
                                 AutomationProperties.Name="{loc:Loc Key=Scene.StartBlank}"
-                                Command="{Binding StartBlankLayoutCommand}"
+                                Command="{Binding Navigation.StartBlankLayoutCommand}"
                                 Content="{loc:Loc Key=Scene.StartBlank}"
                                 Style="{StaticResource GlobalCommandButtonStyle}" />
                         <Button x:Name="StartSampleButton"
                                 Height="42"
                                 Margin="0,10,0,0"
                                 AutomationProperties.Name="{loc:Loc Key=Scene.StartSample}"
-                                Command="{Binding OpenBundledSampleCommand}"
+                                Command="{Binding Navigation.OpenBundledSampleCommand}"
                                 Content="{loc:Loc Key=Scene.StartSample}"
                                 Style="{StaticResource QuietCommandButtonStyle}"
                                 ToolTip="{loc:Loc Key=Scene.StartSampleTooltip}" />
@@ -96,7 +96,7 @@
                                 <MultiDataTrigger>
                                     <MultiDataTrigger.Conditions>
                                         <Condition Binding="{Binding HasAuthoredLayout}" Value="False" />
-                                        <Condition Binding="{Binding IsStartupChoiceVisible}" Value="False" />
+                                        <Condition Binding="{Binding Navigation.IsStartupChoiceVisible}" Value="False" />
                                     </MultiDataTrigger.Conditions>
                                     <Setter Property="Visibility" Value="Visible" />
                                 </MultiDataTrigger>

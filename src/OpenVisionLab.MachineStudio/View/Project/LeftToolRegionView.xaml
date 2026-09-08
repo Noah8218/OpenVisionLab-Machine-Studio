@@ -144,7 +144,7 @@
                         </Style.Triggers>
                     </Style>
                 </Grid.Style>
-                <TabControl SelectedIndex="{Binding SelectedLeftToolTabIndex, Mode=TwoWay}">
+                <TabControl SelectedIndex="{Binding Navigation.SelectedLeftToolTabIndex, Mode=TwoWay}">
                     <TabItem Header="{loc:Loc Key=Shell.Project}">
                         <TreeView ItemsSource="{Binding ProjectTree.Roots}"
                                   ScrollViewer.HorizontalScrollBarVisibility="Disabled">

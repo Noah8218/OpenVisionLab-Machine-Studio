@@ -1,9 +1,6 @@
 using System.Collections.Immutable;
 using System.Threading.Channels;
-using OpenVisionLab.Machine.Core.Channels;
-using OpenVisionLab.Machine.Core.Devices;
 using OpenVisionLab.Machine.IO.Channels;
-using OpenVisionLab.Machine.Sequence.Compilation;
 using OpenVisionLab.Machine.Sequence.Runtime;
 using OpenVisionLab.Machine.Simulation.Axis;
 using OpenVisionLab.Machine.Simulation.Camera;
@@ -18,22 +15,16 @@ using OpenVisionLab.Machine.Simulation.Workpieces;
 
 namespace OpenVisionLab.Machine.Simulation.Engine;
 
-public sealed class FixedStepSimulationEngine : ISimulationEngine
+public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEventJournalSource
 {
     private readonly SimulationSettings _settings;
-    private readonly SimulationClock _clock;
     private readonly Channel<SimulationCommand> _commandChannel;
     private readonly SimulationEventPublisher _eventPublisher;
     private readonly LatestSnapshotStore _snapshotStore;
     private readonly SimulationEngineLifecycle _lifecycle;
     private readonly SimulationPhysicalRuntimeTick _physicalRuntimeTick;
-    private readonly List<ServoAxisComponent> _axes = new();
+    private readonly SimulationRuntimeState _runtimeState;
     private readonly DeterministicSimulationCommandTraceStore _commandTraceStore = new();
-    private readonly List<DeterministicVirtualCamera> _cameras = new();
-    private readonly SimulationSequenceRuntime _sequenceRuntime = new();
-    private readonly SimulationRuntimeConfigurationBuilder _runtimeConfigurationBuilder;
-    private readonly SimulationConditionScenarioRuntime _conditionScenarioRuntime = new();
-    private readonly SimulationAutomaticRunRuntime _automaticRunRuntime = new();
     private readonly SimulationManualControlCommandHandler _manualControlCommandHandler = new();
     private readonly SimulationFaultCommandHandler _faultCommandHandler = new();
     private readonly SimulationConditionScheduledFaultRecoveryHandler _conditionScheduledFaultRecoveryHandler = new();
@@ -44,22 +35,51 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
     private readonly SimulationAutomaticRunCycleHandler _automaticRunCycleHandler = new();
     private readonly SimulationSequenceCommandHandler _sequenceCommandHandler = new();
     private readonly SimulationRunControlCommandHandler _runControlCommandHandler = new();
-    private readonly SimulationFaultRuntime _faultRuntime = new();
     private readonly Action<SimulationEngineFaultPoint>? _faultInjector;
-    private double _timeScale;
-    private DeterministicSignalHub _signalHub;
-    private DeterministicMachineLayout? _machineLayout;
-    private DeterministicPickPlaceWorkpiece? _pickPlaceWorkpiece;
-    private SimulationRunMode _runMode = SimulationRunMode.Paused;
-    private SimulationControlOwner _controlOwner = SimulationControlOwner.Definition;
-    private string? _activeSequenceId;
-    private int _pendingSteps;
-    private long _tickIndex;
-    private long _commandBoundaryTick;
-    private TimeSpan _commandBoundaryTime;
     private SimulationCommand? _currentCommand;
     private string? _operationContext;
     private bool _disposed;
+
+    private SimulationClock _clock => _runtimeState.Clock;
+    private List<ServoAxisComponent> _axes => _runtimeState.Axes;
+    private List<DeterministicVirtualCamera> _cameras => _runtimeState.Cameras;
+    private SimulationSequenceRuntime _sequenceRuntime => _runtimeState.SequenceRuntime;
+    private SimulationConditionScenarioRuntime _conditionScenarioRuntime => _runtimeState.ConditionScenarioRuntime;
+    private SimulationAutomaticRunRuntime _automaticRunRuntime => _runtimeState.AutomaticRunRuntime;
+    private SimulationFaultRuntime _faultRuntime => _runtimeState.FaultRuntime;
+    private DeterministicSignalHub _signalHub => _runtimeState.SignalHub;
+    private DeterministicMachineLayout? _machineLayout => _runtimeState.MachineLayout;
+    private DeterministicPickPlaceWorkpiece? _pickPlaceWorkpiece => _runtimeState.PickPlaceWorkpiece;
+    private double _timeScale
+    {
+        get => _runtimeState.TimeScale;
+        set => _runtimeState.TimeScale = value;
+    }
+    private SimulationRunMode _runMode
+    {
+        get => _runtimeState.RunMode;
+        set => _runtimeState.RunMode = value;
+    }
+    private SimulationControlOwner _controlOwner
+    {
+        get => _runtimeState.ControlOwner;
+        set => _runtimeState.ControlOwner = value;
+    }
+    private string? _activeSequenceId
+    {
+        get => _runtimeState.ActiveSequenceId;
+        set => _runtimeState.ActiveSequenceId = value;
+    }
+    private int _pendingSteps
+    {
+        get => _runtimeState.PendingSteps;
+        set => _runtimeState.PendingSteps = value;
+    }
+    private long _tickIndex => _runtimeState.TickIndex;
+    private long _commandBoundaryTick => _runtimeState.CommandBoundaryTick;
+    private TimeSpan _commandBoundaryTime => _runtimeState.CommandBoundaryTime;
+    private string? _projectId => _runtimeState.ProjectId;
+    private long _runtimeGeneration => _runtimeState.RuntimeGeneration;
 
     public FixedStepSimulationEngine(SimulationSettings settings)
         : this(settings, null)
@@ -88,10 +108,14 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         {
             throw new ArgumentOutOfRangeException(nameof(settings), "EventBufferCapacity must be positive.");
         }
+        if (settings.CanonicalEventJournalCapacity is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(settings),
+                "CanonicalEventJournalCapacity must be positive when configured.");
+        }
 
-        _timeScale = settings.TimeScale;
-        _clock = new SimulationClock(settings.FixedStep);
-        _runtimeConfigurationBuilder = new SimulationRuntimeConfigurationBuilder(settings.FixedStep);
+        _runtimeState = new SimulationRuntimeState(settings.FixedStep, settings.TimeScale);
         _commandChannel = Channel.CreateBounded<SimulationCommand>(
             new BoundedChannelOptions(settings.CommandQueueCapacity)
             {
@@ -99,8 +123,9 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
                 SingleReader = true,
                 SingleWriter = false
             });
-        _eventPublisher = new SimulationEventPublisher(settings.EventBufferCapacity);
-        _signalHub = DeterministicSignalHub.Create(Array.Empty<ChannelDefinition>()).Hub!;
+        _eventPublisher = new SimulationEventPublisher(
+            settings.EventBufferCapacity,
+            settings.CanonicalEventJournalCapacity ?? settings.EventBufferCapacity);
         _snapshotStore = new LatestSnapshotStore(CreateSnapshot());
         _physicalRuntimeTick = new SimulationPhysicalRuntimeTick(EmitPhysicalRuntimeEvent);
         _lifecycle = new SimulationEngineLifecycle(
@@ -119,7 +144,12 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
     public TimeSpan FixedStep => _settings.FixedStep;
     public ChannelReader<SimulationSnapshot> SnapshotReader => _snapshotStore.Reader;
     public ChannelReader<SimulationEvent> EventReader => _eventPublisher.Reader;
+    public SimulationEventJournalSnapshot EventJournal => _eventPublisher.JournalSnapshot;
     public Task<SimulationEngineTerminationResult> Termination => _lifecycle.Termination;
+
+    public IAsyncEnumerable<SimulationEvent> ReadCanonicalEventsAsync(
+        CancellationToken cancellationToken = default) =>
+        _eventPublisher.ReadJournalAsync(cancellationToken);
 
     public ImmutableArray<DeterministicSimulationCommandTraceEntry> CommandTrace => _commandTraceStore.Snapshot();
 
@@ -141,12 +171,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             throw new InvalidOperationException("Axes cannot be added directly after the engine starts.");
         }
 
-        if (_axes.Any(existing => string.Equals(existing.Id, axis.Id, StringComparison.Ordinal)))
-        {
-            throw new ArgumentException($"Axis id '{axis.Id}' is duplicated.", nameof(axis));
-        }
-
-        _axes.Add(axis);
+        _runtimeState.AddAxis(axis);
         _snapshotStore.SetCurrent(CreateSnapshot());
     }
 
@@ -316,11 +341,20 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
 
     private SimulationCommandResult ApplyCommand(SimulationCommand command)
     {
-        _commandBoundaryTick = _tickIndex;
-        _commandBoundaryTime = _clock.Time;
+        _runtimeState.SetCommandBoundary();
         SimulationCommandResult result;
         switch (command)
         {
+            // Check owned state at application time, before any handler mutates it.
+            // CurrentSnapshot may still describe the previous configuration here.
+            case { ExpectedRuntime: { } expected } when !_runtimeState.Matches(expected):
+                result = Reject(
+                    command,
+                    SimulationCommandErrorCode.RuntimeIdentityMismatch,
+                    $"Command expects project '{expected.ProjectId ?? "<none>"}' generation {expected.RuntimeGeneration}, " +
+                    $"but current runtime is project '{_projectId ?? "<none>"}' generation {_runtimeGeneration}.");
+                break;
+
             case PlayCommand:
             case PauseCommand:
             case StepCommand:
@@ -349,7 +383,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
                 break;
 
             case ConfigureRuntimeCommand configureRuntime:
-                result = ApplyRuntimeConfiguration(command, configureRuntime.Configuration);
+                result = ApplyRuntimeConfiguration(command, configureRuntime);
                 break;
 
             case ConfigureAxesCommand configureAxes:
@@ -574,41 +608,16 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
 
     private SimulationCommandResult ApplyRuntimeConfiguration(
         SimulationCommand command,
-        SimulationRuntimeConfiguration configuration)
+        ConfigureRuntimeCommand configureRuntime)
     {
-        if (!_runtimeConfigurationBuilder.TryBuild(
+        var configuration = configureRuntime.Configuration;
+        if (!_runtimeState.TryApplyRuntimeConfiguration(
                 configuration,
-                out var candidate,
+                configureRuntime.ProjectId,
                 out var configurationError))
         {
             return Reject(command, SimulationCommandErrorCode.RuntimeConfigurationInvalid, configurationError);
         }
-
-        SimulationRuntimeConfigurationBuildResult runtime = candidate!;
-        _runMode = SimulationRunMode.Paused;
-        _pendingSteps = 0;
-        ClearSequenceDebugConfiguration();
-        _clock.Reset();
-        _tickIndex = 0;
-        _axes.Clear();
-        _axes.AddRange(runtime.Axes);
-        _cameras.Clear();
-        _cameras.AddRange(runtime.Cameras);
-        _signalHub = runtime.SignalHub;
-        _machineLayout = runtime.MachineLayout;
-        _pickPlaceWorkpiece = runtime.PickPlaceWorkpiece;
-        if (configuration.TimeScale.HasValue)
-        {
-            _timeScale = configuration.TimeScale.Value;
-        }
-        _faultRuntime.Clear();
-        _conditionScenarioRuntime.Clear();
-        _sequenceRuntime.Configure(runtime.CompiledSequences, runtime.SequenceExecutors);
-        _automaticRunRuntime.Configure(
-            configuration.AutomaticRun,
-            runtime.AutomaticRunRepeatDelayTicks);
-        _activeSequenceId = null;
-        _controlOwner = SimulationControlOwner.Definition;
 
         var configurationSummary =
             $"Configured {_axes.Count} axis/axes, {configuration.Channels.Count} signal(s), " +
@@ -631,30 +640,11 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
         SimulationCommand command,
         IReadOnlyList<AxisConfiguration> configurations)
     {
-        if (!_runtimeConfigurationBuilder.TryCreateAxes(configurations, out var axes, out var error))
+        if (!_runtimeState.TryApplyAxisConfiguration(configurations, out var error))
         {
             return Reject(command, SimulationCommandErrorCode.RuntimeConfigurationInvalid, error);
         }
 
-        var emptySignalHub = DeterministicSignalHub.Create(Array.Empty<ChannelDefinition>()).Hub!;
-
-        _runMode = SimulationRunMode.Paused;
-        _pendingSteps = 0;
-        ClearSequenceDebugConfiguration();
-        _clock.Reset();
-        _tickIndex = 0;
-        _axes.Clear();
-        _axes.AddRange(axes);
-        _cameras.Clear();
-        _signalHub = emptySignalHub;
-        _machineLayout = null;
-        _pickPlaceWorkpiece = null;
-        _faultRuntime.Clear();
-        _conditionScenarioRuntime.Clear();
-        _sequenceRuntime.ClearConfiguration();
-        _automaticRunRuntime.Configure(null, repeatDelayTicks: 0);
-        _activeSequenceId = null;
-        _controlOwner = SimulationControlOwner.Definition;
         EmitAtCommandBoundary(
             "Runtime",
             "AxesConfigured",
@@ -679,7 +669,9 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
                 _faultRuntime,
                 _commandBoundaryTick,
                 _commandBoundaryTime,
-                FormatSignal));
+                FormatSignal,
+                _projectId,
+                _runtimeGeneration));
         if (outcome.RunMode.HasValue)
         {
             _runMode = outcome.RunMode.Value;
@@ -835,8 +827,8 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
 
     private void Tick()
     {
-        var eventTick = _tickIndex + 1;
-        var eventTime = _clock.Time + _settings.FixedStep;
+        var eventTick = _runtimeState.NextTickIndex;
+        var eventTime = _runtimeState.NextSimulationTime;
 
         AdvanceConditionScenario(eventTick, eventTime);
 
@@ -924,8 +916,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
 
         AdvancePickPlaceWorkpiece(eventTick, eventTime);
 
-        _clock.Advance();
-        _tickIndex = eventTick;
+        _runtimeState.AdvanceTick();
         PublishSnapshot();
     }
 
@@ -962,8 +953,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
 
         if (scenarioTick == schedule.InjectTick)
         {
-            _commandBoundaryTick = eventTick;
-            _commandBoundaryTime = eventTime;
+            _runtimeState.SetCommandBoundary(eventTick, eventTime);
             var outcome = _conditionScheduledFaultInjectionHandler.Apply(
                 new SimulationConditionScheduledFaultInjectionContext(
                     schedule,
@@ -1009,8 +999,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             return;
         }
 
-        _commandBoundaryTick = eventTick;
-        _commandBoundaryTime = eventTime;
+        _runtimeState.SetCommandBoundary(eventTick, eventTime);
         var outcome = _conditionScheduledFaultRecoveryHandler.Apply(
             CreateConditionScheduledFaultRecoveryContext(restartSequence, commandId));
         if (outcome.State is { } state)
@@ -1123,77 +1112,20 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
 
     private void ResetRuntime()
     {
-        _runMode = SimulationRunMode.Paused;
-        _pendingSteps = 0;
-        _sequenceRuntime.DebugState.ClearPendingSemanticStep();
-        _sequenceRuntime.DebugState.SetPause(SequenceDebugPauseReason.None, null);
-        _clock.Reset();
-        _tickIndex = 0;
-        foreach (var axis in _axes)
-        {
-            axis.Reset();
-        }
-        foreach (var camera in _cameras)
-        {
-            camera.Reset();
-        }
-        _faultRuntime.Clear();
-        _signalHub.Reset();
-        _machineLayout?.Reset();
-        _pickPlaceWorkpiece?.Reset();
-        _sequenceRuntime.ResetExecutors();
-        _automaticRunRuntime.Reset();
-        _conditionScenarioRuntime.Reset();
-        _activeSequenceId = null;
-        _controlOwner = SimulationControlOwner.Definition;
+        _runtimeState.Reset();
     }
 
-    private SimulationSnapshot CreateSnapshot() =>
-        SimulationSnapshotFactory.Create(
-            new SimulationSnapshotFactoryContext(
-                _clock.Time,
-                _tickIndex,
-                _runMode,
-                _controlOwner,
-                _timeScale,
-                _axes,
-                _signalHub,
-                _sequenceRuntime.SequenceExecutors,
-                _cameras,
-                new AutomaticRunSnapshot(
-                    _automaticRunRuntime.Configuration is not null,
-                    _automaticRunRuntime.IsActive,
-                    _automaticRunRuntime.WaitingForRepeat,
-                    _automaticRunRuntime.CompletedCycleCount,
-                    _automaticRunRuntime.RemainingDelayTicks),
-                _machineLayout,
-                _faultRuntime.Values,
-                _conditionScenarioRuntime.CreateSnapshot(),
-                _pickPlaceWorkpiece,
-                _sequenceRuntime.DebugState.CreateSnapshot()));
+    private SimulationSnapshot CreateSnapshot() => _runtimeState.CreateSnapshot();
 
     private void AdvancePickPlaceWorkpiece(long eventTick, TimeSpan eventTime)
     {
-        if (_pickPlaceWorkpiece is null)
+        var result = _runtimeState.AdvancePickPlaceWorkpiece();
+        if (result is null)
         {
             return;
         }
 
-        var x = _axes.Single(axis => string.Equals(
-            axis.Id,
-            _pickPlaceWorkpiece.XAxisId,
-            StringComparison.Ordinal)).Position;
-        var y = _axes.Single(axis => string.Equals(
-            axis.Id,
-            _pickPlaceWorkpiece.YAxisId,
-            StringComparison.Ordinal)).Position;
-        var gripper = _signalHub.ReadDigitalSignal(_pickPlaceWorkpiece.GripperSignalId);
-        PickPlaceWorkpieceTransition? transition = _pickPlaceWorkpiece.Tick(x, y, gripper.Value == true);
-        if (transition is null)
-        {
-            return;
-        }
-
+        var (transition, workpieceId) = result.Value;
         var code = transition.CurrentState == PickPlaceWorkpieceState.Attached
             ? "WorkpieceAttached"
             : "WorkpiecePlaced";
@@ -1201,7 +1133,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine
             "Workpiece",
             code,
             FormattableString.Invariant(
-                $"{_pickPlaceWorkpiece.CaptureSnapshot().Id}: {transition.PreviousState} -> {transition.CurrentState} at X {transition.X:F3}, Y {transition.Y:F3}."),
+                $"{workpieceId}: {transition.PreviousState} -> {transition.CurrentState} at X {transition.X:F3}, Y {transition.Y:F3}."),
             tickIndex: eventTick,
             simulationTime: eventTime);
     }

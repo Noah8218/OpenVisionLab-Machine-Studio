@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text.Json.Serialization;
 using OpenVisionLab.Machine.IO.Channels;
 using OpenVisionLab.Machine.Sequence.Runtime;
 using OpenVisionLab.Machine.Simulation.Camera;
@@ -12,6 +13,10 @@ namespace OpenVisionLab.Machine.Simulation.Snapshots;
 
 public sealed class SimulationSnapshot
 {
+    [JsonIgnore]
+    public string? ProjectId { get; }
+    [JsonIgnore]
+    public long RuntimeGeneration { get; }
     public TimeSpan SimulationTime { get; }
     public long TickIndex { get; }
     public SimulationRunMode RunMode { get; }
@@ -140,8 +145,12 @@ public sealed class SimulationSnapshot
         IEnumerable<OhtHandoffSnapshot>? ohtHandoffs = null,
         IEnumerable<PrealignerSnapshot>? prealigners = null,
         SequenceDebugSnapshot? sequenceDebug = null,
-        IEnumerable<AnalogSignalSnapshot>? analogSignals = null)
+        IEnumerable<AnalogSignalSnapshot>? analogSignals = null,
+        string? projectId = null,
+        long runtimeGeneration = 0)
     {
+        ProjectId = projectId;
+        RuntimeGeneration = runtimeGeneration;
         SimulationTime = simulationTime;
         TickIndex = tickIndex;
         RunMode = runMode;

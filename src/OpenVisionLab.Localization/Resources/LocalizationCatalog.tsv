@@ -736,6 +736,13 @@ Camera.Result	결과	Result
 Camera.Frame	프레임	Frame
 Camera.Source	이미지 소스	Image source
 Camera.SourceSetup	이미지 소스 설정	Image source setup
+Camera.SourceMode	실행 경로	Execution path
+Camera.SourceModeAutomatic	자동 Sequence · placeholder	Automatic Sequence · placeholder
+Camera.SourceModeManual	수동 · 프로젝트 이미지 소스	Manual · project image source
+Camera.SourceModeManualReady	수동 이미지 소스 준비됨	Manual image source ready
+Camera.SourceModeManualUnavailable	수동 이미지 소스 미설정	Manual image source unavailable
+Camera.SourceModeAutomaticOnly	자동 Sequence · placeholder만 사용	Automatic Sequence · placeholder only
+Camera.SourceModeUnavailable	카메라 실행 경로 없음	No camera execution path
 Camera.SourceRelativePath	프로젝트 상대 경로	Project-relative path
 Camera.Browse	찾아보기	Browse
 Camera.BrowseTooltip	프로젝트 폴더 안의 단일 이미지 파일을 선택합니다.	Select a single-image file inside the project folder.

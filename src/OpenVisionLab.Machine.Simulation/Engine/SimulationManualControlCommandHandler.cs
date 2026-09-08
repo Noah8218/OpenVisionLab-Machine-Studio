@@ -20,7 +20,9 @@ internal sealed record SimulationManualControlContext(
     IReadOnlyDictionary<SimulationFaultKey, SimulationFaultSnapshot> ActiveFaults,
     long CommandBoundaryTick,
     TimeSpan CommandBoundaryTime,
-    Func<bool, string> FormatSignal);
+    Func<bool, string> FormatSignal,
+    string? ProjectId = null,
+    long RuntimeGeneration = 0);
 
 internal sealed record SimulationManualControlEvent(
     string Category,

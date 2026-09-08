@@ -306,6 +306,7 @@ internal sealed class SimulationEngineLifecycle : IDisposable
         _startCancellationRegistration.Dispose();
         _startCancellationRegistration = default;
         _stopCts.Dispose();
+        _eventPublisher.Dispose();
     }
 
     private enum EngineLifecycleState

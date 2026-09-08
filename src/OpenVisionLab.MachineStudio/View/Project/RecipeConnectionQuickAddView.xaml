@@ -45,14 +45,14 @@
                                     <Style.Triggers>
                                         <MultiDataTrigger>
                                             <MultiDataTrigger.Conditions>
-                                                <Condition Binding="{Binding IsCompactLayout}" Value="True" />
+                                                <Condition Binding="{Binding Navigation.IsCompactLayout}" Value="True" />
                                                 <Condition Binding="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockTimeoutPreviewVisible}" Value="True" />
                                             </MultiDataTrigger.Conditions>
                                             <Setter Property="Visibility" Value="Collapsed" />
                                         </MultiDataTrigger>
                                         <MultiDataTrigger>
                                             <MultiDataTrigger.Conditions>
-                                                <Condition Binding="{Binding IsCompactLayout}" Value="True" />
+                                                <Condition Binding="{Binding Navigation.IsCompactLayout}" Value="True" />
                                                 <Condition Binding="{Binding RecipeConnections.LoadLocks.IsVisible}" Value="True" />
                                             </MultiDataTrigger.Conditions>
                                             <Setter Property="Visibility" Value="Collapsed" />
@@ -343,14 +343,14 @@
                                 <Style.Triggers>
                                         <MultiDataTrigger>
                                         <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsCompactLayout}" Value="True" />
+                                            <Condition Binding="{Binding Navigation.IsCompactLayout}" Value="True" />
                                             <Condition Binding="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockTimeoutPreviewVisible}" Value="True" />
                                         </MultiDataTrigger.Conditions>
                                             <Setter Property="Visibility" Value="Collapsed" />
                                         </MultiDataTrigger>
                                         <MultiDataTrigger>
                                             <MultiDataTrigger.Conditions>
-                                                <Condition Binding="{Binding IsCompactLayout}" Value="True" />
+                                            <Condition Binding="{Binding Navigation.IsCompactLayout}" Value="True" />
                                                 <Condition Binding="{Binding RecipeConnections.LoadLocks.IsVisible}" Value="True" />
                                             </MultiDataTrigger.Conditions>
                                             <Setter Property="Visibility" Value="Collapsed" />

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using OpenVisionLab.Machine.Core.Channels;
 using OpenVisionLab.Machine.Core.Devices;
 using OpenVisionLab.Machine.IO.Channels;
@@ -69,7 +70,9 @@ public class SimulationSnapshotFactoryTests
                 Array.Empty<SimulationFaultSnapshot>(),
                 DeterministicConditionScenarioSnapshot.NotConfigured,
                 null,
-                SequenceDebugSnapshot.Empty));
+                SequenceDebugSnapshot.Empty,
+                ProjectId: "project-a",
+                RuntimeGeneration: 12));
 
         Assert.Equal(TimeSpan.FromMilliseconds(25), snapshot.SimulationTime);
         Assert.Equal(5, snapshot.TickIndex);
@@ -79,5 +82,11 @@ public class SimulationSnapshotFactoryTests
         Assert.Empty(snapshot.LayoutComponents);
         Assert.Empty(snapshot.Workpieces);
         Assert.Equal(SequenceDebugSnapshot.Empty, snapshot.SequenceDebug);
+        Assert.Equal("project-a", snapshot.ProjectId);
+        Assert.Equal(12, snapshot.RuntimeGeneration);
+
+        var json = JsonSerializer.Serialize(snapshot);
+        Assert.DoesNotContain("project-a", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("RuntimeGeneration", json, StringComparison.Ordinal);
     }
 }

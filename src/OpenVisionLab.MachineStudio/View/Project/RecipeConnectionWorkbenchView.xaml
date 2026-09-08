@@ -38,7 +38,7 @@
             <Setter Property="Width" Value="190" />
             <Setter Property="Margin" Value="0,0,7,6" />
             <Style.Triggers>
-                <DataTrigger Binding="{Binding IsCompactLayout}" Value="True">
+                <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
                     <Setter Property="Width" Value="158" />
                 </DataTrigger>
             </Style.Triggers>
@@ -48,7 +48,7 @@
                BasedOn="{StaticResource LoadLockSetupFieldStyle}">
             <Setter Property="Width" Value="130" />
             <Style.Triggers>
-                <DataTrigger Binding="{Binding IsCompactLayout}" Value="True">
+                <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
                     <Setter Property="Width" Value="122" />
                 </DataTrigger>
             </Style.Triggers>
@@ -140,7 +140,7 @@
                                         <Style.Triggers>
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding IsCompactLayout}" Value="True" />
+                                                    <Condition Binding="{Binding Navigation.IsCompactLayout}" Value="True" />
                                                     <Condition Binding="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockTimeoutPreviewVisible}" Value="True" />
                                                 </MultiDataTrigger.Conditions>
                                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -190,7 +190,7 @@
                                             </DataTrigger>
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding IsCompactLayout}" Value="True" />
+                                                    <Condition Binding="{Binding Navigation.IsCompactLayout}" Value="True" />
                                                     <Condition Binding="{Binding RecipeConnections.ProcessBlocks.IsProcessBlockTimeoutPreviewVisible}" Value="True" />
                                                 </MultiDataTrigger.Conditions>
                                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -384,7 +384,7 @@
                                     <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
                                         <Setter Property="MaxHeight" Value="170" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsCompactLayout}" Value="True">
+                                            <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
                                                 <Setter Property="MaxHeight" Value="105" />
                                             </DataTrigger>
                                         </Style.Triggers>

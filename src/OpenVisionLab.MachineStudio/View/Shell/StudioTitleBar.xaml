@@ -46,8 +46,8 @@
                 <ComboBox Width="84"
                           Margin="0,0,12,0"
                           DisplayMemberPath="DisplayName"
-                          ItemsSource="{Binding LanguageOptions}"
-                          SelectedItem="{Binding SelectedLanguageOption, Mode=TwoWay}"
+                          ItemsSource="{Binding Navigation.LanguageOptions}"
+                          SelectedItem="{Binding Navigation.SelectedLanguageOption, Mode=TwoWay}"
                           Style="{StaticResource LanguageComboBoxStyle}"
                           ToolTip="{loc:Loc Key=Shell.LanguageTooltip}" />
             </StackPanel>

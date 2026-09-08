@@ -131,6 +131,67 @@ public sealed class DeterministicSimulationCommandTraceTests
         Assert.Equal(initialTick, target.CurrentSnapshot.TickIndex);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RuntimeBoundTracePreservesArgumentsAndOutcomeButCannotReplayWithoutItsAdmission(bool stale)
+    {
+        using var source = new FixedStepSimulationEngine(new SimulationSettings());
+        await source.StartAsync();
+        try
+        {
+            Assert.True((await source.EnqueueCommandAsync(new ConfigureRuntimeCommand(
+                new SimulationRuntimeConfiguration([new AxisConfiguration { Id = "x" }], [], []), "source-project"))).IsAccepted);
+            Assert.True((await source.EnqueueCommandAsync(new StartManualControlCommand())).IsAccepted);
+            Assert.True((await source.EnqueueCommandAsync(new PauseCommand())).IsAccepted);
+            source.ClearCommandTrace();
+            var snapshot = source.CurrentSnapshot;
+            var command = new MoveAxesAbsoluteCommand([new AxisMoveTarget("x", 12.5)])
+            {
+                ExpectedRuntime = new SimulationRuntimeIdentity(snapshot.ProjectId, snapshot.RuntimeGeneration + (stale ? 1 : 0))
+            };
+            var result = await source.EnqueueCommandAsync(command);
+            Assert.Equal(!stale, result.IsAccepted);
+            var package = source.CreateCommandTracePackage();
+            var entry = Assert.Single(package.Entries);
+            Assert.Equal(result.ErrorCode, entry.ErrorCode);
+            Assert.Equal(result.Detail, entry.Detail);
+            Assert.False(entry.IsReplayable);
+            Assert.Contains("runtime identity", entry.ReplayabilityReason, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("x", entry.Arguments.GetProperty("targets")[0].GetProperty("axisId").GetString());
+            Assert.Equal("12.5", entry.Arguments.GetProperty("targets")[0].GetProperty("targetPosition").GetString());
+            Assert.False(entry.TryCreateCommand(out var restoredCommand, out var reason));
+            Assert.Null(restoredCommand);
+            Assert.Equal(entry.ReplayabilityReason, reason);
+
+            var path = Path.Combine(TestStorage.RootPath, "runtime-command-admission", $"bound-trace-{stale}.json");
+            DeterministicSimulationCommandTracePackage.SaveToJson(package, path);
+            var restored = DeterministicSimulationCommandTracePackage.LoadFromJson(path);
+            Assert.NotNull(restored);
+            Assert.True(restored.HasValidTraceHash());
+            Assert.False(restored.CanReplay);
+            Assert.Equal(package.TraceHash, restored.TraceHash);
+            Assert.Equal(DeterministicSimulationCommandTracePackage.SaveToJson(package),
+                DeterministicSimulationCommandTracePackage.SaveToJson(restored));
+
+            using var target = await CreateConfiguredEngineAsync();
+            try
+            {
+                var before = target.CurrentSnapshot;
+                var traceCount = target.CommandTrace.Length;
+                var eventCount = target.EventJournal.TotalEventCount;
+                var replay = await new DeterministicSimulationCommandTraceReplayRunner().ReplayAsync(target, restored);
+                Assert.False(replay.IsSuccess);
+                Assert.Empty(replay.CommandResults);
+                Assert.Equal(traceCount, target.CommandTrace.Length);
+                Assert.Equal(eventCount, target.EventJournal.TotalEventCount);
+                Assert.Same(before, target.CurrentSnapshot);
+            }
+            finally { await target.StopAsync(); }
+        }
+        finally { await source.StopAsync(); }
+    }
+
     private static async Task<FixedStepSimulationEngine> CreateConfiguredEngineAsync()
     {
         var engine = new FixedStepSimulationEngine(

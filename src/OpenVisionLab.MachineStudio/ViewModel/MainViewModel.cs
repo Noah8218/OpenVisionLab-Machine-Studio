@@ -6,18 +6,15 @@ using System.IO;
 using System.Text.Json;
 using System.Windows.Input;
 using OpenVisionLab;
-using OpenVisionLab.Integration.Contracts;
 using OpenVisionLab.Machine.Core.Axes;
 using OpenVisionLab.Machine.Core.Channels;
 using OpenVisionLab.Machine.Core.Devices;
 using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.Machine.Core.Models;
 using OpenVisionLab.Machine.Sequence.Runtime;
-using OpenVisionLab.Machine.Sequence.Authoring;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Core.Sequences;
 using OpenVisionLab.Machine.IO.Channels;
-using OpenVisionLab.Machine.Infrastructure.Integration;
 using OpenVisionLab.Machine.Simulation.Axis;
 using OpenVisionLab.Machine.Simulation.Camera;
 using OpenVisionLab.Machine.Simulation.Commissioning;
@@ -75,6 +72,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         nameof(CurrentCylinderInterlockText), nameof(CylinderCommissioningHintText),
         nameof(ConveyorCommissioningHintText),
         nameof(CurrentCameraName), nameof(CurrentCameraStateText), nameof(CurrentCameraResultText),
+        nameof(CurrentCameraSourceModeText),
         nameof(CameraCommissioningHintText), nameof(VisionEvidenceStatusText),
         nameof(VisionEvidenceComparisonText), nameof(CurrentCameraEvidenceDetailsText),
         nameof(CurrentSequenceName), nameof(CurrentSequenceStateText), nameof(CurrentSequenceStepText),
@@ -92,40 +90,23 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     #region Dependencies
 
-    private readonly ProjectDocumentStore _projectStore = new();
-    private readonly ProjectDocumentSession _projectSession;
-    private readonly ProjectOpenWorkflow _projectOpenWorkflow;
-    private readonly ProjectSaveWorkflow _projectSaveWorkflow;
-    private readonly SemiconductorRecipeCopyWorkflow _semiconductorRecipeCopyWorkflow;
-    private readonly VirtualCameraInspectionTemplate _virtualCameraInspectionTemplate = new();
-    private readonly RecipeConnectionProjectApplier _recipeConnectionProjectApplier = new();
-    private readonly MachineIntegrationRequestWorkflow _integrationRequestWorkflow;
+    private readonly ProjectLifecycleCoordinator _projectLifecycle;
+    private readonly SimulationSessionCoordinator _simulationSession;
+    private readonly RuntimeObservabilityJournal _runtimeObservabilityJournal;
     private readonly RuntimeObservabilityPresenter _runtimeObservabilityPresenter;
-    private readonly ISimulationEngine _engine;
     private readonly RuntimeDefinitionApplicationWorkflow _runtimeDefinitionApplicationWorkflow;
     private readonly ProjectRuntimeApplicationWorkflow _projectRuntimeApplicationWorkflow;
-    private readonly SimulationRuntimeLoop _runtimeLoop;
-    private readonly SimulationRuntimeResourceOwner _runtimeResources;
-    private readonly SimulationRuntimeShutdownWorkflow _runtimeShutdownWorkflow;
     private readonly EquipmentCommandDispatcher _equipmentCommandDispatcher;
-    private readonly ManualControlCommandWorkflow _manualControlCommandWorkflow;
-    private readonly SimulationRunControlWorkflow _simulationRunControlWorkflow;
     private readonly SimulationCommandPresentationDispatcher _simulationCommandPresentationDispatcher;
     private readonly SimulationRuntimeProjectionCoordinator _runtimeProjectionCoordinator;
     private readonly ProjectSelectionSynchronizationWorkflow _selectionSynchronization;
-    private readonly LayoutSelectionCommandWorkflow _layoutSelectionCommands;
-    private readonly ManualCameraTriggerRequestFactory _manualCameraTriggerRequestFactory = new();
     private readonly MultiAxisCommissioningExecutionWorkflow _multiAxisCommissioningExecutionWorkflow;
     private readonly SimulationScenarioExecutionCoordinator _simulationScenarioExecutionCoordinator;
-    private readonly ManualEquipmentPresentation _manualEquipmentPresentation;
-    private readonly CameraCommissioningPresentation _cameraCommissioningPresentation;
-    private readonly CameraSelectionWorkflow _cameraSelection;
-    private readonly RecipeConnectionSimulationWorkflow _recipeConnectionSimulationWorkflow;
-    private readonly RecipeConnectionSetupWorkflow _recipeConnectionSetupWorkflow;
-    private readonly LayoutComponentAuthoringService _layoutComponentAuthoringService = new();
-    private readonly LayoutAuthoringHistoryViewModel _layoutAuthoringHistory;
-    private readonly LayoutAuthoringMutationWorkflow _layoutAuthoringMutationWorkflow;
-    private readonly ProcessPlanReviewViewModel _processPlanReview;
+    private readonly ManualEquipmentCommissioningViewModel _manualEquipment;
+    private readonly CameraCommissioningViewModel _camera;
+    private readonly ShellNavigationViewModel _shellNavigation;
+    private readonly LayoutAuthoringWorkspace _layoutAuthoring;
+    private readonly RecipeAuthoringWorkspace _recipeAuthoring;
     private readonly SimulationCommandTraceViewModel _simulationCommandTrace;
     private readonly ProjectFileDialogHost _projectFileDialogHost = new();
     private readonly SimulationEvidenceFileDialogHost _simulationEvidenceFileDialogHost = new();
@@ -133,10 +114,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     private readonly MainWpfInteractionHost _mainWpfInteractionHost = new();
     private readonly MultiAxisCommissioningViewModel _multiAxisCommissioning;
     private SimulationScenarioBatchViewModel? _scenarioBatch;
-    private readonly VisionExecutionEvidenceViewModel _visionExecutionEvidence;
     private readonly UnifiedCommissioningEvidenceViewModel _unifiedCommissioningEvidence;
-    private readonly ManualCameraTriggerWorkflow _manualCameraTriggerWorkflow;
-    private readonly string? _startupSamplePath;
 
     #endregion
 
@@ -146,27 +124,15 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     private string _statusMessage = "Ready";
     private bool _isRunning;
     private bool _isDesignMode = true;
-    private bool _isCompactLayout;
-    private string? _integrationContextKey;
     private bool _isApplyingProject;
-    private bool _isStartupChoiceVisible;
-    private int _selectedLeftToolTabIndex;
     private bool _runtimeDefinitionDirty;
+    private bool _sessionCloseRequested;
     private bool _disposed;
-    private OpenVisionLanguageOption _selectedLanguageOption;
-    private int _selectedDocumentTabIndex;
 
     #endregion
 
     #region Command Backing Fields
 
-    private ICommand? _sceneSelectionRequestedCommand;
-    private ICommand? _sceneMoveRequestedCommand;
-    private ICommand? _sceneMarqueeSelectionRequestedCommand;
-    private ICommand? _sceneTransformRequestedCommand;
-    private ICommand? _sceneLibraryComponentDropRequestedCommand;
-    private ICommand? _startBlankLayoutCommand;
-    private ICommand? _openBundledSampleCommand;
     private ICommand? _newProjectCommand;
     private ICommand? _openProjectCommand;
     private ICommand? _saveProjectCommand;
@@ -185,24 +151,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     private ICommand? _exportUnifiedCommissioningEvidenceCommand;
     private ICommand? _importUnifiedCommissioningEvidenceCommand;
     private ICommand? _cycleStartCommand;
-    private ICommand? _startManualEquipmentControlCommand;
-    private ICommand? _startManualCameraControlCommand;
-    private ICommand? _triggerCameraCommand;
     private ICommand? _runMultiAxisCommissioningRecipeCommand;
     private ICommand? _stopMultiAxisCommissioningRecipeCommand;
-    private ICommand? _forceSensorOnCommand;
-    private ICommand? _forceSensorOffCommand;
-    private ICommand? _clearSensorForceCommand;
-    private ICommand? _extendCylinderCommand;
-    private ICommand? _retractCylinderCommand;
-    private ICommand? _runConveyorForwardCommand;
-    private ICommand? _runConveyorReverseCommand;
-    private ICommand? _stopConveyorCommand;
-    private ICommand? _addLayoutComponentCommand;
-    private ICommand? _deleteLayoutComponentCommand;
-    private ICommand? _nudgeLayoutComponentCommand;
-    private ICommand? _alignLayoutSelectionCommand;
-    private ICommand? _changeLayoutLayerOrderCommand;
     private ICommand? _exitCommand;
 
     #endregion
@@ -220,31 +170,42 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         OpenVisionLanguageService.Load();
         UnsavedProjectPrompt = _mainMessageDialogHost.ShowUnsavedProjectPrompt;
         ProjectOpenFailurePresenter = _mainMessageDialogHost.ShowProjectOpenFailure;
-        _selectedLanguageOption = OpenVisionLanguageService.LanguageOptions
-            .First(option => option.Language == OpenVisionLanguageService.CurrentLanguage);
-        OpenVisionLanguageService.LanguageChanged += OnLanguageChanged;
-        _projectSession = new(
-            _projectStore,
+        _simulationSession = new(SimulationFixedStep);
+        _runtimeObservabilityJournal = new(
+            LogMessageRetentionLimit,
+            OperationalDiagnosticRetentionLimit,
+            getRuntimeCoordinates: () => (RuntimeProjection.SimulationTime, RuntimeProjection.TickIndex));
+        _projectLifecycle = new(
             initialProject ?? new MachineProjectDocument { Name = "Untitled" },
-            initialProjectPath);
-        _integrationRequestWorkflow = new();
-        _startupSamplePath = string.IsNullOrWhiteSpace(startupSamplePath)
-            ? null
-            : Path.GetFullPath(startupSamplePath);
-        _isStartupChoiceVisible = initialProject is null && _startupSamplePath is not null;
-        _projectOpenWorkflow = new(
-            _projectStore,
-            TryResolveUnsavedChangesAsync,
-            ApplyOpenedProjectAsync,
-            HandleProjectOpenFailure);
-        _semiconductorRecipeCopyWorkflow = new(
-            _projectStore,
+            initialProjectPath,
+            startupSamplePath,
+            ApplyProjectAsync,
+            OnProjectTransitionCompleted,
+            OnProjectSaveCompleted,
+            _mainWpfInteractionHost.CommitFocusedEditorAsync,
+            project => SimulationWorkspace!.SaveProjectScenario(project.Simulation),
+            path => _scenarioBatch!.PersistForProjectPath(path),
+            path => _multiAxisCommissioning!.PersistForProjectPath(path),
+            path => _camera!.PersistEvidenceForProjectPath(path),
+            () => UnsavedProjectPrompt(),
+            HandleProjectOpenFailure,
+            HandleProjectSaveFailure,
+            name => _projectFileDialogHost.SelectProjectSaveAs(name),
+            fileName => _projectFileDialogHost.SelectRecipeCopyDestination(fileName),
             () => OpenVisionLanguageService.T("Gallery.TemplateOverwriteRejected"));
+        _shellNavigation = new(
+            initialProject is null && _projectLifecycle.HasStartupSample,
+            () => !_disposed && !_sessionCloseRequested && !_isApplyingProject && !IsValidationBusy,
+            () => !_disposed && !_sessionCloseRequested && !_isApplyingProject && !IsValidationBusy &&
+                  _projectLifecycle.HasStartupSample,
+            OpenBundledSampleAsync,
+            OnBlankLayoutStarted,
+            HandleCommandException);
+        _shellNavigation.PropertyChanged += OnShellNavigationPropertyChanged;
+        _shellNavigation.LanguageChanged += OnLanguageChanged;
         var initialRuntime = BuildRuntimeConfiguration(CurrentProject);
-        _engine = new FixedStepSimulationEngine(
-            new SimulationSettings { FixedStep = SimulationFixedStep });
         _runtimeDefinitionApplicationWorkflow = new(
-            _engine,
+            _simulationSession.Engine,
             SimulationFixedStep);
         _projectRuntimeApplicationWorkflow = new(
             _runtimeDefinitionApplicationWorkflow,
@@ -252,34 +213,16 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             OnProjectRuntimeApplicationRejected,
             CompleteProjectRuntimeApplication);
         _equipmentCommandDispatcher = new(
-            _engine,
+            _simulationSession.Engine,
             status => StatusMessage = status,
-            Log);
+            _runtimeObservabilityJournal.Log);
         _simulationCommandPresentationDispatcher = new(
-            _engine,
+            _simulationSession.Engine,
             status => StatusMessage = status,
-            Log);
+            _runtimeObservabilityJournal.Log);
         _multiAxisCommissioningExecutionWorkflow = new(
-            _engine,
+            _simulationSession.Engine,
             _equipmentCommandDispatcher);
-        _manualEquipmentPresentation = new();
-        _cameraCommissioningPresentation = new();
-        _recipeConnectionSetupWorkflow = new(
-            _recipeConnectionProjectApplier,
-            () => CurrentProject,
-            ExitDryRunPlayback,
-            CompleteConnectionSetupMutation,
-            CompleteConnectionProcessBlockMutation,
-            status => StatusMessage = status,
-            Log);
-        _recipeConnectionSimulationWorkflow = new(
-            () => CurrentProject,
-            project =>
-            {
-                BuildRuntimeConfiguration(project);
-            },
-            status => StatusMessage = status,
-            Log);
         AxisCommissioning = new AxisCommissioningViewModel(
             _equipmentCommandDispatcher.DispatchAxisCommandAsync,
             HandleCommandException);
@@ -287,84 +230,64 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         ProjectTree = new ProjectTreeViewModel();
         Properties = new PropertiesViewModel();
         Layout = new MachineLayoutViewModel();
-        _manualControlCommandWorkflow = new(
+        _manualEquipment = new(
             _equipmentCommandDispatcher,
-            _manualEquipmentPresentation,
+            CreateManualEquipmentProjection,
             () => Layout.SelectedItem?.Component?.Kind,
-            () => IsRunning = true);
-        RecipeConnections = new RecipeConnectionWorkbenchViewModel(
-            componentId =>
-            {
-                if (componentId is null)
-                {
-                    Layout.SelectedItem = null;
-                }
-                else
-                {
-                    Layout.Select(componentId);
-                }
-            },
-            OpenConnectionSequenceStep,
-            AddConnectionSequenceStep,
-            _recipeConnectionSimulationWorkflow.ValidateSimulationReadiness,
-            _recipeConnectionSimulationWorkflow.RunSequenceStepPreviewAsync,
-            _recipeConnectionSimulationWorkflow.RunRecipeDryRunAsync,
-            ShowConnectionDryRunStep,
-            ApplyConnectionVirtualCameraWorkflow,
-            _recipeConnectionSetupWorkflow.ApplyStationSkeleton,
-            _recipeConnectionSetupWorkflow.ApplyLoadLockSetup,
-            _recipeConnectionSetupWorkflow.ApplyWaferHandlerSetup,
-            _recipeConnectionSetupWorkflow.ApplyPrealignerSetup,
-            _recipeConnectionSetupWorkflow.ApplyInspectionHandoffSetup,
-            _recipeConnectionSetupWorkflow.ApplyInspectionSortRouterSetup,
-            _recipeConnectionSetupWorkflow.ApplyOhtHandoffSetup,
-            _recipeConnectionSetupWorkflow.ApplyProcessBlocks,
-            ApplyConnectionProcessBlockTimeouts,
-            OnConnectionCheckpointTemplateApplied,
-            OpenProcessBlockSequenceStep);
+            () => IsRunning = true,
+            HandleCommandException);
+        _manualEquipment.PropertyChanged += OnManualEquipmentPropertyChanged;
         SequenceEditor = new SequenceEditorViewModel();
-        _processPlanReview = new ProcessPlanReviewViewModel(
-            () => RecipeConnections.IsEditable,
-            () => RecipeConnections.ProcessBlocks.IsProcessBlockPreviewVisible,
-            () => RecipeConnections.ProcessBlocks.VisibleProcessBlockItems,
-            () => RecipeConnections.ProcessBlocks.ProcessBlockItems,
-            TryOpenConnectionSequenceStepForReview,
-            stepId => RecipeConnections.ProcessBlocks.SelectProcessBlockStep(stepId)?.StepText,
-            tabIndex => SelectedDocumentTabIndex = tabIndex,
-            status => StatusMessage = status);
-        _processPlanReview.PropertyChanged += OnProcessPlanReviewPropertyChanged;
+        _recipeAuthoring = new RecipeAuthoringWorkspace(
+            Layout,
+            SequenceEditor,
+            () => CurrentProject,
+            () => IsDesignMode,
+            project => { BuildRuntimeConfiguration(project); },
+            tabIndex => Navigation.SelectedDocumentTabIndex = tabIndex,
+            () => MarkProjectChanged(),
+            UpdateRunToolAvailability,
+            () => RefreshDefinitionPresentation(null),
+            () => _layoutAuthoring!.Reset(),
+            RefreshVirtualCameraWorkflowPresentation,
+            () => InvalidateCommands(),
+            status => StatusMessage = status,
+            _runtimeObservabilityJournal.Log);
+        _recipeAuthoring.ProcessPlanReview.PropertyChanged += OnProcessPlanReviewPropertyChanged;
         _simulationCommandTrace = new SimulationCommandTraceViewModel(
             () => IsRunMode
                   && !_isApplyingProject
+                  && !_sessionCloseRequested
                   && !IsValidationBusy
                   && !IsRunning
                   && !_runtimeDefinitionDirty,
-            () => _engine as FixedStepSimulationEngine,
+            () => _simulationSession.Engine as FixedStepSimulationEngine,
             ApplyMonitorSnapshot,
             ResetUnifiedCommissioningEvidenceForTraceCapture,
             RaiseUnifiedCommissioningEvidencePresentationChanged,
             status => StatusMessage = status,
-            message => Log("Simulation", message),
+            message => _runtimeObservabilityJournal.Log("Simulation", message),
             ExportSimulationCommandTraceWithDialog,
             ReplaySimulationCommandTraceWithDialogAsync,
             HandleCommandException);
         _simulationCommandTrace.PropertyChanged += OnSimulationCommandTracePropertyChanged;
         SimulationWorkspace = new SimulationWorkspaceViewModel();
         _simulationScenarioExecutionCoordinator = new(
-            new SimulationScenarioWorkflow(command => _engine.EnqueueCommandAsync(command)),
+            new SimulationScenarioWorkflow(command => _simulationSession.Engine.EnqueueCommandAsync(command)),
             SimulationWorkspace,
             () => CurrentProject,
             EnsureRuntimeDefinitionAppliedAsync,
             value => IsDesignMode = value,
             value => IsRunning = value,
             status => StatusMessage = status,
-            Log);
+            _runtimeObservabilityJournal.Log);
         MultiAxisCommissioningRecipe = new MultiAxisCommissioningRecipeEditorViewModel(
             OnMultiAxisCommissioningRecipeChanged);
         _multiAxisCommissioning = new MultiAxisCommissioningViewModel(
             MultiAxisCommissioningRecipe,
             () => IsRunMode
                   && !_isApplyingProject
+                  && !_sessionCloseRequested
                   && !IsScenarioBatchRunning
                   && !IsRunning
                   && !_runtimeDefinitionDirty
@@ -374,12 +297,12 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             () => IsScenarioBatchRunning,
             () => CurrentProject,
             () => CurrentProjectPath,
-            () => _projectSession.SerializeForEvidence(),
+            () => _projectLifecycle.SerializeForEvidence(),
             () => BuildRuntimeConfiguration(CurrentProject),
             SimulationFixedStep,
             _mainWpfInteractionHost.DispatchAsync,
             status => StatusMessage = status,
-            message => Log("Motion", message),
+            message => _runtimeObservabilityJournal.Log("Motion", message),
             NavigateToCommissioningMismatch,
             OnMultiAxisCommissioningPresentationChanged,
             HandleCommandException);
@@ -387,15 +310,18 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             SimulationWorkspace,
             () => IsRunMode
                   && !_isApplyingProject
+                  && !_sessionCloseRequested
                   && !_multiAxisCommissioning.IsValidationRunning
                   && !string.IsNullOrWhiteSpace(SimulationWorkspace.ScenarioTargetId)
                   && SimulationWorkspace.IsScheduledFaultConfigurationValid
                   && SimulationWorkspace.IsAssertionConfigurationValid,
             () => IsRunMode
                   && !_isApplyingProject
+                  && !_sessionCloseRequested
                   && !_multiAxisCommissioning.IsValidationRunning,
             () => IsRunMode
                   && !_isApplyingProject
+                  && !_sessionCloseRequested
                   && !IsRunning
                   && !_multiAxisCommissioning.IsValidationRunning
                   && !string.IsNullOrWhiteSpace(SimulationWorkspace.ScenarioTargetId)
@@ -409,32 +335,38 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             PauseRuntimeForScenarioBatchAsync,
             project => SimulationWorkspace.SaveProjectScenario(project.Simulation),
             () => BuildRuntimeConfiguration(CurrentProject),
-            () => _projectSession.SerializeForEvidence(),
+            () => _projectLifecycle.SerializeForEvidence(),
             SimulationFixedStep,
             _mainWpfInteractionHost.DispatchBatchProgressAsync,
             () => ConditionScenarioTargets,
             ResetUnifiedCommissioningEvidenceForTraceCapture,
             status => StatusMessage = status,
-            message => Log("Batch", message),
+            message => _runtimeObservabilityJournal.Log("Batch", message),
             NavigateToBatchMismatch,
             OnScenarioBatchPresentationChanged,
             HandleCommandException);
-        _visionExecutionEvidence = new VisionExecutionEvidenceViewModel(
-            CreateVisionEvidenceContext,
-            message => Log("Vision", message),
-            NotifyCameraCommissioningChanged);
-        _manualCameraTriggerWorkflow = new(
-            () => _engine.CurrentSnapshot,
-            _equipmentCommandDispatcher.DispatchCameraCommandAsync,
-            _visionExecutionEvidence,
-            ApplyMonitorSnapshot);
-        _projectSaveWorkflow = new(
-            _projectStore,
+        SceneSnapshots = new SceneSnapshotStore();
+        _camera = new(
             () => CurrentProject,
-            project => SimulationWorkspace.SaveProjectScenario(project.Simulation),
-            _scenarioBatch!.PersistForProjectPath,
-            _multiAxisCommissioning.PersistForProjectPath,
-            _visionExecutionEvidence.PersistForProjectPath);
+            CreateCameraCommissioningProjection,
+            CreateVisionEvidenceContext,
+            () => new ManualCameraSessionIdentity(
+                _projectLifecycle.SessionId,
+                _projectLifecycle.Revision),
+            CreateManualCameraTriggerRequestInput,
+            () => _simulationSession.Engine.CurrentSnapshot,
+            () => _simulationSession.RuntimeLoop.CancellationToken,
+            _equipmentCommandDispatcher.DispatchCameraCommandAsync,
+            ApplyMonitorSnapshot,
+            () => ApplyMonitorSnapshot(SceneSnapshots.Latest ?? _simulationSession.Engine.CurrentSnapshot),
+            _manualEquipment.StartManualCameraControlAsync,
+            () => MarkProjectChanged(requiresRuntimeRebuild: false),
+            status => StatusMessage = status,
+            _runtimeObservabilityJournal.Log,
+            RefreshIntegrationContext,
+            OpenVisionLanguageService.T,
+            HandleCommandException);
+        _camera.PropertyChanged += OnCameraPropertyChanged;
         _unifiedCommissioningEvidence = new UnifiedCommissioningEvidenceViewModel(
             CanExportUnifiedCommissioningEvidenceCore,
             CanImportUnifiedCommissioningEvidenceCore,
@@ -444,30 +376,16 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             CreateUnifiedCommissioningEvidenceContext,
             ApplyImportedUnifiedCommissioningArtifacts,
             status => StatusMessage = status,
-            message => Log("Batch", message),
+            message => _runtimeObservabilityJournal.Log("Batch", message),
             RaiseUnifiedCommissioningEvidencePresentationChanged);
-        CameraImageSourceEditor = new CameraImageSourceEditorViewModel(OnCameraImageSourceApplied);
-        SceneSnapshots = new SceneSnapshotStore();
-        _cameraSelection = new(
-            () => CurrentProject,
-            cameraId => CameraImageSourceEditor.SelectCamera(cameraId),
-            () => _visionExecutionEvidence.RefreshContext(),
-            () => ApplyMonitorSnapshot(SceneSnapshots.Latest ?? _engine.CurrentSnapshot),
-            OnPropertyChanged,
-            () => NotifyCameraCommissioningChanged());
         Integration = new MachineIntegrationViewModel(
-            CreateTwoDIntegrationRequest,
-            CanBuildTwoDIntegrationRequest,
+            CaptureIntegrationRequestContext,
+            () => BuildIdentity.IntegrationIdentity,
             () => CurrentProject.Id,
-            integrationSettingsPath);
+            integrationSettingsPath,
+            _mainWpfInteractionHost.DispatchOnUiThreadAsync);
         SemiconductorRecipes = new SemiconductorRecipeGalleryViewModel(
             CreateSemiconductorRecipeCopyAsync);
-        DryRunPlayback = new RecipeDryRunPlaybackViewModel(
-            () => IsDesignMode,
-            isEditable => Layout.IsEditable = isEditable,
-            tabIndex => SelectedDocumentTabIndex = tabIndex,
-            step => RecipeConnections.DryRun.SelectedRecipeDryRunStep = step,
-            status => StatusMessage = status);
         DryRunPlayback.PropertyChanged += OnDryRunPlaybackPropertyChanged;
         DigitalIo = new DigitalIoCommissioningViewModel(
             _simulationCommandPresentationDispatcher.DispatchDigitalIoAsync);
@@ -475,57 +393,42 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             _simulationCommandPresentationDispatcher.DispatchFaultAsync);
         RuntimeDebugger = new RuntimeDebuggerViewModel(DispatchRuntimeDebuggerCommandAsync);
         _runtimeObservabilityPresenter = new(
-            LogMessageRetentionLimit,
-            OperationalDiagnosticRetentionLimit,
-            _visionExecutionEvidence,
+            _runtimeObservabilityJournal,
+            _camera.VisionEvidence,
             RuntimeDebugger);
         LogMessages = _runtimeObservabilityPresenter.LogMessages;
-        _layoutAuthoringHistory = new LayoutAuthoringHistoryViewModel(
+        _layoutAuthoring = new LayoutAuthoringWorkspace(
             Layout,
             () => CurrentProject,
             () => IsSceneEditable,
             () => _isApplyingProject,
+            () => !_disposed && !_sessionCloseRequested,
             () => MarkProjectChanged(),
             UpdateRunToolAvailability,
             RefreshDefinitionPresentation,
             () => InvalidateCommands(),
             status => StatusMessage = status,
-            Log,
+            _runtimeObservabilityJournal.Log,
             OnLayoutDefinitionChanged);
-        _layoutAuthoringMutationWorkflow = new(
-            Layout,
-            _layoutComponentAuthoringService,
-            _layoutAuthoringHistory,
-            () => CurrentProject,
-            () => IsSceneEditable,
-            () => _isApplyingProject,
-            () => MarkProjectChanged(),
-            UpdateRunToolAvailability,
-            RefreshDefinitionPresentation,
-            status => StatusMessage = status,
-            Log);
-        _layoutSelectionCommands = new(
-            Layout,
-            status => StatusMessage = status);
         _runtimeProjectionCoordinator = new(
             MultiAxisCommissioningRecipe,
             SimulationWorkspace,
             DigitalIo,
             FaultManager,
             RuntimeDebugger,
-            _visionExecutionEvidence,
+            _camera.VisionEvidence,
             value => IsRunning = value,
-            RefreshManualEquipmentProjection,
-            RefreshCameraCommissioningProjection);
+            snapshot => RefreshManualEquipmentProjection(snapshot),
+            () => _camera.RefreshProjection());
         _selectionSynchronization = new(
             ProjectTree,
             Layout,
             Properties,
             RecipeConnections,
             SequenceEditor,
-            _cameraSelection,
+            _camera.Selection,
             () => CurrentProject,
-            () => SceneSnapshots.Latest ?? _engine.CurrentSnapshot,
+            () => SceneSnapshots.Latest ?? _simulationSession.Engine.CurrentSnapshot,
             snapshot => _runtimeProjectionCoordinator.UpdateSelectedAxis(
                 snapshot,
                 CreateRuntimeProjectionSelection()),
@@ -535,10 +438,33 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             OnAnalogChannelDefinitionChanged,
             status => StatusMessage = status);
         _selectionSynchronization.PropertyChanged += OnSelectionSynchronizationPropertyChanged;
-        _simulationRunControlWorkflow = new(
-            _engine,
-            SimulationFixedStep,
-            () => new SimulationRunControlState(
+        SimulationWorkspace.PropertyChanged += OnSimulationWorkspacePropertyChanged;
+        SequenceEditor.DefinitionChanged += OnSequenceDefinitionChanged;
+
+        _isApplyingProject = true;
+        try
+        {
+            ApplyProjectPresentation(CurrentProject);
+            RuntimeDebugger.LoadProject(CurrentProject, resetSession: true);
+            _layoutAuthoring.Reset();
+            _multiAxisCommissioning.Restore();
+            _camera.RestoreEvidence();
+            var initialSnapshot = _simulationSession.Engine.CurrentSnapshot;
+            SceneSnapshots.Publish(initialSnapshot);
+            ApplyMonitorSnapshot(initialSnapshot);
+        }
+        finally
+        {
+            _isApplyingProject = false;
+        }
+        AcceptCurrentProjectAsSaved();
+        _runtimeObservabilityJournal.Log("System", "Deterministic machine runtime ready · fixed step 5 ms");
+
+        _simulationSession.Start(new SimulationSessionStartup
+        {
+            ProjectId = CurrentProject.Id,
+            InitialRuntime = initialRuntime,
+            GetRunControlState = () => new SimulationRunControlState(
                 _isApplyingProject,
                 IsValidationBusy,
                 IsRunMode,
@@ -557,66 +483,43 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
                 RuntimeProjection.ControlOwner,
                 RuntimeProjection.CurrentSequence?.Status,
                 ActiveSequenceId),
-            EnsureRuntimeDefinitionAppliedAsync,
-            value => IsDesignMode = value,
-            value => IsRunning = value,
-            ApplyMonitorSnapshot,
-            _visionExecutionEvidence.CancelCapture,
-            status => StatusMessage = status,
-            Log,
-            () => InvalidateCommands());
-        SimulationWorkspace.PropertyChanged += OnSimulationWorkspacePropertyChanged;
-        RecipeConnections.ProcessBlocks.ProcessBlockPreviewClosed += OnProcessBlockPreviewClosed;
-        SequenceEditor.DefinitionChanged += OnSequenceDefinitionChanged;
-
-        _isApplyingProject = true;
-        try
-        {
-            ApplyProjectPresentation(CurrentProject);
-            RuntimeDebugger.LoadProject(CurrentProject, resetSession: true);
-            _layoutAuthoringHistory.Reset();
-            _multiAxisCommissioning.Restore();
-            _visionExecutionEvidence.Restore();
-            var initialSnapshot = _engine.CurrentSnapshot;
-            SceneSnapshots.Publish(initialSnapshot);
-            ApplyMonitorSnapshot(initialSnapshot);
-        }
-        finally
-        {
-            _isApplyingProject = false;
-        }
-        AcceptCurrentProjectAsSaved();
-        Log("System", "Deterministic machine runtime ready · fixed step 5 ms");
-
-        _runtimeLoop = new SimulationRuntimeLoop(
-            _engine,
-            _mainWpfInteractionHost.DispatchAsync,
-            snapshot => SceneSnapshots.Publish(snapshot),
-            ApplyMonitorSnapshot,
-            () =>
+            EnsureRuntimeDefinitionApplied = EnsureRuntimeDefinitionAppliedAsync,
+            SetDesignMode = value => IsDesignMode = value,
+            SetRunning = value => IsRunning = value,
+            ApplySnapshot = ApplyMonitorSnapshot,
+            CancelVisionCapture = CancelManualCameraPreparation,
+            SetStatus = status => StatusMessage = status,
+            Log = _runtimeObservabilityJournal.Log,
+            NotifyCommandsChanged = () => InvalidateCommands(),
+            Dispatch = _mainWpfInteractionHost.DispatchAsync,
+            PublishSnapshot = snapshot => SceneSnapshots.Publish(snapshot),
+            OnInitialRuntimeApplied = () =>
             {
-                ApplyMonitorSnapshot(_engine.CurrentSnapshot);
+                ApplyMonitorSnapshot(_simulationSession.Engine.CurrentSnapshot);
                 _scenarioBatch!.Restore();
             },
-            detail => Log("Runtime", $"Initial configuration rejected · {detail}"),
-            runtimeEvent => _runtimeObservabilityPresenter.RecordRuntimeEvent(
+            OnInitialConfigurationRejected = detail => _runtimeObservabilityJournal.Log(
+                "Runtime",
+                $"Initial configuration rejected · {detail}"),
+            OnRuntimeEvent = _runtimeObservabilityPresenter.RecordRuntimeEventPresentation,
+            OnTerminated = _runtimeObservabilityPresenter.RecordEngineTermination,
+            OnUnhandledException = HandleCommandException,
+            OnCanonicalEvent = runtimeEvent => _runtimeObservabilityPresenter.RecordCanonicalRuntimeEvent(
                 runtimeEvent,
-                _engine.CurrentSnapshot),
-            _runtimeObservabilityPresenter.RecordEngineTermination,
-            HandleCommandException);
-        _runtimeResources = new(
-            _engine,
-            _runtimeLoop,
-            SimulationWorkspace,
-            _scenarioBatch,
-            _multiAxisCommissioning);
-        _runtimeShutdownWorkflow = new(
-            _engine,
-            _runtimeLoop,
-            _runtimeResources,
-            _simulationRunControlWorkflow,
-            RecordShutdownDiagnostic);
-        _runtimeLoop.Start(initialRuntime);
+                _simulationSession.Engine.CurrentSnapshot),
+            OnCanonicalJournalCompleted = _runtimeObservabilityPresenter.RecordCanonicalEventJournalCompleted,
+            Workspace = SimulationWorkspace,
+            ScenarioBatch = _scenarioBatch,
+            MultiAxisCommissioning = _multiAxisCommissioning,
+            ObserveProjectSave = _projectLifecycle.ObserveSaveAsync,
+            ObserveCameraAcquisition = _camera.ObserveAsync,
+            ObserveScenarioBatch = _scenarioBatch.ObserveAsync,
+            ObserveCommissioningValidation = _multiAxisCommissioning.ObserveAsync,
+            ObserveIntegration = Integration.ObserveAsync,
+            ResolveUnsavedChanges = TryResolveUnsavedChangesAsync,
+            SetCloseAdmission = SetSessionCloseAdmission,
+            RecordShutdownDiagnostic = _runtimeObservabilityPresenter.RecordShutdownDiagnostic
+        });
     }
 
     #endregion
@@ -626,8 +529,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     private bool IsScenarioBatchRunning => _scenarioBatch?.IsBatchRunning == true;
     private bool IsValidationBusy => IsScenarioBatchRunning || _multiAxisCommissioning.IsValidationRunning;
     private SimulationRuntimeSnapshotProjection RuntimeProjection => _runtimeProjectionCoordinator.CurrentProjection;
-    private MachineProjectDocument CurrentProject => _projectSession.Project;
-    private string ProjectDisplayName => _projectSession.DisplayName;
+    private MachineProjectDocument CurrentProject => _projectLifecycle.CurrentProject;
+    private string ProjectDisplayName => _projectLifecycle.DisplayName;
     private string? ActiveSequenceId => CurrentProject.Simulation.AutomaticRun?.SequenceId
         ?? CurrentProject.Sequences.FirstOrDefault()?.Id;
     private VirtualAxisDefinition? CurrentAxisDefinition => RuntimeProjection.CurrentAxis is null
@@ -635,11 +538,12 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         : CurrentProject.Axes.FirstOrDefault(axis =>
             string.Equals(axis.Id, RuntimeProjection.CurrentAxis.Id, StringComparison.Ordinal));
     private DeviceDefinition? CurrentCameraDefinition =>
-        _cameraSelection.GetSelectedDefinition(RuntimeProjection.CurrentCamera?.Id);
+        _camera.GetSelectedDefinition(RuntimeProjection.CurrentCamera?.Id);
 
     internal Func<UnsavedProjectDecision> UnsavedProjectPrompt { get; set; }
     internal Action<string> ProjectOpenFailurePresenter { get; set; }
-    internal string? CurrentProjectPath => _projectSession.CurrentPath;
+    internal string? CurrentProjectPath => _projectLifecycle.CurrentPath;
+    internal bool IsSessionCloseRequested => _sessionCloseRequested;
 
     public string Title
     {
@@ -667,9 +571,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(RunStatusText));
             NotifyManualCommissioningChanged(invalidateCommands: false);
             NotifyAxisCommissioningChanged(invalidateCommands: false);
-            NotifySensorCommissioningChanged(invalidateCommands: false);
-            NotifyCylinderCommissioningChanged(invalidateCommands: false);
-            NotifyConveyorCommissioningChanged(invalidateCommands: false);
             NotifyCameraCommissioningChanged(invalidateCommands: false);
             NotifyMultiAxisCommissioningRecipeChanged(invalidateCommands: false);
             InvalidateCommands();
@@ -686,6 +587,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
                 return;
             }
 
+            _multiAxisCommissioningExecutionWorkflow.InvalidatePendingExecution();
             OnPropertyChanged(nameof(IsRunMode));
             OnPropertyChanged(nameof(IsSceneEditable));
             OnPropertyChanged(nameof(ModeText));
@@ -695,7 +597,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(RightPanelHeaderText));
             if (!value)
             {
-                ExitDryRunPlayback();
+                _recipeAuthoring.ExitPlayback();
             }
             Layout.IsEditable = IsSceneEditable;
             RecipeConnections.IsEditable = value;
@@ -724,12 +626,14 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     }
 
     public bool HasUnsavedChanges
-        => _projectSession.HasUnsavedChanges;
+        => _projectLifecycle.HasUnsavedChanges;
+
+    public ShellNavigationViewModel Navigation => _shellNavigation;
 
     public bool IsCompactLayout
     {
-        get => _isCompactLayout;
-        set => SetProperty(ref _isCompactLayout, value);
+        get => Navigation.IsCompactLayout;
+        set => Navigation.IsCompactLayout = value;
     }
 
     public ProjectTreeViewModel ProjectTree { get; }
@@ -739,43 +643,44 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     public int SelectedDocumentTabIndex
     {
-        get => _selectedDocumentTabIndex;
-        set => SetProperty(ref _selectedDocumentTabIndex, value);
+        get => Navigation.SelectedDocumentTabIndex;
+        set => Navigation.SelectedDocumentTabIndex = value;
     }
 
     public int SelectedLeftToolTabIndex
     {
-        get => _selectedLeftToolTabIndex;
-        set => SetProperty(ref _selectedLeftToolTabIndex, value);
+        get => Navigation.SelectedLeftToolTabIndex;
+        set => Navigation.SelectedLeftToolTabIndex = value;
     }
 
-    public bool IsStartupChoiceVisible
-    {
-        get => _isStartupChoiceVisible;
-        private set => SetProperty(ref _isStartupChoiceVisible, value);
-    }
+    public bool IsStartupChoiceVisible => Navigation.IsStartupChoiceVisible;
 
-    public bool HasProcessPlanReturnContext => _processPlanReview.HasReturnContext;
-    public string? ProcessPlanReturnStepId => _processPlanReview.ReturnStepId;
-    public string ProcessPlanReviewPositionText => _processPlanReview.ReviewPositionText;
+    public bool HasProcessPlanReturnContext => _recipeAuthoring.ProcessPlanReview.HasReturnContext;
+    public string? ProcessPlanReturnStepId => _recipeAuthoring.ProcessPlanReview.ReturnStepId;
+    public string ProcessPlanReviewPositionText => _recipeAuthoring.ProcessPlanReview.ReviewPositionText;
     public bool HasSelectedAxisDefinition => AxisDriveTuningEditor is not null;
     public bool HasSelectedAnalogChannel => AnalogIoAuthoring is not null;
     public AxisCommissioningViewModel AxisCommissioning { get; }
     public MachineLayoutViewModel Layout { get; }
-    public RecipeConnectionWorkbenchViewModel RecipeConnections { get; }
+    public LayoutAuthoringWorkspace LayoutAuthoring => _layoutAuthoring;
+    public RecipeAuthoringWorkspace RecipeAuthoring => _recipeAuthoring;
+    public RecipeConnectionWorkbenchViewModel RecipeConnections => _recipeAuthoring.Connections;
     public SequenceEditorViewModel SequenceEditor { get; }
     public SimulationWorkspaceViewModel SimulationWorkspace { get; }
     public MultiAxisCommissioningRecipeEditorViewModel MultiAxisCommissioningRecipe { get; }
-    public CameraImageSourceEditorViewModel CameraImageSourceEditor { get; }
+    public ManualEquipmentCommissioningViewModel ManualEquipment => _manualEquipment;
+    public CameraCommissioningViewModel Camera => _camera;
+    // Compatibility for existing callers; the Camera inspector binds directly to Camera.
+    public CameraImageSourceEditorViewModel CameraImageSourceEditor => _camera.ImageSourceEditor;
     public MachineIntegrationViewModel Integration { get; }
     public SemiconductorRecipeGalleryViewModel SemiconductorRecipes { get; }
-    public RecipeDryRunPlaybackViewModel DryRunPlayback { get; }
+    public RecipeDryRunPlaybackViewModel DryRunPlayback => _recipeAuthoring.Playback;
     public SceneSnapshotStore SceneSnapshots { get; }
     public SceneSnapshotStore SceneSnapshotSource => DryRunPlayback.IsActive
         ? DryRunPlayback.PlaybackSnapshots
         : SceneSnapshots;
     private SimulationSnapshot PresentationSnapshot =>
-        SceneSnapshotSource.Latest ?? SceneSnapshots.Latest ?? _engine.CurrentSnapshot;
+        SceneSnapshotSource.Latest ?? SceneSnapshots.Latest ?? _simulationSession.Engine.CurrentSnapshot;
     public bool IsSceneEditable => IsDesignMode && !DryRunPlayback.IsActive;
     public bool IsDryRunPlaybackActive => DryRunPlayback.IsActive;
     public string DryRunPlaybackTitleText => DryRunPlayback.TitleText;
@@ -807,14 +712,14 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     public ReadOnlyObservableCollection<string> LogMessages { get; }
     public IReadOnlyList<SimulationOperationalDiagnostic> OperationalDiagnostics =>
         _runtimeObservabilityPresenter.OperationalDiagnostics;
-    public IReadOnlyList<OpenVisionLanguageOption> LanguageOptions => OpenVisionLanguageService.LanguageOptions;
+    public IReadOnlyList<OpenVisionLanguageOption> LanguageOptions => Navigation.LanguageOptions;
 
     public DeterministicConditionScenarioSnapshot ConditionScenario => RuntimeProjection.ConditionScenario;
     public IReadOnlyList<SimulationScenarioTargetOption> ConditionScenarioTargets
     {
         get
         {
-            var snapshot = SceneSnapshots.Latest ?? _engine.CurrentSnapshot;
+            var snapshot = SceneSnapshots.Latest ?? _simulationSession.Engine.CurrentSnapshot;
             return snapshot.Axes
                 .Select(axis => new SimulationScenarioTargetOption(axis.Id, axis.Name))
                 .Concat(snapshot.LayoutComponents.Select(component =>
@@ -827,12 +732,12 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<SimulationScenarioTargetOption> ScheduledFaultTargets =>
         new SimulationFaultTargetCatalog()
             .GetTargets(
-                SceneSnapshots.Latest ?? _engine.CurrentSnapshot,
+                SceneSnapshots.Latest ?? _simulationSession.Engine.CurrentSnapshot,
                 SimulationWorkspace.ScheduledFaultKind)
             .Select(target => new SimulationScenarioTargetOption(target.Id, target.Name))
             .ToArray();
     public IReadOnlyList<SimulationScenarioTargetOption> RecoverySequences =>
-        (SceneSnapshots.Latest ?? _engine.CurrentSnapshot).Sequences
+        (SceneSnapshots.Latest ?? _simulationSession.Engine.CurrentSnapshot).Sequences
             .Select(sequence => new SimulationScenarioTargetOption(
                 sequence.SequenceId,
                 sequence.SequenceId))
@@ -878,8 +783,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         && !string.IsNullOrWhiteSpace(SimulationWorkspace.ScenarioTargetId)
         && SimulationWorkspace.IsScheduledFaultConfigurationValid
         && SimulationWorkspace.IsAssertionConfigurationValid;
-    public bool CanAbortSequence => _simulationRunControlWorkflow.CanAbortSequence();
-    public bool CanRetrySequence => _simulationRunControlWorkflow.CanRetrySequence();
+    public bool CanAbortSequence => _simulationSession.RunControl.CanAbortSequence();
+    public bool CanRetrySequence => _simulationSession.RunControl.CanRetrySequence();
     public bool IsBatchRunning => _scenarioBatch?.IsBatchRunning == true;
     public bool IsScenarioConfigurationEnabled =>
         _scenarioBatch?.IsScenarioConfigurationEnabled ?? !IsValidationBusy;
@@ -916,28 +821,14 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     public OpenVisionLanguageOption SelectedLanguageOption
     {
-        get => _selectedLanguageOption;
-        set
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            if (ReferenceEquals(_selectedLanguageOption, value))
-            {
-                return;
-            }
-
-            _selectedLanguageOption = value;
-            OnPropertyChanged();
-            OpenVisionLanguageService.SetLanguage(value.Language);
-        }
+        get => Navigation.SelectedLanguageOption;
+        set => Navigation.SelectedLanguageOption = value;
     }
 
     public bool HasSelectedEquipment => Layout.SelectedItem?.Component is not null;
     public bool HasSelectedAxisStage => Layout.SelectedItem?.Component?.Kind is
         LayoutComponentKind.LinearStage or LayoutComponentKind.RotaryStage;
-    public bool HasSelectedManualEquipment => HasSelectedAxisStage
-        || HasSelectedDigitalSensor
-        || HasSelectedPneumaticCylinder
-        || HasSelectedConveyor;
+    public bool HasSelectedManualEquipment => _manualEquipment.HasSelectedManualEquipment;
     public EquipmentStatusPresentation? SelectedEquipmentStatus => Layout.SelectedItem is null
         ? null
         : EquipmentStatusPresentation.Create(
@@ -995,27 +886,24 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         .SelectMany(layout => layout.Components)
         .Count()
         .ToString(System.Globalization.CultureInfo.InvariantCulture);
-    public string CameraCountText => CurrentProject.Devices.Count(device => device.Kind == DeviceKind.Camera)
-        .ToString(System.Globalization.CultureInfo.InvariantCulture);
-    public bool HasVirtualCamera => CurrentProject.Devices.Any(device => device.Kind == DeviceKind.Camera);
-    public IReadOnlyList<DeviceDefinition> VirtualCameras => CurrentProject.Devices
-        .Where(device => device.Kind == DeviceKind.Camera)
-        .ToArray();
+    public string CameraCountText => _camera.CameraCountText;
+    public bool HasVirtualCamera => _camera.HasVirtualCamera;
+    public IReadOnlyList<DeviceDefinition> VirtualCameras => _camera.VirtualCameras;
     public DeviceDefinition? SelectedVirtualCamera
     {
-        get => _cameraSelection.SelectedVirtualCamera;
-        set => _cameraSelection.SelectVirtualCamera(value?.Id);
+        get => _camera.SelectedVirtualCamera;
+        set => _camera.SelectedCameraId = value?.Id;
     }
     public string? SelectedCameraId
     {
-        get => _cameraSelection.SelectedCameraId;
-        set => _cameraSelection.SelectVirtualCamera(value);
+        get => _camera.SelectedCameraId;
+        set => _camera.SelectedCameraId = value;
     }
-    public IReadOnlyList<string> CurrentCameraRecipes => _cameraSelection.CurrentCameraRecipes;
+    public IReadOnlyList<string> CurrentCameraRecipes => _camera.CurrentCameraRecipes;
     public string? SelectedCameraRecipe
     {
-        get => _cameraSelection.SelectedCameraRecipe;
-        set => _cameraSelection.SelectCameraRecipe(value);
+        get => _camera.SelectedCameraRecipe;
+        set => _camera.SelectedCameraRecipe = value;
     }
     public bool HasEmbeddedSequence => CurrentProject.Sequences.Count > 0;
     public bool HasAutomaticRun => CurrentProject.Simulation.AutomaticRun is not null;
@@ -1080,26 +968,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     public bool IsCurrentAxisInterlocked => AxisCommissioning.IsCurrentAxisInterlocked;
     public string CurrentAxisInterlockText => AxisCommissioning.CurrentAxisInterlockText;
     public string AxisCommissioningHintText => AxisCommissioning.AxisCommissioningHintText;
-    public bool CanStartManualEquipmentControl => IsRunMode
-        && !_isApplyingProject
-        && !IsValidationBusy
-        && !_runtimeDefinitionDirty
-        && !IsRunning
-        && !RuntimeProjection.AutomaticRun.IsActive
-        && RuntimeProjection.CurrentSequence?.Status != SequenceExecutionStatus.Running
-        && (Layout.SelectedItem?.Component?.Kind switch
-        {
-            LayoutComponentKind.LinearStage => AxisCommissioning.HasCurrentAxis
-                && !AxisCommissioning.IsCurrentAxisInterlocked,
-            LayoutComponentKind.RotaryStage => AxisCommissioning.HasCurrentAxis
-                && !AxisCommissioning.IsCurrentAxisInterlocked,
-            LayoutComponentKind.DigitalSensor => _manualEquipmentPresentation.HasSelectedDigitalSensor
-                && !_manualEquipmentPresentation.IsCurrentSensorFaulted,
-            LayoutComponentKind.PneumaticCylinder => _manualEquipmentPresentation.HasSelectedPneumaticCylinder
-                && !_manualEquipmentPresentation.IsCurrentCylinderInterlocked,
-            LayoutComponentKind.Conveyor => _manualEquipmentPresentation.HasSelectedConveyor,
-            _ => false
-        });
+    public bool CanStartManualEquipmentControl => _manualEquipment.CanStartManualEquipmentControl;
     public bool IsMultiAxisCommissioningRecipeSelection => IsDesignMode
         && ProjectTree.SelectedNode?.Kind is
             global::OpenVisionLab.MachineStudio.Model.TreeNodeKind.Project or
@@ -1157,46 +1026,42 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     public bool CanMoveAxisAbsolute => AxisCommissioning.CanMoveAxisAbsolute;
     public bool CanMoveAxisRelative => AxisCommissioning.CanMoveAxisRelative;
     public bool CanMoveAxisVelocity => AxisCommissioning.CanMoveAxisVelocity;
-    public bool HasSelectedDigitalSensor => _manualEquipmentPresentation.HasSelectedDigitalSensor;
-    public bool IsCurrentSensorFaulted => _manualEquipmentPresentation.IsCurrentSensorFaulted;
-    public bool IsCurrentSensorManuallyForced => _manualEquipmentPresentation.IsCurrentSensorManuallyForced;
-    public string CurrentSensorForceText => _manualEquipmentPresentation.CurrentSensorForceText;
-    public string SensorCommissioningHintText => _manualEquipmentPresentation.SensorCommissioningHintText;
-    public bool CanForceSensorOn => _manualEquipmentPresentation.CanForceSensorOn;
-    public bool CanForceSensorOff => _manualEquipmentPresentation.CanForceSensorOff;
-    public bool CanClearSensorForce => _manualEquipmentPresentation.CanClearSensorForce;
-    public bool HasSelectedPneumaticCylinder => _manualEquipmentPresentation.HasSelectedPneumaticCylinder;
-    public bool IsCurrentCylinderInterlocked => _manualEquipmentPresentation.IsCurrentCylinderInterlocked;
-    public string CurrentCylinderInterlockText => _manualEquipmentPresentation.CurrentCylinderInterlockText;
-    public string CylinderCommissioningHintText => _manualEquipmentPresentation.CylinderCommissioningHintText;
-    public bool CanExtendCylinder => _manualEquipmentPresentation.CanExtendCylinder;
-    public bool CanRetractCylinder => _manualEquipmentPresentation.CanRetractCylinder;
-    public bool HasSelectedConveyor => _manualEquipmentPresentation.HasSelectedConveyor;
-    public string ConveyorCommissioningHintText => _manualEquipmentPresentation.ConveyorCommissioningHintText;
-    public bool CanRunConveyorForward => _manualEquipmentPresentation.CanRunConveyorForward;
-    public bool CanRunConveyorReverse => _manualEquipmentPresentation.CanRunConveyorReverse;
-    public bool CanStopConveyor => _manualEquipmentPresentation.CanStopConveyor;
+    public bool HasSelectedDigitalSensor => _manualEquipment.HasSelectedDigitalSensor;
+    public bool IsCurrentSensorFaulted => _manualEquipment.IsCurrentSensorFaulted;
+    public bool IsCurrentSensorManuallyForced => _manualEquipment.IsCurrentSensorManuallyForced;
+    public string CurrentSensorForceText => _manualEquipment.CurrentSensorForceText;
+    public string SensorCommissioningHintText => _manualEquipment.SensorCommissioningHintText;
+    public bool CanForceSensorOn => _manualEquipment.CanForceSensorOn;
+    public bool CanForceSensorOff => _manualEquipment.CanForceSensorOff;
+    public bool CanClearSensorForce => _manualEquipment.CanClearSensorForce;
+    public bool HasSelectedPneumaticCylinder => _manualEquipment.HasSelectedPneumaticCylinder;
+    public bool IsCurrentCylinderInterlocked => _manualEquipment.IsCurrentCylinderInterlocked;
+    public string CurrentCylinderInterlockText => _manualEquipment.CurrentCylinderInterlockText;
+    public string CylinderCommissioningHintText => _manualEquipment.CylinderCommissioningHintText;
+    public bool CanExtendCylinder => _manualEquipment.CanExtendCylinder;
+    public bool CanRetractCylinder => _manualEquipment.CanRetractCylinder;
+    public bool HasSelectedConveyor => _manualEquipment.HasSelectedConveyor;
+    public string ConveyorCommissioningHintText => _manualEquipment.ConveyorCommissioningHintText;
+    public bool CanRunConveyorForward => _manualEquipment.CanRunConveyorForward;
+    public bool CanRunConveyorReverse => _manualEquipment.CanRunConveyorReverse;
+    public bool CanStopConveyor => _manualEquipment.CanStopConveyor;
     internal DigitalSignalSnapshot? CurrentSelectedSensorSignal =>
-        _manualEquipmentPresentation.CurrentSelectedSensorSignal;
-    public string CurrentCameraName => _cameraCommissioningPresentation.CurrentCameraName;
-    public string CurrentCameraStateText => _cameraCommissioningPresentation.CurrentCameraStateText;
-    public string CurrentCameraResultText => _cameraCommissioningPresentation.CurrentCameraResultText;
-    public string CurrentCameraFrameText => _cameraCommissioningPresentation.CurrentCameraFrameText;
-    public string CurrentCameraExposureTicksText =>
-        _cameraCommissioningPresentation.CurrentCameraExposureTicksText;
-    public string CurrentCameraTransferTicksText =>
-        _cameraCommissioningPresentation.CurrentCameraTransferTicksText;
-    public string CurrentCameraSourceText => _cameraCommissioningPresentation.CurrentCameraSourceText;
-    public string CurrentCameraFrameHashText => _cameraCommissioningPresentation.CurrentCameraFrameHashText;
-    public string CurrentCameraInspectionIdText =>
-        _cameraCommissioningPresentation.CurrentCameraInspectionIdText;
-    public string CurrentCameraInspectionMessageText =>
-        _cameraCommissioningPresentation.CurrentCameraInspectionMessageText;
-    public string CurrentCameraInspectionMetricsText =>
-        _cameraCommissioningPresentation.CurrentCameraInspectionMetricsText;
-    public string CurrentVisionEvidenceHashText => _visionExecutionEvidence.EvidenceHashText;
-    public string VisionEvidenceStatusText => _visionExecutionEvidence.StatusText;
-    public string VisionEvidenceComparisonText => _visionExecutionEvidence.ComparisonText;
+        _manualEquipment.CurrentSelectedSensorSignal;
+    public string CurrentCameraName => _camera.CurrentCameraName;
+    public string CurrentCameraStateText => _camera.CurrentCameraStateText;
+    public string CurrentCameraResultText => _camera.CurrentCameraResultText;
+    public string CurrentCameraFrameText => _camera.CurrentCameraFrameText;
+    public string CurrentCameraExposureTicksText => _camera.CurrentCameraExposureTicksText;
+    public string CurrentCameraTransferTicksText => _camera.CurrentCameraTransferTicksText;
+    public string CurrentCameraSourceText => _camera.CurrentCameraSourceText;
+    public string CurrentCameraSourceModeText => _camera.CurrentCameraSourceModeText;
+    public string CurrentCameraFrameHashText => _camera.CurrentCameraFrameHashText;
+    public string CurrentCameraInspectionIdText => _camera.CurrentCameraInspectionIdText;
+    public string CurrentCameraInspectionMessageText => _camera.CurrentCameraInspectionMessageText;
+    public string CurrentCameraInspectionMetricsText => _camera.CurrentCameraInspectionMetricsText;
+    public string CurrentVisionEvidenceHashText => _camera.CurrentVisionEvidenceHashText;
+    public string VisionEvidenceStatusText => _camera.VisionEvidenceStatusText;
+    public string VisionEvidenceComparisonText => _camera.VisionEvidenceComparisonText;
     public string CurrentCameraEvidenceDetailsText => string.Join(
         Environment.NewLine,
         $"{OpenVisionLanguageService.T("Camera.InspectionId")}: {CurrentCameraInspectionIdText}",
@@ -1206,14 +1071,12 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         VisionEvidenceStatusText,
         VisionEvidenceComparisonText);
     internal DeterministicVisionExecutionEvidencePackage? LatestVisionEvidence =>
-        _visionExecutionEvidence.LatestEvidence;
+        _camera.LatestVisionEvidence;
     internal DeterministicVisionExecutionComparison? VisionEvidenceComparison =>
-        _visionExecutionEvidence.Comparison;
-    public string CameraCommissioningHintText =>
-        _cameraCommissioningPresentation.CameraCommissioningHintText;
-    public bool CanStartManualCameraControl =>
-        _cameraCommissioningPresentation.CanStartManualCameraControl;
-    public bool CanTriggerCamera => _cameraCommissioningPresentation.CanTriggerCamera;
+        _camera.VisionEvidenceComparison;
+    public string CameraCommissioningHintText => _camera.CameraCommissioningHintText;
+    public bool CanStartManualCameraControl => _camera.CanStartManualCameraControl;
+    public bool CanTriggerCamera => _camera.CanTriggerCamera;
     public string CurrentSequenceName => ResolveSequenceName(RuntimeProjection.CurrentSequence?.SequenceId);
     public string CurrentSequenceStateText => RuntimeProjection.CurrentSequence is null
         ? OpenVisionLanguageService.T("Shell.NotConfigured")
@@ -1241,13 +1104,9 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     #region Commands
 
-    public ICommand StartBlankLayoutCommand => _startBlankLayoutCommand ??= CreateRelayCommand(
-        _ => StartBlankLayout(),
-        _ => IsStartupChoiceVisible);
+    public ICommand StartBlankLayoutCommand => Navigation.StartBlankLayoutCommand;
 
-    public ICommand OpenBundledSampleCommand => _openBundledSampleCommand ??= CreateAsyncCommand(
-        async _ => await OpenBundledSampleAsync(),
-        _ => IsStartupChoiceVisible && _startupSamplePath is not null);
+    public ICommand OpenBundledSampleCommand => Navigation.OpenBundledSampleCommand;
 
     public ICommand NewProjectCommand => _newProjectCommand ??= CreateAsyncCommand(async _ =>
     {
@@ -1274,30 +1133,46 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         _ => !_isApplyingProject && !IsValidationBusy && !string.IsNullOrWhiteSpace(CurrentProject.Name));
 
     public ICommand RunCommand => _runCommand ??= CreateAsyncCommand(
-        async _ => await _simulationRunControlWorkflow.RunAsync(),
-        _ => _simulationRunControlWorkflow.CanRun());
+        async _ =>
+        {
+            _multiAxisCommissioningExecutionWorkflow.InvalidatePendingExecution();
+            await _simulationSession.RunControl.RunAsync();
+        },
+        _ => _simulationSession.RunControl.CanRun());
 
     public ICommand PauseCommand => _pauseCommand ??= CreateAsyncCommand(
-        async _ => await _simulationRunControlWorkflow.PauseAsync(),
-        _ => _simulationRunControlWorkflow.CanPause());
+        async _ =>
+        {
+            _multiAxisCommissioningExecutionWorkflow.InvalidatePendingExecution();
+            await _simulationSession.RunControl.PauseAsync();
+        },
+        _ => _simulationSession.RunControl.CanPause());
 
     public ICommand StopCommand => PauseCommand;
 
     public ICommand AbortSequenceCommand => _abortSequenceCommand ??= CreateAsyncCommand(
-        async _ => await _simulationRunControlWorkflow.AbortSequenceAsync(),
-        _ => _simulationRunControlWorkflow.CanAbortSequence());
+        async _ => await _simulationSession.RunControl.AbortSequenceAsync(),
+        _ => _simulationSession.RunControl.CanAbortSequence());
 
     public ICommand RetrySequenceCommand => _retrySequenceCommand ??= CreateAsyncCommand(
-        async _ => await _simulationRunControlWorkflow.RetrySequenceAsync(),
-        _ => _simulationRunControlWorkflow.CanRetrySequence());
+        async _ => await _simulationSession.RunControl.RetrySequenceAsync(),
+        _ => _simulationSession.RunControl.CanRetrySequence());
 
     public ICommand StepCommand => _stepCommand ??= CreateAsyncCommand(
-        async _ => await _simulationRunControlWorkflow.StepAsync(),
-        _ => _simulationRunControlWorkflow.CanStep());
+        async _ =>
+        {
+            _multiAxisCommissioningExecutionWorkflow.InvalidatePendingExecution();
+            await _simulationSession.RunControl.StepAsync();
+        },
+        _ => _simulationSession.RunControl.CanStep());
 
     public ICommand ResetCommand => _resetCommand ??= CreateAsyncCommand(
-        async _ => await _simulationRunControlWorkflow.ResetAsync(),
-        _ => _simulationRunControlWorkflow.CanReset());
+        async _ =>
+        {
+            _multiAxisCommissioningExecutionWorkflow.InvalidatePendingExecution();
+            await _simulationSession.RunControl.ResetAsync();
+        },
+        _ => _simulationSession.RunControl.CanReset());
 
     public ICommand StartTestScenarioCommand => _startTestScenarioCommand ??= CreateAsyncCommand(
         async _ => await _simulationScenarioExecutionCoordinator.StartAsync(),
@@ -1389,22 +1264,15 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         _simulationCommandTrace.ReplayCommand;
 
     public ICommand CycleStartCommand => _cycleStartCommand ??= CreateAsyncCommand(
-        async _ => await _simulationRunControlWorkflow.CycleStartAsync(),
-        _ => _simulationRunControlWorkflow.CanCycleStart());
+        async _ => await _simulationSession.RunControl.CycleStartAsync(),
+        _ => _simulationSession.RunControl.CanCycleStart());
 
-    public ICommand StartManualEquipmentControlCommand => _startManualEquipmentControlCommand ??=
-        CreateAsyncCommand(
-            async _ => await _manualControlCommandWorkflow.StartEquipmentControlAsync(),
-            _ => CanStartManualEquipmentControl);
+    public ICommand StartManualEquipmentControlCommand =>
+        _manualEquipment.StartManualEquipmentControlCommand;
 
-    public ICommand StartManualCameraControlCommand => _startManualCameraControlCommand ??=
-        CreateAsyncCommand(
-            async _ => await _manualControlCommandWorkflow.StartCameraControlAsync(),
-            _ => CanStartManualCameraControl);
+    public ICommand StartManualCameraControlCommand => _camera.StartManualCameraControlCommand;
 
-    public ICommand TriggerCameraCommand => _triggerCameraCommand ??= CreateAsyncCommand(
-        async _ => await TriggerSelectedCameraAsync(),
-        _ => CanTriggerCamera);
+    public ICommand TriggerCameraCommand => _camera.TriggerCameraCommand;
 
     public ICommand MoveAxisAbsoluteCommand => AxisCommissioning.MoveAxisAbsoluteCommand;
     public ICommand MoveAxisRelativeCommand => AxisCommissioning.MoveAxisRelativeCommand;
@@ -1437,101 +1305,51 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     public ICommand NavigateToCommissioningMismatchCommand =>
         _multiAxisCommissioning.NavigateToMismatchCommand;
 
-    public ICommand ForceSensorOnCommand => _forceSensorOnCommand ??=
-        CreateAsyncCommand(
-            async _ => await _manualControlCommandWorkflow.SetSensorForceAsync(true),
-            _ => CanForceSensorOn);
+    public ICommand ForceSensorOnCommand => _manualEquipment.ForceSensorOnCommand;
 
-    public ICommand ForceSensorOffCommand => _forceSensorOffCommand ??=
-        CreateAsyncCommand(
-            async _ => await _manualControlCommandWorkflow.SetSensorForceAsync(false),
-            _ => CanForceSensorOff);
+    public ICommand ForceSensorOffCommand => _manualEquipment.ForceSensorOffCommand;
 
-    public ICommand ClearSensorForceCommand => _clearSensorForceCommand ??=
-        CreateAsyncCommand(
-            async _ => await _manualControlCommandWorkflow.SetSensorForceAsync(null),
-            _ => CanClearSensorForce);
+    public ICommand ClearSensorForceCommand => _manualEquipment.ClearSensorForceCommand;
 
-    public ICommand ExtendCylinderCommand => _extendCylinderCommand ??=
-        CreateAsyncCommand(
-            async _ => await _manualControlCommandWorkflow.SetCylinderAsync(extend: true),
-            _ => CanExtendCylinder);
+    public ICommand ExtendCylinderCommand => _manualEquipment.ExtendCylinderCommand;
 
-    public ICommand RetractCylinderCommand => _retractCylinderCommand ??=
-        CreateAsyncCommand(
-            async _ => await _manualControlCommandWorkflow.SetCylinderAsync(extend: false),
-            _ => CanRetractCylinder);
+    public ICommand RetractCylinderCommand => _manualEquipment.RetractCylinderCommand;
 
-    public ICommand RunConveyorForwardCommand => _runConveyorForwardCommand ??=
-        CreateAsyncCommand(
-            async _ => await _manualControlCommandWorkflow.SetConveyorAsync(
-                true,
-                ConveyorDirection.Forward),
-            _ => CanRunConveyorForward);
+    public ICommand RunConveyorForwardCommand => _manualEquipment.RunConveyorForwardCommand;
 
-    public ICommand RunConveyorReverseCommand => _runConveyorReverseCommand ??=
-        CreateAsyncCommand(
-            async _ => await _manualControlCommandWorkflow.SetConveyorAsync(
-                true,
-                ConveyorDirection.Reverse),
-            _ => CanRunConveyorReverse);
+    public ICommand RunConveyorReverseCommand => _manualEquipment.RunConveyorReverseCommand;
 
-    public ICommand StopConveyorCommand => _stopConveyorCommand ??=
-        CreateAsyncCommand(
-            async _ => await _manualControlCommandWorkflow.StopConveyorAsync(),
-            _ => CanStopConveyor);
+    public ICommand StopConveyorCommand => _manualEquipment.StopConveyorCommand;
 
-    public ICommand AddLayoutComponentCommand => _addLayoutComponentCommand ??=
-        CreateRelayCommand(AddLayoutComponent, _ => IsSceneEditable && !_isApplyingProject);
+    public ICommand AddLayoutComponentCommand => _layoutAuthoring.AddLayoutComponentCommand;
 
-    public ICommand DeleteLayoutComponentCommand => _deleteLayoutComponentCommand ??=
-        CreateRelayCommand(
-            _ => DeleteSelectedLayoutComponent(),
-            _ => IsSceneEditable && !_isApplyingProject && Layout.SelectionCount == 1 && Layout.SelectedItem?.Component is not null);
+    public ICommand DeleteLayoutComponentCommand => _layoutAuthoring.DeleteLayoutComponentCommand;
 
-    public ICommand SceneSelectionRequestedCommand => _sceneSelectionRequestedCommand ??=
-        CreateRelayCommand(HandleSceneSelectionRequested);
+    public ICommand SceneSelectionRequestedCommand => _layoutAuthoring.SceneSelectionRequestedCommand;
 
-    public ICommand SceneMoveRequestedCommand => _sceneMoveRequestedCommand ??=
-        CreateRelayCommand(HandleSceneMoveRequested);
+    public ICommand SceneMoveRequestedCommand => _layoutAuthoring.SceneMoveRequestedCommand;
 
-    public ICommand SceneMarqueeSelectionRequestedCommand => _sceneMarqueeSelectionRequestedCommand ??=
-        CreateRelayCommand(HandleSceneMarqueeSelectionRequested);
+    public ICommand SceneMarqueeSelectionRequestedCommand => _layoutAuthoring.SceneMarqueeSelectionRequestedCommand;
 
-    public ICommand SceneTransformRequestedCommand => _sceneTransformRequestedCommand ??=
-        CreateRelayCommand(HandleSceneTransformRequested);
+    public ICommand SceneTransformRequestedCommand => _layoutAuthoring.SceneTransformRequestedCommand;
 
-    public ICommand SceneLibraryComponentDropRequestedCommand => _sceneLibraryComponentDropRequestedCommand ??=
-        CreateRelayCommand(HandleSceneLibraryComponentDropRequested);
+    public ICommand SceneLibraryComponentDropRequestedCommand => _layoutAuthoring.SceneLibraryComponentDropRequestedCommand;
 
-    public ICommand NudgeLayoutComponentCommand => _nudgeLayoutComponentCommand ??=
-        CreateRelayCommand(
-            _layoutSelectionCommands.Nudge,
-            _ => IsSceneEditable && !_isApplyingProject && Layout.SelectedItem?.Component is not null);
+    public ICommand NudgeLayoutComponentCommand => _layoutAuthoring.NudgeLayoutComponentCommand;
 
-    public ICommand AlignLayoutSelectionCommand => _alignLayoutSelectionCommand ??=
-        CreateRelayCommand(
-            _layoutSelectionCommands.Align,
-            _ => IsSceneEditable && !_isApplyingProject && Layout.HasMultipleSelection);
+    public ICommand AlignLayoutSelectionCommand => _layoutAuthoring.AlignLayoutSelectionCommand;
 
-    public ICommand ChangeLayoutLayerOrderCommand => _changeLayoutLayerOrderCommand ??=
-        CreateRelayCommand(
-            _layoutSelectionCommands.ChangeLayerOrder,
-            parameter => IsSceneEditable &&
-                !_isApplyingProject &&
-                parameter is string value &&
-                Enum.TryParse(value, out LayoutLayerOrder order) &&
-                Layout.CanChangeSelectionLayerOrder(order));
+    public ICommand ChangeLayoutLayerOrderCommand => _layoutAuthoring.ChangeLayoutLayerOrderCommand;
 
-    public ICommand UndoLayoutEditCommand => _layoutAuthoringHistory.UndoCommand;
+    public ICommand UndoLayoutEditCommand => _layoutAuthoring.UndoLayoutEditCommand;
 
-    public ICommand RedoLayoutEditCommand => _layoutAuthoringHistory.RedoCommand;
+    public ICommand RedoLayoutEditCommand => _layoutAuthoring.RedoLayoutEditCommand;
 
-    public ICommand CopyLayoutSelectionCommand => _layoutAuthoringHistory.CopyCommand;
+    public ICommand CopyLayoutSelectionCommand => _layoutAuthoring.CopyLayoutSelectionCommand;
 
-    public ICommand DuplicateLayoutSelectionCommand => _layoutAuthoringHistory.DuplicateCommand;
+    public ICommand DuplicateLayoutSelectionCommand => _layoutAuthoring.DuplicateLayoutSelectionCommand;
 
-    public ICommand PasteLayoutSelectionCommand => _layoutAuthoringHistory.PasteCommand;
+    public ICommand PasteLayoutSelectionCommand => _layoutAuthoring.PasteLayoutSelectionCommand;
 
     public ICommand PreviousDryRunPlaybackStepCommand => DryRunPlayback.PreviousStepCommand;
 
@@ -1539,11 +1357,11 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     public ICommand ExitDryRunPlaybackCommand => DryRunPlayback.ExitCommand;
 
-    public ICommand ReturnToProcessPlanCommand => _processPlanReview.ReturnToProcessPlanCommand;
+    public ICommand ReturnToProcessPlanCommand => _recipeAuthoring.ProcessPlanReview.ReturnToProcessPlanCommand;
 
-    public ICommand PreviousProcessPlanReviewStepCommand => _processPlanReview.PreviousStepCommand;
+    public ICommand PreviousProcessPlanReviewStepCommand => _recipeAuthoring.ProcessPlanReview.PreviousStepCommand;
 
-    public ICommand NextProcessPlanReviewStepCommand => _processPlanReview.NextStepCommand;
+    public ICommand NextProcessPlanReviewStepCommand => _recipeAuthoring.ProcessPlanReview.NextStepCommand;
 
     public ICommand ExitCommand => _exitCommand ??= CreateRelayCommand(_ => _mainWpfInteractionHost.ShutdownApplication());
 
@@ -1551,110 +1369,40 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     #region Project File Operations
 
-    internal Task<bool> OpenProjectAsync(string path) => _projectOpenWorkflow.OpenAsync(path);
+    internal Task<bool> OpenProjectAsync(string path) =>
+        _projectLifecycle.OpenProjectAsync(path);
 
     internal Task<bool> OpenProjectReplacingCurrentAsync(string path) =>
-        _projectOpenWorkflow.OpenAsync(path, replaceCurrent: true);
+        _projectLifecycle.OpenProjectReplacingCurrentAsync(path);
 
-    private async Task<bool> ApplyOpenedProjectAsync(MachineProjectDocument project, string path)
+    internal Task<bool> CreateNewProjectAsync() =>
+        _projectLifecycle.CreateNewProjectAsync();
+
+    private void OnBlankLayoutStarted()
     {
-        if (!await ApplyProjectAsync(project))
-        {
-            return false;
-        }
-
-        _projectSession.SetCurrentPath(path);
-        RefreshProjectIdentity();
-        CameraImageSourceEditor.Load(CurrentProject, CurrentProjectPath, _cameraSelection.SelectedCameraId);
-        _scenarioBatch!.Restore();
-        _multiAxisCommissioning.Restore();
-        _visionExecutionEvidence.Restore();
-        IsStartupChoiceVisible = false;
-        Log("Project", $"Opened {project.Name}");
-        return true;
-    }
-
-    internal async Task<bool> CreateNewProjectAsync()
-    {
-        if (!await TryResolveUnsavedChangesAsync()
-            || !await ApplyProjectAsync(new MachineProjectDocument { Name = "Untitled" }))
-        {
-            return false;
-        }
-
-        _projectSession.SetCurrentPath(null);
-        RefreshProjectIdentity();
-        CameraImageSourceEditor.SetProjectPath(null, isSaved: true);
-        _visionExecutionEvidence.Clear();
-        IsStartupChoiceVisible = false;
-        SelectedLeftToolTabIndex = 1;
-        Log("Project", "Created new project");
-        return true;
-    }
-
-    private void StartBlankLayout()
-    {
-        IsStartupChoiceVisible = false;
-        SelectedLeftToolTabIndex = 1;
         StatusMessage = OpenVisionLanguageService.T("Scene.BlankLayoutReadyStatus");
         InvalidateCommands();
     }
 
-    private async Task OpenBundledSampleAsync()
-    {
-        if (_startupSamplePath is null)
-        {
-            return;
-        }
+    private Task OpenBundledSampleAsync() =>
+        _projectLifecycle.OpenBundledSampleAsync();
 
-        var project = await _projectStore.LoadAsync(_startupSamplePath);
-        if (!await ApplyProjectAsync(project))
-        {
-            return;
-        }
+    internal Task SaveProjectAsync(string path) =>
+        _projectLifecycle.SaveProjectAsync(path);
 
-        _projectSession.SetCurrentPath(null);
-        CameraImageSourceEditor.SetProjectPath(null, isSaved: true);
-        IsStartupChoiceVisible = false;
-        SelectedLeftToolTabIndex = 0;
-        StatusMessage = OpenVisionLanguageService.T("Scene.SampleOpenedStatus");
-        Log("Project", $"Opened bundled sample · {project.Name}");
-        InvalidateCommands();
-    }
+    private Task<bool> CreateSemiconductorRecipeCopyAsync(
+        SemiconductorRecipeGalleryItemViewModel recipe,
+        string? destinationPath) => CreateSemiconductorRecipeCopyCoreAsync(recipe, destinationPath);
 
-    internal async Task SaveProjectAsync(string path)
-    {
-        await _mainWpfInteractionHost.CommitFocusedEditorAsync();
-        _projectSession.SetCurrentPath(await _projectSaveWorkflow.SaveAsync(path));
-        RefreshProjectIdentity();
-        CameraImageSourceEditor.SetProjectPath(CurrentProjectPath, isSaved: true);
-        NotifyCameraCommissioningChanged();
-        AcceptCurrentProjectAsSaved();
-        Log("Project", $"Saved {CurrentProject.Name}");
-    }
+    private Task<bool> TrySaveCurrentProjectAsync(bool saveAs = false) =>
+        _projectLifecycle.TrySaveCurrentProjectAsync(saveAs);
 
-    private async Task<bool> CreateSemiconductorRecipeCopyAsync(
+    private async Task<bool> CreateSemiconductorRecipeCopyCoreAsync(
         SemiconductorRecipeGalleryItemViewModel recipe,
         string? destinationPath)
     {
-        if (string.IsNullOrWhiteSpace(destinationPath))
-        {
-            destinationPath = _projectFileDialogHost.SelectRecipeCopyDestination(recipe.FileName);
-            if (destinationPath is null)
-            {
-                return false;
-            }
-        }
-
-        if (!await TryResolveUnsavedChangesAsync())
-        {
-            return false;
-        }
-
-        var copyPath = await _semiconductorRecipeCopyWorkflow.CopyAsync(
-            recipe.SourcePath,
-            destinationPath);
-        if (!await OpenProjectAsync(copyPath))
+        var copied = await _projectLifecycle.CreateSemiconductorRecipeCopyAsync(recipe, destinationPath);
+        if (!copied)
         {
             return false;
         }
@@ -1663,43 +1411,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             CultureInfo.CurrentCulture,
             OpenVisionLanguageService.T("Gallery.CopySucceeded"),
             recipe.DisplayName);
-        Log("Project", $"Created semiconductor recipe copy · {recipe.DisplayName}");
-        return true;
-    }
-
-    private async Task<bool> TrySaveCurrentProjectAsync(bool saveAs = false)
-    {
-        try
-        {
-            if (!saveAs && CurrentProjectPath is not null)
-            {
-                await SaveProjectAsync(CurrentProjectPath);
-                return true;
-            }
-
-            return await TrySaveProjectAsAsync();
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            StatusMessage = OpenVisionLanguageService.T(
-                "Project.SaveFailedStatus",
-                "프로젝트를 저장하지 못했습니다",
-                "The project could not be saved");
-            Log("Project", $"Save failed · {exception.Message}");
-            _mainMessageDialogHost.ShowProjectSaveFailure(exception.Message);
-            return false;
-        }
-    }
-
-    private async Task<bool> TrySaveProjectAsAsync()
-    {
-        await _mainWpfInteractionHost.CommitFocusedEditorAsync();
-        if (_projectFileDialogHost.SelectProjectSaveAs(CurrentProject.Name) is not { } path)
-        {
-            return false;
-        }
-
-        await SaveProjectAsync(path);
+        _runtimeObservabilityJournal.Log("Project", $"Created semiconductor recipe copy · {recipe.DisplayName}");
         return true;
     }
 
@@ -1707,104 +1419,11 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     #region Layout Authoring And Scene Interaction
 
-    private void AddLayoutComponent(object? parameter)
-    {
-        if (parameter is LayoutComponentKind kind)
-        {
-            TryAddLayoutComponent(kind);
-        }
-    }
-
     public bool TryAddLayoutComponent(
         LayoutComponentKind kind,
         double? worldX = null,
         double? worldY = null) =>
-        _layoutAuthoringMutationWorkflow.TryAdd(kind, worldX, worldY);
-
-    private void HandleSceneSelectionRequested(object? parameter)
-    {
-        if (parameter is not SceneSelectionRequest request)
-        {
-            return;
-        }
-
-        Layout.ExtendSelection(request.Item, request.Toggle);
-    }
-
-    private void HandleSceneMoveRequested(object? parameter)
-    {
-        if (parameter is not SceneMoveRequest request)
-        {
-            return;
-        }
-
-        switch (request.Action)
-        {
-            case SceneViewportMoveAction.Begin:
-                Layout.BeginSelectionDrag();
-                break;
-            case SceneViewportMoveAction.Update:
-                Layout.UpdateSelectionDrag(request.Delta.X, request.Delta.Y);
-                break;
-            case SceneViewportMoveAction.Commit:
-                Layout.CompleteSelectionDrag();
-                break;
-            case SceneViewportMoveAction.Cancel:
-                Layout.CancelSelectionDrag();
-                break;
-        }
-    }
-
-    private void HandleSceneMarqueeSelectionRequested(object? parameter)
-    {
-        if (parameter is not SceneMarqueeSelectionRequest request)
-        {
-            return;
-        }
-
-        Layout.SelectRegion(request.Items, request.Mode);
-    }
-
-    private void HandleSceneTransformRequested(object? parameter)
-    {
-        if (parameter is not SceneTransformRequest request)
-        {
-            return;
-        }
-
-        switch (request.Action)
-        {
-            case SceneViewportMoveAction.Begin:
-                Layout.BeginSelectionTransform(request.Handle);
-                break;
-            case SceneViewportMoveAction.Update:
-                Layout.UpdateSelectionTransform(
-                    request.WorldPoint.X,
-                    request.WorldPoint.Y,
-                    request.PreserveAspectRatio);
-                break;
-            case SceneViewportMoveAction.Commit:
-                Layout.CompleteSelectionTransform();
-                break;
-            case SceneViewportMoveAction.Cancel:
-                Layout.CancelSelectionTransform();
-                break;
-        }
-    }
-
-    private void HandleSceneLibraryComponentDropRequested(object? parameter)
-    {
-        if (parameter is not SceneLibraryComponentDropRequest request)
-        {
-            return;
-        }
-
-        TryAddLayoutComponent(request.Kind, request.WorldPoint.X, request.WorldPoint.Y);
-    }
-
-
-    private void DeleteSelectedLayoutComponent() =>
-        _layoutAuthoringMutationWorkflow.TryRemoveSelected();
+        _layoutAuthoring.TryAddComponent(kind, worldX, worldY);
 
     private void RefreshDefinitionPresentation(string? selectedComponentId)
     {
@@ -1835,6 +1454,12 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     private void OnProjectRuntimeApplicationStateChanged(bool isApplying)
     {
+        if (isApplying)
+        {
+            _multiAxisCommissioningExecutionWorkflow.InvalidatePendingExecution();
+            _camera.InvalidatePreparation();
+        }
+
         _isApplyingProject = isApplying;
         RefreshManualEquipmentProjection();
         RefreshCameraCommissioningProjection();
@@ -1847,30 +1472,31 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     {
         if (result.Outcome == RuntimeDefinitionApplicationOutcome.CompilationRejected)
         {
-            Log("Project", $"Project rejected · {result.CompilationDetail}");
+            _runtimeObservabilityJournal.Log("Project", $"Project rejected · {result.CompilationDetail}");
         }
         else if (result.CommandResult is { } commandResult)
         {
-            Log("Project", $"Project rejected · {commandResult.ErrorCode}: {commandResult.Detail}");
+            _runtimeObservabilityJournal.Log("Project", $"Project rejected · {commandResult.ErrorCode}: {commandResult.Detail}");
         }
     }
 
     private void CompleteProjectRuntimeApplication(MachineProjectDocument project)
     {
-        _projectSession.ReplaceProject(project);
+        _camera.InvalidatePreparation();
+        _projectLifecycle.ReplaceProject(project);
         _unifiedCommissioningEvidence.Reset();
         _scenarioBatch!.Reset();
         _simulationCommandTrace.Reset();
         _multiAxisCommissioning.Reset();
-        _visionExecutionEvidence.Clear();
+        _camera.ClearEvidence();
         ApplyProjectPresentation(project);
         RuntimeDebugger.LoadProject(project, resetSession: true);
-        _layoutAuthoringHistory.Reset();
+        _layoutAuthoring.Reset();
         _runtimeDefinitionDirty = false;
         UpdateRunToolAvailability();
         IsRunning = false;
         IsDesignMode = true;
-        ApplyMonitorSnapshot(_engine.CurrentSnapshot);
+        ApplyMonitorSnapshot(_simulationSession.Engine.CurrentSnapshot);
         AcceptCurrentProjectAsSaved();
     }
 
@@ -1887,28 +1513,26 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             StatusMessage = "Machine definition is invalid";
             if (result.Outcome == RuntimeDefinitionApplicationOutcome.CompilationRejected)
             {
-                Log("Project", $"Simulation build rejected · {result.CompilationDetail}");
+                _runtimeObservabilityJournal.Log("Project", $"Simulation build rejected · {result.CompilationDetail}");
             }
             else if (result.CommandResult is { } commandResult)
             {
-                Log("Project", $"Simulation build rejected · {commandResult.ErrorCode}: {commandResult.Detail}");
+                _runtimeObservabilityJournal.Log("Project", $"Simulation build rejected · {commandResult.ErrorCode}: {commandResult.Detail}");
             }
             return false;
         }
 
         _runtimeDefinitionDirty = false;
         UpdateRunToolAvailability();
-        ApplyMonitorSnapshot(_engine.CurrentSnapshot);
-        Log("Runtime", "Authored machine rebuilt for Simulation ON");
+        ApplyMonitorSnapshot(_simulationSession.Engine.CurrentSnapshot);
+        _runtimeObservabilityJournal.Log("Runtime", "Authored machine rebuilt for Simulation ON");
         return true;
     }
 
     private void ApplyProjectPresentation(MachineProjectDocument project)
     {
-        ExitDryRunPlayback();
-        _processPlanReview.Clear();
-        _cameraSelection.EnsureSelectionFor(project);
-        CameraImageSourceEditor.Load(project, CurrentProjectPath, _cameraSelection.SelectedCameraId);
+        _recipeAuthoring.ResetPresentation();
+        _camera.LoadProject(project, CurrentProjectPath);
         _selectionSynchronization.ClearEditors();
         ProjectTree.LoadProject(project);
         Layout.Load(project);
@@ -1925,13 +1549,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(SelectionStatusText));
         OnPropertyChanged(nameof(AxisCountText));
         OnPropertyChanged(nameof(LayoutComponentCountText));
-        OnPropertyChanged(nameof(CameraCountText));
-        OnPropertyChanged(nameof(HasVirtualCamera));
-        OnPropertyChanged(nameof(VirtualCameras));
-        OnPropertyChanged(nameof(SelectedVirtualCamera));
-        OnPropertyChanged(nameof(SelectedCameraId));
-        OnPropertyChanged(nameof(CurrentCameraRecipes));
-        OnPropertyChanged(nameof(SelectedCameraRecipe));
         OnPropertyChanged(nameof(HasEmbeddedSequence));
         OnPropertyChanged(nameof(HasAutomaticRun));
         OnPropertyChanged(nameof(HasAuthoredLayout));
@@ -1940,11 +1557,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(SceneTitleText));
         OnPropertyChanged(nameof(CurrentSequenceName));
         OnPropertyChanged(nameof(CurrentSequenceStepText));
-        OnPropertyChanged(nameof(CurrentCameraName));
-        OnPropertyChanged(nameof(CurrentCameraStateText));
-        OnPropertyChanged(nameof(CurrentCameraResultText));
-        OnPropertyChanged(nameof(CurrentCameraFrameText));
-        NotifyCameraCommissioningChanged(invalidateCommands: false);
         NotifyMultiAxisCommissioningRecipeChanged();
         InvalidateCommands();
     }
@@ -1968,48 +1580,52 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     #region Runtime Projection
 
-    private void RefreshManualEquipmentProjection(SimulationSnapshot? snapshot = null)
-    {
-        var selected = Layout.SelectedItem;
-        _manualEquipmentPresentation.ApplyProjection(
-            new ManualEquipmentProjection(
-                snapshot ?? PresentationSnapshot,
-                selected?.Id,
-                selected?.Component?.Kind,
-                IsRunMode,
-                _isApplyingProject,
-                IsValidationBusy,
-                _runtimeDefinitionDirty,
-                IsRunning,
-                RuntimeProjection.ControlOwner,
-                RuntimeProjection.AutomaticRun.IsActive,
-                RuntimeProjection.CurrentSequence?.Status));
-    }
+    private void RefreshManualEquipmentProjection(
+        SimulationSnapshot? snapshot = null,
+        bool invalidateCommands = true) =>
+        _manualEquipment.RefreshProjection(snapshot, invalidateCommands);
 
-    private void RefreshCameraCommissioningProjection()
+    private ManualEquipmentProjection CreateManualEquipmentProjection(SimulationSnapshot? snapshot = null) =>
+        new(
+            snapshot ?? PresentationSnapshot,
+            Layout.SelectedItem?.Id,
+            Layout.SelectedItem?.Component?.Kind,
+            IsRunMode,
+            _isApplyingProject,
+            IsValidationBusy,
+            _runtimeDefinitionDirty,
+            IsRunning,
+            RuntimeProjection.ControlOwner,
+            RuntimeProjection.AutomaticRun.IsActive,
+            RuntimeProjection.CurrentSequence?.Status,
+            RuntimeProjection.CurrentAxis is not null,
+            RuntimeProjection.CurrentAxis?.State == AxisState.Error);
+
+    private CameraCommissioningProjection CreateCameraCommissioningProjection()
     {
         var cameraDefinition = CurrentCameraDefinition;
         var fallbackCameraName = CurrentProject.Devices
             .FirstOrDefault(device => device.Kind == DeviceKind.Camera)
             ?.Name;
-        _cameraCommissioningPresentation.ApplyProjection(
-            new CameraCommissioningProjection(
-                RuntimeProjection.CurrentCamera,
-                cameraDefinition is not null,
-                fallbackCameraName,
-                cameraDefinition?.Camera?.SingleImageSource,
-                CurrentProjectPath,
-                _cameraSelection.SelectedCameraRecipe,
-                _engine.CurrentSnapshot.RunMode,
-                IsRunMode,
-                _isApplyingProject,
-                IsValidationBusy,
-                _runtimeDefinitionDirty,
-                IsRunning,
-                RuntimeProjection.ControlOwner,
-                RuntimeProjection.AutomaticRun.IsActive,
-                RuntimeProjection.CurrentSequence?.Status));
+        return new(
+            RuntimeProjection.CurrentCamera,
+            cameraDefinition is not null,
+            fallbackCameraName,
+            cameraDefinition?.Camera?.SingleImageSource,
+            CurrentProjectPath,
+            _camera.SelectedCameraRecipe,
+            _simulationSession.Engine.CurrentSnapshot.RunMode,
+            IsRunMode,
+            _isApplyingProject,
+            IsValidationBusy,
+            _runtimeDefinitionDirty,
+            IsRunning,
+            RuntimeProjection.ControlOwner,
+            RuntimeProjection.AutomaticRun.IsActive,
+            RuntimeProjection.CurrentSequence?.Status);
     }
+
+    private void RefreshCameraCommissioningProjection() => _camera.RefreshProjection();
 
     private SimulationRuntimeProjectionSelection CreateRuntimeProjectionSelection()
     {
@@ -2025,7 +1641,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             selectedLayout?.Component?.Kind,
             selectedLayout?.BehaviorBindingId,
             selectedTreeAxisId,
-            _cameraSelection.SelectedCameraId ?? projectCameraId,
+            _camera.SelectedCameraId ?? projectCameraId,
             SimulationWorkspace.ScheduledFaultKind,
             ActiveSequenceId);
     }
@@ -2048,14 +1664,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(CurrentAxisVelocityText));
         NotifyManualCommissioningChanged(invalidateCommands: false);
         NotifyAxisCommissioningChanged(invalidateCommands: false);
-        NotifySensorCommissioningChanged(invalidateCommands: false);
-        NotifyCylinderCommissioningChanged(invalidateCommands: false);
-        NotifyConveyorCommissioningChanged(invalidateCommands: false);
-        OnPropertyChanged(nameof(CurrentCameraName));
-        OnPropertyChanged(nameof(CurrentCameraStateText));
-        OnPropertyChanged(nameof(CurrentCameraResultText));
-        OnPropertyChanged(nameof(CurrentCameraFrameText));
-        NotifyCameraCommissioningChanged(invalidateCommands: false);
+        _camera.RefreshProjection(invalidateCommands: false);
         OnPropertyChanged(nameof(CurrentSequenceName));
         OnPropertyChanged(nameof(CurrentSequenceStateText));
         OnPropertyChanged(nameof(CurrentSequenceStepText));
@@ -2166,11 +1775,11 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     private bool CanExportUnifiedCommissioningEvidenceCore() => CanExportSimulationEvidence
         && _simulationCommandTrace.IsCaptureStarted
-        && _engine is FixedStepSimulationEngine traceEngine
+        && _simulationSession.Engine is FixedStepSimulationEngine traceEngine
         && traceEngine.CommandTrace.Length > 0;
 
     private bool CanImportUnifiedCommissioningEvidenceCore() => CanImportSimulationEvidence
-        && !_visionExecutionEvidence.IsCapturing;
+        && !_camera.VisionEvidence.IsCapturing;
 
     private DeterministicSimulationEvidenceExchangePackage?
         CreateSimulationEvidenceForUnifiedCommissioning() =>
@@ -2181,7 +1790,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             : null;
 
     private DeterministicSimulationCommandTracePackage? CreateCommandTraceForUnifiedCommissioning() =>
-        _engine is FixedStepSimulationEngine traceEngine
+        _simulationSession.Engine is FixedStepSimulationEngine traceEngine
             ? traceEngine.CreateCommandTracePackage()
             : null;
 
@@ -2197,7 +1806,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         {
             return new UnifiedCommissioningEvidenceContext(
                 CurrentProject.Id,
-                _projectSession.SerializeForEvidence(),
+                _projectLifecycle.SerializeForEvidence(),
                 SimulationFixedStep,
                 SimulationWorkspace.BuildEngineProfile(targetId),
                 BuildIdentity.Current,
@@ -2220,20 +1829,20 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         DeterministicVisionExecutionEvidencePackage? visionEvidence)
     {
         _scenarioBatch!.SetImportedPackages(batchResult, acceptedBaseline);
-        _visionExecutionEvidence.SetImportedEvidence(visionEvidence);
+        _camera.SetImportedEvidence(visionEvidence);
     }
 
     private VisionEvidenceContext CreateVisionEvidenceContext() =>
         new(
             CurrentProject.Id,
-            _projectSession.SerializeForEvidence(),
+            _projectLifecycle.SerializeForEvidence(),
             BuildIdentity.Current,
             CurrentProjectPath,
-            _cameraSelection.SelectedCameraId,
-            _cameraSelection.SelectedCameraRecipe);
+            _camera.SelectedCameraId,
+            _camera.SelectedCameraRecipe);
 
     private DeterministicVisionExecutionEvidencePackage? GetCurrentUnifiedCommissioningVisionEvidence() =>
-        _visionExecutionEvidence.GetCurrentEvidence();
+        _camera.GetCurrentEvidence();
 
     #endregion
 
@@ -2247,7 +1856,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             OpenVisionLanguageService.T("Simulation.BatchMismatchNavigationStatus"),
             mismatch.TargetId,
             mismatch.ObservedTickIndex);
-        Log(
+        _runtimeObservabilityJournal.Log(
             "Batch",
             $"First mismatch selected · {mismatch.EvidenceKind} · {mismatch.TargetId} · Tick {mismatch.ObservedTickIndex}");
     }
@@ -2295,8 +1904,17 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(SceneTitleText));
     }
 
+    private void InvalidateManualCameraPreparation()
+        => _camera.InvalidatePreparation();
+
+    private void CancelManualCameraPreparation()
+        => _camera.CancelPreparation();
+
     private void MarkProjectChanged(bool requiresRuntimeRebuild = true)
     {
+        _multiAxisCommissioningExecutionWorkflow.InvalidatePendingExecution();
+        InvalidateManualCameraPreparation();
+        _projectLifecycle.MarkChanged();
         if (requiresRuntimeRebuild)
         {
             _runtimeDefinitionDirty = true;
@@ -2308,7 +1926,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     private void RefreshProjectDirtyState()
     {
-        if (_projectSession.RefreshDirtyState())
+        if (_projectLifecycle.RefreshDirtyState())
         {
             OnPropertyChanged(nameof(HasUnsavedChanges));
             RefreshProjectIdentity();
@@ -2317,30 +1935,76 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     private void AcceptCurrentProjectAsSaved()
     {
-        if (_projectSession.AcceptAsSaved())
+        if (_projectLifecycle.AcceptAsSaved())
         {
             OnPropertyChanged(nameof(HasUnsavedChanges));
             RefreshProjectIdentity();
         }
     }
 
-    internal async Task<bool> TryResolveUnsavedChangesAsync()
+    private void OnProjectTransitionCompleted(ProjectLifecycleTransition transition)
     {
-        await _mainWpfInteractionHost.CommitFocusedEditorAsync();
-        SimulationWorkspace.SaveProjectScenario(CurrentProject.Simulation);
-        RefreshProjectDirtyState();
-        if (!HasUnsavedChanges)
+        switch (transition.Kind)
         {
-            return true;
+            case ProjectLifecycleTransitionKind.ProjectOpened:
+                RefreshProjectIdentity();
+                _camera.LoadProject(transition.Project, transition.Path);
+                _scenarioBatch!.Restore();
+                _multiAxisCommissioning.Restore();
+                _camera.RestoreEvidence();
+                Navigation.HideStartupChoice();
+                _runtimeObservabilityJournal.Log("Project", $"Opened {transition.Project.Name}");
+                break;
+            case ProjectLifecycleTransitionKind.NewProjectCreated:
+                RefreshProjectIdentity();
+                _camera.SetProjectPath(null, isSaved: true);
+                _camera.ClearEvidence();
+                Navigation.HideStartupChoice();
+                Navigation.SelectedLeftToolTabIndex = 1;
+                _runtimeObservabilityJournal.Log("Project", "Created new project");
+                break;
+            case ProjectLifecycleTransitionKind.BundledSampleOpened:
+                RefreshProjectIdentity();
+                _camera.SetProjectPath(null, isSaved: true);
+                Navigation.HideStartupChoice();
+                Navigation.SelectedLeftToolTabIndex = 0;
+                StatusMessage = OpenVisionLanguageService.T("Scene.SampleOpenedStatus");
+                _runtimeObservabilityJournal.Log("Project", $"Opened bundled sample · {transition.Project.Name}");
+                InvalidateCommands();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(transition.Kind), transition.Kind, null);
+        }
+    }
+
+    private void OnProjectSaveCompleted(ProjectSaveLifecycleResult result)
+    {
+        if (!result.Applied)
+        {
+            RefreshProjectDirtyState();
+            RefreshProjectIdentity();
+            _runtimeObservabilityJournal.Log("Project", $"Save completed for a stale document revision · {result.Receipt.Revision}");
+            return;
         }
 
-        return UnsavedProjectPrompt() switch
-        {
-            UnsavedProjectDecision.Save => await TrySaveCurrentProjectAsync(),
-            UnsavedProjectDecision.Discard => true,
-            _ => false
-        };
+        RefreshProjectIdentity();
+        _camera.SetProjectPath(CurrentProjectPath, isSaved: true);
+        AcceptCurrentProjectAsSaved();
+        _runtimeObservabilityJournal.Log("Project", $"Saved {CurrentProject.Name}");
     }
+
+    private void HandleProjectSaveFailure(Exception exception)
+    {
+        StatusMessage = OpenVisionLanguageService.T(
+            "Project.SaveFailedStatus",
+            "프로젝트를 저장하지 못했습니다",
+            "The project could not be saved");
+        _runtimeObservabilityJournal.Log("Project", $"Save failed · {exception.Message}");
+        _mainMessageDialogHost.ShowProjectSaveFailure(exception.Message);
+    }
+
+    internal Task<bool> TryResolveUnsavedChangesAsync() =>
+        _projectLifecycle.TryResolveUnsavedChangesAsync();
 
     private void HandleProjectOpenFailure(Exception exception)
     {
@@ -2348,7 +2012,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             "Project.OpenFailedStatus",
             "프로젝트를 열지 못했습니다",
             "The project could not be opened");
-        Log("Project", $"Open failed · {exception.Message}");
+        _runtimeObservabilityJournal.Log("Project", $"Open failed · {exception.Message}");
         ProjectOpenFailurePresenter(CreateProjectOpenFailureDetail(exception));
     }
 
@@ -2410,18 +2074,18 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         try
         {
             var command = new PauseCommand();
-            var result = await _engine.EnqueueCommandAsync(command);
+            var result = await _simulationSession.Engine.EnqueueCommandAsync(command);
             if (!result.IsAccepted)
             {
-                Log("Batch", $"Main runtime pause rejected · {result.ErrorCode}: {result.Detail}");
+                _runtimeObservabilityJournal.Log("Batch", $"Main runtime pause rejected · {result.ErrorCode}: {result.Detail}");
                 return false;
             }
 
             IsRunning = false;
-            Log("Batch", $"Main runtime paused before sequential batch · {ShortCommandId(command)}");
+            _runtimeObservabilityJournal.Log("Batch", $"Main runtime paused before sequential batch · {ShortCommandId(command)}");
             return true;
         }
-        catch (OperationCanceledException) when (_runtimeLoop.CancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (_simulationSession.RuntimeLoop.CancellationToken.IsCancellationRequested)
         {
             return false;
         }
@@ -2432,14 +2096,14 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         try
         {
             var command = new PauseCommand();
-            var result = await _engine.EnqueueCommandAsync(command);
+            var result = await _simulationSession.Engine.EnqueueCommandAsync(command);
             if (result.IsAccepted)
             {
                 IsRunning = false;
-                Log("Simulation", "Paused before entering Design mode");
+                _runtimeObservabilityJournal.Log("Simulation", "Paused before entering Design mode");
             }
         }
-        catch (OperationCanceledException) when (_runtimeLoop.CancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (_simulationSession.RuntimeLoop.CancellationToken.IsCancellationRequested)
         {
         }
         catch (Exception exception)
@@ -2458,7 +2122,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(SelectionStatusText));
         if (isAxisSelection)
         {
-            ApplyMonitorSnapshot(SceneSnapshots.Latest ?? _engine.CurrentSnapshot);
+            ApplyMonitorSnapshot(SceneSnapshots.Latest ?? _simulationSession.Engine.CurrentSnapshot);
             return;
         }
 
@@ -2473,13 +2137,10 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(SelectionStatusText));
         OnPropertyChanged(nameof(HasSelectedEquipment));
         OnPropertyChanged(nameof(SelectedEquipmentStatus));
-        RefreshManualEquipmentProjection(SceneSnapshots.Latest ?? _engine.CurrentSnapshot);
+        RefreshManualEquipmentProjection(SceneSnapshots.Latest ?? _simulationSession.Engine.CurrentSnapshot);
         RefreshCameraCommissioningProjection();
         NotifyManualCommissioningChanged(invalidateCommands: false);
         NotifyAxisCommissioningChanged(invalidateCommands: false);
-        NotifySensorCommissioningChanged(invalidateCommands: false);
-        NotifyCylinderCommissioningChanged(invalidateCommands: false);
-        NotifyConveyorCommissioningChanged(invalidateCommands: false);
         InvalidateCommands();
     }
 
@@ -2501,7 +2162,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     private void OnLayoutDefinitionChanged()
     {
-        ExitDryRunPlayback();
+        _recipeAuthoring.ExitPlayback();
         RecipeConnections.Load(CurrentProject, Layout.SelectedItem?.Id);
         Properties.Show(Layout.SelectedItem?.Component);
         RefreshManualEquipmentProjection();
@@ -2511,7 +2172,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     private void OnAxisDefinitionChanged()
     {
-        ExitDryRunPlayback();
+        _recipeAuthoring.ExitPlayback();
         MarkProjectChanged();
         _multiAxisCommissioning.InvalidateContextIfResult();
         UpdateRunToolAvailability();
@@ -2521,7 +2182,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
                 string.Equals(axis.Id, AxisDriveTuningEditor.Id, StringComparison.Ordinal)));
         NotifyAxisCommissioningChanged(invalidateCommands: false);
         MultiAxisCommissioningRecipe.ApplyAxisSnapshots(
-            (SceneSnapshots.Latest ?? _engine.CurrentSnapshot).Axes);
+            (SceneSnapshots.Latest ?? _simulationSession.Engine.CurrentSnapshot).Axes);
         _multiAxisCommissioning.NotifyRuntimeChanged(invalidateCommands: false);
         StatusMessage = "Axis tuning changed; Simulation ON will validate and rebuild the runtime";
         InvalidateCommands();
@@ -2529,7 +2190,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     private void OnAnalogChannelDefinitionChanged()
     {
-        ExitDryRunPlayback();
+        _recipeAuthoring.ExitPlayback();
         MarkProjectChanged();
         UpdateRunToolAvailability();
         Properties.ShowNode(ProjectTree.SelectedNode);
@@ -2552,7 +2213,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         object? sender,
         SequenceEditorChangedEventArgs args)
     {
-        ExitDryRunPlayback();
+        _recipeAuthoring.ExitPlayback();
         MarkProjectChanged();
         UpdateRunToolAvailability();
         if (args.StructureChanged)
@@ -2611,115 +2272,43 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     #region Integration Context
 
-    private void RefreshIntegrationContext()
-    {
-        var frame = RuntimeProjection.CurrentCamera?.Result?.FrameEvidence ??
-            RuntimeProjection.CurrentCamera?.FrameEvidence;
-        var contextKey = string.Join(
-            "\u001F",
-            CurrentProject.Id,
-            CurrentProjectPath ?? string.Empty,
-            _cameraSelection.SelectedCameraId ?? string.Empty,
-            _cameraSelection.SelectedCameraRecipe ?? string.Empty,
-            RuntimeProjection.CurrentCamera?.State.ToString() ?? string.Empty,
-            RuntimeProjection.CurrentCamera?.CurrentAcquisitionId ?? string.Empty,
-            frame?.FrameId ?? string.Empty,
-            frame?.ContentSha256 ?? string.Empty,
-            frame?.SourceRelativePath ?? string.Empty);
-        if (string.Equals(_integrationContextKey, contextKey, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        _integrationContextKey = contextKey;
-        Integration.RefreshContext();
-    }
+    private void RefreshIntegrationContext() => Integration.RefreshSourceContext();
 
     #endregion
 
     #region Integration And Camera
 
-    private bool CanBuildTwoDIntegrationRequest(
-        string recipePath,
-        IntegrationApplicationIdentity consumer) =>
-        CreateTwoDIntegrationRequest(recipePath, consumer) is not null;
+    private MachineIntegrationRequestContext CaptureIntegrationRequestContext() => new(
+        BuildIdentity.IsExactCommit,
+        CurrentProject.Id,
+        CurrentProject.Schema,
+        CurrentProject.Sequences,
+        CurrentProjectPath,
+        _camera.SelectedCameraId,
+        _camera.SelectedCameraRecipe,
+        RuntimeProjection.CurrentCamera,
+        CurrentCameraDefinition?.Camera?.SingleImageSource);
 
-    private MachineInspectionHandoffRequest? CreateTwoDIntegrationRequest(
-        string recipePath,
-        IntegrationApplicationIdentity consumer)
-        => _integrationRequestWorkflow.TryCreate(
-            new MachineIntegrationRequestContext(
-                BuildIdentity.IsExactCommit,
-                CurrentProject.Id,
-                CurrentProject.Schema,
-                CurrentProject.Sequences,
-                CurrentProjectPath,
-                _cameraSelection.SelectedCameraId,
-                _cameraSelection.SelectedCameraRecipe,
-            RuntimeProjection.CurrentCamera,
-                CurrentCameraDefinition?.Camera?.SingleImageSource,
-                BuildIdentity.IntegrationIdentity,
-                consumer),
-            recipePath);
-
-    private ManualCameraTriggerRequest? CreateManualCameraTriggerRequest()
+    private ManualCameraTriggerRequestInput CreateManualCameraTriggerRequestInput()
     {
         var cameraDefinition = CurrentCameraDefinition?.Camera;
         var sourceDefinition = cameraDefinition?.SingleImageSource;
-        return _manualCameraTriggerRequestFactory.TryCreate(
-            new ManualCameraTriggerRequestInput(
-                CanTriggerCamera,
-                CurrentProject.Id,
-                CurrentProject.Name,
-                CurrentProjectPath,
-                _projectSession.SerializeForEvidence(),
-                BuildIdentity.Current,
-                SimulationFixedStep,
-                _engine.CurrentSnapshot,
-                RuntimeProjection.CurrentCamera,
-                _cameraSelection.SelectedCameraRecipe,
-                cameraDefinition,
-                sourceDefinition,
-                CurrentProject.Simulation.Seed));
-    }
-
-    private async Task TriggerSelectedCameraAsync()
-    {
-        var request = CreateManualCameraTriggerRequest();
-        if (request is null)
-        {
-            return;
-        }
-
-        var result = await _manualCameraTriggerWorkflow.ExecuteAsync(
-            request,
-            _runtimeLoop.CancellationToken);
-        PresentManualCameraTriggerFailure(result);
-    }
-
-    private void PresentManualCameraTriggerFailure(ManualCameraTriggerResult result)
-    {
-        switch (result.Outcome)
-        {
-            case ManualCameraTriggerOutcome.SourceRejected:
-                StatusMessage = OpenVisionLanguageService.T("Camera.StatusRejected");
-                Log("Camera", string.Format(
-                    CultureInfo.CurrentCulture,
-                    OpenVisionLanguageService.T("Camera.SourceRejected"),
-                    result.Detail ?? string.Empty));
-                break;
-            case ManualCameraTriggerOutcome.InspectionRejected:
-                StatusMessage = OpenVisionLanguageService.T("Camera.StatusRejected");
-                Log("Camera", string.Format(
-                    CultureInfo.CurrentCulture,
-                    OpenVisionLanguageService.T("Camera.InspectionRejected"),
-                    result.Detail ?? string.Empty));
-                break;
-            case ManualCameraTriggerOutcome.ContextChanged:
-                StatusMessage = OpenVisionLanguageService.T("Camera.StatusRejected");
-                Log("Camera", OpenVisionLanguageService.T("Camera.ContextChanged"));
-                break;
-        }
+        return new(
+            CanTriggerCamera,
+            _projectLifecycle.SessionId,
+            _projectLifecycle.Revision,
+            CurrentProject.Id,
+            CurrentProject.Name,
+            CurrentProjectPath,
+            _projectLifecycle.SerializeForEvidence(),
+            BuildIdentity.Current,
+            SimulationFixedStep,
+            _simulationSession.Engine.CurrentSnapshot,
+            RuntimeProjection.CurrentCamera,
+            _camera.SelectedCameraRecipe,
+            cameraDefinition,
+            sourceDefinition,
+            CurrentProject.Simulation.Seed);
     }
 
     #endregion
@@ -2737,9 +2326,23 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        var executionVersion = _multiAxisCommissioningExecutionWorkflow.ExecutionVersion;
+        var sessionId = _projectLifecycle.SessionId;
+        var revision = _projectLifecycle.Revision;
+        var runtimeGeneration = _simulationSession.Engine.CurrentSnapshot.RuntimeGeneration;
+        bool IsContextCurrent() => !_disposed && !_sessionCloseRequested && !_isApplyingProject
+            && !_simulationSession.IsShutdownRequested && IsRunMode && !IsValidationBusy
+            && _multiAxisCommissioningExecutionWorkflow.ExecutionVersion == executionVersion
+            && _projectLifecycle.SessionId == sessionId && _projectLifecycle.Revision == revision
+            && _simulationSession.Engine.CurrentSnapshot.RuntimeGeneration == runtimeGeneration;
+
         var result = await _multiAxisCommissioningExecutionWorkflow.ExecuteAsync(
             MultiAxisCommissioningRecipe.Targets.Select(target =>
-                new AxisMoveTarget(target.AxisId, target.TargetPosition)));
+                new AxisMoveTarget(target.AxisId, target.TargetPosition)), IsContextCurrent);
+        if (result.Outcome == MultiAxisCommissioningExecutionOutcome.Interrupted || !IsContextCurrent())
+        {
+            return;
+        }
 
         if (result.PausedBeforeExecution)
         {
@@ -2750,7 +2353,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             && result.RejectedCommand is not null)
         {
             var pause = result.RejectedCommand;
-            Log("Motion", $"Recipe preparation rejected · {pause.ErrorCode}: {pause.Detail}");
+            _runtimeObservabilityJournal.Log("Motion", $"Recipe preparation rejected · {pause.ErrorCode}: {pause.Detail}");
             return;
         }
 
@@ -2760,9 +2363,13 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private Task StopMultiAxisCommissioningRecipeAsync() => _equipmentCommandDispatcher.DispatchAxisCommandAsync(
-        new StopAxesCommand(MultiAxisCommissioningRecipe.Targets.Select(target => target.AxisId)),
-        "Axis.ActionStopRecipe");
+    private Task StopMultiAxisCommissioningRecipeAsync()
+    {
+        _multiAxisCommissioningExecutionWorkflow.InvalidatePendingExecution();
+        return _equipmentCommandDispatcher.DispatchAxisCommandAsync(
+            new StopAxesCommand(MultiAxisCommissioningRecipe.Targets.Select(target => target.AxisId)),
+            "Axis.ActionStopRecipe");
+    }
 
     private void NavigateToCommissioningMismatch(DeterministicCommissioningMismatch mismatch)
     {
@@ -2778,7 +2385,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             OpenVisionLanguageService.T("Axis.RecipeMismatchNavigationStatus"),
             mismatch.TargetId,
             mismatch.TickIndex);
-        Log("Motion", $"Commissioning mismatch selected · {mismatch.TargetId} · Tick {mismatch.TickIndex}");
+        _runtimeObservabilityJournal.Log("Motion", $"Commissioning mismatch selected · {mismatch.TargetId} · Tick {mismatch.TickIndex}");
     }
 
     #endregion
@@ -2828,40 +2435,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     #endregion
 
     #region Sequence Review
-
-    private void OpenConnectionSequenceStep(string sequenceId, string stepId)
-    {
-        _processPlanReview.Clear();
-        TryOpenConnectionSequenceStep(sequenceId, stepId);
-    }
-
-    private bool TryOpenConnectionSequenceStep(string sequenceId, string stepId)
-    {
-        SequenceEditor.SelectStep(sequenceId, stepId);
-        if (SequenceEditor.SelectedStep is null)
-        {
-            StatusMessage = OpenVisionLanguageService.T("Connections.OpenStepRejectedStatus");
-            return false;
-        }
-
-        SelectedDocumentTabIndex = 2;
-        StatusMessage = string.Format(
-            CultureInfo.CurrentCulture,
-            OpenVisionLanguageService.T("Connections.OpenStepStatus"),
-            SequenceEditor.SelectedStep.DisplayName);
-        return true;
-    }
-
-    private void OpenProcessBlockSequenceStep(string sequenceId, string stepId) =>
-        _processPlanReview.OpenProcessBlockSequenceStep(sequenceId, stepId);
-
-    private string? TryOpenConnectionSequenceStepForReview(string sequenceId, string stepId) =>
-        TryOpenConnectionSequenceStep(sequenceId, stepId)
-            ? SequenceEditor.SelectedStep?.DisplayName
-            : null;
-
-    private void OnProcessBlockPreviewClosed(object? sender, EventArgs args) =>
-        _processPlanReview.Clear();
 
     private void OnProcessPlanReviewPropertyChanged(
         object? sender,
@@ -2916,16 +2489,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     #region Recipe Connection Authoring
 
-    private void ShowConnectionDryRunStep(RecipeDryRunStepPresentation step)
-    {
-        DryRunPlayback.Show(step, RecipeConnections.DryRun.Timeline);
-    }
-
-    private void ExitDryRunPlayback()
-    {
-        DryRunPlayback.Exit();
-    }
-
     private void OnDryRunPlaybackPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         OnPropertyChanged(nameof(IsDryRunPlaybackActive));
@@ -2962,94 +2525,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         {
             InvalidateCommands();
         }
-    }
-
-    private int ApplyConnectionProcessBlockTimeouts(
-        SemiconductorManagedTimeoutAdjustmentPreview preview)
-    {
-        ExitDryRunPlayback();
-        var result = _recipeConnectionProjectApplier.ApplyProcessBlockTimeouts(CurrentProject, preview);
-        if (!result.Changed)
-        {
-            StatusMessage = OpenVisionLanguageService.T("Connections.ProcessBlockTimeoutRejectedStatus");
-            return 0;
-        }
-
-        MarkProjectChanged();
-        UpdateRunToolAvailability();
-        SequenceEditor.Load(CurrentProject);
-        StatusMessage = string.Format(
-            CultureInfo.CurrentCulture,
-            OpenVisionLanguageService.T("Connections.ProcessBlockTimeoutAppliedStatus"),
-            result.AppliedStepCount,
-            preview.ProposedTimeoutMs);
-        RecipeConnections.RefreshDefinitionPreservingProcessBlockPlan(Layout.SelectedItem?.Id);
-        Log(
-            "Sequence",
-            $"Applied managed timeout adjustment · {result.AppliedStepCount} step(s) · {preview.ProposedTimeoutMs} ms");
-        InvalidateCommands();
-        return result.ChangeCount;
-    }
-
-    private void CompleteConnectionSetupMutation()
-    {
-        MarkProjectChanged();
-        UpdateRunToolAvailability();
-        RefreshDefinitionPresentation(null);
-        SequenceEditor.RefreshAuthoringTargets();
-        _layoutAuthoringHistory.Reset();
-        InvalidateCommands();
-    }
-
-    private void CompleteConnectionProcessBlockMutation()
-    {
-        MarkProjectChanged();
-        UpdateRunToolAvailability();
-        RefreshDefinitionPresentation(null);
-        SequenceEditor.Load(CurrentProject);
-        _layoutAuthoringHistory.Reset();
-        InvalidateCommands();
-    }
-
-    private string? AddConnectionSequenceStep(string targetId)
-    {
-        string? stepId = SequenceEditor.TryAddStepForTarget(targetId);
-        if (stepId is null)
-        {
-            StatusMessage = string.Format(
-                CultureInfo.CurrentCulture,
-                OpenVisionLanguageService.T("Connections.AddStepRejectedStatus"),
-                SequenceEditor.StructuralEditStatus);
-            return null;
-        }
-
-        SelectedDocumentTabIndex = 2;
-        StatusMessage = string.Format(
-            CultureInfo.CurrentCulture,
-            OpenVisionLanguageService.T("Connections.AddStepStatus"),
-            targetId);
-        Log("Sequence", $"Added connection target step · {stepId} · {targetId}");
-        return stepId;
-    }
-
-    private void OnConnectionCheckpointTemplateApplied(int appliedCount)
-    {
-        ExitDryRunPlayback();
-        if (appliedCount <= 0)
-        {
-            StatusMessage = OpenVisionLanguageService.T("Connections.CheckpointTemplateNoChangesStatus");
-            return;
-        }
-
-        MarkProjectChanged();
-        UpdateRunToolAvailability();
-        SequenceEditor.RefreshAuthoringTargets();
-        StatusMessage = string.Format(
-            CultureInfo.CurrentCulture,
-            OpenVisionLanguageService.T("Connections.CheckpointTemplateAppliedStatus"),
-            appliedCount);
-        Log("Sequence", $"Applied representative recipe checkpoints · {appliedCount}");
-        InvalidateCommands();
     }
 
     #endregion
@@ -3151,63 +2626,9 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void NotifyCylinderCommissioningChanged(bool invalidateCommands = true)
-    {
-        OnPropertyChanged(nameof(HasSelectedPneumaticCylinder));
-        OnPropertyChanged(nameof(IsCurrentCylinderInterlocked));
-        OnPropertyChanged(nameof(CurrentCylinderInterlockText));
-        OnPropertyChanged(nameof(CylinderCommissioningHintText));
-        OnPropertyChanged(nameof(CanExtendCylinder));
-        OnPropertyChanged(nameof(CanRetractCylinder));
-        if (invalidateCommands)
-        {
-            InvalidateCommands();
-        }
-    }
-
-    private void NotifySensorCommissioningChanged(bool invalidateCommands = true)
-    {
-        OnPropertyChanged(nameof(HasSelectedDigitalSensor));
-        OnPropertyChanged(nameof(IsCurrentSensorFaulted));
-        OnPropertyChanged(nameof(IsCurrentSensorManuallyForced));
-        OnPropertyChanged(nameof(CurrentSensorForceText));
-        OnPropertyChanged(nameof(SensorCommissioningHintText));
-        OnPropertyChanged(nameof(CanForceSensorOn));
-        OnPropertyChanged(nameof(CanForceSensorOff));
-        OnPropertyChanged(nameof(CanClearSensorForce));
-        if (invalidateCommands)
-        {
-            InvalidateCommands();
-        }
-    }
-
-    private void NotifyConveyorCommissioningChanged(bool invalidateCommands = true)
-    {
-        OnPropertyChanged(nameof(HasSelectedConveyor));
-        OnPropertyChanged(nameof(ConveyorCommissioningHintText));
-        OnPropertyChanged(nameof(CanRunConveyorForward));
-        OnPropertyChanged(nameof(CanRunConveyorReverse));
-        OnPropertyChanged(nameof(CanStopConveyor));
-        if (invalidateCommands)
-        {
-            InvalidateCommands();
-        }
-    }
-
     private void NotifyCameraCommissioningChanged(bool invalidateCommands = true)
     {
-        RefreshCameraCommissioningProjection();
-        OnPropertyChanged(nameof(CurrentCameraExposureTicksText));
-        OnPropertyChanged(nameof(CurrentCameraTransferTicksText));
-        OnPropertyChanged(nameof(CurrentCameraSourceText));
-        OnPropertyChanged(nameof(CurrentCameraFrameHashText));
-        if (HasVirtualCamera)
-        {
-            OnPropertyChanged(nameof(CurrentCameraEvidenceDetailsText));
-        }
-        OnPropertyChanged(nameof(CameraCommissioningHintText));
-        OnPropertyChanged(nameof(CanStartManualCameraControl));
-        OnPropertyChanged(nameof(CanTriggerCamera));
+        _camera.RefreshProjection(invalidateCommands: false);
         OnPropertyChanged(nameof(UnifiedCommissioningEvidenceStatusText));
         OnPropertyChanged(nameof(CanImportUnifiedCommissioningEvidence));
         RefreshIntegrationContext();
@@ -3217,25 +2638,9 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void OnCameraImageSourceApplied(string cameraId, string detail)
-    {
-        if (string.IsNullOrWhiteSpace(cameraId))
-        {
-            StatusMessage = OpenVisionLanguageService.T("Camera.SourceMustBeProjectOwned");
-            Log("Camera", $"Image source selection rejected · {detail}");
-            return;
-        }
-
-        MarkProjectChanged(requiresRuntimeRebuild: false);
-        StatusMessage = OpenVisionLanguageService.T("Camera.SourceAppliedSave");
-        Log("Camera", $"Image source applied · {cameraId} · {detail}");
-        _visionExecutionEvidence.RefreshContext();
-        NotifyCameraCommissioningChanged();
-    }
-
     private void NotifyManualCommissioningChanged(bool invalidateCommands = true)
     {
-        RefreshManualEquipmentProjection();
+        RefreshManualEquipmentProjection(invalidateCommands: false);
         OnPropertyChanged(nameof(HasSelectedAxisStage));
         OnPropertyChanged(nameof(HasSelectedManualEquipment));
         OnPropertyChanged(nameof(CanStartManualEquipmentControl));
@@ -3310,28 +2715,12 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     #region Virtual Camera Workflow
 
-    private bool ApplyConnectionVirtualCameraWorkflow()
+    private void RefreshVirtualCameraWorkflowPresentation(string cameraId)
     {
-        ExitDryRunPlayback();
-        var result = _virtualCameraInspectionTemplate.Apply(CurrentProject);
-        if (!result.Created)
-        {
-            return false;
-        }
-
-        MarkProjectChanged();
-        UpdateRunToolAvailability();
         ApplyProjectPresentation(CurrentProject);
         RuntimeDebugger.LoadProject(CurrentProject, resetSession: false);
-        _layoutAuthoringHistory.Reset();
-        _cameraSelection.SelectVirtualCamera(result.CameraId);
-        OpenConnectionSequenceStep(result.SequenceId, result.TriggerStepId);
-        StatusMessage = OpenVisionLanguageService.T("Connections.VirtualCameraWorkflowCreatedStatus");
-        Log(
-            "Project",
-            $"Created virtual-camera inspection workflow · {result.CameraId} · {result.SequenceId}");
-        InvalidateCommands();
-        return true;
+        _layoutAuthoring.Reset();
+        _camera.SelectedCameraId = cameraId;
     }
 
     #endregion
@@ -3342,19 +2731,10 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         SimulationCommand command)
         => await _simulationCommandPresentationDispatcher.DispatchRuntimeDebuggerAsync(
             command,
-            () => ApplyMonitorSnapshot(_engine.CurrentSnapshot));
-
-    private void Log(string category, string message) =>
-        AppendLog(RuntimeProjection.SimulationTime, category, message);
+            () => ApplyMonitorSnapshot(_simulationSession.Engine.CurrentSnapshot));
 
     internal void AppendLog(TimeSpan time, string category, string message)
-    {
-        _runtimeObservabilityPresenter.Append(
-            time,
-            category,
-            message,
-            RuntimeProjection.TickIndex);
-    }
+        => _runtimeObservabilityJournal.Append(time, category, message);
 
     #endregion
 
@@ -3370,16 +2750,53 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     private static string LocalizeRuntimeState(string state) =>
         OpenVisionLanguageService.T($"Equipment.State.{state}", state, state);
 
+    private void OnShellNavigationPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        switch (args.PropertyName)
+        {
+            case nameof(ShellNavigationViewModel.IsCompactLayout):
+                OnPropertyChanged(nameof(IsCompactLayout));
+                break;
+            case nameof(ShellNavigationViewModel.SelectedDocumentTabIndex):
+                OnPropertyChanged(nameof(SelectedDocumentTabIndex));
+                break;
+            case nameof(ShellNavigationViewModel.SelectedLeftToolTabIndex):
+                OnPropertyChanged(nameof(SelectedLeftToolTabIndex));
+                break;
+            case nameof(ShellNavigationViewModel.IsStartupChoiceVisible):
+                OnPropertyChanged(nameof(IsStartupChoiceVisible));
+                break;
+            case nameof(ShellNavigationViewModel.SelectedLanguageOption):
+                OnPropertyChanged(nameof(SelectedLanguageOption));
+                break;
+        }
+    }
+
+    private void OnCameraPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (string.IsNullOrEmpty(args.PropertyName))
+        {
+            return;
+        }
+
+        OnPropertyChanged(args.PropertyName);
+        OnPropertyChanged(nameof(UnifiedCommissioningEvidenceStatusText));
+        OnPropertyChanged(nameof(CanImportUnifiedCommissioningEvidence));
+    }
+
+    private void OnManualEquipmentPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (string.IsNullOrEmpty(args.PropertyName))
+        {
+            return;
+        }
+
+        OnPropertyChanged(args.PropertyName);
+    }
+
     private void OnLanguageChanged(object? sender, EventArgs e)
     {
-        ExitDryRunPlayback();
-        var language = OpenVisionLanguageService.CurrentLanguage;
-        var option = LanguageOptions.FirstOrDefault(item => item.Language == language);
-        if (option is not null && !ReferenceEquals(_selectedLanguageOption, option))
-        {
-            _selectedLanguageOption = option;
-            OnPropertyChanged(nameof(SelectedLanguageOption));
-        }
+        _recipeAuthoring.ExitPlayback();
 
         foreach (var propertyName in LocalizedPropertyNames)
         {
@@ -3387,8 +2804,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         }
 
         Properties.RefreshLocalization();
-        CameraImageSourceEditor.RefreshLocalization();
-        _visionExecutionEvidence.RefreshLocalization();
+        _manualEquipment.RefreshLocalization();
+        _camera.RefreshLocalization();
         AxisCommissioning.RefreshLocalization();
         AxisDriveTuningEditor?.RefreshLocalization();
         MultiAxisCommissioningRecipe.RefreshLocalization();
@@ -3411,20 +2828,32 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     private AsyncRelayCommand CreateAsyncCommand(
         Func<object?, Task> execute,
-        Predicate<object?>? canExecute = null) =>
-        new(
+        Predicate<object?>? canExecute = null)
+    {
+        return new(
             execute,
-            canExecute,
+            parameter => !_disposed
+                && !_sessionCloseRequested
+                && (canExecute?.Invoke(parameter) ?? true),
             HandleCommandException,
             useCommandManagerRequery: false);
+    }
 
-    private static RelayCommand CreateRelayCommand(
+    private RelayCommand CreateRelayCommand(
         Action<object?> execute,
-        Predicate<object?>? canExecute = null) =>
-        new(execute, canExecute, useCommandManagerRequery: false);
+        Predicate<object?>? canExecute = null)
+    {
+        return new(
+            execute,
+            parameter => !_disposed
+                && !_sessionCloseRequested
+                && (canExecute?.Invoke(parameter) ?? true),
+            useCommandManagerRequery: false);
+    }
 
     private void InvalidateCommands(bool includeCommandManager = true)
     {
+        Navigation.InvalidateCommands();
         RaiseCanExecuteChanged(_newProjectCommand);
         RaiseCanExecuteChanged(_openProjectCommand);
         RaiseCanExecuteChanged(_saveProjectCommand);
@@ -3445,28 +2874,13 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         _multiAxisCommissioning.InvalidateCommands();
         _scenarioBatch?.InvalidateCommands();
         RaiseCanExecuteChanged(_cycleStartCommand);
-        RaiseCanExecuteChanged(_startManualEquipmentControlCommand);
-        RaiseCanExecuteChanged(_startManualCameraControlCommand);
-        RaiseCanExecuteChanged(_triggerCameraCommand);
+        _manualEquipment.InvalidateCommands();
+        _camera.InvalidateCommands();
         AxisCommissioning.InvalidateCommands();
         RaiseCanExecuteChanged(_runMultiAxisCommissioningRecipeCommand);
         RaiseCanExecuteChanged(_stopMultiAxisCommissioningRecipeCommand);
-        RaiseCanExecuteChanged(_forceSensorOnCommand);
-        RaiseCanExecuteChanged(_forceSensorOffCommand);
-        RaiseCanExecuteChanged(_clearSensorForceCommand);
-        RaiseCanExecuteChanged(_extendCylinderCommand);
-        RaiseCanExecuteChanged(_retractCylinderCommand);
-        RaiseCanExecuteChanged(_runConveyorForwardCommand);
-        RaiseCanExecuteChanged(_runConveyorReverseCommand);
-        RaiseCanExecuteChanged(_stopConveyorCommand);
-        RaiseCanExecuteChanged(_addLayoutComponentCommand);
-        RaiseCanExecuteChanged(_deleteLayoutComponentCommand);
-        RaiseCanExecuteChanged(_nudgeLayoutComponentCommand);
-        RaiseCanExecuteChanged(_alignLayoutSelectionCommand);
-        RaiseCanExecuteChanged(_changeLayoutLayerOrderCommand);
-        _layoutAuthoringHistory.InvalidateCommands();
-        DryRunPlayback.InvalidateCommands();
-        _processPlanReview.InvalidateCommands();
+        _layoutAuthoring.InvalidateCommands();
+        _recipeAuthoring.InvalidateCommands();
         RuntimeDebugger.InvalidateCommands();
 
         if (includeCommandManager)
@@ -3494,14 +2908,10 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         _multiAxisCommissioning.InvalidateCommands();
         _scenarioBatch?.InvalidateCommands();
         RaiseCanExecuteChanged(_cycleStartCommand);
+        _manualEquipment.InvalidateCommands();
         AxisCommissioning.InvalidateCommands();
-        RaiseCanExecuteChanged(_addLayoutComponentCommand);
-        RaiseCanExecuteChanged(_deleteLayoutComponentCommand);
-        RaiseCanExecuteChanged(_nudgeLayoutComponentCommand);
-        RaiseCanExecuteChanged(_alignLayoutSelectionCommand);
-        RaiseCanExecuteChanged(_changeLayoutLayerOrderCommand);
-        _layoutAuthoringHistory.InvalidateCommands();
-        _processPlanReview.InvalidateCommands();
+        _layoutAuthoring.InvalidateCommands();
+        _recipeAuthoring.ProcessPlanReview.InvalidateCommands();
     }
 
     private static void RaiseCanExecuteChanged(ICommand? command)
@@ -3519,13 +2929,13 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     private void HandleCommandException(Exception exception)
     {
-        if (_disposed || _runtimeShutdownWorkflow.IsShutdownRequested)
+        if (_disposed || _sessionCloseRequested || _simulationSession.IsShutdownRequested)
         {
             return;
         }
 
         StatusMessage = "Command failed";
-        Log("Error", exception.Message);
+        _runtimeObservabilityJournal.Log("Error", exception.Message);
     }
 
     private static string ShortCommandId(SimulationCommand command) =>
@@ -3543,37 +2953,116 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     internal Task<RuntimeShutdownResult> ShutdownAsync(
         TimeSpan? timeout = null,
-        CancellationToken cancellationToken = default) =>
-        _runtimeShutdownWorkflow.ShutdownAsync(
-            timeout ?? RuntimeShutdownTimeout,
-            cancellationToken);
-
-    private void RecordShutdownDiagnostic(SimulationRuntimeShutdownDiagnostic diagnostic) =>
-        RecordShutdownDiagnostic(
-            diagnostic.Kind,
-            diagnostic.Severity,
-            diagnostic.Message,
-            diagnostic.Stage,
-            diagnostic.Termination,
-            diagnostic.Exception);
-
-    private void RecordShutdownDiagnostic(
-        SimulationOperationalDiagnosticKind kind,
-        SimulationLogSeverity severity,
-        string message,
-        string stage,
-        SimulationEngineTerminationResult? termination = null,
-        Exception? exception = null)
+        CancellationToken cancellationToken = default)
     {
-        _runtimeObservabilityPresenter.RecordShutdownDiagnostic(
-            kind,
-            severity,
-            message,
-            stage,
-            RuntimeProjection.TickIndex,
-            RuntimeProjection.SimulationTime,
-            termination,
-            exception);
+        _multiAxisCommissioningExecutionWorkflow.InvalidatePendingExecution();
+        return _simulationSession.ShutdownAsync(timeout ?? RuntimeShutdownTimeout, cancellationToken);
+    }
+
+    internal Task<SimulationSessionCloseResult> RequestCloseAsync(TimeSpan? timeout = null) =>
+        _simulationSession.RequestCloseAsync(timeout ?? RuntimeShutdownTimeout);
+
+    internal void PresentCloseResult(SimulationSessionCloseResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        if (result.IsApproved || result.Outcome == SimulationSessionCloseOutcome.UnsavedChangesRejected)
+        {
+            return;
+        }
+
+        var status = result.Outcome switch
+        {
+            SimulationSessionCloseOutcome.ShutdownIncomplete => OpenVisionLanguageService.T(
+                "Shell.ShutdownIncomplete",
+                "실행 증거가 완결되지 않아 종료를 취소했습니다.",
+                "Close was cancelled because runtime evidence is incomplete."),
+            SimulationSessionCloseOutcome.ShutdownTimedOut => OpenVisionLanguageService.T(
+                "Shell.ShutdownTimedOut",
+                "실행 종료 시간이 초과되어 창을 닫지 않았습니다.",
+                "Close was cancelled because runtime shutdown timed out."),
+            SimulationSessionCloseOutcome.ShutdownFaulted => OpenVisionLanguageService.T(
+                "Shell.ShutdownFaulted",
+                "실행 종료 중 오류가 발생해 창을 닫지 않았습니다.",
+                "Close was cancelled because runtime shutdown failed."),
+            _ => OpenVisionLanguageService.T(
+                "Shell.CloseFailed",
+                "종료를 완료하지 못했습니다.",
+                "The session could not be closed.")
+        };
+        StatusMessage = status;
+        var detail = result.Shutdown?.Stage is { } stage
+            ? $"{status} · stage={stage}"
+            : result.Exception is { } exception
+                ? $"{status} · {exception.Message}"
+                : status;
+        _runtimeObservabilityJournal.Log("Runtime", detail);
+    }
+
+    internal void PresentCloseFailure(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        StatusMessage = OpenVisionLanguageService.T(
+            "Shell.CloseFailed",
+            "종료를 완료하지 못했습니다.",
+            "The session could not be closed.");
+        _runtimeObservabilityJournal.Log("Runtime", $"Close failed · {exception.Message}");
+    }
+
+    private void SetSessionCloseAdmission(bool isRequested)
+    {
+        if (_sessionCloseRequested == isRequested)
+        {
+            return;
+        }
+
+        _sessionCloseRequested = isRequested;
+        Integration.SetSessionCloseAdmission(isRequested);
+        _manualEquipment.SetSessionCloseAdmission(isRequested);
+        _camera.SetSessionCloseAdmission(isRequested);
+        if (isRequested)
+        {
+            _multiAxisCommissioningExecutionWorkflow.InvalidatePendingExecution();
+            _scenarioBatch?.CancelBatch();
+            _multiAxisCommissioning.CancelValidation();
+        }
+
+        OnPropertyChanged(nameof(IsSessionCloseRequested));
+        InvalidateCommands();
+    }
+
+    private void DisposeShellResources()
+    {
+        _manualEquipment.Dispose();
+        _camera.Dispose();
+        _selectionSynchronization.Dispose();
+        _recipeAuthoring.Dispose();
+        AxisCommissioning.Dispose();
+        DigitalIo.Dispose();
+        FaultManager.Dispose();
+        RuntimeDebugger.Dispose();
+        SemiconductorRecipes.Dispose();
+        _layoutAuthoring.Dispose();
+        Layout.Dispose();
+        SequenceEditor.Dispose();
+        _simulationCommandTrace.Dispose();
+        _simulationScenarioExecutionCoordinator.Dispose();
+        Integration.Dispose();
+    }
+
+    private void DetachShellEventHandlers()
+    {
+        _shellNavigation.PropertyChanged -= OnShellNavigationPropertyChanged;
+        _shellNavigation.LanguageChanged -= OnLanguageChanged;
+        _shellNavigation.Dispose();
+        _manualEquipment.PropertyChanged -= OnManualEquipmentPropertyChanged;
+        _camera.PropertyChanged -= OnCameraPropertyChanged;
+        _selectionSynchronization.PropertyChanged -= OnSelectionSynchronizationPropertyChanged;
+        SimulationWorkspace.PropertyChanged -= OnSimulationWorkspacePropertyChanged;
+        _recipeAuthoring.DetachEventHandlers();
+        _recipeAuthoring.ProcessPlanReview.PropertyChanged -= OnProcessPlanReviewPropertyChanged;
+        _simulationCommandTrace.PropertyChanged -= OnSimulationCommandTracePropertyChanged;
+        SequenceEditor.DefinitionChanged -= OnSequenceDefinitionChanged;
+        DryRunPlayback.PropertyChanged -= OnDryRunPlaybackPropertyChanged;
     }
 
     public void Dispose()
@@ -3584,31 +3073,9 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         }
 
         _disposed = true;
-        OpenVisionLanguageService.LanguageChanged -= OnLanguageChanged;
-        _selectionSynchronization.PropertyChanged -= OnSelectionSynchronizationPropertyChanged;
-        _selectionSynchronization.Dispose();
-        SimulationWorkspace.PropertyChanged -= OnSimulationWorkspacePropertyChanged;
-        RecipeConnections.ProcessBlocks.ProcessBlockPreviewClosed -= OnProcessBlockPreviewClosed;
-        RecipeConnections.Dispose();
-        _processPlanReview.PropertyChanged -= OnProcessPlanReviewPropertyChanged;
-        _simulationCommandTrace.PropertyChanged -= OnSimulationCommandTracePropertyChanged;
-        AxisCommissioning.Dispose();
-        DigitalIo.Dispose();
-        FaultManager.Dispose();
-        RuntimeDebugger.Dispose();
-        SemiconductorRecipes.Dispose();
-        _layoutAuthoringHistory.Dispose();
-        Layout.Dispose();
-        SequenceEditor.DefinitionChanged -= OnSequenceDefinitionChanged;
-        SequenceEditor.Dispose();
-        DryRunPlayback.PropertyChanged -= OnDryRunPlaybackPropertyChanged;
-        _simulationCommandTrace.Dispose();
-        _visionExecutionEvidence.Dispose();
-        _simulationScenarioExecutionCoordinator.Dispose();
-        Integration.Dispose();
-
-        var shutdownTask = ShutdownAsync(cancellationToken: CancellationToken.None);
-        _runtimeShutdownWorkflow.CompleteDisposeAfterShutdown(shutdownTask);
+        _multiAxisCommissioningExecutionWorkflow.Dispose();
+        DetachShellEventHandlers();
+        _simulationSession.BeginDispose(RuntimeShutdownTimeout, DisposeShellResources);
     }
 
     #endregion
