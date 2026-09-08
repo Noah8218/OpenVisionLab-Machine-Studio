@@ -139,6 +139,10 @@ normalization. The package retains public `CompareTo`/`IsEquivalentTo`
 compatibility forwards and uses the comparer for persisted mismatch integrity
 checks.
 
+## Deterministic condition scenario ownership
+
+The authored condition profile is discoverable in `DeterministicConditionScenarioProfile.cs`. It owns profile data, recovery schedules, JSON persistence, normalization, and validation. Runtime samples, transitions, snapshots, and mutable deterministic progression are discoverable in `DeterministicConditionScenarioRuntime.cs`, which owns `DeterministicConditionStateMachine`. Both files remain WPF-neutral in the existing `Scenarios` namespace, and existing engine command/progress/runtime/replay owners keep their boundaries. Do not re-split these owners without a new defect, requirement, responsibility conflict, or measured constraint.
+
 ## Authoring-to-runtime flow
 
 ```text

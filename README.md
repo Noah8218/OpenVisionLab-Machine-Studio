@@ -13,13 +13,18 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.13`
+Current version: `v0.2.0-dev.14`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.14` (2026-09-09)
+
+- Split authored deterministic condition profile and recovery contracts from runtime sample, transition, snapshot, and state-machine contracts.
+- Preserved public names, JSON schema, and call paths; focused 11/11, related MachineStudio Simulation 74/74, full Simulation 530/530, and Release warning-as-error gates pass.
 
 #### `v0.2.0-dev.13` (2026-09-09)
 
