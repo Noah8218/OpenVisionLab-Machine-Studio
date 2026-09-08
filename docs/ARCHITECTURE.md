@@ -1146,15 +1146,17 @@ camera/manual projections, debugger, and Vision evidence completion.
 and WPF notification fan-out. Both projection owners are concrete,
 independently testable, and have no WPF visual-tree dependency.
 
-The remaining MainViewModel runtime command policy has a concrete owner.
-`SimulationRunControlWorkflow` owns Run/Pause/Abort/Retry/Step/Reset/Cycle
-Start availability, command construction, active-sequence preconditions, and
-cross-command serialization. Main keeps the public `ICommand` names and mode,
-runtime-definition, status, log, and snapshot callbacks. The workflow
-rechecks state after waiting on its gate, so a queued command cannot repeat an
-already completed transition, and rechecks lifecycle admission after the gate
-so queued work does not enter an engine command core after disposal is
-requested.
+The remaining MainViewModel runtime command policy has two concrete owners.
+`SimulationRunControlAdmissionPolicy` consumes the immutable
+`SimulationRunControlState` snapshot and returns the seven shell-facing `Can*`
+decisions without an engine, WPF, or callback dependency.
+`SimulationRunControlWorkflow` keeps command construction, active-sequence
+preconditions, cross-command serialization, busy admission, callbacks, and
+disposal. Main keeps the public `ICommand` names and mode, runtime-definition,
+status, log, and snapshot callbacks. The workflow rechecks the policy after
+waiting on its gate, so a queued command cannot repeat an already completed
+transition, and rechecks lifecycle admission after the gate so queued work does
+not enter an engine command core after disposal is requested.
 
 `ProjectSelectionSynchronizationWorkflow` under `ViewModel/Project` owns
 ProjectTree/Layout selection subscriptions, editor instances, property-panel

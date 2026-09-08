@@ -13,13 +13,20 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.8`
+Current version: `v0.2.0-dev.9`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.9` (2026-09-09)
+
+- Separated immutable run-control admission decisions into the WPF-neutral
+  `SimulationRunControlAdmissionPolicy`.
+- Kept engine command ordering, callbacks, serialization, and disposal in
+  `SimulationRunControlWorkflow`; focused run-control and session tests passed.
 
 #### `v0.2.0-dev.8` (2026-09-08)
 

@@ -6,30 +6,10 @@ using OpenVisionLab.Machine.Simulation.Snapshots;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
-internal readonly record struct SimulationRunControlState(
-    bool IsApplyingProject,
-    bool IsValidationBusy,
-    bool IsRunMode,
-    bool IsRunning,
-    bool RuntimeDefinitionDirty,
-    bool HasAutomaticRun,
-    bool AutomaticRunConfigured,
-    bool AutomaticRunActive,
-    bool HasEmbeddedSequence,
-    bool HasAxes,
-    bool HasAuthoredLayout,
-    bool HasVirtualCamera,
-    bool HasCycleStartInput,
-    bool CycleStartActive,
-    bool HasActiveFaults,
-    SimulationControlOwner ControlOwner,
-    SequenceExecutionStatus? ActiveSequenceStatus,
-    string? ActiveSequenceId);
-
 /// <summary>
 /// Owns the Simulation run-control transaction. The shell supplies a current
-/// state snapshot and presentation callbacks; this type owns command policy,
-/// command ordering, and cross-command serialization without WPF coupling.
+/// state snapshot and presentation callbacks; this type owns engine command
+/// ordering and cross-command serialization without WPF coupling.
 /// </summary>
 internal sealed class SimulationRunControlWorkflow : IDisposable
 {
@@ -84,133 +64,38 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
 
     internal bool CanRun()
     {
-        return !IsBusy && CanRunState(_getState());
-    }
-
-    private static bool CanRunState(SimulationRunControlState state)
-    {
-        if (state.IsApplyingProject || state.IsValidationBusy || state.IsRunning)
-        {
-            return false;
-        }
-
-        if (state.RuntimeDefinitionDirty)
-        {
-            return state.HasAxes || state.HasEmbeddedSequence;
-        }
-
-        if (state.HasAutomaticRun)
-        {
-            return state.AutomaticRunConfigured
-                && (state.AutomaticRunActive
-                    || state.ActiveSequenceStatus == SequenceExecutionStatus.Ready);
-        }
-
-        if (!state.HasEmbeddedSequence)
-        {
-            return state.HasAxes;
-        }
-
-        return state.ActiveSequenceStatus is SequenceExecutionStatus.Ready
-            or SequenceExecutionStatus.Running;
+        return !IsBusy && SimulationRunControlAdmissionPolicy.CanRun(_getState());
     }
 
     internal bool CanPause()
     {
-        return !IsBusy && CanPauseState(_getState());
+        return !IsBusy && SimulationRunControlAdmissionPolicy.CanPause(_getState());
     }
-
-    private static bool CanPauseState(SimulationRunControlState state) =>
-        !state.IsApplyingProject
-            && !state.IsValidationBusy
-            && state.IsRunMode
-            && state.IsRunning;
 
     internal bool CanAbortSequence()
     {
-        return !IsBusy && CanAbortSequenceState(_getState());
+        return !IsBusy && SimulationRunControlAdmissionPolicy.CanAbortSequence(_getState());
     }
-
-    private static bool CanAbortSequenceState(SimulationRunControlState state) =>
-        state.IsRunMode
-            && !state.IsApplyingProject
-            && !state.IsValidationBusy
-            && !state.RuntimeDefinitionDirty
-            && state.ActiveSequenceStatus == SequenceExecutionStatus.Running;
 
     internal bool CanRetrySequence()
     {
-        return !IsBusy && CanRetrySequenceState(_getState());
+        return !IsBusy && SimulationRunControlAdmissionPolicy.CanRetrySequence(_getState());
     }
-
-    private static bool CanRetrySequenceState(SimulationRunControlState state) =>
-        state.IsRunMode
-            && !state.IsApplyingProject
-            && !state.IsValidationBusy
-            && !state.RuntimeDefinitionDirty
-            && !state.HasActiveFaults
-            && state.ActiveSequenceStatus == SequenceExecutionStatus.Faulted;
 
     internal bool CanStep()
     {
-        return !IsBusy && CanStepState(_getState());
-    }
-
-    private static bool CanStepState(SimulationRunControlState state)
-    {
-        if (state.IsApplyingProject
-            || state.IsValidationBusy
-            || !state.IsRunMode
-            || state.IsRunning
-            || state.RuntimeDefinitionDirty)
-        {
-            return false;
-        }
-
-        if (state.ControlOwner == SimulationControlOwner.Manual)
-        {
-            return state.HasAuthoredLayout || state.HasAxes || state.HasVirtualCamera;
-        }
-
-        if (!state.HasEmbeddedSequence)
-        {
-            return state.HasAxes;
-        }
-
-        if (state.HasAutomaticRun)
-        {
-            return state.AutomaticRunActive;
-        }
-
-        return state.ActiveSequenceStatus is SequenceExecutionStatus.Ready
-            or SequenceExecutionStatus.Running;
+        return !IsBusy && SimulationRunControlAdmissionPolicy.CanStep(_getState());
     }
 
     internal bool CanCycleStart()
     {
-        return !IsBusy && CanCycleStartState(_getState());
+        return !IsBusy && SimulationRunControlAdmissionPolicy.CanCycleStart(_getState());
     }
-
-    private static bool CanCycleStartState(SimulationRunControlState state) =>
-        state.IsRunMode
-            && !state.IsApplyingProject
-            && !state.IsValidationBusy
-            && !state.RuntimeDefinitionDirty
-            && state.HasEmbeddedSequence
-            && state.HasCycleStartInput
-            && !state.CycleStartActive
-            && state.ActiveSequenceStatus == SequenceExecutionStatus.Running;
 
     internal bool CanReset()
     {
-        return !IsBusy && CanResetState(_getState());
+        return !IsBusy && SimulationRunControlAdmissionPolicy.CanReset(_getState());
     }
-
-    private static bool CanResetState(SimulationRunControlState state) =>
-        !state.IsApplyingProject
-            && !state.IsValidationBusy
-            && state.IsRunMode
-            && !state.RuntimeDefinitionDirty;
 
     internal Task RunAsync(CancellationToken cancellationToken = default) =>
         ExecuteSerializedAsync(RunCoreAsync, cancellationToken);
@@ -240,7 +125,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             return;
         }
 
-        if (!CanRunState(_getState()))
+        if (!SimulationRunControlAdmissionPolicy.CanRun(_getState()))
         {
             return;
         }
@@ -304,7 +189,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
 
     private async Task PauseCoreAsync(CancellationToken cancellationToken)
     {
-        if (!CanPauseState(_getState()))
+        if (!SimulationRunControlAdmissionPolicy.CanPause(_getState()))
         {
             return;
         }
@@ -324,7 +209,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
 
     private async Task AbortSequenceCoreAsync(CancellationToken cancellationToken)
     {
-        if (!CanAbortSequenceState(_getState()))
+        if (!SimulationRunControlAdmissionPolicy.CanAbortSequence(_getState()))
         {
             return;
         }
@@ -357,7 +242,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
 
     private async Task RetrySequenceCoreAsync(CancellationToken cancellationToken)
     {
-        if (!CanRetrySequenceState(_getState()))
+        if (!SimulationRunControlAdmissionPolicy.CanRetrySequence(_getState()))
         {
             return;
         }
@@ -391,7 +276,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
     private async Task StepCoreAsync(CancellationToken cancellationToken)
     {
         var state = _getState();
-        if (!CanStepState(state))
+        if (!SimulationRunControlAdmissionPolicy.CanStep(state))
         {
             return;
         }
@@ -426,7 +311,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
     private async Task ResetCoreAsync(CancellationToken cancellationToken)
     {
         var state = _getState();
-        if (!CanResetState(state))
+        if (!SimulationRunControlAdmissionPolicy.CanReset(state))
         {
             return;
         }
@@ -447,7 +332,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
 
     private async Task CycleStartCoreAsync(CancellationToken cancellationToken)
     {
-        if (!CanCycleStartState(_getState()))
+        if (!SimulationRunControlAdmissionPolicy.CanCycleStart(_getState()))
         {
             return;
         }
