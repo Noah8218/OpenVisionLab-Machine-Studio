@@ -13,6 +13,7 @@ internal sealed class AsyncOperationParticipant<TResult> : IDisposable
     private readonly Func<Exception, TResult> _createTimedOutResult;
     private readonly Func<Exception, TResult> _createFailedResult;
     private Task<TResult>? _currentTask;
+    private bool _cancellationRequested;
     private bool _disposed;
 
     internal AsyncOperationParticipant(
@@ -45,11 +46,26 @@ internal sealed class AsyncOperationParticipant<TResult> : IDisposable
             }
 
             _currentTask = _lifetime.Start(operation);
+            _cancellationRequested = false;
             return _currentTask;
         }
     }
 
-    internal void Cancel() => _lifetime.Cancel();
+    internal void Cancel()
+    {
+        lock (_gate)
+        {
+            if (_currentTask is { IsCompleted: false })
+            {
+                // Keep the request visible until the next observation. The
+                // operation can finish synchronously during Cancel(), before
+                // the close workflow gets a chance to capture its task.
+                _cancellationRequested = true;
+            }
+        }
+
+        _lifetime.Cancel();
+    }
 
     internal Task<TResult> ObserveAsync(TimeSpan timeout)
     {
@@ -61,12 +77,20 @@ internal sealed class AsyncOperationParticipant<TResult> : IDisposable
         Task<TResult>? task;
         lock (_gate)
         {
-            if (_currentTask?.IsCompleted == true)
+            task = _currentTask;
+            var observeCompletedCancellation = _cancellationRequested
+                && task?.IsCanceled == true;
+            _cancellationRequested = false;
+
+            if (task?.IsCompleted == true)
             {
                 _currentTask = null;
             }
 
-            task = _currentTask;
+            if (task?.IsCompleted == true && !observeCompletedCancellation)
+            {
+                task = null;
+            }
         }
 
         return task is null

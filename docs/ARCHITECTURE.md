@@ -1,3 +1,21 @@
+## P3-20 Deterministic step preview owners (2026-09-09)
+
+`DeterministicSequenceStepPreviewCompiler.cs` owns deterministic synthetic
+preview-sequence construction, compilation targets, preview IDs, and the
+load-lock vacuum prerequisite policy. It consumes explicit step/runtime inputs
+and has no engine, WPF, file, network, or mutable lifetime dependency.
+`DeterministicSequenceStepPreviewRunner.cs` owns project/step lookup, isolated
+`FixedStepSimulationEngine` start/stop and fixed-tick execution, settling/fault
+handling, cancellation, and `SequenceStepPreviewResult` creation.
+
+`RecipeConnectionSimulationWorkflow` and the smoke verifier keep their existing
+calls to the runner. The runner calls the compiler directly, then the sequence
+compiler and engine through their existing owners. The source is now a 296-line
+execution runner plus a 94-line compiler; public names, result shape, preview
+schema, timing, cancellation, error text, and callers are unchanged. A junior
+navigation path is workflow → runner → compiler or engine, within three modules.
+Do not re-split these owners or any completed owner without new evidence.
+
 ## P3-19 Deterministic command trace replay owner (2026-09-09)
 
 `DeterministicSimulationCommandTrace.cs` owns the trace entry/package/mismatch/result contracts, validation, SHA-256 hash, and JSON persistence. `DeterministicSimulationCommandTraceReplayRunner.cs` owns replay admission, paused fixed-step progression, command enqueueing, and mismatch reduction. `DeterministicSimulationCommandTraceCommandCodec.cs` remains the typed argument codec owner, while `FixedStepSimulationEngine.cs` remains the mutable tick and lifetime owner.
@@ -1030,9 +1048,11 @@ cancellation-source lifetime. `AsyncOperationParticipant<TResult>` builds on
 that primitive for the repeated participant mechanics: one current typed task,
 duplicate-start sharing, bounded observation, typed cancellation/timeout/failure
 mapping, and disposal. Batch and multi-axis keep their domain-specific result
-records and concrete participant facades; Camera preparation, Project Save's
-multiple in-flight saves, and Integration's admission/state contract remain
-separate owners.
+records and concrete participant facades. A cancellation request is retained
+until the next bounded observation, so synchronous task completion cannot be
+misreported as `Idle`; the request is consumed once that observation captures
+the task. Camera preparation, Project Save's multiple in-flight saves, and
+Integration's admission/state contract remain separate owners.
 `MultiAxisCommissioningViewModel` owns repeat-validation state, progress/status/result presentation, bounded history
 projection, baseline comparison, stale-context presentation, and mismatch
 navigation. The concrete WPF-neutral `MultiAxisCommissioningArtifactStore`
