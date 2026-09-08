@@ -13,13 +13,18 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.15`
+Current version: `v0.2.0-dev.16`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.16` (2026-09-09)
+
+- Separated immutable recipe dry-run result contracts from the deterministic execution owner in the Simulation Sequences module.
+- Preserved public names, record shapes, timing, and callers; focused runner tests 14/14, full Simulation 530/530, full MachineStudio 439/439, and Release warning-as-error gates pass.
 
 #### `v0.2.0-dev.15` (2026-09-09)
 

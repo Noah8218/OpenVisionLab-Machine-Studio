@@ -1,3 +1,18 @@
+## P3-18 Recipe dry-run contract owner (2026-09-09)
+
+`RecipeDryRunContracts.cs` is the navigation owner for the immutable
+`RecipeDryRunOutcome`, issue, checkpoint, mismatch, step-trace, and result
+values. It has no engine lifetime, file I/O, WPF, or mutable runtime state.
+`DeterministicRecipeDryRunRunner.cs` retains project lookup, compilation,
+fixed-tick command execution, trace/checkpoint reduction, and engine start/stop.
+The runner and all existing callers use the same public names and namespace.
+
+A junior path is Simulation sequence → RecipeDryRunContracts for result meaning, or
+Simulation sequence → DeterministicRecipeDryRunRunner → FixedStepSimulationEngine
+for execution, within three modules. No API, schema, timing, cancellation, or
+serialization change was made. Do not re-split this owner or earlier completed
+owners without new evidence.
+
 `MachineProjectRuntimeComponentCompiler` owns conversion of the selected
 active layout's component definitions into typed runtime component records,
 including sensor target/delay and cylinder timing validation. The surrounding
