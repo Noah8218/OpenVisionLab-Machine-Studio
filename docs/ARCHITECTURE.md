@@ -6,6 +6,16 @@ selection, then delegates device-family runtime compilation to
 `MachineLayoutDeviceRuntimeCompiler`. This keeps the junior navigation path
 project compiler → layout compiler → component compiler explicit.
 
+`DeterministicScenarioAssertion` is the project-owned normalized assertion
+contract. `DeterministicScenarioAssertionEvaluator` is the internal WPF-neutral
+runtime evidence policy: it evaluates captured snapshots/events, resolves final
+equipment state for checkpoints, and owns the definition/outcome hashes used by
+portable run evidence. `DeterministicSimulationRunResultPackage` and
+`DeterministicRecipeDryRunRunner` call that owner directly. Definition mapping,
+normalization, and validation remain with the assertion contract. Do not split
+these owners again without a newly measured defect, requirement, responsibility
+conflict, or constraint.
+
 # OpenVisionLab Machine Studio Architecture
 
 ## Overview

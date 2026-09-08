@@ -1,5 +1,11 @@
 using System.Collections.Immutable;
+using OpenVisionLab.Machine.IO.Channels;
+using OpenVisionLab.Machine.Sequence.Runtime;
+using OpenVisionLab.Machine.Simulation.Axis;
+using OpenVisionLab.Machine.Simulation.Engine;
+using OpenVisionLab.Machine.Simulation.Events;
 using OpenVisionLab.Machine.Simulation.Scenarios;
+using OpenVisionLab.Machine.Simulation.Snapshots;
 using OpenVisionLab.TestSupport;
 using Xunit;
 
@@ -175,6 +181,43 @@ public sealed class DeterministicScenarioAssertionTests
         Assert.Contains(
             DeterministicConditionScenarioProfile.Validate(duplicate),
             error => error.Contains("must be unique", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Evaluator_ProjectsFinalAxisStateAndStableHashes()
+    {
+        var snapshot = new SimulationSnapshot(
+            TimeSpan.FromTicks(7),
+            7,
+            SimulationRunMode.Paused,
+            SimulationControlOwner.Definition,
+            1,
+            new[] { new AxisSnapshot("x", "X", AxisState.Idle, 0, 0) },
+            0,
+            Array.Empty<DigitalSignalSnapshot>(),
+            Array.Empty<SequenceExecutionSnapshot>());
+        var assertions = ImmutableArray.Create(
+            new DeterministicScenarioAssertion(
+                "x-final-state",
+                DeterministicScenarioAssertionKind.FinalEquipmentState,
+                TargetId: "x",
+                ExpectedState: "Idle"));
+
+        var outcomes = DeterministicScenarioAssertionEvaluator.Evaluate(
+            assertions,
+            new[] { snapshot },
+            Array.Empty<SimulationEvent>());
+        var outcome = Assert.Single(outcomes);
+
+        Assert.True(outcome.IsPassed);
+        Assert.Equal("Idle", outcome.ActualValue);
+        Assert.Equal(7, outcome.ObservedTickIndex);
+        Assert.Equal(
+            DeterministicScenarioAssertionEvaluator.HashDefinitions(assertions),
+            DeterministicScenarioAssertionEvaluator.HashDefinitions(outcomes));
+        Assert.NotEqual(
+            DeterministicScenarioAssertionEvaluator.HashOutcomes(Array.Empty<DeterministicScenarioAssertionOutcome>()),
+            DeterministicScenarioAssertionEvaluator.HashOutcomes(outcomes));
     }
 
     private static void SaveAndAssertRoundTrip(

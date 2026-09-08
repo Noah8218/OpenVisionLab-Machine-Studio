@@ -13,13 +13,18 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.12`
+Current version: `v0.2.0-dev.13`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.13` (2026-09-09)
+
+- Separated authored scenario assertion definitions from the WPF-neutral runtime evaluator and evidence hash owner.
+- Preserved schema-5 run-package and recipe dry-run call paths; focused 4/4, related MachineStudio Scenario 33/33, full Simulation 530/530, and Release warning-as-error gates pass.
 
 #### `v0.2.0-dev.12` (2026-09-09)
 
