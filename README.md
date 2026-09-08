@@ -13,13 +13,18 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.14`
+Current version: `v0.2.0-dev.15`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.15` (2026-09-09)
+
+- Split machine-layout snapshot/state contracts from fixed-tick transition/result contracts into two WPF-neutral owners.
+- Preserved public names, namespace, constructor overloads, collection ordering, and call paths; focused layout 50/50, related MachineStudio 129/129, full Simulation 530/530, full MachineStudio 439/439, and Release warning-as-error gates pass.
 
 #### `v0.2.0-dev.14` (2026-09-09)
 

@@ -139,6 +139,19 @@ normalization. The package retains public `CompareTo`/`IsEquivalentTo`
 compatibility forwards and uses the comparer for persisted mismatch integrity
 checks.
 
+## Machine layout runtime contract ownership
+
+Machine-layout immutable state contracts are in
+`MachineLayoutRuntimeSnapshots.cs`. It owns the general component snapshot,
+specialized equipment snapshots, and the enums that describe their current
+runtime state. `MachineLayoutRuntimeTransitions.cs` owns accepted sensor,
+cylinder, and conveyor transitions plus the immutable `MachineLayoutTickResult`
+that groups one fixed-tick output. `DeterministicMachineLayout` remains the
+mutable tick/reset owner; `SimulationSnapshotFactory` reads snapshots and
+`SimulationPhysicalRuntimeTick` reads transitions. Both files remain
+WPF-neutral, use the existing namespace, and preserve all public contracts and
+collection ordering.
+
 ## Deterministic condition scenario ownership
 
 The authored condition profile is discoverable in `DeterministicConditionScenarioProfile.cs`. It owns profile data, recovery schedules, JSON persistence, normalization, and validation. Runtime samples, transitions, snapshots, and mutable deterministic progression are discoverable in `DeterministicConditionScenarioRuntime.cs`, which owns `DeterministicConditionStateMachine`. Both files remain WPF-neutral in the existing `Scenarios` namespace, and existing engine command/progress/runtime/replay owners keep their boundaries. Do not re-split these owners without a new defect, requirement, responsibility conflict, or measured constraint.
