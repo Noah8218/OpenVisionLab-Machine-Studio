@@ -144,7 +144,8 @@ MachineProjectRuntimeCompiler
                delegates specialized layout-device configuration:
         |
         +------> MachineLayoutDeviceRuntimeCompiler
-               validates LoadLock, WaferHandler, Inspection, OHT, and Prealigner bindings
+               coordinates LoadLock, Inspection, OHT, and Prealigner bindings
+               delegates WaferHandler validation to MachineLayoutWaferHandlerRuntimeCompiler
                returns the immutable layout-device runtime configuration
         +--> MachineProjectRuntimeSequenceCompiler
         |      compiles authored sequences and maps typed compilation errors
@@ -718,6 +719,13 @@ OHT handoff, and Prealigner runtime configuration. Its concrete
 `MachineProjectRuntimeAutomaticRunCompiler`, and
 `MachineProjectRuntimePickPlaceCompiler` own their respective typed project
 policy conversions and have no WPF/ViewModel dependency.
+
+`MachineLayoutDeviceRuntimeCompiler` remains the layout-device orchestration owner.
+`MachineLayoutWaferHandlerRuntimeCompiler` owns the separate wafer-handler contract:
+handler filtering, axis/workpiece/channel validation, soft-limit checks, and typed
+runtime configuration/error construction. It has no WPF, file, network, engine, or
+shared mutable state dependency; the coordinator keeps the other device-family
+compilers and final `MachineLayoutRuntimeConfiguration` assembly.
 The active application shell is `ShellWindow`; the retired `MainWindow`,
 `WorkspaceView`, and `SimulationWorkspaceView` resources are not part of the
 compiled UI path.

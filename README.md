@@ -13,13 +13,18 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.10`
+Current version: `v0.2.0-dev.11`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.11` (2026-09-09)
+
+- Extracted wafer-handler runtime compilation into the WPF-neutral `MachineLayoutWaferHandlerRuntimeCompiler`.
+- Preserved layout-device orchestration and verified focused, full Simulation, MachineStudio Sequence, and Release build gates.
 
 #### `v0.2.0-dev.10` (2026-09-09)
 
