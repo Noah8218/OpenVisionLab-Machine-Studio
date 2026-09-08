@@ -1,3 +1,11 @@
+`MachineProjectRuntimeComponentCompiler` owns conversion of the selected
+active layout's component definitions into typed runtime component records,
+including sensor target/delay and cylinder timing validation. The surrounding
+`MachineProjectRuntimeLayoutCompiler` keeps project validation and active-layout
+selection, then delegates device-family runtime compilation to
+`MachineLayoutDeviceRuntimeCompiler`. This keeps the junior navigation path
+project compiler → layout compiler → component compiler explicit.
+
 # OpenVisionLab Machine Studio Architecture
 
 ## Overview

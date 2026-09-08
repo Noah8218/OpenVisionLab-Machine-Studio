@@ -13,13 +13,18 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.11`
+Current version: `v0.2.0-dev.12`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.12` (2026-09-09)
+
+- Extracted active-layout component materialization into the WPF-neutral `MachineProjectRuntimeComponentCompiler`.
+- Layout compilation now keeps active-layout selection and device-family orchestration in their existing owners; focused 59/59 and full Simulation 529/529 gates pass.
 
 #### `v0.2.0-dev.11` (2026-09-09)
 
