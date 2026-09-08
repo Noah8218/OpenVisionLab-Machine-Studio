@@ -1,3 +1,10 @@
+## P3-19 Deterministic command trace replay owner (2026-09-09)
+
+`DeterministicSimulationCommandTrace.cs` owns the trace entry/package/mismatch/result contracts, validation, SHA-256 hash, and JSON persistence. `DeterministicSimulationCommandTraceReplayRunner.cs` owns replay admission, paused fixed-step progression, command enqueueing, and mismatch reduction. `DeterministicSimulationCommandTraceCommandCodec.cs` remains the typed argument codec owner, while `FixedStepSimulationEngine.cs` remains the mutable tick and lifetime owner.
+
+The existing `SimulationCommandTraceViewModel` caller and public names, record shapes, schema, timing, cancellation, and serialization remain unchanged. A junior navigation path is trace contracts/persistence -> replay runner -> engine, within three modules. Do not re-split this owner or any completed owner without a new defect, requirement, responsibility conflict, or measured constraint.
+
+
 ## P3-18 Recipe dry-run contract owner (2026-09-09)
 
 `RecipeDryRunContracts.cs` is the navigation owner for the immutable

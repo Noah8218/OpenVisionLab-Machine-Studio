@@ -13,13 +13,18 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.17`
+Current version: `v0.2.0-dev.18`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.18` (2026-09-09)
+
+- Separated deterministic sequence-step preview compilation and vacuum-prerequisite policy from fixed-step preview execution into `DeterministicSequenceStepPreviewCompiler.cs`.
+- Preserved preview contracts, sequence schema, timing, cancellation, and callers; focused preview tests 14/14, full Simulation 530/530, full MachineStudio 439/439, and Release warning-as-error gates pass.
 
 #### `v0.2.0-dev.17` (2026-09-09)
 
