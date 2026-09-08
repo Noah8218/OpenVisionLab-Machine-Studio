@@ -758,6 +758,14 @@ remain visible and field-editable, but structural commands fail closed rather
 than silently rewriting control flow. **Simulation ON** remains the only path
 that validates and atomically replaces the runtime configuration.
 
+`SequenceCompiler` owns the one-definition contract: authored fields, target lookup,
+step parameter parsing, and typed `CompiledSequence` construction.
+`SequenceCompositionValidator` owns the separate post-compilation graph contract:
+sequence-id lookup, unknown `CallSubsequenceStep` targets, and cycle detection.
+`MachineProjectRuntimeSequenceCompiler` and `SimulationRuntimeConfigurationBuilder`
+call the validator directly; `SequenceCompiler.ValidateComposition` remains only as
+a public compatibility forwarder.
+
 Each authored Sequence carries `watchdogTimeoutMs`. Zero explicitly permits an
 unlimited whole-Sequence execution for backward compatibility; a positive value
 is compiled into the UI-neutral `CompiledSequence`. The

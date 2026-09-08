@@ -55,7 +55,7 @@ internal sealed class MachineProjectRuntimeSequenceCompiler
             compiled.Add(result.Sequence!);
         }
 
-        foreach (SequenceCompositionError error in SequenceCompiler.ValidateComposition(compiled))
+        foreach (SequenceCompositionError error in SequenceCompositionValidator.Validate(compiled))
         {
             errors.Add(Error(
                 MachineProjectRuntimeCompilationErrorCode.SubsequenceCompositionInvalid,

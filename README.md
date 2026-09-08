@@ -13,13 +13,18 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.9`
+Current version: `v0.2.0-dev.10`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
 package.
 
 ### Recent version history
+
+#### `v0.2.0-dev.10` (2026-09-09)
+
+- Extracted cross-sequence identity and cycle validation into the WPF-neutral `SequenceCompositionValidator`.
+- Preserved the `SequenceCompiler` public compatibility entry point and verified Sequence, MachineStudio, full Simulation, and Release build gates.
 
 #### `v0.2.0-dev.9` (2026-09-09)
 

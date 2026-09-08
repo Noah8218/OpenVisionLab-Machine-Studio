@@ -43,11 +43,14 @@ public sealed class SubsequenceCompositionTests
 
         var first = Compile(ParentDefinition("second"), "first", "first", "second");
         var second = Compile(ParentDefinition("first"), "second", "first", "second");
-        var compositionErrors = SequenceCompiler.ValidateComposition([first, second]);
+        var compositionErrors = SequenceCompositionValidator.Validate([first, second]);
 
         var cycle = Assert.Single(compositionErrors, error =>
             error.Code == SequenceCompilationErrorCode.SubsequenceCycle);
         Assert.Contains("first -> second -> first", cycle.Message, StringComparison.Ordinal);
+
+        var compatibilityError = Assert.Single(SequenceCompiler.ValidateComposition([first, second]));
+        Assert.Equal(cycle.Message, compatibilityError.Message);
     }
 
     [Fact]
