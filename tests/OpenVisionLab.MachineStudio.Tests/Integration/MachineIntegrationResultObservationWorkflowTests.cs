@@ -53,6 +53,53 @@ public sealed class MachineIntegrationResultObservationWorkflowTests
     }
 
     [Fact]
+    public async Task ResultWatcherExceptionUsesInjectedUiDispatchBoundary()
+    {
+        using var fixture = new TestRoot();
+        var dispatchDepth = 0;
+        var exceptionTcs = new TaskCompletionSource<Exception>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var workflow = new MachineIntegrationResultObservationWorkflow(
+            () => fixture.ExchangeRoot,
+            () => "project-1",
+            () => true,
+            () => false,
+            () => throw new IOException("watcher-failure"),
+            async operation =>
+            {
+                Interlocked.Increment(ref dispatchDepth);
+                try
+                {
+                    await operation();
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref dispatchDepth);
+                }
+            },
+            exception =>
+            {
+                Assert.Equal(1, Volatile.Read(ref dispatchDepth));
+                exceptionTcs.TrySetResult(exception);
+            });
+
+        workflow.ConfigureWatcher();
+        var transactionDirectory = Path.Combine(
+            fixture.ExchangeRoot,
+            IntegrationTransactionLayout.TransactionsDirectoryName,
+            Guid.NewGuid().ToString("D"));
+        Directory.CreateDirectory(transactionDirectory);
+        File.WriteAllText(
+            Path.Combine(transactionDirectory, IntegrationTransactionLayout.ResultFileName),
+            "{}");
+
+        var exception = await exceptionTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.IsType<IOException>(exception);
+        Assert.Equal(0, Volatile.Read(ref dispatchDepth));
+    }
+
+    [Fact]
     public async Task DisposingWorkflowCancelsPendingResultRefresh()
     {
         using var fixture = new TestRoot();

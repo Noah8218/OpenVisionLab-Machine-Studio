@@ -328,19 +328,25 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
         }
         catch (Exception exception) when (exception is InvalidDataException or ArgumentException)
         {
-            _setStatus(OpenVisionLanguageService.T("Axis.RecipeValidationRejected"));
-            _log($"Commissioning validation rejected · {exception.Message}");
+            await DispatchPresentationAsync(() =>
+            {
+                _setStatus(OpenVisionLanguageService.T("Axis.RecipeValidationRejected"));
+                _log($"Commissioning validation rejected · {exception.Message}");
+            });
             return new(MultiAxisCommissioningParticipantOutcome.Failed, Exception: exception);
         }
 
         var projectJson = _serializeProject();
         var projectPath = _getProjectPath()
             ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, $"unsaved-{project.Id}.ovmachine"));
-        _artifactStore.SetLatestResult(null);
-        _completedRuns = 0;
-        SetValidationRunning(true);
-        _setStatus(OpenVisionLanguageService.T("Axis.RecipeValidationStarted"));
-        _log($"Commissioning repeat validation started · {recipe.ValidationRepetitions} run(s)");
+        await DispatchPresentationAsync(() =>
+        {
+            _artifactStore.SetLatestResult(null);
+            _completedRuns = 0;
+            SetValidationRunning(true);
+            _setStatus(OpenVisionLanguageService.T("Axis.RecipeValidationStarted"));
+            _log($"Commissioning repeat validation started · {recipe.ValidationRepetitions} run(s)");
+        });
         try
         {
             var result = await new DeterministicMultiAxisCommissioningRunner().RunAsync(
@@ -353,31 +359,45 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
                 _fixedStep,
                 UpdateProgressAsync,
                 cancellationToken);
-            _artifactStore.SetLatestResult(result);
-            _artifactStore.AppendHistory(result, DateTimeOffset.UtcNow);
-            SelectedHistoryEntry = ResultHistory.Entries[^1];
-            _baselineComparison = AcceptedBaseline?.CompareTo(result);
-            _setStatus(result.IsSuccess
-                ? OpenVisionLanguageService.T("Axis.RecipeValidationPassedStatus")
-                : OpenVisionLanguageService.T("Axis.RecipeValidationMismatchStatus"));
-            _log(
-                result.IsSuccess
-                    ? $"Commissioning repeat validation passed · {result.CompletedRuns} run(s) · {ShortHash(result.EvidenceHash)}"
-                    : $"Commissioning repeat validation mismatch · run {result.FirstMismatch?.RunIndex} · {result.FirstMismatch?.EvidenceKind} · Tick {result.FirstMismatch?.TickIndex}");
-            PersistResult();
+            await DispatchPresentationAsync(() =>
+            {
+                _artifactStore.SetLatestResult(result);
+                _artifactStore.AppendHistory(result, DateTimeOffset.UtcNow);
+                SelectedHistoryEntry = ResultHistory.Entries[^1];
+                _baselineComparison = AcceptedBaseline?.CompareTo(result);
+                _setStatus(result.IsSuccess
+                    ? OpenVisionLanguageService.T("Axis.RecipeValidationPassedStatus")
+                    : OpenVisionLanguageService.T("Axis.RecipeValidationMismatchStatus"));
+                _log(
+                    result.IsSuccess
+                        ? $"Commissioning repeat validation passed · {result.CompletedRuns} run(s) · {ShortHash(result.EvidenceHash)}"
+                        : $"Commissioning repeat validation mismatch · run {result.FirstMismatch?.RunIndex} · {result.FirstMismatch?.EvidenceKind} · Tick {result.FirstMismatch?.TickIndex}");
+                PersistResult();
+            });
             return new(MultiAxisCommissioningParticipantOutcome.Completed, result);
         }
         catch (Exception exception) when (exception is InvalidOperationException or ArgumentException)
         {
-            _setStatus(OpenVisionLanguageService.T("Axis.RecipeValidationRejected"));
-            _log($"Commissioning repeat validation rejected · {exception.Message}");
+            await DispatchPresentationAsync(() =>
+            {
+                _setStatus(OpenVisionLanguageService.T("Axis.RecipeValidationRejected"));
+                _log($"Commissioning repeat validation rejected · {exception.Message}");
+            });
             return new(MultiAxisCommissioningParticipantOutcome.Failed, Exception: exception);
         }
         finally
         {
-            SetValidationRunning(false);
+            await DispatchPresentationAsync(() => SetValidationRunning(false));
         }
     }
+
+    private Task DispatchPresentationAsync(Action action) => _dispatchToUi(() =>
+    {
+        if (!_disposed)
+        {
+            action();
+        }
+    });
 
     private Task UpdateProgressAsync(int completedRuns) => _dispatchToUi(() =>
     {

@@ -1,4 +1,5 @@
 using System.Net;
+using OpenVisionLab.Machine.Infrastructure.Integration;
 using OpenVisionLab.MachineStudio.ViewModel;
 using Xunit;
 
@@ -26,6 +27,7 @@ public sealed class MachineIntegrationSetupStoreTests
         store.Save(setup);
         var loaded = store.Load();
 
+        Assert.True(Directory.Exists(fixture.ExchangeRoot));
         Assert.Equal(MachineIntegrationSetupLoadWarning.None, loaded.Warning);
         Assert.Null(loaded.ErrorMessage);
         Assert.Equal(setup, loaded.Settings);

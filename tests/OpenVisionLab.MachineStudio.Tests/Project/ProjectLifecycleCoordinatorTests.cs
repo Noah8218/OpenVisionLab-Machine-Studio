@@ -1,4 +1,5 @@
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Persistence.Projects;
 using OpenVisionLab.MachineStudio.Model;
 using OpenVisionLab.MachineStudio.ViewModel;
 using Xunit;
@@ -44,7 +45,7 @@ public sealed class ProjectLifecycleCoordinatorTests
 
             var openedProject = new MachineProjectDocument { Name = "Opened" };
             var openPath = Path.Combine(directory, "opened.ovmachine");
-            await new ProjectDocumentStore().SaveAsync(openedProject, openPath);
+            await new ProjectDocumentFileStore().SaveAsync(openedProject, openPath);
 
             Assert.True(await coordinator.OpenProjectAsync(openPath));
             Assert.Equal(openedProject.Name, appliedProjects[0].Name);
@@ -128,7 +129,7 @@ public sealed class ProjectLifecycleCoordinatorTests
 
             var replacement = new MachineProjectDocument { Name = "Replacement" };
             var replacementPath = Path.Combine(directory, "replacement.ovmachine");
-            await new ProjectDocumentStore().SaveAsync(replacement, replacementPath);
+            await new ProjectDocumentFileStore().SaveAsync(replacement, replacementPath);
 
             Assert.False(await coordinator.OpenProjectReplacingCurrentAsync(replacementPath));
             Assert.Equal("Edited", coordinator.CurrentProject.Name);

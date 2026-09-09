@@ -1,6 +1,7 @@
 using OpenVisionLab.Machine.Core.Devices;
 using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Persistence.Projects;
 using OpenVisionLab.Machine.Core.Sequences;
 using OpenVisionLab.Machine.Simulation.Camera;
 using OpenVisionLab.MachineStudio.ViewModel;
@@ -76,7 +77,7 @@ public sealed class VirtualCameraFirstUseViewModelTests
 
         try
         {
-            var store = new ProjectDocumentStore();
+            var store = new ProjectDocumentFileStore();
             string authoredCameraId;
             string authoredSequenceId;
             using (var authoringViewModel = new MainViewModel(

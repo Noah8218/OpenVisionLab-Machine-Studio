@@ -1363,7 +1363,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     public ICommand NextProcessPlanReviewStepCommand => _recipeAuthoring.ProcessPlanReview.NextStepCommand;
 
-    public ICommand ExitCommand => _exitCommand ??= CreateRelayCommand(_ => _mainWpfInteractionHost.ShutdownApplication());
+    public ICommand ExitCommand => _exitCommand ??= CreateRelayCommand(_ => _mainWpfInteractionHost.RequestApplicationClose());
 
     #endregion
 

@@ -1,4 +1,5 @@
 using System.Net;
+using OpenVisionLab.Machine.Infrastructure.Integration;
 using OpenVisionLab.MachineStudio.ViewModel;
 using Xunit;
 

@@ -219,7 +219,7 @@
                                 </Button>
                                 <Button x:Name="PreviewWaferHandlerSetupButton"
                                         Margin="7,0,0,0"
-                                        Command="{Binding RecipeConnections.SemanticSetups.PreviewWaferHandlerSetupCommand}"
+                                        Command="{Binding RecipeConnections.SemanticSetups.WaferHandler.PreviewCommand}"
                                         AutomationProperties.Name="{loc:Loc Key=Connections.WaferHandlerSetupPreview}"
                                         Style="{StaticResource PrimaryCommandButtonStyle}"
                                         ToolTip="{loc:Loc Key=Connections.WaferHandlerSetupPreviewTooltip}">
@@ -230,7 +230,7 @@
                                 </Button>
                                 <Button x:Name="PreviewPrealignerSetupButton"
                                         Margin="7,0,0,0"
-                                        Command="{Binding RecipeConnections.SemanticSetups.PreviewPrealignerSetupCommand}"
+                                        Command="{Binding RecipeConnections.SemanticSetups.Prealigner.PreviewCommand}"
                                         AutomationProperties.Name="{loc:Loc Key=Connections.PrealignerSetupPreview}"
                                         Style="{StaticResource PrimaryCommandButtonStyle}"
                                         ToolTip="{loc:Loc Key=Connections.PrealignerSetupPreviewTooltip}">
@@ -241,7 +241,7 @@
                                 </Button>
                                 <Button x:Name="PreviewInspectionHandoffSetupButton"
                                         Margin="7,0,0,0"
-                                        Command="{Binding RecipeConnections.SemanticSetups.PreviewInspectionHandoffSetupCommand}"
+                                        Command="{Binding RecipeConnections.SemanticSetups.InspectionHandoff.PreviewCommand}"
                                         AutomationProperties.Name="{loc:Loc Key=Connections.InspectionHandoffSetupPreview}"
                                         Style="{StaticResource PrimaryCommandButtonStyle}"
                                         ToolTip="{loc:Loc Key=Connections.InspectionHandoffSetupPreviewTooltip}">
@@ -252,7 +252,7 @@
                                 </Button>
                                 <Button x:Name="PreviewInspectionSortSetupButton"
                                         Margin="7,0,0,0"
-                                        Command="{Binding RecipeConnections.SemanticSetups.PreviewInspectionSortRouterSetupCommand}"
+                                        Command="{Binding RecipeConnections.SemanticSetups.InspectionSortRouter.PreviewCommand}"
                                         AutomationProperties.Name="{loc:Loc Key=Connections.InspectionSortSetupPreview}"
                                         Style="{StaticResource PrimaryCommandButtonStyle}"
                                         ToolTip="{loc:Loc Key=Connections.InspectionSortSetupPreviewTooltip}">
@@ -263,7 +263,7 @@
                                 </Button>
                                 <Button x:Name="PreviewOhtSetupButton"
                                         Margin="7,0,0,0"
-                                        Command="{Binding RecipeConnections.SemanticSetups.PreviewOhtHandoffSetupCommand}"
+                                        Command="{Binding RecipeConnections.SemanticSetups.OhtHandoff.PreviewCommand}"
                                         AutomationProperties.Name="{loc:Loc Key=Connections.OhtSetupPreview}"
                                         Style="{StaticResource PrimaryCommandButtonStyle}"
                                         ToolTip="{loc:Loc Key=Connections.OhtSetupPreviewTooltip}">

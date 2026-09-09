@@ -105,7 +105,11 @@ internal sealed class MachineIntegrationRequestWorkflow
                 sourceDefinition.Width,
                 sourceDefinition.Height,
                 inspectionRecipePath,
-                frame,
+                new MachineIntegrationFrameEvidence(
+                    frame.FrameId,
+                    frame.SourceRelativePath,
+                    frame.ContentSha256,
+                    frame.ContentLength),
                 producer,
                 consumer));
     }

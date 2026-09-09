@@ -6,12 +6,22 @@ namespace OpenVisionLab.MachineStudio.View.Shell;
 
 internal sealed class MainWpfInteractionHost
 {
-    internal void ShutdownApplication() => Application.Current.Shutdown();
+    private readonly Dispatcher? _dispatcher;
+
+    internal MainWpfInteractionHost(Dispatcher? dispatcher = null)
+    {
+        _dispatcher = dispatcher;
+    }
+
+    // ShellWindow waits for save decisions and runtime shutdown before closing.
+    internal void RequestApplicationClose() => Application.Current.MainWindow?.Close();
 
     internal async Task CommitFocusedEditorAsync()
     {
         Keyboard.ClearFocus();
-        if (Application.Current?.Dispatcher is { } dispatcher)
+        if (GetDispatcher() is { } dispatcher
+            && !dispatcher.HasShutdownStarted
+            && !dispatcher.HasShutdownFinished)
         {
             await dispatcher.InvokeAsync(
                 () => { },
@@ -21,8 +31,14 @@ internal sealed class MainWpfInteractionHost
 
     internal async Task DispatchAsync(Action action)
     {
-        var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.HasShutdownStarted)
+        var dispatcher = GetDispatcher();
+        if (dispatcher is null)
+        {
+            action();
+            return;
+        }
+
+        if (dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
         {
             return;
         }
@@ -32,8 +48,19 @@ internal sealed class MainWpfInteractionHost
 
     internal async Task DispatchBatchProgressAsync(Action action)
     {
-        var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.HasShutdownStarted || dispatcher.CheckAccess())
+        var dispatcher = GetDispatcher();
+        if (dispatcher is null)
+        {
+            action();
+            return;
+        }
+
+        if (dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
+        {
+            return;
+        }
+
+        if (dispatcher.CheckAccess())
         {
             action();
             return;
@@ -45,9 +72,21 @@ internal sealed class MainWpfInteractionHost
     internal Task DispatchOnUiThreadAsync(Func<Task> operation)
     {
         ArgumentNullException.ThrowIfNull(operation);
-        var dispatcher = Application.Current?.Dispatcher;
-        return dispatcher is null || dispatcher.HasShutdownStarted || dispatcher.CheckAccess()
+        var dispatcher = GetDispatcher();
+        if (dispatcher is null)
+        {
+            return operation();
+        }
+
+        if (dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
+        {
+            return Task.CompletedTask;
+        }
+
+        return dispatcher.CheckAccess()
             ? operation()
             : dispatcher.InvokeAsync(operation).Task.Unwrap();
     }
+
+    private Dispatcher? GetDispatcher() => _dispatcher ?? Application.Current?.Dispatcher;
 }

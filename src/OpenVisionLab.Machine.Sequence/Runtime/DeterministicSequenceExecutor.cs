@@ -451,7 +451,9 @@ public sealed class DeterministicSequenceExecutor
     private SequenceExecutionResult Fault(SequenceExecutionError error)
     {
         _lastError = error;
-        if (_frames.Count > 1)
+        // A watchdog exhausts the execution budget, including nested calls.
+        // Only ordinary step failures may recover through a caller's error route.
+        if (error.Code != SequenceExecutionErrorCode.SequenceWatchdogTimedOut && _frames.Count > 1)
         {
             var child = CurrentFrame!;
             var parent = _frames[^2];
