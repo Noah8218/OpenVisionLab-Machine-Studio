@@ -1731,7 +1731,7 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
-                    <Border>
+                    <Border DataContext="{Binding Camera}">
                         <Border.Style>
                             <Style TargetType="Border" BasedOn="{StaticResource InspectorCardStyle}">
                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -1777,13 +1777,13 @@
                                          Padding="7,0"
                                          VerticalContentAlignment="Center"
                                          IsReadOnly="True"
-                                         Text="{Binding CameraImageSourceEditor.PathText}"
-                                         ToolTip="{Binding CameraImageSourceEditor.PathText}"
+                                         Text="{Binding ImageSourceEditor.PathText}"
+                                         ToolTip="{Binding ImageSourceEditor.PathText}"
                                          AutomationProperties.Name="{loc:Loc Key=Camera.SourceRelativePath}" />
                                 <Button x:Name="BrowseCameraSourceButton"
                                         Grid.Column="2"
                                         MinWidth="58"
-                                        Command="{Binding CameraImageSourceEditor.BrowseCommand}"
+                                        Command="{Binding ImageSourceEditor.BrowseCommand}"
                                         Content="{loc:Loc Key=Camera.Browse}"
                                         ToolTip="{loc:Loc Key=Camera.BrowseTooltip}"
                                         AutomationProperties.Name="{loc:Loc Key=Camera.Browse}" />
@@ -1801,7 +1801,7 @@
                                                   Minimum="1"
                                                   Maximum="100000"
                                                   SmallChange="1"
-                                                  Value="{Binding CameraImageSourceEditor.Width, Mode=TwoWay}" />
+                                                  Value="{Binding ImageSourceEditor.Width, Mode=TwoWay}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
@@ -1810,7 +1810,7 @@
                                                   Minimum="1"
                                                   Maximum="100000"
                                                   SmallChange="1"
-                                                  Value="{Binding CameraImageSourceEditor.Height, Mode=TwoWay}" />
+                                                  Value="{Binding ImageSourceEditor.Height, Mode=TwoWay}" />
                                 </StackPanel>
                             </Grid>
                             <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
@@ -1819,13 +1819,13 @@
                                      Height="{StaticResource Density.InspectorFieldHeight}"
                                      Padding="7,0"
                                      VerticalContentAlignment="Center"
-                                     Text="{Binding CameraImageSourceEditor.PixelFormatText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Text="{Binding ImageSourceEditor.PixelFormatText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      ToolTip="{loc:Loc Key=Camera.PixelFormatTooltip}"
                                      AutomationProperties.Name="{loc:Loc Key=Camera.SourcePixelFormat}">
                                 <TextBox.Style>
                                     <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding CameraImageSourceEditor.HasError}" Value="True">
+                                            <DataTrigger Binding="{Binding ImageSourceEditor.HasError}" Value="True">
                                                 <Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" />
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -1835,13 +1835,13 @@
                             <TextBlock x:Name="CameraSourceValidationText"
                                        Margin="2,5,2,0"
                                        FontSize="10.5"
-                                       Text="{Binding CameraImageSourceEditor.ValidationText}"
+                                       Text="{Binding ImageSourceEditor.ValidationText}"
                                        TextWrapping="Wrap">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Foreground" Value="{DynamicResource State.Running}" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding CameraImageSourceEditor.HasError}" Value="True">
+                                            <DataTrigger Binding="{Binding ImageSourceEditor.HasError}" Value="True">
                                                 <Setter Property="Foreground" Value="{DynamicResource State.Fault}" />
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -1855,16 +1855,16 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <Button x:Name="ApplyCameraSourceButton"
-                                        Command="{Binding CameraImageSourceEditor.ApplyCommand}"
-                                        IsEnabled="{Binding CameraImageSourceEditor.CanApply}"
+                                        Command="{Binding ImageSourceEditor.ApplyCommand}"
+                                        IsEnabled="{Binding ImageSourceEditor.CanApply}"
                                         Style="{StaticResource PrimaryCommandButtonStyle}"
                                         Content="{loc:Loc Key=Camera.ApplySource}"
                                         ToolTip="{loc:Loc Key=Camera.ApplySourceTooltip}"
                                         AutomationProperties.Name="{loc:Loc Key=Camera.ApplySource}" />
                                 <Button x:Name="RevertCameraSourceButton"
                                         Grid.Column="2"
-                                        Command="{Binding CameraImageSourceEditor.RevertCommand}"
-                                        IsEnabled="{Binding CameraImageSourceEditor.CanRevert}"
+                                        Command="{Binding ImageSourceEditor.RevertCommand}"
+                                        IsEnabled="{Binding ImageSourceEditor.CanRevert}"
                                         Content="{loc:Loc Key=Camera.RevertSource}"
                                         ToolTip="{loc:Loc Key=Camera.RevertSourceTooltip}"
                                         AutomationProperties.Name="{loc:Loc Key=Camera.RevertSource}" />
@@ -1952,6 +1952,13 @@
                             <TextBlock FontFamily="{StaticResource Typography.Telemetry}"
                                        FontSize="9.5"
                                        Text="{Binding CurrentCameraSourceText}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,9,0,2"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Camera.SourceMode}" />
+                            <TextBlock FontFamily="{StaticResource Typography.Telemetry}"
+                                       FontSize="9.5"
+                                       Text="{Binding CurrentCameraSourceModeText}"
                                        TextWrapping="Wrap" />
                             <TextBlock Margin="0,7,0,2"
                                        Foreground="{DynamicResource Text.Secondary}"

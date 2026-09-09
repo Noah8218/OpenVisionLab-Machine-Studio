@@ -11,4 +11,10 @@ public sealed class SimulationSettings
     public int Seed { get; init; } = 1001;
     public int CommandQueueCapacity { get; init; } = DefaultCommandQueueCapacity;
     public int EventBufferCapacity { get; init; } = DefaultEventBufferCapacity;
+
+    /// <summary>
+    /// Optional canonical journal capacity. When omitted, the presentation
+    /// event-buffer capacity remains the compatibility default.
+    /// </summary>
+    public int? CanonicalEventJournalCapacity { get; init; }
 }

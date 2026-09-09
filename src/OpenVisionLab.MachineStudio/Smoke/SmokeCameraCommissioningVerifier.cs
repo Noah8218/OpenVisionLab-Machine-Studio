@@ -3,6 +3,11 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Threading;
 using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Devices;
@@ -76,17 +81,19 @@ internal static class SmokeCameraCommissioningVerifier
                 await Task.Delay(50);
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             }
-            throw new InvalidOperationException(failureMessage);
+            throw new InvalidOperationException($"{failureMessage} Observed tick: {viewModel.SceneSnapshots.Latest?.TickIndex}.");
         }
 
         async Task StepAsync()
         {
+            // Snapshot publication can precede AsyncRelayCommand completion.
+            await WaitForAsync(() => viewModel.StepCommand.CanExecute(null), "Camera Step command remained busy.");
             var beforeTick = viewModel.SceneSnapshots.Latest?.TickIndex
                 ?? throw new InvalidOperationException("Camera snapshot was unavailable before Step.");
             viewModel.StepCommand.Execute(null);
             await WaitForAsync(
                 () => viewModel.SceneSnapshots.Latest?.TickIndex == beforeTick + 1,
-                "Camera commissioning Step did not advance exactly one tick.");
+                $"Camera commissioning Step did not advance exactly one tick from {beforeTick}.");
         }
 
         await WaitForAsync(
@@ -102,6 +109,9 @@ internal static class SmokeCameraCommissioningVerifier
                 }
                 && viewModel.SceneSnapshots.Latest.Cameras[0].State == VirtualCameraState.Idle,
             "Camera runtime did not reset before commissioning.");
+
+        await scrollIntoView();
+        await VerifyBindingsAsync(window, viewModel, Path.GetDirectoryName(projectPath)!, Check);
 
         if (editImageSource)
         {
@@ -343,7 +353,17 @@ internal static class SmokeCameraCommissioningVerifier
                 && viewModel.SceneSnapshots.Latest?.ControlOwner == SimulationControlOwner.Manual,
             "Manual camera control did not restart for evidence comparison.");
         viewModel.PauseCommand.Execute(null);
-        await WaitForAsync(() => !viewModel.IsRunning, "Repeat camera control did not pause.");
+        await WaitForAsync(
+            () => !viewModel.IsRunning
+                && viewModel.SceneSnapshots.Latest?.RunMode == SimulationRunMode.Paused
+                && viewModel.StepCommand.CanExecute(null),
+            "Repeat camera control did not pause.");
+        // Equal trigger ticks correctly produce equal deterministic inspection IDs.
+        // This mismatch scenario must deliberately choose a different input tick.
+        if (viewModel.SceneSnapshots.Latest!.TickIndex == triggered.TickIndex)
+        {
+            await StepAsync();
+        }
         viewModel.TriggerCameraCommand.Execute(null);
         await WaitForAsync(
             () => viewModel.SceneSnapshots.Latest?.Cameras[0].State == VirtualCameraState.Exposing,
@@ -397,6 +417,130 @@ internal static class SmokeCameraCommissioningVerifier
         };
     }
 
+    private static async Task VerifyBindingsAsync(
+        ShellWindow window,
+        MainViewModel viewModel,
+        string evidenceDirectory,
+        Action<string, bool> check)
+    {
+        var inspector = SmokeVisualTreeQuery.FindVisualDescendant<RightToolRegionView>(window)
+            ?? throw new InvalidOperationException("Camera inspector was unavailable.");
+        var camera = viewModel.Camera;
+        var editor = camera.ImageSourceEditor;
+        var originalCameraId = camera.SelectedCameraId;
+        var originalRecipe = camera.SelectedCameraRecipe;
+        var originalWidth = editor.Width;
+        var snapshot = viewModel.SceneSnapshots.Latest!;
+        var capture = new SmokeWindowCapture();
+
+        bool UsesCamera(DependencyObject target, DependencyProperty property)
+        {
+            var binding = BindingOperations.GetBindingExpression(target, property);
+            return binding?.Status == BindingStatus.Active && ReferenceEquals(binding.DataItem, camera);
+        }
+
+        check("cameraControlsResolveDirectOwner",
+            UsesCamera(inspector.CameraSelectionComboBox, ItemsControl.ItemsSourceProperty)
+            && UsesCamera(inspector.CameraSelectionComboBox, Selector.SelectedValueProperty)
+            && UsesCamera(inspector.CameraRecipeComboBox, Selector.SelectedItemProperty)
+            && UsesCamera(inspector.CameraSourcePixelFormatTextBox, TextBox.TextProperty)
+            && UsesCamera(inspector.CameraSourcePathTextBox, TextBox.TextProperty)
+            && UsesCamera(inspector.StartCameraManualControlButton, Button.CommandProperty)
+            && UsesCamera(inspector.TriggerCameraButton, Button.CommandProperty)
+            && UsesCamera(inspector.CameraExecutionEvidenceDetailsTextBlock, TextBlock.TextProperty));
+        check("cameraCommandsUseOwnerInstances",
+            ReferenceEquals(inspector.StartCameraManualControlButton.Command, camera.StartManualCameraControlCommand)
+            && ReferenceEquals(inspector.TriggerCameraButton.Command, camera.TriggerCameraCommand)
+            && ReferenceEquals(inspector.ApplyCameraSourceButton.Command, editor.ApplyCommand)
+            && ReferenceEquals(inspector.RevertCameraSourceButton.Command, editor.RevertCommand)
+            && ReferenceEquals(inspector.BrowseCameraSourceButton.Command, editor.BrowseCommand));
+
+        if (camera.VirtualCameras.Count > 1)
+        {
+            var otherId = camera.VirtualCameras.First(item => item.Id != originalCameraId).Id;
+            inspector.CameraSelectionComboBox.SetCurrentValue(Selector.SelectedValueProperty, otherId);
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            check("cameraSelectionControlToOwner", camera.SelectedCameraId == otherId);
+            camera.SelectedCameraId = originalCameraId;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            check("cameraSelectionOwnerToControl", Equals(inspector.CameraSelectionComboBox.SelectedValue, originalCameraId));
+        }
+
+        if (camera.CurrentCameraRecipes.Count > 1)
+        {
+            var otherRecipe = camera.CurrentCameraRecipes.First(item => item != originalRecipe);
+            inspector.CameraRecipeComboBox.SetCurrentValue(Selector.SelectedItemProperty, otherRecipe);
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            check("recipeSelectionControlToOwner", camera.SelectedCameraRecipe == otherRecipe);
+            camera.SelectedCameraRecipe = originalRecipe;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            check("recipeSelectionOwnerToControl", Equals(inspector.CameraRecipeComboBox.SelectedItem, originalRecipe));
+        }
+
+        var widthEditor = SmokeVisualTreeQuery.FindVisualDescendant<global::Wpf.Ui.Controls.NumberBox>(
+            inspector, item => AutomationProperties.GetAutomationId(item) == "CameraSourceWidthNumberBox")
+            ?? throw new InvalidOperationException("Camera source width control was unavailable.");
+        widthEditor.SetCurrentValue(global::Wpf.Ui.Controls.NumberBox.ValueProperty, (double)(originalWidth + 1));
+        // NumberBox commits on focus loss; commit this programmatic binding probe explicitly.
+        widthEditor.GetBindingExpression(global::Wpf.Ui.Controls.NumberBox.ValueProperty)!.UpdateSource();
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        check("sourceWidthControlToOwner", editor.Width == originalWidth + 1);
+        editor.Width = originalWidth;
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        check("sourceWidthOwnerToControl", widthEditor.Value == originalWidth);
+
+        inspector.CameraSourcePixelFormatTextBox.SetCurrentValue(TextBox.TextProperty, "Mono16");
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        check("sourceTextControlToOwner", editor.PixelFormatText == "Mono16");
+        editor.PixelFormatText = string.Empty;
+        // Programmatic draft changes do not generate the input events that normally requery commands.
+        CommandManager.InvalidateRequerySuggested();
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        check("sourceValidationOwnerToControl",
+            inspector.CameraSourcePixelFormatTextBox.Text.Length == 0
+            && editor.HasError
+            && !inspector.ApplyCameraSourceButton.IsEnabled
+            && inspector.CameraSourceValidationText.Text == editor.ValidationText);
+        capture.Capture(window, Path.Combine(evidenceDirectory, "bindings-validation.png"));
+
+        using var input = new SmokeNativeInput();
+        window.Activate();
+        input.ActivateWindow(window);
+        inspector.RevertCameraSourceButton.BringIntoView();
+        inspector.RevertCameraSourceButton.UpdateLayout();
+        for (var attempt = 0; attempt < 3 && !inspector.RevertCameraSourceButton.IsKeyboardFocused; attempt++)
+        {
+            await Task.Delay(50);
+            inspector.RevertCameraSourceButton.Focus();
+            Keyboard.Focus(inspector.RevertCameraSourceButton);
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        }
+        check("sourceRevertKeyboardFocused", inspector.RevertCameraSourceButton.IsKeyboardFocused);
+        if (!inspector.RevertCameraSourceButton.IsKeyboardFocused)
+        {
+            Console.Error.WriteLine($"Camera Revert focus unavailable: WindowActive={window.IsActive}; Visible={inspector.RevertCameraSourceButton.IsVisible}; Enabled={inspector.RevertCameraSourceButton.IsEnabled}; Focusable={inspector.RevertCameraSourceButton.Focusable}; Focused={Keyboard.FocusedElement}.");
+        }
+        capture.Capture(window, Path.Combine(evidenceDirectory, "bindings-keyboard-focus.png"));
+        if (inspector.RevertCameraSourceButton.IsKeyboardFocused)
+        {
+            input.SendKey(0x20);
+        }
+        await Task.Delay(100);
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        check("sourceRevertKeyboardRestoresRenderedValues",
+            inspector.CameraSourcePixelFormatTextBox.Text == "Mono8"
+            && !editor.IsDirty && !editor.HasError
+            && !inspector.ApplyCameraSourceButton.IsEnabled
+            && !inspector.RevertCameraSourceButton.IsEnabled);
+        editor.RevertCommand.Execute(null);
+        check("bindingRoundTripDoesNotAcquireOrAdvance",
+            viewModel.SceneSnapshots.Latest!.TickIndex == snapshot.TickIndex
+            && viewModel.SceneSnapshots.Latest.Cameras.All(item => item.AcquisitionOrdinal == 0 && item.FrameEvidence is null));
+        check("sourcePathIsReadOnlyAndHasAppliedValue",
+            inspector.CameraSourcePathTextBox.IsReadOnly && inspector.CameraSourcePathTextBox.Text == editor.PathText);
+        await ScrollIntoViewAsync(window);
+    }
+
     public static async Task ApplyStateAsync(
         ShellWindow window,
         MainViewModel viewModel,
@@ -425,11 +569,23 @@ internal static class SmokeCameraCommissioningVerifier
 
         async Task StepAsync()
         {
+            await WaitForAsync(() => viewModel.StepCommand.CanExecute(null), "Camera Step command remained busy.");
             var before = viewModel.SceneSnapshots.Latest!.TickIndex;
             viewModel.StepCommand.Execute(null);
             await WaitForAsync(
                 () => viewModel.SceneSnapshots.Latest?.TickIndex == before + 1,
                 "Camera smoke Step did not advance one tick.");
+        }
+
+        if (state == "automatic")
+        {
+            await WaitForAsync(
+                () => viewModel.IsRunning
+                    && viewModel.SceneSnapshots.Latest?.ControlOwner
+                        == SimulationControlOwner.EmbeddedSequence,
+                "Automatic camera smoke state did not retain Embedded Sequence control.");
+            await ScrollIntoViewAsync(window);
+            return;
         }
 
         await WaitForAsync(
@@ -445,7 +601,8 @@ internal static class SmokeCameraCommissioningVerifier
         {
             viewModel.CameraImageSourceEditor.PixelFormatText = string.Empty;
         }
-        else if (state is "source-focus" or "source-hover-apply" or "source-pressed-apply")
+        else if (state is "source-focus" or "source-hover-apply" or "source-pressed-apply"
+                 or "source-hover-revert" or "source-pressed-revert")
         {
             viewModel.CameraImageSourceEditor.PixelFormatText = "Mono8";
             viewModel.CameraImageSourceEditor.Width += 1;
@@ -482,6 +639,7 @@ internal static class SmokeCameraCommissioningVerifier
             }
         }
 
+        CommandManager.InvalidateRequerySuggested();
         await ScrollIntoViewAsync(window);
         var inspector = SmokeVisualTreeQuery.FindVisualDescendant<RightToolRegionView>(window)
             ?? throw new InvalidOperationException("Run inspector was unavailable.");
@@ -567,7 +725,19 @@ internal static class SmokeCameraCommissioningVerifier
                 interaction.MarkSmokePointerHeld();
             }
         }
-        else if (state is not "ready" and not "manual" and not "exposing"
+        else if (state is "source-hover-revert" or "source-pressed-revert")
+        {
+            inspector.RevertCameraSourceButton.BringIntoView();
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            interaction.ActivateWindow();
+            interaction.MovePointerToCenter(inspector.RevertCameraSourceButton);
+            if (state == "source-pressed-revert")
+            {
+                interaction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
+                interaction.MarkSmokePointerHeld();
+            }
+        }
+        else if (state is not "ready" and not "manual" and not "automatic" and not "exposing"
                  and not "transferring" and not "frame-ready"
                  and not "source-hover-browse" and not "source-pressed-browse")
         {

@@ -28,6 +28,19 @@ internal sealed class SimulationManualCameraCommandHandler
         TriggerVirtualCameraCommand triggerCamera,
         SimulationManualControlContext context)
     {
+        if (triggerCamera.HasRuntimeIdentity
+            && (!string.Equals(triggerCamera.ProjectId, context.ProjectId, StringComparison.Ordinal)
+                || triggerCamera.RuntimeGeneration != context.RuntimeGeneration))
+        {
+            return SimulationManualControlCommandHandler.Reject(
+                command,
+                context,
+                SimulationCommandErrorCode.CameraTriggerRejected,
+                $"Manual camera request belongs to project '{triggerCamera.ProjectId}' runtime generation " +
+                $"{triggerCamera.RuntimeGeneration}, but current runtime is project " +
+                $"'{context.ProjectId ?? "<none>"}' generation {context.RuntimeGeneration}.");
+        }
+
         if (context.ControlOwner != SimulationControlOwner.Manual)
         {
             return SimulationManualControlCommandHandler.Reject(

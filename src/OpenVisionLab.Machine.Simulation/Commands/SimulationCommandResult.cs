@@ -44,7 +44,8 @@ public enum SimulationCommandErrorCode
     UnsupportedCommand,
     EngineNotStarted,
     EngineFaulted,
-    EngineStopped
+    EngineStopped,
+    RuntimeIdentityMismatch
 }
 
 public sealed record SimulationCommandResult(

@@ -41,4 +41,13 @@ internal sealed class MainWpfInteractionHost
 
         await dispatcher.InvokeAsync(action);
     }
+
+    internal Task DispatchOnUiThreadAsync(Func<Task> operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        var dispatcher = Application.Current?.Dispatcher;
+        return dispatcher is null || dispatcher.HasShutdownStarted || dispatcher.CheckAccess()
+            ? operation()
+            : dispatcher.InvokeAsync(operation).Task.Unwrap();
+    }
 }

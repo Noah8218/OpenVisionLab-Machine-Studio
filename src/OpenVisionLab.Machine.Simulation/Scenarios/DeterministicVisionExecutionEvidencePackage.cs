@@ -272,19 +272,7 @@ public sealed record DeterministicVisionExecutionEvidencePackage(
 
         var fullPath = Path.GetFullPath(path);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-        var temporaryPath = $"{fullPath}.{Guid.NewGuid():N}.tmp";
-        try
-        {
-            File.WriteAllText(temporaryPath, SaveToJson(package));
-            File.Move(temporaryPath, fullPath, overwrite: true);
-        }
-        finally
-        {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
-        }
+        AtomicEvidenceFile.Write(fullPath, temporaryPath => File.WriteAllText(temporaryPath, SaveToJson(package)));
     }
 
     public static DeterministicVisionExecutionEvidencePackage? LoadFromJson(string path)

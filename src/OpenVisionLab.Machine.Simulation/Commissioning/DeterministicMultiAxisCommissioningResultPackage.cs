@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Simulation.Events;
 using OpenVisionLab.Machine.Simulation.Snapshots;
+using OpenVisionLab.Machine.Simulation.Scenarios;
 
 namespace OpenVisionLab.Machine.Simulation.Commissioning;
 
@@ -166,19 +167,7 @@ public sealed record DeterministicMultiAxisCommissioningResultPackage(
 
         var fullPath = Path.GetFullPath(path);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-        var temporaryPath = $"{fullPath}.{Guid.NewGuid():N}.tmp";
-        try
-        {
-            File.WriteAllText(temporaryPath, SaveToJson(package));
-            File.Move(temporaryPath, fullPath, overwrite: true);
-        }
-        finally
-        {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
-        }
+        AtomicEvidenceFile.Write(fullPath, temporaryPath => File.WriteAllText(temporaryPath, SaveToJson(package)));
     }
 
     public static DeterministicMultiAxisCommissioningResultPackage? LoadFromJson(string path)

@@ -13,7 +13,7 @@ single-step, reset, dry-run, and layout playback workflows.
 
 ## Version
 
-Current version: `v0.2.0-dev.7`
+Current version: `v0.2.0-dev.19`
 
 This project is maintained using explicit version numbers. The current branch
 is a Release 2 development candidate; it is not a release tag or downloadable
@@ -21,70 +21,56 @@ package.
 
 ### Recent version history
 
-#### `v0.2.0-dev.7` (2026-09-07)
+#### `v0.2.0-dev.19` (2026-09-09)
 
-- Consolidated concrete ownership boundaries across simulation, integration,
-  smoke verification, and WPF ViewModel responsibilities while preserving the
-  existing project, recipe, simulation, and integration contracts.
-- Hardened asynchronous lifetime boundaries for commissioning, runtime,
-  integration, and Recipe Connection workflows with focused regression tests.
-- Added late-completion protection for Test Scenario execution and sequence-step
-  preview during shell/workbench disposal; no release package or deployment was
-  published.
+- Preserved cancellation requests until the next bounded observation so a just-completed batch or commissioning validation is reported as `Cancelled`, not `Idle`.
+- Kept one-shot cleanup, duplicate-start sharing, timeout mapping, and caller exception behavior unchanged.
 
-#### `v0.2.0-dev.6` (2026-09-05)
+#### `v0.2.0-dev.18` (2026-09-09)
 
-- Made unified commissioning evidence tests deterministic across the supported
-  Korean and English language settings by asserting localized catalog values.
-- Retained the `v0.2.0-dev.5` structural refactor and its explicitly recorded
-  partial 31-state Direct EXE matrix.
+- Separated deterministic sequence-step preview compilation and vacuum-prerequisite policy from fixed-step preview execution into `DeterministicSequenceStepPreviewCompiler.cs`.
+- Preserved preview contracts, sequence schema, timing, cancellation, and callers; focused preview tests 14/14, full Simulation 530/530, full MachineStudio 439/439, and Release warning-as-error gates pass.
 
-#### `v0.2.0-dev.5` (2026-09-05)
+#### `v0.2.0-dev.17` (2026-09-09)
 
-- Consolidated the Machine Studio refactoring into explicit ownership boundaries
-  across simulation, ViewModel, and Direct EXE smoke verification code.
-- Preserved the existing project, recipe, simulation, and integration contracts
-  while adding focused unit coverage for the extracted responsibilities.
-- The 31-state Direct EXE Recipe Connection matrix remains partial (16/31); this
-  development candidate does not claim full runtime UI verification.
+- Separated deterministic command-trace replay execution from trace contracts, validation, and JSON persistence into `DeterministicSimulationCommandTraceReplayRunner.cs`.
+- Preserved public names, record shapes, replay timing, cancellation, schema, and callers; focused command-trace tests 7/7, full Simulation 530/530, full MachineStudio 439/439, and Release warning-as-error gates pass.
 
-#### `v0.2.0-dev.4` (2026-09-04)
+#### `v0.2.0-dev.16` (2026-09-09)
 
-- Aligned the release-candidate validation script with the active `-dev.N`
-  development-candidate version convention.
-- Kept the release-candidate workflow limited to build, test, audit, and package
-  verification; no release or download was published.
+- Separated immutable recipe dry-run result contracts from the deterministic execution owner in the Simulation Sequences module.
+- Preserved public names, record shapes, timing, and callers; focused runner tests 14/14, full Simulation 530/530, full MachineStudio 439/439, and Release warning-as-error gates pass.
 
-#### `v0.2.0-dev.3` (2026-09-04)
+#### `v0.2.0-dev.15` (2026-09-09)
 
-- Corrected the canonical product-version source after the preceding public
-  metadata commit left `Directory.Build.props` at the previous development
-  version.
-- Retained the independently tested `SimulationRunLoopTiming` refactor with
-  no additional runtime behavior change.
+- Split machine-layout snapshot/state contracts from fixed-tick transition/result contracts into two WPF-neutral owners.
+- Preserved public names, namespace, constructor overloads, collection ordering, and call paths; focused layout 50/50, related MachineStudio 129/129, full Simulation 530/530, full MachineStudio 439/439, and Release warning-as-error gates pass.
 
-#### `v0.2.0-dev.2` (2026-09-04)
+#### `v0.2.0-dev.14` (2026-09-09)
 
-- Isolated real-time wall-clock accumulation, catch-up limiting, and delay
-  calculation behind the independently tested `SimulationRunLoopTiming` owner.
-- Preserved the existing deterministic fixed-step engine and Release 2 public
-  development branch contract.
+- Split authored deterministic condition profile and recovery contracts from runtime sample, transition, snapshot, and state-machine contracts.
+- Preserved public names, JSON schema, and call paths; focused 11/11, related MachineStudio Simulation 74/74, full Simulation 530/530, and Release warning-as-error gates pass.
 
-#### `v0.2.0-dev.1` (2026-09-01)
+#### `v0.2.0-dev.13` (2026-09-09)
 
-- Aligned the Release 2 development branch with immutable Contracts `0.2.0-alpha.3` and TCP Transport `0.1.0-alpha.3` package bytes.
-- Recorded the clean shared-package source commit and preserved the previous alpha.2 package bytes for traceability.
+- Separated authored scenario assertion definitions from the WPF-neutral runtime evaluator and evidence hash owner.
+- Preserved schema-5 run-package and recipe dry-run call paths; focused 4/4, related MachineStudio Scenario 33/33, full Simulation 530/530, and Release warning-as-error gates pass.
 
-#### `v0.2.0-dev` (2026-08-31)
+#### `v0.2.0-dev.12` (2026-09-09)
 
-- Added authenticated TCP transfer for explicit Machine/consumer transaction
-  exchange, with session-only shared keys and persisted endpoint settings.
-- Preserved the existing explicit Handoff export and Result refresh workflow.
+- Extracted active-layout component materialization into the WPF-neutral `MachineProjectRuntimeComponentCompiler`.
+- Layout compilation now keeps active-layout selection and device-family orchestration in their existing owners; focused 59/59 and full Simulation 529/529 gates pass.
 
-#### `v0.1.0-rc.4` (2026-08-22)
+#### `v0.2.0-dev.11` (2026-09-09)
 
-- Release 1 public release-candidate baseline for local deterministic
-  simulation and virtual commissioning.
+- Extracted wafer-handler runtime compilation into the WPF-neutral `MachineLayoutWaferHandlerRuntimeCompiler`.
+- Preserved layout-device orchestration and verified focused, full Simulation, MachineStudio Sequence, and Release build gates.
+
+#### `v0.2.0-dev.10` (2026-09-09)
+
+- Extracted cross-sequence identity and cycle validation into the WPF-neutral `SequenceCompositionValidator`.
+- Preserved the `SequenceCompiler` public compatibility entry point and verified Sequence, MachineStudio, full Simulation, and Release build gates.
+
 
 ## Download
 

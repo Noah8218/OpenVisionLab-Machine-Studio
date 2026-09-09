@@ -11,7 +11,8 @@ public enum SimulationOperationalDiagnosticKind
     ShutdownRequested,
     ShutdownCompleted,
     ShutdownFaulted,
-    ShutdownTimedOut
+    ShutdownTimedOut,
+    ShutdownIncomplete
 }
 
 public sealed record SimulationOperationalDiagnostic(

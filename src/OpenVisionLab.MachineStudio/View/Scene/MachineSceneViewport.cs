@@ -90,8 +90,8 @@ public sealed class MachineSceneViewport : FrameworkElement
     private Point _gestureStart;
     private LayoutItem? _pressedItem;
     private ModifierKeys _gestureModifiers;
-    private LayoutProjection? _gestureProjection;
-    private LayoutProjection? _viewProjection;
+    private SceneViewportProjection? _gestureProjection;
+    private SceneViewportProjection? _viewProjection;
     private Rect? _marqueeBounds;
     private double _zoomFactor = 1d;
     private LayoutTransformHandle? _transformHandle;
@@ -1378,7 +1378,7 @@ public sealed class MachineSceneViewport : FrameworkElement
     private void DrawTransformHandles(
         DrawingContext context,
         LayoutRenderItem item,
-        LayoutProjection projection)
+        SceneViewportProjection projection)
     {
         var handles = GetTransformHandleCenters(item, projection);
         var topCenter = GetRotatedLocalPoint(item, projection, 0d, -item.Height / 2d);
@@ -1388,7 +1388,7 @@ public sealed class MachineSceneViewport : FrameworkElement
     private void DrawSelectionTransformHandles(
         DrawingContext context,
         IReadOnlyList<LayoutRenderItem> items,
-        LayoutProjection projection)
+        SceneViewportProjection projection)
     {
         var bounds = GetSelectionScreenBounds(items, projection);
         context.DrawRectangle(null, _resources!.SelectionPen, bounds);
@@ -1565,7 +1565,7 @@ public sealed class MachineSceneViewport : FrameworkElement
     private static IReadOnlyDictionary<LayoutTransformHandle, Point>
         GetSelectionTransformHandleCenters(
             IReadOnlyList<LayoutRenderItem> items,
-            LayoutProjection projection)
+            SceneViewportProjection projection)
     {
         var bounds = GetSelectionScreenBounds(items, projection);
         var topCenter = new Point(bounds.Left + (bounds.Width / 2d), bounds.Top);
@@ -1581,7 +1581,7 @@ public sealed class MachineSceneViewport : FrameworkElement
 
     private static Rect GetSelectionScreenBounds(
         IReadOnlyList<LayoutRenderItem> items,
-        LayoutProjection projection)
+        SceneViewportProjection projection)
     {
         var bounds = GetScreenBounds(items[0], projection);
         foreach (var item in items.Skip(1))
@@ -1593,7 +1593,7 @@ public sealed class MachineSceneViewport : FrameworkElement
 
     private static IReadOnlyDictionary<LayoutTransformHandle, Point> GetTransformHandleCenters(
         LayoutRenderItem item,
-        LayoutProjection projection)
+        SceneViewportProjection projection)
     {
         var topLeft = GetRotatedLocalPoint(item, projection, -item.Width / 2d, -item.Height / 2d);
         var topRight = GetRotatedLocalPoint(item, projection, item.Width / 2d, -item.Height / 2d);
@@ -1614,7 +1614,7 @@ public sealed class MachineSceneViewport : FrameworkElement
 
     private static Point GetRotatedLocalPoint(
         LayoutRenderItem item,
-        LayoutProjection projection,
+        SceneViewportProjection projection,
         double localX,
         double localY)
     {
@@ -1665,7 +1665,7 @@ public sealed class MachineSceneViewport : FrameworkElement
             .ToArray();
     }
 
-    private LayoutProjection? CreateCurrentProjection()
+    private SceneViewportProjection? CreateCurrentProjection()
     {
         var authoredItems = GetAuthoredItems();
         if (authoredItems.Length == 0 || ActualWidth < 1 || ActualHeight < 1)
@@ -1675,7 +1675,7 @@ public sealed class MachineSceneViewport : FrameworkElement
         return CreateProjection(CreateRenderItems(authoredItems, SnapshotSource?.Latest));
     }
 
-    private LayoutProjection? CreateDropProjection()
+    private SceneViewportProjection? CreateDropProjection()
     {
         if (ActualWidth < 1 || ActualHeight < 1)
         {
@@ -1684,7 +1684,7 @@ public sealed class MachineSceneViewport : FrameworkElement
 
         return CreateCurrentProjection()
             ?? _viewProjection
-            ?? LayoutProjection.CreateEmpty(ActualWidth, ActualHeight);
+            ?? SceneViewportProjection.CreateEmpty(ActualWidth, ActualHeight);
     }
 
     private void UpdateLibraryDrag(DragEventArgs e)
@@ -1717,8 +1717,11 @@ public sealed class MachineSceneViewport : FrameworkElement
             ? data.GetData(typeof(ComponentLibraryItem)) as ComponentLibraryItem
             : null;
 
-    private LayoutProjection CreateProjection(IReadOnlyList<LayoutRenderItem> geometry) =>
-        _viewProjection ??= LayoutProjection.Create(geometry, ActualWidth, ActualHeight);
+    private SceneViewportProjection CreateProjection(IReadOnlyList<LayoutRenderItem> geometry) =>
+        _viewProjection ??= SceneViewportProjection.Create(
+            geometry.Select(item => new SceneViewportGeometry(item.X, item.Y, item.Width, item.Height)).ToArray(),
+            ActualWidth,
+            ActualHeight);
 
     private void UpdatePan(Point point)
     {
@@ -1774,7 +1777,7 @@ public sealed class MachineSceneViewport : FrameworkElement
     private static double PositiveModulo(double value, double divisor) =>
         ((value % divisor) + divisor) % divisor;
 
-    private static Rect GetScreenBounds(LayoutRenderItem item, LayoutProjection projection)
+    private static Rect GetScreenBounds(LayoutRenderItem item, SceneViewportProjection projection)
     {
         var center = projection.ToScreen(item.X, item.Y);
         var width = Math.Max(8, item.Width * projection.Scale);
@@ -2123,63 +2126,6 @@ public sealed class MachineSceneViewport : FrameworkElement
         string? WorkpieceType,
         WorkpieceInspectionState? InspectionState,
         WaferHandlerOwnershipState? TransferOwnershipState);
-
-    private readonly record struct LayoutProjection(
-        double MinimumX,
-        double MinimumY,
-        double Scale,
-        double OffsetX,
-        double OffsetY)
-    {
-        private const double Padding = 48;
-
-        public static LayoutProjection Create(
-            IReadOnlyList<LayoutRenderItem> items,
-            double viewportWidth,
-            double viewportHeight)
-        {
-            var minimumX = items.Min(item => item.X - (item.Width / 2));
-            var maximumX = items.Max(item => item.X + (item.Width / 2));
-            var minimumY = items.Min(item => item.Y - (item.Height / 2));
-            var maximumY = items.Max(item => item.Y + (item.Height / 2));
-            var worldWidth = Math.Max(1, maximumX - minimumX);
-            var worldHeight = Math.Max(1, maximumY - minimumY);
-            var availableWidth = Math.Max(1, viewportWidth - (Padding * 2));
-            var availableHeight = Math.Max(1, viewportHeight - (Padding * 2));
-            var scale = Math.Min(availableWidth / worldWidth, availableHeight / worldHeight);
-            var offsetX = Padding + ((availableWidth - (worldWidth * scale)) / 2);
-            var offsetY = Padding + ((availableHeight - (worldHeight * scale)) / 2);
-            return new LayoutProjection(minimumX, minimumY, scale, offsetX, offsetY);
-        }
-
-        public static LayoutProjection CreateEmpty(double viewportWidth, double viewportHeight) => new(
-            0,
-            0,
-            1,
-            viewportWidth / 2,
-            viewportHeight / 2);
-
-        public Point ToScreen(double x, double y) =>
-            new(OffsetX + ((x - MinimumX) * Scale), OffsetY + ((y - MinimumY) * Scale));
-
-        public Point ToWorld(Point point) => new(
-            MinimumX + ((point.X - OffsetX) / Scale),
-            MinimumY + ((point.Y - OffsetY) / Scale));
-
-        public LayoutProjection ZoomAt(Point anchor, double factor) => new(
-            MinimumX,
-            MinimumY,
-            Scale * factor,
-            anchor.X - ((anchor.X - OffsetX) * factor),
-            anchor.Y - ((anchor.Y - OffsetY) * factor));
-
-        public LayoutProjection Translate(Vector delta) => new(
-            MinimumX,
-            MinimumY,
-            Scale,
-            OffsetX + delta.X,
-            OffsetY + delta.Y);
-    }
 
     private void DrawCenteredText(DrawingContext context, string text, double fontSize, Brush brush)
     {

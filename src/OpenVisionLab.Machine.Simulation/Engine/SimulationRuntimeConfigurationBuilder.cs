@@ -78,7 +78,7 @@ internal sealed class SimulationRuntimeConfigurationBuilder
             }
         }
 
-        var compositionErrors = SequenceCompiler.ValidateComposition(compiled.Values);
+        var compositionErrors = SequenceCompositionValidator.Validate(compiled.Values);
         if (compositionErrors.Count != 0)
         {
             var compositionError = compositionErrors[0];
