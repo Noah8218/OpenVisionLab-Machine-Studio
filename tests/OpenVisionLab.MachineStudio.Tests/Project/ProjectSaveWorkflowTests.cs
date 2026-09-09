@@ -1,4 +1,5 @@
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Persistence.Projects;
 using OpenVisionLab.MachineStudio.ViewModel;
 using Xunit;
 
@@ -112,6 +113,7 @@ public sealed class ProjectSaveWorkflowTests
         Action<string> persistMultiAxisResult,
         Action<string> persistVisionEvidence) =>
         new(
+            new ProjectDocumentFileStore(),
             new ProjectDocumentStore(),
             () => project,
             prepareProject,

@@ -1,8 +1,4 @@
-using System.Globalization;
-using System.IO;
-using System.Net;
 using System.ComponentModel;
-using System.Windows.Input;
 using OpenVisionLab;
 using OpenVisionLab.Integration.Contracts;
 using OpenVisionLab.Machine.Infrastructure.Integration;
@@ -11,9 +7,9 @@ using OpenVisionLab.MachineStudio.View.Dialogs;
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
 /// <summary>
-/// Owns the explicit Machine Studio integration setup and its read-only
-/// transaction projection. It never acknowledges a handoff or starts a
-/// consumer inspection.
+/// Composes the explicit Machine Studio integration setup with its read-only
+/// transaction projection; setup editing belongs to <see cref="MachineIntegrationSetupViewModel"/>.
+/// This owner never acknowledges a handoff or starts a consumer inspection.
 /// </summary>
 public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
 {
@@ -22,21 +18,9 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     private readonly Func<string?> _projectIdProvider;
     private readonly Func<MachineIntegrationRequestContext>? _requestContextProvider;
     private string? _requestContextKey;
-    private readonly Func<string, string?> _selectExchangeRoot;
-    private readonly Func<string, string?> _selectInspectionRecipe;
     private readonly Func<Func<Task>, Task> _invokeOnUiThreadAsync;
-    private readonly MachineIntegrationPathReadinessPolicy _pathReadiness;
-    private readonly MachineIntegrationSetupStore _setupStore;
     private readonly MachineIntegrationParticipant _integrationParticipant;
     private readonly MachineIntegrationTcpControlViewModel _tcpControl;
-    private string _exchangeRoot = string.Empty;
-    private string _inspectionRecipePath = string.Empty;
-    private string _twoDConsumerVersion = string.Empty;
-    private string _twoDConsumerCommit = string.Empty;
-    private string _tcpListenAddress = "127.0.0.1";
-    private string _tcpListenPortText = "45101";
-    private string _tcpPeerHost = "127.0.0.1";
-    private string _tcpPeerPortText = "45102";
     private readonly MachineIntegrationResultObservationWorkflow _resultObservation;
     private string _statusText = string.Empty;
     private readonly object _lifetimeGate = new();
@@ -106,71 +90,42 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
         _requestFactory = requestFactory ?? throw new ArgumentNullException(nameof(requestFactory));
         _canBuildRequest = canBuildRequest ?? throw new ArgumentNullException(nameof(canBuildRequest));
         _projectIdProvider = projectIdProvider ?? throw new ArgumentNullException(nameof(projectIdProvider));
-        _selectExchangeRoot = selectExchangeRoot ?? throw new ArgumentNullException(nameof(selectExchangeRoot));
-        _selectInspectionRecipe = selectInspectionRecipe ?? throw new ArgumentNullException(nameof(selectInspectionRecipe));
+        ArgumentNullException.ThrowIfNull(selectExchangeRoot);
+        ArgumentNullException.ThrowIfNull(selectInspectionRecipe);
         _invokeOnUiThreadAsync = invokeOnUiThreadAsync ?? ExecuteImmediatelyAsync;
-        _pathReadiness = new();
-        _setupStore = new(settingsPath);
         _integrationParticipant = new();
         _integrationParticipant.StateChanged += OnIntegrationParticipantStateChanged;
 
-        var settingsLoad = _setupStore.Load();
-        var settings = settingsLoad.Settings;
-        _exchangeRoot = settings.ExchangeRoot;
-        _inspectionRecipePath = settings.InspectionRecipePath;
-        _twoDConsumerVersion = settings.TwoDConsumerVersion;
-        _twoDConsumerCommit = settings.TwoDConsumerCommit;
-        _tcpListenAddress = settings.TcpListenAddress;
-        _tcpListenPortText = settings.TcpListenPort.ToString(CultureInfo.InvariantCulture);
-        _tcpPeerHost = settings.TcpPeerHost;
-        _tcpPeerPortText = settings.TcpPeerPort.ToString(CultureInfo.InvariantCulture);
+        MachineIntegrationTcpControlViewModel? tcpControl = null;
+        var pathReadiness = new MachineIntegrationPathReadinessPolicy();
+        Setup = new(
+            settingsPath,
+            pathReadiness,
+            selectExchangeRoot,
+            selectInspectionRecipe,
+            () => !IsDisposed && (tcpControl?.CanEditTcpSetup ?? true),
+            status => TryPublish(() => StatusText = status),
+            () => tcpControl?.SetSessionSharedKey(null));
         _resultObservation = new(
-            () => ExchangeRoot,
+            () => Setup.ExchangeRoot,
             _projectIdProvider,
             () => CanRefreshResults,
             () => IsBusy,
             RefreshResultsAsync,
-             _invokeOnUiThreadAsync,
-             exception =>
-             {
-                 TryPublish(() => StatusText = exception.Message);
-             },
-             _pathReadiness);
-        _statusText = settingsLoad.Warning switch
-        {
-            MachineIntegrationSetupLoadWarning.MissingOrInvalid => L(
-                "SettingsIncompatible",
-                "저장된 TCP 설정이 없거나 올바르지 않아 기본값을 복원했습니다. 수신은 시작되지 않았습니다.",
-                "Saved TCP settings were missing or invalid; defaults were restored. Listening was not started."),
-            MachineIntegrationSetupLoadWarning.ReadFailed => string.Format(
-                CultureInfo.CurrentCulture,
-                L(
-                    "SettingsReadFailed",
-                    "저장된 TCP 설정을 읽지 못해 기본값을 복원했습니다: {0}",
-                    "Saved TCP settings could not be read; defaults were restored: {0}"),
-                settingsLoad.ErrorMessage ?? string.Empty),
-            _ => L(
-                "Ready",
-                "설정을 확인했습니다. 폴더를 스캔하거나 검사를 실행하지 않았습니다.",
-                "Setup loaded. No folder was scanned and no inspection was run.")
-        };
+            _invokeOnUiThreadAsync,
+            exception => TryPublish(() => StatusText = exception.Message),
+            pathReadiness);
         _tcpControl = new(
-            RequireSavedTcpSettings,
+            Setup.RequireSavedTcpSettings,
             () => _resultObservation.LatestTransaction,
             RefreshResultsAsync,
-            status => TryPublish(() => StatusText = status));
+            status => TryPublish(() => StatusText = status),
+            _invokeOnUiThreadAsync);
+        tcpControl = _tcpControl;
+        Setup.PropertyChanged += OnSetupPropertyChanged;
+        Setup.ResetCompleted += OnSetupResetCompleted;
         _tcpControl.PropertyChanged += OnTcpControlPropertyChanged;
 
-        BrowseExchangeRootCommand = new RelayCommand(_ => BrowseExchangeRoot(), useCommandManagerRequery: false);
-        BrowseRecipeCommand = new RelayCommand(_ => BrowseRecipe(), useCommandManagerRequery: false);
-        SaveSetupCommand = new RelayCommand(
-            _ => SaveSetup(),
-            _ => CanEditTcpSetup,
-            useCommandManagerRequery: false);
-        ResetSetupCommand = new RelayCommand(
-            _ => ResetSetup(),
-            _ => CanEditTcpSetup,
-            useCommandManagerRequery: false);
         PublishTwoDImageHandoffCommand = new AsyncRelayCommand(
             _ => PublishTwoDImageHandoffAsync(),
             _ => CanPublishTwoDImageHandoff,
@@ -181,13 +136,11 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             _ => CanRefreshResults,
             HandleCommandException,
             useCommandManagerRequery: false);
+        Setup.RefreshCommandState();
         _resultObservation.ConfigureWatcher();
     }
 
-    public RelayCommand BrowseExchangeRootCommand { get; }
-    public RelayCommand BrowseRecipeCommand { get; }
-    public RelayCommand SaveSetupCommand { get; }
-    public RelayCommand ResetSetupCommand { get; }
+    public MachineIntegrationSetupViewModel Setup { get; }
     public AsyncRelayCommand PublishTwoDImageHandoffCommand { get; }
     public AsyncRelayCommand RefreshResultsCommand { get; }
     public RelayCommand StartTcpListenerCommand => _tcpControl.StartTcpListenerCommand;
@@ -195,107 +148,6 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     public RelayCommand PingTcpPeerCommand => _tcpControl.PingTcpPeerCommand;
     public RelayCommand PushLatestTransactionCommand => _tcpControl.PushLatestTransactionCommand;
     public RelayCommand PullLatestTransactionCommand => _tcpControl.PullLatestTransactionCommand;
-
-    public string ExchangeRoot
-    {
-        get => _exchangeRoot;
-        set
-        {
-            if (SetProperty(ref _exchangeRoot, value ?? string.Empty))
-            {
-                _resultObservation.ConfigureWatcher();
-                RefreshCommandState();
-                OnPropertyChanged(nameof(ExchangeRootStatusText));
-            }
-        }
-    }
-
-    public string InspectionRecipePath
-    {
-        get => _inspectionRecipePath;
-        set
-        {
-            if (SetProperty(ref _inspectionRecipePath, value ?? string.Empty))
-            {
-                RefreshCommandState();
-                OnPropertyChanged(nameof(InspectionRecipeStatusText));
-            }
-        }
-    }
-
-    public string TwoDConsumerVersion
-    {
-        get => _twoDConsumerVersion;
-        set
-        {
-            if (SetProperty(ref _twoDConsumerVersion, value ?? string.Empty))
-            {
-                RefreshCommandState();
-                OnPropertyChanged(nameof(TwoDConsumerIdentityStatusText));
-            }
-        }
-    }
-
-    public string TwoDConsumerCommit
-    {
-        get => _twoDConsumerCommit;
-        set
-        {
-            if (SetProperty(ref _twoDConsumerCommit, value ?? string.Empty))
-            {
-                RefreshCommandState();
-                OnPropertyChanged(nameof(TwoDConsumerIdentityStatusText));
-            }
-        }
-    }
-
-    public string TcpListenAddress
-    {
-        get => _tcpListenAddress;
-        set
-        {
-            if (SetProperty(ref _tcpListenAddress, value ?? string.Empty))
-            {
-                RefreshCommandState();
-            }
-        }
-    }
-
-    public string TcpListenPortText
-    {
-        get => _tcpListenPortText;
-        set
-        {
-            if (SetProperty(ref _tcpListenPortText, value ?? string.Empty))
-            {
-                RefreshCommandState();
-            }
-        }
-    }
-
-    public string TcpPeerHost
-    {
-        get => _tcpPeerHost;
-        set
-        {
-            if (SetProperty(ref _tcpPeerHost, value ?? string.Empty))
-            {
-                RefreshCommandState();
-            }
-        }
-    }
-
-    public string TcpPeerPortText
-    {
-        get => _tcpPeerPortText;
-        set
-        {
-            if (SetProperty(ref _tcpPeerPortText, value ?? string.Empty))
-            {
-                RefreshCommandState();
-            }
-        }
-    }
 
     public bool IsBusy
     {
@@ -323,8 +175,8 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
                 return false;
             }
 
-            var consumer = TwoDConsumerIdentity;
-            var paths = _pathReadiness.Evaluate(ExchangeRoot, InspectionRecipePath);
+            var consumer = Setup.TwoDConsumerIdentity;
+            var paths = Setup.Readiness;
             if (!_integrationParticipant.CanStart
                 || consumer is null
                 || !paths.CanPublishHandoff)
@@ -340,23 +192,11 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
         !IsDisposed
         && _integrationParticipant.CanStart
         && !string.IsNullOrWhiteSpace(_projectIdProvider())
-        && _pathReadiness.Evaluate(ExchangeRoot, InspectionRecipePath).CanRefreshResults;
+        && Setup.Readiness.CanRefreshResults;
 
     public bool CanPushLatestTransaction => _tcpControl.CanPushLatestTransaction;
 
     public bool CanPullLatestTransaction => _tcpControl.CanPullLatestTransaction;
-
-    public string ExchangeRootStatusText => _pathReadiness.Evaluate(ExchangeRoot, InspectionRecipePath).IsExchangeRootAvailable
-        ? L("Available", "교환 폴더를 사용할 수 있습니다.", "Exchange folder is available.")
-        : L("Unavailable", "교환 폴더를 선택하고 설정 저장을 누르세요.", "Choose an exchange folder and save setup.");
-
-    public string InspectionRecipeStatusText => _pathReadiness.Evaluate(ExchangeRoot, InspectionRecipePath).IsInspectionRecipeAvailable
-        ? L("RecipeAvailable", "2D 검사 레시피 파일을 사용할 수 있습니다.", "The 2D inspection recipe file is available.")
-        : L("RecipeRequired", "2D 소비자가 읽을 레시피 파일을 선택하세요.", "Choose the recipe file that the 2D consumer will read.");
-
-    public string TwoDConsumerIdentityStatusText => TwoDConsumerIdentity is not null
-        ? L("ConsumerIdentityValid", "2D 소비자 clean build identity가 유효합니다.", "The 2D consumer clean-build identity is valid.")
-        : L("ConsumerIdentityInvalid", "2D 소비자 버전과 40자리 source commit을 입력하세요.", "Enter the 2D consumer version and its 40-character source commit.");
 
     public string HandoffStatusText => _resultObservation.LatestTransaction is null
         ? L("NoHandoff", "현재 프로젝트의 Handoff가 없습니다.", "No Handoff exists for the current project.")
@@ -456,26 +296,6 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _statusText, value);
     }
 
-    public IntegrationApplicationIdentity? TwoDConsumerIdentity
-    {
-        get
-        {
-            var commit = TwoDConsumerCommit.Trim();
-            if (string.IsNullOrWhiteSpace(TwoDConsumerVersion)
-                || commit.Length != 40
-                || commit.Any(character => !Uri.IsHexDigit(character)))
-            {
-                return null;
-            }
-
-            return new(
-                IntegrationApplicationIds.TwoDStudio,
-                TwoDConsumerVersion.Trim(),
-                commit,
-                IntegrationSourceState.Clean);
-        }
-    }
-
     internal void RefreshSourceContext()
     {
         if (_requestContextProvider is not { } getContext)
@@ -505,9 +325,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
 
     public void RefreshLocalization()
     {
-        OnPropertyChanged(nameof(ExchangeRootStatusText));
-        OnPropertyChanged(nameof(InspectionRecipeStatusText));
-        OnPropertyChanged(nameof(TwoDConsumerIdentityStatusText));
+        Setup.RefreshLocalization();
         _tcpControl.RefreshLocalization();
         RaiseProjectionChanged();
         StatusText = L(
@@ -546,99 +364,10 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
 
     internal Task PullLatestTransactionAsync() => _tcpControl.PullLatestTransactionAsync();
 
-    private void BrowseExchangeRoot()
-    {
-        if (_selectExchangeRoot(ExchangeRoot) is { } selectedPath)
-        {
-            ExchangeRoot = selectedPath;
-            StatusText = L(
-                "FolderSelected",
-                "교환 폴더를 선택했습니다. 설정 저장을 눌러 기억하세요.",
-                "Exchange folder selected. Choose Save setup to remember it.");
-        }
-    }
-
-    private void BrowseRecipe()
-    {
-        if (_selectInspectionRecipe(InspectionRecipePath) is { } selectedPath)
-        {
-            InspectionRecipePath = selectedPath;
-            StatusText = L(
-                "RecipeSelected",
-                "2D 레시피를 선택했습니다. 설정 저장 후 Publish를 실행하세요.",
-                "2D recipe selected. Save setup before publishing.");
-        }
-    }
-
-    private void SaveSetup()
-    {
-        try
-        {
-            var root = RequireText(ExchangeRoot, L("RootRequired", "교환 폴더를 선택하세요.", "Choose an exchange folder."));
-            var tcp = ResolveCurrentTcpSettings(root);
-            Directory.CreateDirectory(tcp.ExchangeRoot);
-            var settings = new MachineIntegrationSetup
-            {
-                ExchangeRoot = tcp.ExchangeRoot,
-                InspectionRecipePath = _pathReadiness.NormalizeFullPath(InspectionRecipePath),
-                TwoDConsumerVersion = TwoDConsumerVersion.Trim(),
-                TwoDConsumerCommit = TwoDConsumerCommit.Trim(),
-                TcpListenAddress = tcp.ListenAddress.ToString(),
-                TcpListenPort = tcp.ListenPort,
-                TcpPeerHost = tcp.PeerHost,
-                TcpPeerPort = tcp.PeerPort
-            };
-            _setupStore.Save(settings);
-            ExchangeRoot = settings.ExchangeRoot;
-            InspectionRecipePath = settings.InspectionRecipePath;
-            TwoDConsumerVersion = settings.TwoDConsumerVersion;
-            TwoDConsumerCommit = settings.TwoDConsumerCommit;
-            TcpListenAddress = settings.TcpListenAddress;
-            TcpListenPortText = settings.TcpListenPort.ToString(CultureInfo.InvariantCulture);
-            TcpPeerHost = settings.TcpPeerHost;
-            TcpPeerPortText = settings.TcpPeerPort.ToString(CultureInfo.InvariantCulture);
-            StatusText = L(
-                "SetupSaved",
-                "교환 폴더와 TCP 주소를 저장했습니다. 공유 키는 저장하지 않으며 네트워크/Publish/Refresh는 실행하지 않았습니다.",
-                "Exchange folder and TCP endpoints saved. The shared key is not saved; network, Publish, and Refresh were not run.");
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            StatusText = exception.Message;
-        }
-    }
-
-    private void ResetSetup()
-    {
-        try
-        {
-            _setupStore.Reset();
-            ExchangeRoot = string.Empty;
-            InspectionRecipePath = string.Empty;
-            TwoDConsumerVersion = string.Empty;
-            TwoDConsumerCommit = string.Empty;
-            TcpListenAddress = "127.0.0.1";
-            TcpListenPortText = "45101";
-            TcpPeerHost = "127.0.0.1";
-            TcpPeerPortText = "45102";
-            SetSessionSharedKey(null);
-            _resultObservation.Reset();
-            RaiseProjectionChanged();
-            StatusText = L(
-                "SetupReset",
-                "통합 설정을 초기화했습니다. Handoff 작업은 실행하지 않았습니다.",
-                "Integration setup reset. No Handoff action was run.");
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            StatusText = exception.Message;
-        }
-    }
-
     private Task<MachineIntegrationOperationObservation> PublishTwoDImageHandoffAsync()
     {
         if (!CanPublishTwoDImageHandoff
-            || TwoDConsumerIdentity is not { } consumer
+            || Setup.TwoDConsumerIdentity is not { } consumer
             || !_integrationParticipant.CanStart)
         {
             return Task.FromResult(new MachineIntegrationOperationObservation(
@@ -670,14 +399,14 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            var request = _requestFactory(_pathReadiness.Normalize(InspectionRecipePath), consumer)
+            var request = _requestFactory(Setup.NormalizePath(Setup.InspectionRecipePath), consumer)
                 ?? throw new InvalidOperationException(
                     L(
                         "ContextNotReady",
                         "저장된 프로젝트에서 완료된 가상 카메라 프레임을 먼저 준비하세요.",
                         "Prepare a completed virtual-camera frame from a saved project first."));
-                var handoff = await MachineIntegrationHandoffPublisher.PublishAsync(
-                    _pathReadiness.Normalize(ExchangeRoot),
+            var handoff = await MachineIntegrationHandoffPublisher.PublishAsync(
+                    Setup.NormalizePath(Setup.ExchangeRoot),
                     request)
                 .ConfigureAwait(true);
             TryPublish(() =>
@@ -754,8 +483,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(CanRefreshResults));
         PublishTwoDImageHandoffCommand.RaiseCanExecuteChanged();
         RefreshResultsCommand.RaiseCanExecuteChanged();
-        SaveSetupCommand.RaiseCanExecuteChanged();
-        ResetSetupCommand.RaiseCanExecuteChanged();
+        Setup.RefreshCommandState();
         _tcpControl.RefreshCommandState();
     }
 
@@ -774,6 +502,22 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
         {
             TryPublish(() => OnPropertyChanged(propertyName));
         }
+    }
+
+    private void OnSetupPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(MachineIntegrationSetupViewModel.ExchangeRoot))
+        {
+            _resultObservation.ConfigureWatcher();
+        }
+
+        TryPublish(RefreshCommandState);
+    }
+
+    private void OnSetupResetCompleted(object? sender, EventArgs args)
+    {
+        _resultObservation.Reset();
+        RaiseProjectionChanged();
     }
 
     private void OnIntegrationParticipantStateChanged(object? sender, EventArgs args)
@@ -805,85 +549,6 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     private static Task ExecuteImmediatelyAsync(Func<Task> operation) => operation();
 
     private void HandleCommandException(Exception exception) => TryPublish(() => StatusText = exception.Message);
-
-    private MachineIntegrationTcpSettings RequireSavedTcpSettings()
-    {
-        var root = _pathReadiness.NormalizeFullPath(RequireText(
-            ExchangeRoot,
-            L(
-                "ChooseAndSaveFolder",
-                "교환 폴더를 선택하고 저장하세요.",
-                "Choose and save an exchange folder.")));
-        var current = ResolveCurrentTcpSettings(root);
-        if (!_setupStore.MatchesSavedTcpSettings(current))
-        {
-            throw new InvalidOperationException(L(
-                "SaveCurrentTcpSetup",
-                "TCP 작업 전에 현재 교환 폴더와 주소를 설정 저장하세요.",
-                "Save the current exchange folder and TCP endpoints before a TCP action."));
-        }
-
-        if (!_pathReadiness.IsExchangeRootAvailable(root))
-        {
-            throw new DirectoryNotFoundException(L(
-                "SavedFolderUnavailable",
-                "저장한 교환 폴더를 사용할 수 없습니다. 폴더를 다시 선택하거나 만든 뒤 설정을 저장하세요.",
-                "The saved exchange folder is unavailable. Choose or recreate it, then save setup again."));
-        }
-
-        return current;
-    }
-
-    private MachineIntegrationTcpSettings ResolveCurrentTcpSettings(string exchangeRoot)
-    {
-        var listenAddressText = RequireText(
-            TcpListenAddress,
-            L(
-                "TcpListenAddressRequired",
-                "TCP 수신 주소를 입력하세요.",
-                "Enter a TCP listen address."));
-        if (!IPAddress.TryParse(listenAddressText, out var listenAddress))
-        {
-            throw new ArgumentException(L(
-                "TcpListenAddressInvalid",
-                "TCP 수신 주소는 이 PC의 올바른 IP 주소여야 합니다.",
-                "The TCP listen address must be a valid IP address on this PC."));
-        }
-
-        return new(
-            _pathReadiness.NormalizeFullPath(exchangeRoot),
-            listenAddress,
-            ParsePort(
-                TcpListenPortText,
-                L("TcpListenPort", "수신 포트", "listen port")),
-            RequireText(
-                TcpPeerHost,
-                L("TcpPeerRequired", "TCP 상대 주소를 입력하세요.", "Enter a TCP peer host.")),
-            ParsePort(
-                TcpPeerPortText,
-                L("TcpPeerPort", "상대 포트", "peer port")));
-    }
-
-    private static int ParsePort(string value, string name)
-    {
-        if (!int.TryParse(
-                value,
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out var port)
-            || port is < 1 or > IPEndPoint.MaxPort)
-        {
-            throw new ArgumentException(
-                $"{name} must be between 1 and {IPEndPoint.MaxPort}.");
-        }
-
-        return port;
-    }
-
-    private static string RequireText(string value, string message) =>
-        string.IsNullOrWhiteSpace(value)
-            ? throw new ArgumentException(message)
-            : value.Trim();
 
     private static string L(string key, string korean, string english) =>
         OpenVisionLanguageService.CurrentLanguage == OpenVisionLanguage.English
@@ -929,6 +594,8 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
 
         _integrationParticipant.StateChanged -= OnIntegrationParticipantStateChanged;
         _integrationParticipant.Dispose();
+        Setup.PropertyChanged -= OnSetupPropertyChanged;
+        Setup.ResetCompleted -= OnSetupResetCompleted;
         _tcpControl.PropertyChanged -= OnTcpControlPropertyChanged;
         _resultObservation.Dispose();
         _tcpControl.Dispose();

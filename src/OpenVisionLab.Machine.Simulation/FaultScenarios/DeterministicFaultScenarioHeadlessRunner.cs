@@ -7,6 +7,7 @@ using OpenVisionLab.Machine.Simulation.Analysis;
 using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Compilation;
 using OpenVisionLab.Machine.Simulation.Engine;
+using OpenVisionLab.Machine.Simulation.Scenarios;
 
 namespace OpenVisionLab.Machine.Simulation.FaultScenarios;
 
@@ -197,7 +198,10 @@ public sealed class DeterministicFaultScenarioHeadlessRunner
         }
 
         var payload = JsonSerializer.Serialize(report, DeterministicFaultScenarioHeadlessRunReport.ReportJsonOptions);
-        await File.WriteAllTextAsync(fullPath, payload, cancellationToken).ConfigureAwait(false);
+        await AtomicEvidenceFile.WriteAsync(
+            fullPath,
+            (temporaryPath, token) => File.WriteAllTextAsync(temporaryPath, payload, token),
+            cancellationToken).ConfigureAwait(false);
     }
 
     private static string[] RuntimeCompilationErrors(

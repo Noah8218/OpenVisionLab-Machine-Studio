@@ -31,6 +31,7 @@
   <ItemGroup>
     <ProjectReference Include="..\OpenVisionLab.Machine.Core\OpenVisionLab.Machine.Core.csproj" />
     <ProjectReference Include="..\OpenVisionLab.Machine.IO\OpenVisionLab.Machine.IO.csproj" />
+    <ProjectReference Include="..\OpenVisionLab.Machine.Persistence\OpenVisionLab.Machine.Persistence.csproj" />
     <ProjectReference Include="..\OpenVisionLab.Machine.Infrastructure\OpenVisionLab.Machine.Infrastructure.csproj" />
     <ProjectReference Include="..\OpenVisionLab.Machine.Sequence\OpenVisionLab.Machine.Sequence.csproj" />
     <ProjectReference Include="..\OpenVisionLab.Machine.Simulation\OpenVisionLab.Machine.Simulation.csproj" />

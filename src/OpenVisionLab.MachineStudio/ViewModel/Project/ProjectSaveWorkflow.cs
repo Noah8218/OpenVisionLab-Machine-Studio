@@ -1,5 +1,6 @@
 using System.IO;
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Persistence.Projects;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
@@ -9,7 +10,8 @@ namespace OpenVisionLab.MachineStudio.ViewModel;
 /// </summary>
 internal sealed class ProjectSaveWorkflow
 {
-    private readonly ProjectDocumentStore _projectStore;
+    private readonly ProjectDocumentFileStore _projectStore;
+    private readonly ProjectDocumentStore _documentStore;
     private readonly Func<MachineProjectDocument> _getProject;
     private readonly Action<MachineProjectDocument> _prepareProject;
     private readonly Action<string> _persistScenarioBatchArtifacts;
@@ -17,7 +19,8 @@ internal sealed class ProjectSaveWorkflow
     private readonly Action<string> _persistVisionEvidence;
 
     internal ProjectSaveWorkflow(
-        ProjectDocumentStore projectStore,
+        ProjectDocumentFileStore projectStore,
+        ProjectDocumentStore documentStore,
         Func<MachineProjectDocument> getProject,
         Action<MachineProjectDocument> prepareProject,
         Action<string> persistScenarioBatchArtifacts,
@@ -25,6 +28,7 @@ internal sealed class ProjectSaveWorkflow
         Action<string> persistVisionEvidence)
     {
         _projectStore = projectStore ?? throw new ArgumentNullException(nameof(projectStore));
+        _documentStore = documentStore ?? throw new ArgumentNullException(nameof(documentStore));
         _getProject = getProject ?? throw new ArgumentNullException(nameof(getProject));
         _prepareProject = prepareProject ?? throw new ArgumentNullException(nameof(prepareProject));
         _persistScenarioBatchArtifacts = persistScenarioBatchArtifacts
@@ -50,7 +54,7 @@ internal sealed class ProjectSaveWorkflow
             ?? throw new InvalidOperationException("The current project is not available.");
         _prepareProject(project);
         var contentHash = ProjectDocumentSession.ComputeContentHash(
-            _projectStore.SerializeForEvidence(project));
+            _documentStore.SerializeForEvidence(project));
         await _projectStore.SaveAsync(project, path);
 
         var fullPath = Path.GetFullPath(path);

@@ -23,6 +23,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\OpenVisionLab.MachineStudio\OpenVisionLab.MachineStudio.csproj" />
+    <ProjectReference Include="..\..\src\OpenVisionLab.Machine.Infrastructure\OpenVisionLab.Machine.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\OpenVisionLab.Machine.Persistence\OpenVisionLab.Machine.Persistence.csproj" />
   </ItemGroup>
 
   <ItemGroup>

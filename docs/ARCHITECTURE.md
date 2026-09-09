@@ -71,20 +71,43 @@ Camera acquisition and Vision evidence remain supported secondary capabilities.
 They join a machine cycle when an inspection task requires them; they do not own
 the core equipment-simulation workflow.
 
-For current source navigation, read [DEVELOPER_ONBOARDING.md](DEVELOPER_ONBOARDING.md)
-and [MVVM_ARCHITECTURE.md](MVVM_ARCHITECTURE.md). MachineStudio feature owners
-live in shallow `ViewModel` domain folders; `MainViewModel.cs` remains the root
-composition entrypoint. Folder movement preserves existing namespaces and does
-not itself change the module dependency graph below.
+## Source navigation
+
+The shortest code-reading route follows the runtime rather than the UI tree:
+
+```text
+MachineStudio/MainViewModel
+  -> ViewModel/Simulation/Session/SimulationSessionCoordinator
+  -> Simulation/Engine/Runtime/FixedStepSimulationEngine
+  -> Simulation/Commands/Axis and Commands/Equipment (axis/I/O commands)
+  -> Sequence/Runtime and Simulation/Engine/Sequence
+  -> Vision contracts and Simulation/Scenarios/Vision
+  -> Simulation/Engine/Faults
+  -> Simulation/Scenarios/Evidence (result/evidence packages)
+```
+
+The physical folders make the ownership visible without changing namespaces or
+public bindings. `ViewModel/Recipes` is grouped by authoring, dry-run, gallery,
+semantic equipment, and station setup; `ViewModel/Simulation` is grouped by
+faults, runtime, scenarios, session, and trace. Simulation commands are grouped
+by axis, camera, equipment, faults, run control, and sequence. The corresponding
+simulation tests use the same responsibility names, so a caller and its focused
+test can be found by the same search term.
+
+`MainViewModel.cs` remains the WPF composition entrypoint. Folder movement
+preserves existing namespaces, XAML bindings, and the module dependency graph.
 
 ## Layered architecture
 
 ```text
 MachineStudio (WPF composition and presentation)
-  -> Core, IO, Sequence, Simulation, Vision, Infrastructure
+  -> Core, IO, Persistence, Sequence, Simulation, Vision, Infrastructure
 
 Infrastructure (project assets and external adapters)
   -> Vision
+
+Persistence (project JSON file adapter and catalog)
+  -> Core
 
 Simulation (project compiler, fixed-step composition, runtime truth,
             deterministic execution evidence)

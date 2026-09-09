@@ -2000,15 +2000,15 @@
                                 <TextBox x:Name="IntegrationExchangeRootTextBox"
                                          MinHeight="28"
                                          HorizontalScrollBarVisibility="Auto"
-                                         Text="{Binding Integration.ExchangeRoot, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Text="{Binding Integration.Setup.ExchangeRoot, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          TextWrapping="NoWrap"
-                                         ToolTip="{Binding Integration.ExchangeRoot}"
+                                         ToolTip="{Binding Integration.Setup.ExchangeRoot}"
                                          AutomationProperties.AutomationId="IntegrationExchangeRootTextBox"
                                          AutomationProperties.Name="{loc:Loc Key=Integration.ExchangeRoot}" />
                                 <Button x:Name="BrowseIntegrationExchangeRootButton"
                                         Grid.Column="1"
                                         Margin="6,0,0,0"
-                                        Command="{Binding Integration.BrowseExchangeRootCommand}"
+                                        Command="{Binding Integration.Setup.BrowseExchangeRootCommand}"
                                         Content="{loc:Loc Key=Integration.Browse}"
                                         ToolTip="{loc:Loc Key=Integration.BrowseExchangeRootTooltip}"
                                         AutomationProperties.AutomationId="BrowseIntegrationExchangeRootButton"
@@ -2017,7 +2017,7 @@
                             <TextBlock Margin="0,3,0,0"
                                        FontSize="10"
                                        Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding Integration.ExchangeRootStatusText}"
+                                       Text="{Binding Integration.Setup.ExchangeRootStatusText}"
                                        TextWrapping="Wrap" />
                             <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
                                        Text="{loc:Loc Key=Integration.Recipe}" />
@@ -2029,15 +2029,15 @@
                                 <TextBox x:Name="IntegrationRecipePathTextBox"
                                          MinHeight="28"
                                          HorizontalScrollBarVisibility="Auto"
-                                         Text="{Binding Integration.InspectionRecipePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Text="{Binding Integration.Setup.InspectionRecipePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          TextWrapping="NoWrap"
-                                         ToolTip="{Binding Integration.InspectionRecipePath}"
+                                         ToolTip="{Binding Integration.Setup.InspectionRecipePath}"
                                          AutomationProperties.AutomationId="IntegrationRecipePathTextBox"
                                          AutomationProperties.Name="{loc:Loc Key=Integration.Recipe}" />
                                 <Button x:Name="BrowseIntegrationRecipeButton"
                                         Grid.Column="1"
                                         Margin="6,0,0,0"
-                                        Command="{Binding Integration.BrowseRecipeCommand}"
+                                        Command="{Binding Integration.Setup.BrowseRecipeCommand}"
                                         Content="{loc:Loc Key=Integration.Browse}"
                                         ToolTip="{loc:Loc Key=Integration.BrowseRecipeTooltip}"
                                         AutomationProperties.AutomationId="BrowseIntegrationRecipeButton"
@@ -2046,13 +2046,13 @@
                             <TextBlock Margin="0,3,0,0"
                                        FontSize="10"
                                        Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding Integration.InspectionRecipeStatusText}"
+                                       Text="{Binding Integration.Setup.InspectionRecipeStatusText}"
                                        TextWrapping="Wrap" />
                             <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
                                        Text="{loc:Loc Key=Integration.ConsumerVersion}" />
                             <TextBox x:Name="IntegrationTwoDConsumerVersionTextBox"
                                      MinHeight="28"
-                                     Text="{Binding Integration.TwoDConsumerVersion, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Text="{Binding Integration.Setup.TwoDConsumerVersion, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      AutomationProperties.AutomationId="IntegrationTwoDConsumerVersionTextBox"
                                      AutomationProperties.Name="{loc:Loc Key=Integration.ConsumerVersion}" />
                             <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
@@ -2062,7 +2062,7 @@
                                      FontFamily="{StaticResource Typography.Telemetry}"
                                      FontSize="9.5"
                                      HorizontalScrollBarVisibility="Auto"
-                                     Text="{Binding Integration.TwoDConsumerCommit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Text="{Binding Integration.Setup.TwoDConsumerCommit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      TextWrapping="NoWrap"
                                      ToolTip="{loc:Loc Key=Integration.ConsumerCommitTooltip}"
                                      AutomationProperties.AutomationId="IntegrationTwoDConsumerCommitTextBox"
@@ -2070,7 +2070,7 @@
                             <TextBlock Margin="0,3,0,0"
                                        FontSize="10"
                                        Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding Integration.TwoDConsumerIdentityStatusText}"
+                                       Text="{Binding Integration.Setup.TwoDConsumerIdentityStatusText}"
                                        TextWrapping="Wrap" />
                             <Expander Margin="0,10,0,0"
                                       IsExpanded="True"
@@ -2100,7 +2100,7 @@
                                         <TextBox x:Name="IntegrationTcpListenAddressTextBox"
                                                  Grid.Column="2"
                                                  MinHeight="28"
-                                                 Text="{Binding Integration.TcpListenAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 Text="{Binding Integration.Setup.TcpListenAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  IsEnabled="{Binding Integration.CanEditTcpSetup}"
                                                  AutomationProperties.AutomationId="IntegrationTcpListenAddressTextBox"
                                                  AutomationProperties.Name="{loc:Loc Key=Integration.TcpListenAddress}" />
@@ -2113,7 +2113,7 @@
                                                  Grid.Column="2"
                                                  Margin="0,3,0,0"
                                                  MinHeight="28"
-                                                 Text="{Binding Integration.TcpListenPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 Text="{Binding Integration.Setup.TcpListenPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  IsEnabled="{Binding Integration.CanEditTcpSetup}"
                                                  AutomationProperties.AutomationId="IntegrationTcpListenPortTextBox"
                                                  AutomationProperties.Name="{loc:Loc Key=Integration.TcpListenPort}" />
@@ -2126,7 +2126,7 @@
                                                  Grid.Column="2"
                                                  Margin="0,3,0,0"
                                                  MinHeight="28"
-                                                 Text="{Binding Integration.TcpPeerHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 Text="{Binding Integration.Setup.TcpPeerHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  IsEnabled="{Binding Integration.CanEditTcpSetup}"
                                                  AutomationProperties.AutomationId="IntegrationTcpPeerHostTextBox"
                                                  AutomationProperties.Name="{loc:Loc Key=Integration.TcpPeerHost}" />
@@ -2139,7 +2139,7 @@
                                                  Grid.Column="2"
                                                  Margin="0,3,0,0"
                                                  MinHeight="28"
-                                                 Text="{Binding Integration.TcpPeerPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 Text="{Binding Integration.Setup.TcpPeerPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  IsEnabled="{Binding Integration.CanEditTcpSetup}"
                                                  AutomationProperties.AutomationId="IntegrationTcpPeerPortTextBox"
                                                  AutomationProperties.Name="{loc:Loc Key=Integration.TcpPeerPort}" />
@@ -2249,14 +2249,14 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <Button x:Name="SaveIntegrationSetupButton"
-                                        Command="{Binding Integration.SaveSetupCommand}"
+                                        Command="{Binding Integration.Setup.SaveSetupCommand}"
                                         Content="{loc:Loc Key=Integration.SaveSetup}"
                                         ToolTip="{loc:Loc Key=Integration.SaveSetupTooltip}"
                                         AutomationProperties.AutomationId="SaveIntegrationSetupButton"
                                         AutomationProperties.Name="{loc:Loc Key=Integration.SaveSetup}" />
                                 <Button x:Name="ResetIntegrationSetupButton"
                                         Grid.Column="2"
-                                        Command="{Binding Integration.ResetSetupCommand}"
+                                        Command="{Binding Integration.Setup.ResetSetupCommand}"
                                         Click="OnResetIntegrationSetupClicked"
                                         Content="{loc:Loc Key=Integration.ResetSetup}"
                                         ToolTip="{loc:Loc Key=Integration.ResetSetupTooltip}"

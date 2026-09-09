@@ -31,19 +31,48 @@ public sealed class RecipeConnectionWorkbenchViewModelTests
             () => clearCount++);
 
         viewModel.Load(project);
-        Assert.True(viewModel.PreviewInspectionHandoffSetupCommand.CanExecute(null));
+        var semantic = viewModel;
+        Assert.True(semantic.InspectionHandoff.PreviewCommand.CanExecute(null));
 
-        viewModel.PreviewInspectionHandoffSetupCommand.Execute(null);
+        semantic.InspectionHandoff.PreviewCommand.Execute(null);
 
         Assert.Equal(1, clearCount);
-        Assert.True(viewModel.IsInspectionHandoffSetupVisible);
-        Assert.True(viewModel.CancelInspectionHandoffSetupCommand.CanExecute(null));
+        Assert.True(semantic.InspectionHandoff.IsVisible);
+        Assert.True(semantic.InspectionHandoff.CancelCommand.CanExecute(null));
 
-        viewModel.IsEditable = false;
+        semantic.IsEditable = false;
 
-        Assert.False(viewModel.PreviewInspectionHandoffSetupCommand.CanExecute(null));
-        Assert.False(viewModel.ApplyInspectionHandoffSetupCommand.CanExecute(null));
-        Assert.True(viewModel.CancelInspectionHandoffSetupCommand.CanExecute(null));
+        Assert.False(semantic.InspectionHandoff.PreviewCommand.CanExecute(null));
+        Assert.False(semantic.InspectionHandoff.ApplyCommand.CanExecute(null));
+        Assert.True(semantic.InspectionHandoff.CancelCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void SemanticSetupChildrenKeepPreviewStateMutuallyExclusive()
+    {
+        var project = new ProjectDocumentStore().Load(File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "SemiconductorRecipes",
+            "04-WaferOcrInspection.ovmachine")));
+        SemanticEquipmentSetupViewModel? semantic = null;
+        semantic = new SemanticEquipmentSetupViewModel(
+            _ => 0,
+            _ => 0,
+            _ => 0,
+            _ => 0,
+            _ => 0,
+            () => semantic!.ClearPreviewForCompetingSetup());
+
+        semantic.Load(project);
+        semantic.WaferHandler.PreviewCommand.Execute(null);
+        Assert.True(semantic.WaferHandler.IsVisible);
+        Assert.False(semantic.Prealigner.IsVisible);
+        Assert.False(semantic.InspectionHandoff.IsVisible);
+
+        semantic.Prealigner.PreviewCommand.Execute(null);
+        Assert.False(semantic.WaferHandler.IsVisible);
+        Assert.True(semantic.Prealigner.IsVisible);
+        Assert.False(semantic.InspectionHandoff.IsVisible);
     }
 
     [Fact]
@@ -261,85 +290,87 @@ public sealed class RecipeConnectionWorkbenchViewModelTests
                 () => dryRunCount++,
                 () => playbackCount++);
             viewModel.Load(project);
+            var semantic = viewModel.SemanticSetups;
 
             ICommand PreviewCommand() => setupKind switch
             {
-                "wafer-handler" => viewModel.SemanticSetups.PreviewWaferHandlerSetupCommand,
-                "prealigner" => viewModel.SemanticSetups.PreviewPrealignerSetupCommand,
-                "inspection-handoff" => viewModel.SemanticSetups.PreviewInspectionHandoffSetupCommand,
-                "inspection-sort" => viewModel.SemanticSetups.PreviewInspectionSortRouterSetupCommand,
-                _ => viewModel.SemanticSetups.PreviewOhtHandoffSetupCommand
+                "wafer-handler" => semantic.WaferHandler.PreviewCommand,
+                "prealigner" => semantic.Prealigner.PreviewCommand,
+                "inspection-handoff" => semantic.InspectionHandoff.PreviewCommand,
+                "inspection-sort" => semantic.InspectionSortRouter.PreviewCommand,
+                _ => semantic.OhtHandoff.PreviewCommand
             };
             ICommand ApplyCommand() => setupKind switch
             {
-                "wafer-handler" => viewModel.SemanticSetups.ApplyWaferHandlerSetupCommand,
-                "prealigner" => viewModel.SemanticSetups.ApplyPrealignerSetupCommand,
-                "inspection-handoff" => viewModel.SemanticSetups.ApplyInspectionHandoffSetupCommand,
-                "inspection-sort" => viewModel.SemanticSetups.ApplyInspectionSortRouterSetupCommand,
-                _ => viewModel.SemanticSetups.ApplyOhtHandoffSetupCommand
+                "wafer-handler" => semantic.WaferHandler.ApplyCommand,
+                "prealigner" => semantic.Prealigner.ApplyCommand,
+                "inspection-handoff" => semantic.InspectionHandoff.ApplyCommand,
+                "inspection-sort" => semantic.InspectionSortRouter.ApplyCommand,
+                _ => semantic.OhtHandoff.ApplyCommand
             };
             ICommand ResetCommand() => setupKind switch
             {
-                "wafer-handler" => viewModel.SemanticSetups.ResetWaferHandlerSetupCommand,
-                "prealigner" => viewModel.SemanticSetups.ResetPrealignerSetupCommand,
-                "inspection-handoff" => viewModel.SemanticSetups.ResetInspectionHandoffSetupCommand,
-                "inspection-sort" => viewModel.SemanticSetups.ResetInspectionSortRouterSetupCommand,
-                _ => viewModel.SemanticSetups.ResetOhtHandoffSetupCommand
+                "wafer-handler" => semantic.WaferHandler.ResetCommand,
+                "prealigner" => semantic.Prealigner.ResetCommand,
+                "inspection-handoff" => semantic.InspectionHandoff.ResetCommand,
+                "inspection-sort" => semantic.InspectionSortRouter.ResetCommand,
+                _ => semantic.OhtHandoff.ResetCommand
             };
             ICommand CancelCommand() => setupKind switch
             {
-                "wafer-handler" => viewModel.SemanticSetups.CancelWaferHandlerSetupCommand,
-                "prealigner" => viewModel.SemanticSetups.CancelPrealignerSetupCommand,
-                "inspection-handoff" => viewModel.SemanticSetups.CancelInspectionHandoffSetupCommand,
-                "inspection-sort" => viewModel.SemanticSetups.CancelInspectionSortRouterSetupCommand,
-                _ => viewModel.SemanticSetups.CancelOhtHandoffSetupCommand
+                "wafer-handler" => semantic.WaferHandler.CancelCommand,
+                "prealigner" => semantic.Prealigner.CancelCommand,
+                "inspection-handoff" => semantic.InspectionHandoff.CancelCommand,
+                "inspection-sort" => semantic.InspectionSortRouter.CancelCommand,
+                _ => semantic.OhtHandoff.CancelCommand
             };
             string? DraftValue() => setupKind switch
             {
-                "wafer-handler" => viewModel.SemanticSetups.WaferHandlerHorizontalAxisId,
-                "prealigner" => viewModel.SemanticSetups.PrealignerRotaryStageComponentId,
-                "inspection-handoff" => viewModel.SemanticSetups.InspectionHandoffCameraId,
-                "inspection-sort" => viewModel.SemanticSetups.InspectionSortCameraId,
-                _ => viewModel.SemanticSetups.OhtTransportConveyorId
+                "wafer-handler" => semantic.WaferHandler.HorizontalAxisId,
+                "prealigner" => semantic.Prealigner.RotaryStageComponentId,
+                "inspection-handoff" => semantic.InspectionHandoff.CameraId,
+                "inspection-sort" => semantic.InspectionSortRouter.CameraId,
+                _ => semantic.OhtHandoff.TransportConveyorId
             };
             void SetDraftValue(string value)
             {
-                if (setupKind == "wafer-handler") viewModel.SemanticSetups.WaferHandlerHorizontalAxisId = value;
-                else if (setupKind == "prealigner") viewModel.SemanticSetups.PrealignerRotaryStageComponentId = value;
-                else if (setupKind == "inspection-handoff") viewModel.SemanticSetups.InspectionHandoffCameraId = value;
-                else if (setupKind == "inspection-sort") viewModel.SemanticSetups.InspectionSortCameraId = value;
-                else viewModel.SemanticSetups.OhtTransportConveyorId = value;
+                if (setupKind == "wafer-handler") semantic.WaferHandler.HorizontalAxisId = value;
+                else if (setupKind == "prealigner") semantic.Prealigner.RotaryStageComponentId = value;
+                else if (setupKind == "inspection-handoff") semantic.InspectionHandoff.CameraId = value;
+                else if (setupKind == "inspection-sort") semantic.InspectionSortRouter.CameraId = value;
+                else semantic.OhtHandoff.TransportConveyorId = value;
             }
             ObservableCollection<LoadLockSetupOption> DraftOptions() => setupKind switch
             {
-                "wafer-handler" => viewModel.SemanticSetups.WaferHandlerAxisOptions,
-                "prealigner" => viewModel.SemanticSetups.PrealignerStageOptions,
-                "oht" => viewModel.SemanticSetups.InspectionConveyorOptions,
-                _ => viewModel.SemanticSetups.InspectionCameraOptions
+                "wafer-handler" => semantic.WaferHandler.AxisOptions,
+                "prealigner" => semantic.Prealigner.StageOptions,
+                "oht" => semantic.OhtHandoff.ConveyorOptions,
+                "inspection-sort" => semantic.InspectionSortRouter.CameraOptions,
+                _ => semantic.InspectionHandoff.CameraOptions
             };
             bool IsVisible() => setupKind switch
             {
-                "wafer-handler" => viewModel.SemanticSetups.IsWaferHandlerSetupVisible,
-                "prealigner" => viewModel.SemanticSetups.IsPrealignerSetupVisible,
-                "inspection-handoff" => viewModel.SemanticSetups.IsInspectionHandoffSetupVisible,
-                "inspection-sort" => viewModel.SemanticSetups.IsInspectionSortRouterSetupVisible,
-                _ => viewModel.SemanticSetups.IsOhtHandoffSetupVisible
+                "wafer-handler" => semantic.WaferHandler.IsVisible,
+                "prealigner" => semantic.Prealigner.IsVisible,
+                "inspection-handoff" => semantic.InspectionHandoff.IsVisible,
+                "inspection-sort" => semantic.InspectionSortRouter.IsVisible,
+                _ => semantic.OhtHandoff.IsVisible
             };
             bool HasValidationError() => setupKind switch
             {
-                "wafer-handler" => viewModel.SemanticSetups.HasWaferHandlerSetupValidationError,
-                "prealigner" => viewModel.SemanticSetups.HasPrealignerSetupValidationError,
-                "inspection-handoff" => viewModel.SemanticSetups.HasInspectionHandoffSetupValidationError,
-                "inspection-sort" => viewModel.SemanticSetups.HasInspectionSortRouterSetupValidationError,
-                _ => viewModel.SemanticSetups.HasOhtHandoffSetupValidationError
+                "wafer-handler" => semantic.WaferHandler.HasValidationError,
+                "prealigner" => semantic.Prealigner.HasValidationError,
+                "inspection-handoff" => semantic.InspectionHandoff.HasValidationError,
+                "inspection-sort" => semantic.InspectionSortRouter.HasValidationError,
+                _ => semantic.OhtHandoff.HasValidationError
             };
             string ValidationText() => setupKind switch
             {
-                "wafer-handler" => viewModel.SemanticSetups.WaferHandlerSetupValidationText,
-                "prealigner" => viewModel.SemanticSetups.PrealignerSetupValidationText,
-                "inspection-handoff" => viewModel.SemanticSetups.InspectionHandoffSetupValidationText,
-                "inspection-sort" => viewModel.SemanticSetups.InspectionSortRouterSetupValidationText,
-                _ => viewModel.SemanticSetups.OhtHandoffSetupValidationText
+                "wafer-handler" => semantic.WaferHandler.ValidationText,
+                "prealigner" => semantic.Prealigner.ValidationText,
+                "inspection-handoff" => semantic.InspectionHandoff.ValidationText,
+                "inspection-sort" => semantic.InspectionSortRouter.ValidationText,
+                _ => semantic.OhtHandoff.ValidationText
             };
 
             PreviewCommand().Execute(null);

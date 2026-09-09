@@ -5,6 +5,7 @@ using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.Machine.Core.Models;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Core.Sequences;
+using OpenVisionLab.Machine.Persistence.Projects;
 using Xunit;
 
 namespace OpenVisionLab.Machine.Core.Tests;
@@ -12,6 +13,7 @@ namespace OpenVisionLab.Machine.Core.Tests;
 public class ProjectDocumentStoreTests
 {
     private readonly ProjectDocumentStore _store = new();
+    private readonly ProjectDocumentFileStore _fileStore = new();
 
     [Fact]
     public void Serialize_DoesNotChangeProjectMetadata()
@@ -57,12 +59,12 @@ public class ProjectDocumentStoreTests
         var path = Path.Combine(directory, "machine.ovmachine");
         try
         {
-            await _store.SaveAsync(new MachineProjectDocument { Name = "Before" }, path);
+            await _fileStore.SaveAsync(new MachineProjectDocument { Name = "Before" }, path);
             var previousJson = await File.ReadAllTextAsync(path);
 
-            await _store.SaveAsync(new MachineProjectDocument { Name = "After" }, path);
+            await _fileStore.SaveAsync(new MachineProjectDocument { Name = "After" }, path);
 
-            Assert.Equal("After", (await _store.LoadAsync(path)).Name);
+            Assert.Equal("After", (await _fileStore.LoadAsync(path)).Name);
             Assert.Equal(previousJson, await File.ReadAllTextAsync(path + ".bak"));
             Assert.Empty(Directory.EnumerateFiles(directory, ".*.tmp"));
         }
@@ -484,7 +486,7 @@ public class ProjectDocumentStoreTests
             await File.WriteAllTextAsync(path, json);
 
             var exception = await Assert.ThrowsAsync<ProjectDocumentLoadException>(
-                () => _store.LoadAsync(path));
+                () => _fileStore.LoadAsync(path));
 
             Assert.Equal(ProjectDocumentLoadErrorCode.UnsupportedSchema, exception.ErrorCode);
             Assert.Equal(json, await File.ReadAllTextAsync(path));
@@ -503,8 +505,8 @@ public class ProjectDocumentStoreTests
         var path = Path.Combine(directory, "machine.ovmachine");
         try
         {
-            await _store.SaveAsync(new MachineProjectDocument { Name = "Before" }, path);
-            await _store.SaveAsync(new MachineProjectDocument { Name = "Committed" }, path);
+            await _fileStore.SaveAsync(new MachineProjectDocument { Name = "Before" }, path);
+            await _fileStore.SaveAsync(new MachineProjectDocument { Name = "Committed" }, path);
             var primaryBeforeFailure = await File.ReadAllBytesAsync(path);
             var backupBeforeFailure = await File.ReadAllBytesAsync(path + ".bak");
 
@@ -524,7 +526,7 @@ public class ProjectDocumentStoreTests
                        FileShare.None))
             {
                 var exception = await Record.ExceptionAsync(
-                    () => _store.SaveAsync(failedDocument, path));
+                    () => _fileStore.SaveAsync(failedDocument, path));
 
                 Assert.NotNull(exception);
                 Assert.True(
@@ -551,7 +553,7 @@ public class ProjectDocumentStoreTests
         var path = Path.Combine(directory, "machine.ovmachine");
         try
         {
-            await _store.SaveAsync(new MachineProjectDocument { Name = "Before" }, path);
+            await _fileStore.SaveAsync(new MachineProjectDocument { Name = "Before" }, path);
             var primaryBeforeFailure = await File.ReadAllBytesAsync(path);
 
             var failedDocument = new MachineProjectDocument
@@ -566,7 +568,7 @@ public class ProjectDocumentStoreTests
             cancellation.Cancel();
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(
-                () => _store.SaveAsync(failedDocument, path, cancellation.Token));
+                () => _fileStore.SaveAsync(failedDocument, path, cancellation.Token));
 
             Assert.Equal(primaryBeforeFailure, await File.ReadAllBytesAsync(path));
             Assert.Equal(schemaBeforeFailure, failedDocument.Schema);
@@ -592,7 +594,7 @@ public class ProjectDocumentStoreTests
             await File.WriteAllTextAsync(path, primaryJson);
             await File.WriteAllTextAsync(backupPath, backupJson);
 
-            var loaded = await _store.LoadAsync(path);
+            var loaded = await _fileStore.LoadAsync(path);
 
             Assert.Equal("Recovered", loaded.Name);
             Assert.Equal(primaryJson, await File.ReadAllTextAsync(path));
@@ -618,7 +620,7 @@ public class ProjectDocumentStoreTests
             await File.WriteAllTextAsync(backupPath, backupJson);
 
             var exception = await Assert.ThrowsAsync<ProjectDocumentLoadException>(
-                () => _store.LoadAsync(path));
+                () => _fileStore.LoadAsync(path));
 
             Assert.Equal(ProjectDocumentLoadErrorCode.UnsupportedSchema, exception.ErrorCode);
             Assert.Equal("2.0", exception.ProjectSchema);
@@ -641,7 +643,7 @@ public class ProjectDocumentStoreTests
             var backupJson = _store.Save(new MachineProjectDocument { Name = "Recovered missing primary" });
             await File.WriteAllTextAsync(path + ".bak", backupJson);
 
-            var loaded = await _store.LoadAsync(path);
+            var loaded = await _fileStore.LoadAsync(path);
 
             Assert.Equal("Recovered missing primary", loaded.Name);
             Assert.False(File.Exists(path));
@@ -678,7 +680,7 @@ public class ProjectDocumentStoreTests
             await File.WriteAllTextAsync(path, primaryJson);
             await File.WriteAllTextAsync(path + ".bak", backupJson);
 
-            var loaded = await _store.LoadAsync(path);
+            var loaded = await _fileStore.LoadAsync(path);
 
             Assert.Equal("Recovered semantic damage", loaded.Name);
             Assert.Equal(primaryJson, await File.ReadAllTextAsync(path));
@@ -1103,7 +1105,7 @@ public class ProjectDocumentStoreTests
     public async Task LoadAsync_SampleFile_ParsesWithoutError()
     {
         var path = "sample-pick-and-place.ovmachine";
-        var loaded = await _store.LoadAsync(path);
+        var loaded = await _fileStore.LoadAsync(path);
 
         Assert.Equal("Sample Pick-and-Place Cell", loaded.Name);
         Assert.Equal(2, loaded.Axes.Count);
@@ -1146,7 +1148,7 @@ public class ProjectDocumentStoreTests
     [Fact]
     public async Task LoadAsync_VisionInspectionCell_PreservesDigitalCycleContract()
     {
-        var loaded = await _store.LoadAsync("VisionInspectionCell.ovmachine");
+        var loaded = await _fileStore.LoadAsync("VisionInspectionCell.ovmachine");
 
         Assert.Equal("1.5", loaded.Schema);
         Assert.Equal(3, loaded.Channels.Count);
@@ -1189,7 +1191,7 @@ public class ProjectDocumentStoreTests
     [Fact]
     public async Task LoadAsync_AutomaticTransferCell_PreservesLayoutSensorAndAutomaticRunContract()
     {
-        var loaded = await _store.LoadAsync("AutomaticTransferCell.ovmachine");
+        var loaded = await _fileStore.LoadAsync("AutomaticTransferCell.ovmachine");
 
         Assert.Equal("1.5", loaded.Schema);
         Assert.Equal("main-cell", loaded.Simulation.ActiveLayoutId);

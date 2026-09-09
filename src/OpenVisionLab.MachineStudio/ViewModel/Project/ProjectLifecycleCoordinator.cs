@@ -1,5 +1,6 @@
 using System.IO;
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Persistence.Projects;
 using OpenVisionLab.MachineStudio.Model;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
@@ -28,6 +29,7 @@ internal sealed record ProjectSaveLifecycleResult(
 internal sealed class ProjectLifecycleCoordinator
 {
     private readonly ProjectDocumentStore _projectStore = new();
+    private readonly ProjectDocumentFileStore _projectFileStore;
     private readonly ProjectDocumentSession _projectSession;
     private readonly ProjectDocumentOperationGate _operationGate = new();
     private readonly ProjectSaveParticipant _projectSaveParticipant = new();
@@ -74,12 +76,14 @@ internal sealed class ProjectLifecycleCoordinator
         _selectRecipeCopyDestination = selectRecipeCopyDestination
             ?? throw new ArgumentNullException(nameof(selectRecipeCopyDestination));
         _startupSamplePath = NormalizePath(startupSamplePath);
+        _projectFileStore = new(_projectStore);
         _projectSession = new(
             _projectStore,
             initialProject ?? throw new ArgumentNullException(nameof(initialProject)),
             initialProjectPath);
 
         _projectSaveWorkflow = new(
+            _projectFileStore,
             _projectStore,
             () => CurrentProject,
             prepareProjectForSave,
@@ -94,12 +98,12 @@ internal sealed class ProjectLifecycleCoordinator
             getUnsavedDecision ?? throw new ArgumentNullException(nameof(getUnsavedDecision)),
             () => TrySaveCurrentProjectWithParticipantAsync(saveAs: false));
         _projectOpenWorkflow = new(
-            _projectStore,
+            _projectFileStore,
             ResolveUnsavedChangesCoreAsync,
             ApplyOpenedProjectAsync,
             handleProjectOpenFailure ?? throw new ArgumentNullException(nameof(handleProjectOpenFailure)));
         _semiconductorRecipeCopyWorkflow = new(
-            _projectStore,
+            _projectFileStore,
             getRecipeOverwriteRejectedMessage
                 ?? throw new ArgumentNullException(nameof(getRecipeOverwriteRejectedMessage)));
         HandleProjectSaveFailure = handleProjectSaveFailure
@@ -217,7 +221,7 @@ internal sealed class ProjectLifecycleCoordinator
             return;
         }
 
-        var project = await _projectStore.LoadAsync(_startupSamplePath);
+        var project = await _projectFileStore.LoadAsync(_startupSamplePath);
         if (!await _applyProject(project))
         {
             return;

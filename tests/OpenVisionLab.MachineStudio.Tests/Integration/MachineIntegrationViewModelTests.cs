@@ -34,10 +34,10 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
         using var fixture = new IntegrationFixture();
         var context = fixture.CreateContext();
         using var viewModel = new MachineIntegrationViewModel(() => context, fixture.CreateProducer, () => context.ProjectId, fixture.SettingsPath);
-        viewModel.ExchangeRoot = fixture.ExchangeRoot;
-        viewModel.InspectionRecipePath = fixture.RecipePath;
-        viewModel.TwoDConsumerVersion = "2.1.0";
-        viewModel.TwoDConsumerCommit = new string('2', 40);
+        viewModel.Setup.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.Setup.InspectionRecipePath = fixture.RecipePath;
+        viewModel.Setup.TwoDConsumerVersion = "2.1.0";
+        viewModel.Setup.TwoDConsumerCommit = new string('2', 40);
         viewModel.RefreshSourceContext();
 
         Assert.True(viewModel.CanPublishTwoDImageHandoff);
@@ -105,10 +105,10 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
             () => { reads++; return fixture.CreateContext(); },
             fixture.CreateProducer,
             () => "project-1", fixture.SettingsPath);
-        viewModel.ExchangeRoot = fixture.ExchangeRoot;
-        viewModel.InspectionRecipePath = fixture.RecipePath;
-        viewModel.TwoDConsumerVersion = "2.1.0";
-        viewModel.TwoDConsumerCommit = new string('2', 40);
+        viewModel.Setup.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.Setup.InspectionRecipePath = fixture.RecipePath;
+        viewModel.Setup.TwoDConsumerVersion = "2.1.0";
+        viewModel.Setup.TwoDConsumerCommit = new string('2', 40);
         Assert.True(viewModel.CanPublishTwoDImageHandoff);
 
         viewModel.SetSessionCloseAdmission(true);
@@ -135,18 +135,18 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
 
         Assert.Contains("No folder was scanned", viewModel.StatusText);
 
-        viewModel.ExchangeRoot = fixture.ExchangeRoot;
-        viewModel.InspectionRecipePath = fixture.RecipePath;
-        viewModel.TwoDConsumerVersion = "2.1.0";
-        viewModel.TwoDConsumerCommit = new string('2', 40);
-        viewModel.TcpListenAddress = IPAddress.Loopback.ToString();
-        viewModel.TcpListenPortText = "45111";
-        viewModel.TcpPeerHost = IPAddress.Loopback.ToString();
-        viewModel.TcpPeerPortText = "45112";
+        viewModel.Setup.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.Setup.InspectionRecipePath = fixture.RecipePath;
+        viewModel.Setup.TwoDConsumerVersion = "2.1.0";
+        viewModel.Setup.TwoDConsumerCommit = new string('2', 40);
+        viewModel.Setup.TcpListenAddress = IPAddress.Loopback.ToString();
+        viewModel.Setup.TcpListenPortText = "45111";
+        viewModel.Setup.TcpPeerHost = IPAddress.Loopback.ToString();
+        viewModel.Setup.TcpPeerPortText = "45112";
         var encodedKey = Convert.ToBase64String(
             SHA256.HashData(Encoding.UTF8.GetBytes("setup-key")));
         viewModel.SetSessionSharedKey(encodedKey);
-        viewModel.SaveSetupCommand.Execute(null);
+        viewModel.Setup.SaveSetupCommand.Execute(null);
 
         Assert.DoesNotContain(
             encodedKey,
@@ -157,14 +157,14 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
             (_, _) => null,
             (_, _) => false);
 
-        Assert.Equal(fixture.ExchangeRoot, reloaded.ExchangeRoot);
-        Assert.Equal(fixture.RecipePath, reloaded.InspectionRecipePath);
-        Assert.Equal("2.1.0", reloaded.TwoDConsumerVersion);
-        Assert.Equal(new string('2', 40), reloaded.TwoDConsumerCommit);
-        Assert.Equal(IPAddress.Loopback.ToString(), reloaded.TcpListenAddress);
-        Assert.Equal("45111", reloaded.TcpListenPortText);
-        Assert.Equal(IPAddress.Loopback.ToString(), reloaded.TcpPeerHost);
-        Assert.Equal("45112", reloaded.TcpPeerPortText);
+        Assert.Equal(fixture.ExchangeRoot, reloaded.Setup.ExchangeRoot);
+        Assert.Equal(fixture.RecipePath, reloaded.Setup.InspectionRecipePath);
+        Assert.Equal("2.1.0", reloaded.Setup.TwoDConsumerVersion);
+        Assert.Equal(new string('2', 40), reloaded.Setup.TwoDConsumerCommit);
+        Assert.Equal(IPAddress.Loopback.ToString(), reloaded.Setup.TcpListenAddress);
+        Assert.Equal("45111", reloaded.Setup.TcpListenPortText);
+        Assert.Equal(IPAddress.Loopback.ToString(), reloaded.Setup.TcpPeerHost);
+        Assert.Equal("45112", reloaded.Setup.TcpPeerPortText);
         Assert.True(reloaded.CanRefreshResults);
 
         reloaded.RefreshResultsCommand.Execute(null);
@@ -173,16 +173,16 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
         Assert.Empty(MachineIntegrationExchange.DiscoverTransactions(fixture.ExchangeRoot));
         Assert.Contains("No inspection", reloaded.StatusText);
 
-        reloaded.ResetSetupCommand.Execute(null);
+        reloaded.Setup.ResetSetupCommand.Execute(null);
 
-        Assert.Equal(string.Empty, reloaded.ExchangeRoot);
-        Assert.Equal(string.Empty, reloaded.InspectionRecipePath);
-        Assert.Equal(string.Empty, reloaded.TwoDConsumerVersion);
-        Assert.Equal(string.Empty, reloaded.TwoDConsumerCommit);
-        Assert.Equal("127.0.0.1", reloaded.TcpListenAddress);
-        Assert.Equal("45101", reloaded.TcpListenPortText);
-        Assert.Equal("127.0.0.1", reloaded.TcpPeerHost);
-        Assert.Equal("45102", reloaded.TcpPeerPortText);
+        Assert.Equal(string.Empty, reloaded.Setup.ExchangeRoot);
+        Assert.Equal(string.Empty, reloaded.Setup.InspectionRecipePath);
+        Assert.Equal(string.Empty, reloaded.Setup.TwoDConsumerVersion);
+        Assert.Equal(string.Empty, reloaded.Setup.TwoDConsumerCommit);
+        Assert.Equal("127.0.0.1", reloaded.Setup.TcpListenAddress);
+        Assert.Equal("45101", reloaded.Setup.TcpListenPortText);
+        Assert.Equal("127.0.0.1", reloaded.Setup.TcpPeerHost);
+        Assert.Equal("45102", reloaded.Setup.TcpPeerPortText);
     }
 
     [Fact]
@@ -211,26 +211,26 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
                 return selectedRecipePath;
             });
 
-        viewModel.BrowseExchangeRootCommand.Execute(null);
-        viewModel.BrowseRecipeCommand.Execute(null);
+        viewModel.Setup.BrowseExchangeRootCommand.Execute(null);
+        viewModel.Setup.BrowseRecipeCommand.Execute(null);
 
         Assert.Equal(1, exchangeSelectorCalls);
         Assert.Equal(1, recipeSelectorCalls);
-        Assert.Equal(selectedExchangeRoot, viewModel.ExchangeRoot);
-        Assert.Equal(selectedRecipePath, viewModel.InspectionRecipePath);
+        Assert.Equal(selectedExchangeRoot, viewModel.Setup.ExchangeRoot);
+        Assert.Equal(selectedRecipePath, viewModel.Setup.InspectionRecipePath);
 
         using var cancelledViewModel = fixture.CreateViewModel(
             (_, _) => null,
             (_, _) => false,
             _ => null,
             _ => null);
-        cancelledViewModel.ExchangeRoot = fixture.ExchangeRoot;
-        cancelledViewModel.InspectionRecipePath = fixture.RecipePath;
-        cancelledViewModel.BrowseExchangeRootCommand.Execute(null);
-        cancelledViewModel.BrowseRecipeCommand.Execute(null);
+        cancelledViewModel.Setup.ExchangeRoot = fixture.ExchangeRoot;
+        cancelledViewModel.Setup.InspectionRecipePath = fixture.RecipePath;
+        cancelledViewModel.Setup.BrowseExchangeRootCommand.Execute(null);
+        cancelledViewModel.Setup.BrowseRecipeCommand.Execute(null);
 
-        Assert.Equal(fixture.ExchangeRoot, cancelledViewModel.ExchangeRoot);
-        Assert.Equal(fixture.RecipePath, cancelledViewModel.InspectionRecipePath);
+        Assert.Equal(fixture.ExchangeRoot, cancelledViewModel.Setup.ExchangeRoot);
+        Assert.Equal(fixture.RecipePath, cancelledViewModel.Setup.InspectionRecipePath);
     }
 
     [Fact]
@@ -241,10 +241,10 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
             (_, _) => null,
             (_, _) => true);
 
-        viewModel.ExchangeRoot = fixture.ExchangeRoot;
-        viewModel.InspectionRecipePath = fixture.RecipePath;
-        viewModel.TwoDConsumerVersion = "2.1.0";
-        viewModel.TwoDConsumerCommit = new string('2', 40);
+        viewModel.Setup.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.Setup.InspectionRecipePath = fixture.RecipePath;
+        viewModel.Setup.TwoDConsumerVersion = "2.1.0";
+        viewModel.Setup.TwoDConsumerCommit = new string('2', 40);
 
         Assert.True(viewModel.CanPublishTwoDImageHandoff);
         Assert.True(viewModel.CanRefreshResults);
@@ -265,10 +265,10 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
             (_, _) => null,
             (_, _) => true);
 
-        viewModel.ExchangeRoot = fixture.ExchangeRoot;
-        viewModel.InspectionRecipePath = fixture.RecipePath;
-        viewModel.TwoDConsumerVersion = "2.1.0";
-        viewModel.TwoDConsumerCommit = new string('2', 40);
+        viewModel.Setup.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.Setup.InspectionRecipePath = fixture.RecipePath;
+        viewModel.Setup.TwoDConsumerVersion = "2.1.0";
+        viewModel.Setup.TwoDConsumerCommit = new string('2', 40);
 
         Assert.True(viewModel.CanPublishTwoDImageHandoff);
         Assert.True(viewModel.CanRefreshResults);
@@ -313,10 +313,10 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
                     consumer);
             },
             (_, _) => true);
-        viewModel.ExchangeRoot = fixture.ExchangeRoot;
-        viewModel.InspectionRecipePath = fixture.RecipePath;
-        viewModel.TwoDConsumerVersion = "2.1.0";
-        viewModel.TwoDConsumerCommit = new string('2', 40);
+        viewModel.Setup.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.Setup.InspectionRecipePath = fixture.RecipePath;
+        viewModel.Setup.TwoDConsumerVersion = "2.1.0";
+        viewModel.Setup.TwoDConsumerCommit = new string('2', 40);
         viewModel.PropertyChanged += (_, args) =>
         {
             if (Volatile.Read(ref releaseRequest) == 2
@@ -363,10 +363,10 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
                 return fixture.CreateRequest(recipePath, producer, requestedConsumer);
             },
             (_, _) => true);
-        viewModel.ExchangeRoot = fixture.ExchangeRoot;
-        viewModel.InspectionRecipePath = fixture.RecipePath;
-        viewModel.TwoDConsumerVersion = consumer.ApplicationVersion;
-        viewModel.TwoDConsumerCommit = consumer.SourceCommit;
+        viewModel.Setup.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.Setup.InspectionRecipePath = fixture.RecipePath;
+        viewModel.Setup.TwoDConsumerVersion = consumer.ApplicationVersion;
+        viewModel.Setup.TwoDConsumerCommit = consumer.SourceCommit;
         Assert.True(viewModel.CanPublishTwoDImageHandoff);
 
         var commandTask = Task.Run(() => viewModel.PublishTwoDImageHandoffCommand.Execute(null));
@@ -414,14 +414,14 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
                 requestedConsumer),
             (_, _) => true);
 
-        viewModel.ExchangeRoot = fixture.ExchangeRoot;
-        viewModel.InspectionRecipePath = fixture.RecipePath;
-        viewModel.TwoDConsumerVersion = consumer.ApplicationVersion;
-        viewModel.TwoDConsumerCommit = consumer.SourceCommit;
-        viewModel.TcpListenPortText = "45113";
-        viewModel.TcpPeerPortText = endpoint.Port.ToString();
+        viewModel.Setup.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.Setup.InspectionRecipePath = fixture.RecipePath;
+        viewModel.Setup.TwoDConsumerVersion = consumer.ApplicationVersion;
+        viewModel.Setup.TwoDConsumerCommit = consumer.SourceCommit;
+        viewModel.Setup.TcpListenPortText = "45113";
+        viewModel.Setup.TcpPeerPortText = endpoint.Port.ToString();
         viewModel.SetSessionSharedKey(encodedKey);
-        viewModel.SaveSetupCommand.Execute(null);
+        viewModel.Setup.SaveSetupCommand.Execute(null);
 
         viewModel.PublishTwoDImageHandoffCommand.Execute(null);
         await WaitForAsync(() => !viewModel.IsBusy && viewModel.CanPushLatestTransaction);
@@ -466,10 +466,10 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
                 requestedConsumer),
             (_, _) => true);
 
-        viewModel.ExchangeRoot = fixture.ExchangeRoot;
-        viewModel.InspectionRecipePath = fixture.RecipePath;
-        viewModel.TwoDConsumerVersion = consumer.ApplicationVersion;
-        viewModel.TwoDConsumerCommit = consumer.SourceCommit;
+        viewModel.Setup.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.Setup.InspectionRecipePath = fixture.RecipePath;
+        viewModel.Setup.TwoDConsumerVersion = consumer.ApplicationVersion;
+        viewModel.Setup.TwoDConsumerCommit = consumer.SourceCommit;
 
         Assert.True(viewModel.CanPublishTwoDImageHandoff);
         viewModel.PublishTwoDImageHandoffCommand.Execute(null);
@@ -520,10 +520,10 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
                 requestedConsumer),
             (_, _) => true);
 
-        viewModel.ExchangeRoot = fixture.ExchangeRoot;
-        viewModel.InspectionRecipePath = fixture.RecipePath;
-        viewModel.TwoDConsumerVersion = consumer.ApplicationVersion;
-        viewModel.TwoDConsumerCommit = consumer.SourceCommit;
+        viewModel.Setup.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.Setup.InspectionRecipePath = fixture.RecipePath;
+        viewModel.Setup.TwoDConsumerVersion = consumer.ApplicationVersion;
+        viewModel.Setup.TwoDConsumerCommit = consumer.SourceCommit;
         viewModel.PublishTwoDImageHandoffCommand.Execute(null);
         await WaitForAsync(() =>
             !viewModel.IsBusy
@@ -585,10 +585,10 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
                 requestedConsumer),
             (_, _) => true);
 
-        viewModel.ExchangeRoot = fixture.ExchangeRoot;
-        viewModel.InspectionRecipePath = fixture.RecipePath;
-        viewModel.TwoDConsumerVersion = consumer.ApplicationVersion;
-        viewModel.TwoDConsumerCommit = consumer.SourceCommit;
+        viewModel.Setup.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.Setup.InspectionRecipePath = fixture.RecipePath;
+        viewModel.Setup.TwoDConsumerVersion = consumer.ApplicationVersion;
+        viewModel.Setup.TwoDConsumerCommit = consumer.SourceCommit;
         viewModel.PublishTwoDImageHandoffCommand.Execute(null);
         await WaitForAsync(() =>
             !viewModel.IsBusy

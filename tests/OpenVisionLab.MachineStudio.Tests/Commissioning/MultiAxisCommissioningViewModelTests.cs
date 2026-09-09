@@ -1,6 +1,7 @@
 using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Axes;
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Simulation.Axis;
 using OpenVisionLab.Machine.Simulation.Commissioning;
 using OpenVisionLab.Machine.Simulation.Compilation;
 using OpenVisionLab.Machine.Simulation.Engine;
@@ -69,6 +70,100 @@ public sealed class MultiAxisCommissioningViewModelTests
         Assert.False(viewModel.RejectedStaleResult);
         Assert.Null(viewModel.BaselineComparison);
         Assert.True(viewModel.CanValidate);
+    }
+
+    [Fact]
+    public async Task ValidationCompletionUsesTheUiDispatchBoundary()
+    {
+        OpenVisionLanguageService.Load();
+        var project = CreateProject();
+        project.MultiAxisCommissioningRecipe!.ValidationRepetitions = 2;
+        var recipe = new MultiAxisCommissioningRecipeEditorViewModel(() => { });
+        recipe.Load(project);
+        var dispatchScope = false;
+        var statusCount = 0;
+        var completionStatusWasDispatched = false;
+        var completionLogWasDispatched = false;
+        using var viewModel = new MultiAxisCommissioningViewModel(
+            recipe,
+            () => true,
+            () => false,
+            () => project,
+            () => null,
+            () => "{}",
+            () => new SimulationRuntimeConfiguration(
+                [
+                    new AxisConfiguration
+                    {
+                        Id = "x",
+                        Name = "X",
+                        MinimumPosition = 0,
+                        MaximumPosition = 300,
+                        HomePosition = 0,
+                        MaximumVelocity = 100,
+                        Acceleration = 100,
+                        Deceleration = 100,
+                        FollowingErrorLimit = 10
+                    },
+                    new AxisConfiguration
+                    {
+                        Id = "y",
+                        Name = "Y",
+                        MinimumPosition = 0,
+                        MaximumPosition = 300,
+                        HomePosition = 0,
+                        MaximumVelocity = 100,
+                        Acceleration = 100,
+                        Deceleration = 100,
+                        FollowingErrorLimit = 10
+                    }
+                ],
+                [],
+                []),
+            TimeSpan.FromMilliseconds(5),
+            action =>
+            {
+                var previousScope = dispatchScope;
+                dispatchScope = true;
+                try
+                {
+                    action();
+                }
+                finally
+                {
+                    dispatchScope = previousScope;
+                }
+
+                return Task.CompletedTask;
+            },
+            _ =>
+            {
+                statusCount++;
+                if (statusCount >= 2)
+                {
+                    completionStatusWasDispatched |= dispatchScope;
+                }
+            },
+            _ =>
+            {
+                if (statusCount >= 2)
+                {
+                    completionLogWasDispatched |= dispatchScope;
+                }
+            },
+            _ => { },
+            _ => { },
+            _ => { });
+
+        viewModel.ValidateCommand.Execute(null);
+        var validationTask = viewModel.ValidationTask;
+        Assert.NotNull(validationTask);
+        await validationTask!.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.NotNull(viewModel.LatestResult);
+        Assert.True(completionStatusWasDispatched);
+        Assert.True(completionLogWasDispatched);
+        Assert.False(viewModel.IsValidationRunning);
     }
 
     private static MultiAxisCommissioningViewModel CreateViewModel(

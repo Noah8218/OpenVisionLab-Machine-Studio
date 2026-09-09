@@ -1,4 +1,5 @@
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Persistence.Projects;
 using OpenVisionLab.MachineStudio.ViewModel;
 using Xunit;
 
@@ -22,11 +23,11 @@ public sealed class SemiconductorRecipeCopyWorkflowTests
                 CreatedAt = DateTimeOffset.UtcNow.AddDays(-2),
                 ModifiedAt = DateTimeOffset.UtcNow.AddDays(-1)
             };
-            await new ProjectDocumentStore().SaveAsync(source, sourcePath);
+            await new ProjectDocumentFileStore().SaveAsync(source, sourcePath);
             var sourceBeforeCopy = new ProjectDocumentStore().Load(
                 await File.ReadAllTextAsync(sourcePath));
             var workflow = new SemiconductorRecipeCopyWorkflow(
-                new ProjectDocumentStore(),
+                new ProjectDocumentFileStore(),
                 () => "same path");
 
             var result = await workflow.CopyAsync(sourcePath, destinationPath);
@@ -60,7 +61,7 @@ public sealed class SemiconductorRecipeCopyWorkflowTests
             var path = Path.Combine(directory, "recipe.ovmachine");
             var message = "cannot overwrite recipe";
             var workflow = new SemiconductorRecipeCopyWorkflow(
-                new ProjectDocumentStore(),
+                new ProjectDocumentFileStore(),
                 () => message);
 
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>

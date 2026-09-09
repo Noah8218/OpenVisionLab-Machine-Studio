@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -26,6 +27,46 @@ public sealed class MachineIntegrationTcpControlViewModelTests
 
         Assert.False(viewModel.IsTcpListening);
         Assert.True(viewModel.CanEditTcpSetup);
+    }
+
+    [Fact]
+    public async Task ListenerPresentationUsesTheInjectedUiDispatchBoundary()
+    {
+        using var fixture = new TestRoot();
+        var dispatchThreads = new ConcurrentBag<int>();
+        var propertyChangedThreads = new ConcurrentBag<int>();
+        using var viewModel = new MachineIntegrationTcpControlViewModel(
+            () => new MachineIntegrationTcpSettings(
+                fixture.ExchangeRoot,
+                IPAddress.Loopback,
+                0,
+                IPAddress.Loopback.ToString(),
+                45101),
+            () => null,
+            () => Task.CompletedTask,
+            _ => { },
+            operation => Task.Run(async () =>
+            {
+                dispatchThreads.Add(Environment.CurrentManagedThreadId);
+                await operation();
+            }));
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(viewModel.IsTcpListening))
+            {
+                propertyChangedThreads.Add(Environment.CurrentManagedThreadId);
+            }
+        };
+
+        viewModel.SetSessionSharedKey(CreateEncodedKey("tcp-control-dispatch"));
+        await viewModel.StartTcpListenerAsync();
+        await viewModel.StopTcpListenerAsync();
+
+        Assert.True(dispatchThreads.Count >= 2);
+        Assert.NotEmpty(propertyChangedThreads);
+        Assert.All(
+            propertyChangedThreads,
+            threadId => Assert.Contains(threadId, dispatchThreads));
     }
 
     [Fact]

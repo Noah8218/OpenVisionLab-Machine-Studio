@@ -21,6 +21,7 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
     private readonly Func<MachineIntegrationTcpSettings> _settingsProvider;
     private readonly Func<MachineIntegrationTransactionSummary?> _latestTransactionProvider;
     private readonly Func<Task> _refreshResults;
+    private readonly Func<Func<Task>, Task> _invokeOnUiThreadAsync;
     private readonly Action<string> _setStatus;
     private readonly MachineIntegrationSharedKeyStore _sharedKeyStore = new();
     private readonly MachineIntegrationTcpWorkflow _tcpWorkflow = new();
@@ -35,12 +36,14 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
         Func<MachineIntegrationTcpSettings> settingsProvider,
         Func<MachineIntegrationTransactionSummary?> latestTransactionProvider,
         Func<Task> refreshResults,
-        Action<string> setStatus)
+        Action<string> setStatus,
+        Func<Func<Task>, Task>? invokeOnUiThreadAsync = null)
     {
         _settingsProvider = settingsProvider ?? throw new ArgumentNullException(nameof(settingsProvider));
         _latestTransactionProvider = latestTransactionProvider
             ?? throw new ArgumentNullException(nameof(latestTransactionProvider));
         _refreshResults = refreshResults ?? throw new ArgumentNullException(nameof(refreshResults));
+        _invokeOnUiThreadAsync = invokeOnUiThreadAsync ?? ExecuteImmediatelyAsync;
         _setStatus = setStatus ?? throw new ArgumentNullException(nameof(setStatus));
         _tcpOperationOwner = new(
             isBusy => IsTcpBusy = isBusy,
@@ -179,7 +182,7 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
                         key,
                         cancellationToken)
                     .ConfigureAwait(false);
-                _tcpOperationOwner.TryPublishIfActive(() =>
+                await DispatchPresentationAsync(() =>
                 {
                     IsTcpListening = true;
                     TcpListenerStatusText = string.Format(
@@ -190,7 +193,7 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
                         "TcpStarted",
                         "TCP 수신을 시작했습니다. 수신만으로 ACK, 검사, Run 또는 Result를 실행하지 않습니다.",
                         "TCP listening started. Receipt alone never ACKs, inspects, runs, or creates a Result."));
-                });
+                }).ConfigureAwait(false);
             }
             finally
             {
@@ -203,7 +206,7 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
         async _ =>
         {
             await _tcpWorkflow.StopListeningAsync().ConfigureAwait(false);
-            _tcpOperationOwner.TryPublishIfActive(() =>
+            await DispatchPresentationAsync(() =>
             {
                 IsTcpListening = false;
                 TcpListenerStatusText = L(
@@ -214,7 +217,7 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
                     "TcpStoppedStatus",
                     "TCP 수신을 중지했습니다.",
                     "TCP listening stopped."));
-            });
+            }).ConfigureAwait(false);
         });
 
     internal Task PingTcpPeerAsync() => RunTcpTransferAsync(
@@ -313,22 +316,25 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
                         receipt.FilesTransferred,
                         receipt.BytesTransferred,
                         receipt.Idempotent);
-                    if (!_tcpOperationOwner.TryPublishIfActive(() => LastTcpTransferText = transferText))
+                    if (!await DispatchPresentationAsync(() => LastTcpTransferText = transferText)
+                            .ConfigureAwait(false))
                     {
                         return;
                     }
 
                     if (refreshAfterTransfer)
                     {
-                        if (_tcpOperationOwner.IsDisposed)
+                        await _invokeOnUiThreadAsync(async () =>
                         {
-                            return;
-                        }
-
-                        await _refreshResults().ConfigureAwait(true);
+                            if (!_tcpOperationOwner.IsDisposed)
+                            {
+                                await _refreshResults().ConfigureAwait(true);
+                            }
+                        }).ConfigureAwait(false);
                     }
 
-                    _tcpOperationOwner.TryPublishIfActive(() => _setStatus(LastTcpTransferText));
+                    await DispatchPresentationAsync(() => _setStatus(LastTcpTransferText))
+                        .ConfigureAwait(false);
                 }
                 finally
                 {
@@ -340,6 +346,21 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
         string busyStatus,
         Func<CancellationToken, Task> operation) =>
         _tcpOperationOwner.TrackAsync(busyStatus, operation);
+
+    private async Task<bool> DispatchPresentationAsync(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        var published = false;
+        await _invokeOnUiThreadAsync(() =>
+        {
+            published = _tcpOperationOwner.TryPublishIfActive(action);
+            return Task.CompletedTask;
+        }).ConfigureAwait(false);
+        return published;
+    }
+
+    private static Task ExecuteImmediatelyAsync(Func<Task> operation) => operation();
 
     private byte[] AcquireSharedKey()
     {

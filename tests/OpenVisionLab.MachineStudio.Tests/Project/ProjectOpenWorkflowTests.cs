@@ -1,4 +1,5 @@
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Persistence.Projects;
 using OpenVisionLab.MachineStudio.ViewModel;
 using Xunit;
 
@@ -13,7 +14,7 @@ public sealed class ProjectOpenWorkflowTests
         try
         {
             var path = Path.Combine(directory, "open.ovmachine");
-            await new ProjectDocumentStore().SaveAsync(
+            await new ProjectDocumentFileStore().SaveAsync(
                 new MachineProjectDocument { Name = "Loaded project" },
                 path);
             MachineProjectDocument? appliedProject = null;
@@ -77,7 +78,7 @@ public sealed class ProjectOpenWorkflowTests
         try
         {
             var path = Path.Combine(directory, "replace.ovmachine");
-            await new ProjectDocumentStore().SaveAsync(
+            await new ProjectDocumentFileStore().SaveAsync(
                 new MachineProjectDocument { Name = "Replacement" },
                 path);
             var resolveCount = 0;
@@ -110,7 +111,7 @@ public sealed class ProjectOpenWorkflowTests
         Func<MachineProjectDocument, string, Task<bool>> applyOpenedProject,
         Action<Exception> handleLoadFailure) =>
         new(
-            new ProjectDocumentStore(),
+            new ProjectDocumentFileStore(),
             resolveUnsavedChanges,
             applyOpenedProject,
             handleLoadFailure);

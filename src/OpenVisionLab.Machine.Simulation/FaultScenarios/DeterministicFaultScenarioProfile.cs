@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using OpenVisionLab.Machine.Simulation.Scenarios;
 
 namespace OpenVisionLab.Machine.Simulation.FaultScenarios;
 
@@ -74,8 +75,11 @@ public sealed record DeterministicFaultScenarioProfile(
     public static string SaveToJson(DeterministicFaultScenarioProfile scenario) =>
         JsonSerializer.Serialize(Normalize(scenario), JsonOptions);
 
-    public static void SaveToJson(DeterministicFaultScenarioProfile scenario, string path) =>
-        File.WriteAllText(path, SaveToJson(scenario));
+    public static void SaveToJson(DeterministicFaultScenarioProfile scenario, string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        AtomicEvidenceFile.Write(fullPath, temporaryPath => File.WriteAllText(temporaryPath, SaveToJson(scenario)));
+    }
 
     public static DeterministicFaultScenarioProfile Normalize(DeterministicFaultScenarioProfile? scenario)
     {

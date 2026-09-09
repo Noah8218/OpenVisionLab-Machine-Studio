@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.IO;
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Persistence.Projects;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
@@ -10,13 +11,13 @@ namespace OpenVisionLab.MachineStudio.ViewModel;
 /// </summary>
 internal sealed class ProjectOpenWorkflow
 {
-    private readonly ProjectDocumentStore _projectStore;
+    private readonly ProjectDocumentFileStore _projectStore;
     private readonly Func<Task<bool>> _resolveUnsavedChanges;
     private readonly Func<MachineProjectDocument, string, Task<bool>> _applyOpenedProject;
     private readonly Action<Exception> _handleLoadFailure;
 
     internal ProjectOpenWorkflow(
-        ProjectDocumentStore projectStore,
+        ProjectDocumentFileStore projectStore,
         Func<Task<bool>> resolveUnsavedChanges,
         Func<MachineProjectDocument, string, Task<bool>> applyOpenedProject,
         Action<Exception> handleLoadFailure)
