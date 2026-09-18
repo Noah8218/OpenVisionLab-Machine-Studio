@@ -1,188 +1,76 @@
 # OpenVisionLab Machine Studio
 
-OpenVisionLab Machine Studio is a Windows desktop workbench for designing,
-simulating, and validating industrial machine behavior before physical hardware
-is available.
+OpenVisionLab Machine Studio는 실제 장비를 연결하기 전에 머신 레이아웃과
+자동 동작을 구성하고, 같은 동작을 데스크톱에서 반복해서 확인하기 위한
+Windows 프로그램입니다.
 
-Build a machine layout, connect virtual axes and I/O, author an automatic
-sequence, and inspect the same deterministic execution through run, pause,
-single-step, reset, dry-run, and layout playback workflows.
+가상 축과 I/O를 배치하고 시퀀스를 작성한 뒤 실행·일시정지·단계 실행·초기화와
+드라이런으로 상태와 결과를 확인할 수 있습니다.
 
-> Machine Studio is a technical-alpha virtual-commissioning tool. It is not
-> production-control or safety software.
+## 현재 코드 기준
 
-## Version
+- 버전: `v0.2.0-dev.21`
+- 머신 레이아웃, 장치 상태, 센서, 실린더, 컨베이어, 워크피스 모델을 구성할 수 있습니다.
+- 자동 시퀀스를 작성하고 5 ms 고정 간격 시뮬레이션으로 실행할 수 있습니다.
+- 실행 중 일시정지, 단계 실행, 초기화, 오류 주입, 상태·이벤트 확인을 지원합니다.
+- 시뮬레이션 준비 확인, 연결된 단계 미리보기, 레시피 드라이런, 실행 경계 재생을 지원합니다.
+- `.ovmachine` 프로젝트와 프로젝트에 연결된 실행 근거를 저장하고 다시 열 수 있습니다.
+- 내장 예제 레시피를 수정해 장비 연결, 인터록, I/O, 축 동작, 분기 흐름을 확인할 수 있습니다.
+- 화면 언어를 한국어와 영어로 전환할 수 있습니다.
 
-Current version: `v0.2.0-dev.20`
+## 기본 실행 흐름
 
-This project is maintained using explicit version numbers. The current branch
-is a Release 2 development candidate; it is not a release tag or downloadable
-package.
+1. 프로그램을 실행합니다.
+2. **Start from sample**을 선택합니다.
+3. **Connections**에서 장비 연결과 시퀀스 사용처를 확인합니다.
+4. **Check simulation readiness**로 실행 전에 구성을 확인합니다.
+5. **Dry run recipe**로 타임라인과 최종 상태를 확인합니다.
+6. 타임라인 항목에서 **View state on layout**을 선택해 해당 시점의 레이아웃 상태를 봅니다.
+7. 작업 화면에서 **Simulation ON**을 선택한 뒤 **Pause**, **Step**, **Reset**으로 실행을 살펴봅니다.
+8. 내장 예제를 수정할 때는 **Save As**로 별도 프로젝트를 만듭니다.
 
-### Recent version history
+프로젝트를 열거나 저장된 실행 근거를 확인하는 동작은 시뮬레이션을 자동으로
+시작하거나 프로젝트를 자동 저장하지 않습니다.
 
-#### `v0.2.0-dev.20` (2026-09-10)
+## 내장 예제 레시피
 
-- Organized the machine, simulation, sequence, vision, fault, and result code into responsibility folders while preserving namespaces and runtime contracts.
-- Added headless shutdown termination coverage and kept the Release build plus 1,102 automated tests green.
+내장 갤러리에는 다음 예제가 포함되어 있습니다.
 
-#### `v0.2.0-dev.19` (2026-09-09)
+- FOUP 로드 포트
+- 카세트 매핑
+- 웨이퍼 프리얼라이너
+- OCR 검사 인계
+- 로드락 진입
+- 스핀 코트 이송
+- 디벨로퍼 트랙 이송
+- 드라이 에치 이송
+- CMP 이송
+- 계측 분류
 
-- Preserved cancellation requests until the next bounded observation so a just-completed batch or commissioning validation is reported as `Cancelled`, not `Idle`.
-- Kept one-shot cleanup, duplicate-start sharing, timeout mapping, and caller exception behavior unchanged.
+각 예제는 장비 소유 관계, 인터록, I/O, 축 동작, 분기와 제어 흐름을
+확인하기 위한 시작점입니다. 예제 레시피의 구성과 확인 범위는
+[레시피 안내](samples/SemiconductorRecipes/README.md)에 정리되어 있습니다.
 
-#### `v0.2.0-dev.18` (2026-09-09)
+## 2D·3D 연동 진행
 
-- Separated deterministic sequence-step preview compilation and vacuum-prerequisite policy from fixed-step preview execution into `DeterministicSequenceStepPreviewCompiler.cs`.
-- Preserved preview contracts, sequence schema, timing, cancellation, and callers; focused preview tests 14/14, full Simulation 530/530, full MachineStudio 439/439, and Release warning-as-error gates pass.
+Machine Studio와 외부 2D·3D 프로그램 사이에서 이미지와 검사 결과를
+주고받는 흐름을 연결하고 있습니다. 현재 **3D Exchange** 화면에서 교환
+폴더와 피어 정보를 설정하고, 명시적인 Ping·Push·Pull과 결과 새로고침으로
+핸드오프와 결과 교환을 확인하는 경로를 다듬고 있습니다.
 
-#### `v0.2.0-dev.17` (2026-09-09)
+프로젝트의 `.ovmachine` 파일과 실행 근거는 저장한 프로젝트 옆에 두며,
+화면 언어 설정은 `%LOCALAPPDATA%\OpenVisionLab\MachineStudio\CONFIG`에
+저장합니다. 기본 흐름은 로컬에서 동작하며 계정이나 클라우드 연결을
+필요로 하지 않습니다.
 
-- Separated deterministic command-trace replay execution from trace contracts, validation, and JSON persistence into `DeterministicSimulationCommandTraceReplayRunner.cs`.
-- Preserved public names, record shapes, replay timing, cancellation, schema, and callers; focused command-trace tests 7/7, full Simulation 530/530, full MachineStudio 439/439, and Release warning-as-error gates pass.
+## 소스에서 실행
 
-#### `v0.2.0-dev.16` (2026-09-09)
+필요 환경:
 
-- Separated immutable recipe dry-run result contracts from the deterministic execution owner in the Simulation Sequences module.
-- Preserved public names, record shapes, timing, and callers; focused runner tests 14/14, full Simulation 530/530, full MachineStudio 439/439, and Release warning-as-error gates pass.
+- Windows 10 이상
+- .NET 8 SDK
 
-#### `v0.2.0-dev.15` (2026-09-09)
-
-- Split machine-layout snapshot/state contracts from fixed-tick transition/result contracts into two WPF-neutral owners.
-- Preserved public names, namespace, constructor overloads, collection ordering, and call paths; focused layout 50/50, related MachineStudio 129/129, full Simulation 530/530, full MachineStudio 439/439, and Release warning-as-error gates pass.
-
-#### `v0.2.0-dev.14` (2026-09-09)
-
-- Split authored deterministic condition profile and recovery contracts from runtime sample, transition, snapshot, and state-machine contracts.
-- Preserved public names, JSON schema, and call paths; focused 11/11, related MachineStudio Simulation 74/74, full Simulation 530/530, and Release warning-as-error gates pass.
-
-#### `v0.2.0-dev.13` (2026-09-09)
-
-- Separated authored scenario assertion definitions from the WPF-neutral runtime evaluator and evidence hash owner.
-- Preserved schema-5 run-package and recipe dry-run call paths; focused 4/4, related MachineStudio Scenario 33/33, full Simulation 530/530, and Release warning-as-error gates pass.
-
-#### `v0.2.0-dev.12` (2026-09-09)
-
-- Extracted active-layout component materialization into the WPF-neutral `MachineProjectRuntimeComponentCompiler`.
-- Layout compilation now keeps active-layout selection and device-family orchestration in their existing owners; focused 59/59 and full Simulation 529/529 gates pass.
-
-#### `v0.2.0-dev.11` (2026-09-09)
-
-- Extracted wafer-handler runtime compilation into the WPF-neutral `MachineLayoutWaferHandlerRuntimeCompiler`.
-- Preserved layout-device orchestration and verified focused, full Simulation, MachineStudio Sequence, and Release build gates.
-
-## Download
-
-Download the latest Windows x64 ZIP from
-[GitHub Releases](https://github.com/Noah8218/OpenVisionLab-Machine-Studio/releases),
-extract the complete archive, and run `OpenVisionLab.MachineStudio.exe`.
-
-The self-contained package includes the required .NET 8 desktop runtime. No
-separate .NET installation is required. Current packages are unsigned, so
-Windows may show an unknown-publisher warning. Verify the published SHA-256
-before running a downloaded archive.
-
-## What you can do
-
-- Create a blank machine project or start from the bundled Automatic Transfer
-  Cell.
-- Place and edit machine frames, stages, sensors, cylinders, conveyors, and
-  workpieces on a 2D/2.5D layout.
-- Define virtual motion axes and digital I/O with explicit equipment bindings.
-- Author and reorder automatic sequence steps without editing project JSON.
-- Compile a project atomically and run it on a deterministic 5 ms simulation
-  clock.
-- Pause, step, reset, inject deterministic faults, and review immutable runtime
-  snapshots and events.
-- Check simulation readiness, preview a connected step, dry-run a complete
-  recipe, and replay the exact failing boundary without changing the main
-  runtime.
-- Save and reopen `.ovmachine` projects and project-linked evidence.
-- Use ten editable semiconductor equipment recipes as vendor-neutral starting
-  programs.
-- Switch the interface between Korean and English.
-
-## Five-minute start
-
-1. Launch `OpenVisionLab.MachineStudio.exe`.
-2. Choose **Start from sample**.
-3. Open **Connections** to review the equipment graph and sequence usage.
-4. Choose **Check simulation readiness** to compile without starting the runtime.
-5. Choose **Dry run recipe** to inspect the isolated timeline and final state.
-6. Select a timeline entry and choose **View state on layout** to review that
-   boundary.
-7. Return to the workspace and choose **Simulation ON** for the live deterministic
-   run. Use **Pause**, **Step**, and **Reset** as needed.
-8. Use **Save As** before editing a bundled sample.
-
-Loading, previewing, restoring, or opening linked evidence never starts the
-simulation or saves a project automatically.
-
-## Semiconductor recipe pack
-
-The built-in gallery contains editable examples for:
-
-- FOUP load port;
-- cassette mapping;
-- wafer prealignment;
-- OCR inspection handoff;
-- load-lock entry;
-- spin-coat transfer;
-- developer-track transfer;
-- dry-etch transfer;
-- CMP transfer;
-- metrology sorting.
-
-These recipes validate equipment ownership, interlocks, I/O, motion, branching,
-and control flow. They do not predict semiconductor chemistry, vacuum
-conductance, plasma, polishing, overlay, yield, or production classification.
-See the [recipe pack guide](samples/SemiconductorRecipes/README.md) for the
-case-by-case boundaries.
-
-## Supported scope
-
-Machine Studio currently focuses on local desktop simulation and virtual
-commissioning:
-
-- virtual motion axes and axis-bound stages;
-- deterministic digital I/O;
-- sensor, cylinder, conveyor, workpiece, chamber, and handoff state models;
-- automatic sequence authoring and isolated verification;
-- deterministic fault and assertion evidence;
-- optional virtual-camera timing and mock inspection decisions.
-
-Real-time PLC control, robot teaching, MES, cloud services, production-line
-control, external camera SDKs, production Vision, and safety certification are
-not supported in the current release.
-
-## Projects and local data
-
-Machine projects use the `.ovmachine` JSON format. Normal project data and
-accepted evidence stay beside the saved project. User language settings are
-stored under `%LOCALAPPDATA%\OpenVisionLab\MachineStudio\CONFIG`.
-
-The application does not require an account, cloud service, or network
-connection for its local workflows. Release 2 adds an optional, explicit,
-authenticated TCP transfer path for a configured peer; it does not
-automatically update, upload projects, or execute external equipment.
-
-### Optional TCP integration (Release 2 development)
-
-On the **3D Exchange** tab, save the shared exchange folder and the listen and
-peer endpoints, then enter the same Base64 key (at least 32 decoded bytes) in
-each participating application. The key is session-only; it is never written
-to the settings file. The `OPENVISIONLAB_TCP_SHARED_KEY` environment variable
-can supply the key for a headless or repeatable session. Start the listener and
-use **Ping peer**, **Push latest**, or **Pull latest** explicitly. A transfer
-only copies the selected transaction files; use the existing explicit Result
-refresh action to validate and display a returned inspection result.
-
-## Build from source
-
-Requirements:
-
-- Windows 10 or later;
-- .NET 8 SDK.
+저장소 루트에서 실행합니다.
 
 ```powershell
 dotnet restore OpenVisionLab.MachineStudio.sln
@@ -191,49 +79,29 @@ dotnet test OpenVisionLab.MachineStudio.sln -c Release --no-build --no-restore
 dotnet run --project src/OpenVisionLab.MachineStudio/OpenVisionLab.MachineStudio.csproj
 ```
 
-Create the verified self-contained release-candidate package from a clean Git
-commit:
+## 구조
 
-```powershell
-.\scripts\build-release-candidate.ps1 `
-  -ArtifactDirectory .\artifacts\release-candidate
-```
+시뮬레이션 스레드가 런타임 상태를 소유하고, UI 명령은 명령 큐를 통해
+전달됩니다. UI는 불변 스냅샷과 순서가 보장된 이벤트를 읽습니다.
+시뮬레이션 계산, 시퀀스, 장치 상태, 화면 표현은 각각의 모듈에서 관리합니다.
 
-The script verifies the Release build, tests, dependency findings, asset
-provenance, runtime notices, payload manifest, SHA-256, and archive extraction
-round trip. The output path must not already exist.
+- [구조와 모듈](docs/ARCHITECTURE.md)
+- [시뮬레이션 시간 모델](docs/SIMULATION_TIME_MODEL.md)
+- [비전 연동 경계](docs/VISION_INTEGRATION.md)
+- [외부 자산과 벤더 연동 정책](docs/VENDOR_INTEGRATION_AND_ASSET_POLICY.md)
 
-## Architecture
+## 참여와 문의
 
-The simulation thread is the only runtime-state owner. UI commands enter a
-non-dropping command queue, while the UI reads immutable snapshots and ordered
-events. Simulation math, sequencing, device state, and presentation remain in
-their owning modules.
+변경을 제안하기 전에 [CONTRIBUTING.md](CONTRIBUTING.md)를 확인해 주세요.
+재현 가능한 문제는 이슈 템플릿을 사용하고, 보안 문제는
+[SECURITY.md](SECURITY.md)의 안내를 따라 주세요.
 
-See:
+- [지원 안내](SUPPORT.md)
+- [커뮤니티 행동 규칙](CODE_OF_CONDUCT.md)
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Simulation time model](docs/SIMULATION_TIME_MODEL.md)
-- [Vision integration boundary](docs/VISION_INTEGRATION.md)
-- [Vendor integration and asset policy](docs/VENDOR_INTEGRATION_AND_ASSET_POLICY.md)
-- [Public release roadmap](docs/OPENVISIONLAB_MACHINE_STUDIO_PUBLIC_RELEASE_ROADMAP.md)
+## 라이선스
 
-## Contributing and support
-
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Use the
-issue templates for reproducible bugs and scoped, vendor-neutral proposals.
-
-- Security reports: [SECURITY.md](SECURITY.md)
-- Support boundaries: [SUPPORT.md](SUPPORT.md)
-- Community conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
-
-## License and attribution
-
-Machine Studio is available under the [MIT License](LICENSE). Dependency
-attribution is recorded in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md),
-and built-in visual assets are tracked by path and SHA-256 in
-[ASSET-PROVENANCE.json](ASSET-PROVENANCE.json).
-
-Machine Studio is vendor-neutral and is not affiliated with or endorsed by an
-industrial-equipment or semiconductor-equipment vendor. Product names and
-trademarks belong to their respective owners.
+Machine Studio는 [MIT License](LICENSE)로 제공됩니다. 의존성 고지는
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)에, 내장 시각 자산의
+출처와 해시는 [ASSET-PROVENANCE.json](ASSET-PROVENANCE.json)에 기록되어
+있습니다.

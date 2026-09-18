@@ -179,10 +179,9 @@ the result is either an exact match or the first classified mismatch. Changing
 and then restoring the project context visibly invalidates and revalidates the
 evidence without executing the task.
 
-## Next boundary
+## 현재 문서의 경계
 
-This completes the bounded local single-image Vision commissioning slice. A
-full Vision Workspace, pixel preview, generalized recipe editor, automatic
-sequence file I/O, Vision batch execution, 3D view, or external camera SDK
-remains out of scope. The next repository decision is release-candidate
-readiness and versioning, not expansion into those platforms.
+이 문서는 로컬 단일 이미지 비전 흐름의 현재 계약과 화면 동작을 설명합니다.
+전체 비전 작업 공간, 픽셀 미리보기, 범용 레시피 편집기, 자동 시퀀스 파일
+입출력, 비전 배치 실행, 3D 화면, 외부 카메라 SDK는 이 문서에서 다루지
+않습니다.

@@ -29,8 +29,7 @@ match one vendor. Do not imply affiliation, certification, or endorsement.
   rights.
 - SDK binaries, headers, examples, or documentation copied into the repository
   when their license does not permit it.
-- An asset whose source, license, or transformation history is unknown in a
-  release candidate.
+- An asset whose source, license, or transformation history is unknown.
 
 ## Required adapter record
 

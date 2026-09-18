@@ -35,7 +35,7 @@ that stay within the supported local desktop scope.
 
 Generated outputs, local evidence, user projects, credentials, and IDE files
 must not be committed. Pull requests must pass the hosted deterministic smoke
-and release-candidate checks before merge.
+checks before merge.
 
 ## Pull requests
 

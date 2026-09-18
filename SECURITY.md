@@ -2,9 +2,8 @@
 
 ## Supported versions
 
-Machine Studio is currently a technical alpha. Only the latest published
-release receives security fixes. It is local simulation software and is not
-supported for production equipment control or safety functions.
+Machine Studio is under active development. Security fixes are assessed against
+the latest source and the affected commit is recorded with the report.
 
 ## Reporting a vulnerability
 
