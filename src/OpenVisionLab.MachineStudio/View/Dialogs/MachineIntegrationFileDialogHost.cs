@@ -37,6 +37,21 @@ internal sealed class MachineIntegrationFileDialogHost
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
+    internal static string? SelectHeightMapSource(string currentPath)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = Localize("3D HeightMap C3D 원본 선택", "Choose the 3D HeightMap C3D source"),
+            Filter = "C3D height maps (*.c3d)|*.c3d|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false,
+            InitialDirectory = File.Exists(currentPath)
+                ? Path.GetDirectoryName(Path.GetFullPath(currentPath))
+                : null
+        };
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
     private static string Localize(string korean, string english) =>
         OpenVisionLanguageService.CurrentLanguage == OpenVisionLanguage.English ? english : korean;
 }

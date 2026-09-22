@@ -22,7 +22,9 @@ internal sealed record SimulationSequenceCommandContext(
     IReadOnlyDictionary<SimulationFaultKey, SimulationFaultSnapshot> ActiveFaults,
     DeterministicSequenceDebugState SequenceDebugState,
     long CommandBoundaryTick,
-    TimeSpan CommandBoundaryTime);
+    TimeSpan CommandBoundaryTime,
+    string? ResetRetrySequenceId = null,
+    bool AutomaticRunConfigured = false);
 
 internal sealed record SimulationSequenceCommandEvent(
     string Category,
@@ -211,14 +213,24 @@ internal sealed class SimulationSequenceCommandHandler
         }
 
         var snapshot = executor.CaptureSnapshot();
-        if (!string.Equals(state.ActiveSequenceId, retrySequence.SequenceId, StringComparison.Ordinal)
-            || snapshot.Status != SequenceExecutionStatus.Faulted)
+        var retryAfterReset = string.Equals(
+                context.ResetRetrySequenceId,
+                retrySequence.SequenceId,
+                StringComparison.Ordinal)
+            && state.ActiveSequenceId is null
+            && snapshot.Status == SequenceExecutionStatus.Ready;
+        var retryFromFault = string.Equals(
+                state.ActiveSequenceId,
+                retrySequence.SequenceId,
+                StringComparison.Ordinal)
+            && snapshot.Status == SequenceExecutionStatus.Faulted;
+        if (!retryAfterReset && !retryFromFault)
         {
             return Reject(
                 command,
                 context,
                 SimulationCommandErrorCode.SequenceRetryRejected,
-                $"Sequence '{retrySequence.SequenceId}' must be the active Faulted sequence.");
+                $"Sequence '{retrySequence.SequenceId}' must be the active Faulted sequence or be explicitly reset for retry.");
         }
 
         if (context.ActiveFaults.Count > 0)
@@ -230,7 +242,9 @@ internal sealed class SimulationSequenceCommandHandler
                 "Clear active simulation faults before retrying the sequence.");
         }
 
-        var retried = executor.Retry();
+        var retried = retryAfterReset
+            ? executor.Start()
+            : executor.Retry();
         if (!retried.IsSuccess)
         {
             return Reject(
@@ -245,12 +259,14 @@ internal sealed class SimulationSequenceCommandHandler
         return Accept(
             command,
             context,
-            $"Sequence '{retrySequence.SequenceId}' retried from its entry step; automatic continuation remains stopped.",
+            retryAfterReset
+                ? $"Sequence '{retrySequence.SequenceId}' was reset and retried from its entry step."
+                : $"Sequence '{retrySequence.SequenceId}' retried from its entry step; automatic continuation remains stopped.",
             state with
             {
                 RunMode = SimulationRunMode.Paused,
                 PendingSteps = 0,
-                AutomaticRunActive = false,
+                AutomaticRunActive = retryAfterReset && context.AutomaticRunConfigured,
                 AutomaticRunWaitingForRepeat = false,
                 AutomaticRunRemainingDelayTicks = 0,
                 ConditionScheduledFaultInterruptedAutomaticRun = false,
@@ -260,9 +276,12 @@ internal sealed class SimulationSequenceCommandHandler
             new SimulationSequenceCommandEvent(
                 "Sequence",
                 "SequenceRetried",
-                $"{retrySequence.SequenceId} retried from {snapshot.CurrentStepId ?? "the fault boundary"}; " +
-                "entered " +
-                $"{retried.CurrentStepId}; automatic continuation remains stopped."));
+                retryAfterReset
+                    ? $"{retrySequence.SequenceId} reset-retried from the entry step; entered " +
+                      $"{retried.CurrentStepId}; automatic continuation is armed but remains paused."
+                    : $"{retrySequence.SequenceId} retried from {snapshot.CurrentStepId ?? "the fault boundary"}; " +
+                      "entered " +
+                      $"{retried.CurrentStepId}; automatic continuation remains stopped."));
     }
 
     private static SimulationSequenceCommandOutcome Accept(

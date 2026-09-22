@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Events;
@@ -9,6 +10,90 @@ namespace OpenVisionLab.MachineStudio.Tests;
 
 public sealed class SimulationRuntimeLoopTests
 {
+    [Fact]
+    public async Task RejectsSnapshotWhenRuntimeIdentityChangesBeforeDispatch()
+    {
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings
+            {
+                FixedStep = TimeSpan.FromMilliseconds(1),
+                TimeScale = 1
+            });
+        var latePublishedSnapshots = new ConcurrentQueue<SimulationSnapshot>();
+        var lateAppliedSnapshots = new ConcurrentQueue<SimulationSnapshot>();
+        var runtimeReconfigured = 0;
+        var firstDispatchReleased = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var dispatchCount = 0;
+        var initialRuntimeApplied = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var loop = new SimulationRuntimeLoop(
+            engine,
+            action =>
+            {
+                if (Interlocked.Increment(ref dispatchCount) == 1)
+                {
+                    return ReleaseFirstDispatchAsync(action, firstDispatchReleased.Task);
+                }
+
+                action();
+                return Task.CompletedTask;
+            },
+            snapshot =>
+            {
+                if (Volatile.Read(ref runtimeReconfigured) != 0)
+                {
+                    latePublishedSnapshots.Enqueue(snapshot);
+                }
+            },
+            snapshot =>
+            {
+                if (Volatile.Read(ref runtimeReconfigured) != 0)
+                {
+                    lateAppliedSnapshots.Enqueue(snapshot);
+                }
+            },
+            () => initialRuntimeApplied.TrySetResult(true),
+            _ => { },
+            _ => { },
+            _ => { },
+            _ => { },
+            null,
+            null,
+            snapshot =>
+            {
+                var current = engine.CurrentSnapshot;
+                return snapshot.RuntimeGeneration == current.RuntimeGeneration
+                    && string.Equals(snapshot.ProjectId, current.ProjectId, StringComparison.Ordinal);
+            });
+
+        loop.Start(new SimulationRuntimeConfiguration([], [], []), "project-a");
+        await WaitForAsync(() => engine.CurrentSnapshot.ProjectId == "project-a");
+
+        var reconfigured = await engine.EnqueueCommandAsync(
+            new ConfigureRuntimeCommand(
+                new SimulationRuntimeConfiguration([], [], []),
+                "project-b"));
+        Assert.True(reconfigured.IsAccepted);
+        Volatile.Write(ref runtimeReconfigured, 1);
+
+        firstDispatchReleased.TrySetResult(true);
+        await WaitForAsync(() => Volatile.Read(ref dispatchCount) >= 2);
+
+        Assert.DoesNotContain(latePublishedSnapshots, snapshot => snapshot.ProjectId == "project-a");
+        Assert.DoesNotContain(lateAppliedSnapshots, snapshot => snapshot.ProjectId == "project-a");
+
+        var stopTask = engine.StopAsync();
+        loop.Cancel();
+        await stopTask;
+        await loop.RuntimeTask.WaitAsync(TimeSpan.FromSeconds(2));
+        await loop.TerminationObservationTask.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(
+            loop.IsCompleted,
+            $"Runtime={loop.RuntimeTask.Status}, termination={loop.TerminationObservationTask.Status}");
+        loop.Dispose();
+    }
+
     [Fact]
     public async Task StartsOnceConfiguresAndDeliversSnapshotsBeforeCancellation()
     {
@@ -184,5 +269,11 @@ public sealed class SimulationRuntimeLoopTests
         }
 
         Assert.True(condition(), "The runtime loop did not apply initial configuration.");
+    }
+
+    private static async Task ReleaseFirstDispatchAsync(Action action, Task releaseTask)
+    {
+        await releaseTask;
+        action();
     }
 }

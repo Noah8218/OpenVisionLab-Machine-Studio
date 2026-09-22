@@ -6,6 +6,8 @@
              MinHeight="320">
     <UserControl.Resources>
         <loc:LocalizedSequenceNameConverter x:Key="LocalizedSequenceNameConverter" />
+        <loc:LocalizedSequenceActionConverter x:Key="LocalizedSequenceActionConverter" />
+        <loc:LocalizedSequenceTemplateNameConverter x:Key="LocalizedSequenceTemplateNameConverter" />
         <Style x:Key="SequenceFieldLabelStyle" TargetType="TextBlock">
             <Setter Property="Margin" Value="0,0,7,0" />
             <Setter Property="VerticalAlignment" Value="Center" />
@@ -88,19 +90,24 @@
                                Text="{loc:Loc Key=Sequence.NewStep}" />
                     <ComboBox Width="175"
                               Margin="0,0,6,0"
-                              DisplayMemberPath="Name"
                               ItemsSource="{Binding Templates}"
-                              SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}" />
+                              SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource LocalizedSequenceTemplateNameConverter}}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                     <Button Margin="0,0,6,0"
                             Command="{Binding AddStepCommand}"
                             Content="{loc:Loc Key=Sequence.Add}"
                             Style="{StaticResource PrimaryCommandButtonStyle}"
-                            ToolTip="Insert a new step before the final Complete step" />
+                            ToolTip="{loc:Loc Key=Sequence.AddTooltip}" />
                     <Button Margin="0,0,6,0"
                             Command="{Binding DeleteStepCommand}"
                             Content="{loc:Loc Key=Sequence.Delete}"
                             Style="{StaticResource GlobalCommandButtonStyle}"
-                            ToolTip="Delete the selected non-terminal step" />
+                            ToolTip="{loc:Loc Key=Sequence.DeleteTooltip}" />
                     <Button Margin="0,0,6,0"
                             Command="{Binding MoveStepUpCommand}"
                             Content="{loc:Loc Key=Sequence.MoveUp}"
@@ -109,7 +116,8 @@
                             Content="{loc:Loc Key=Sequence.MoveDown}"
                             Style="{StaticResource GlobalCommandButtonStyle}" />
                     <TextBlock Margin="12,0,0,0"
-                               VerticalAlignment="Center"
+                               MaxWidth="340"
+                               VerticalAlignment="Top"
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="{Binding StructuralEditStatus}"
                                TextWrapping="Wrap" />
@@ -131,10 +139,21 @@
                       SelectionUnit="FullRow">
                 <DataGrid.Columns>
                     <DataGridTextColumn Width="42" Binding="{Binding Order}" Header="#" />
-                    <DataGridTextColumn Width="2*" Binding="{Binding DisplayName}" Header="Step" />
-                    <DataGridTextColumn Width="130" Binding="{Binding Action}" Header="Action" />
-                    <DataGridTextColumn Width="*" Binding="{Binding TargetId}" Header="Target" />
-                    <DataGridTemplateColumn Width="1.5*" Header="Validation">
+                    <DataGridTextColumn Width="2*" Binding="{Binding DisplayName}" Header="{loc:Loc Key=Sequence.Step}" />
+                    <DataGridTextColumn Width="130" Header="{loc:Loc Key=Sequence.Action}">
+                        <DataGridTextColumn.Binding>
+                            <Binding Path="Action" Converter="{StaticResource LocalizedSequenceActionConverter}" />
+                        </DataGridTextColumn.Binding>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Width="*" Binding="{Binding TargetId}" Header="{loc:Loc Key=Sequence.Target}">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="{x:Type TextBlock}">
+                                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                <Setter Property="ToolTip" Value="{Binding TargetId}" />
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTemplateColumn Width="1.5*" Header="{loc:Loc Key=Sequence.Validation}">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock VerticalAlignment="Center"
@@ -181,7 +200,13 @@
                         <ComboBox Grid.Row="1" Grid.Column="1"
                                   ItemsSource="{Binding SelectedStep.AvailableActions}"
                                   SelectedItem="{Binding SelectedStep.Action, Mode=TwoWay}"
-                                  Style="{StaticResource SequenceComboBoxStyle}" />
+                                  Style="{StaticResource SequenceComboBoxStyle}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Converter={StaticResource LocalizedSequenceActionConverter}}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                         <TextBlock Grid.Row="1" Grid.Column="2" Margin="8,0,7,0"
                                    Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Target}" />
                         <ComboBox x:Name="SequenceTargetComboBox"
@@ -289,21 +314,69 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <TextBlock Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Sequence.Validation}" />
-                        <ListBox Grid.Row="1"
+                        <TextBlock Grid.Row="1"
+                                   Margin="0,4,0,0"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{Binding ValidationComparisonText}"
+                                   TextWrapping="Wrap" />
+                        <ListBox x:Name="SequenceValidationIssuesListBox"
+                                 Grid.Row="2"
                                  Margin="0,5,0,0"
                                  BorderThickness="0"
-                                 ItemsSource="{Binding ValidationMessages}"
+                                 ItemsSource="{Binding ValidationIssues}"
+                                 SelectedItem="{Binding SelectedValidationIssue, Mode=TwoWay}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Background" Value="Transparent" />
+                                    <Setter Property="BorderThickness" Value="0" />
+                                    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <ContentPresenter />
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Margin="0,2"
-                                               FontSize="10.5"
-                                               Foreground="{DynamicResource State.Fault}"
-                                               Text="{Binding}"
-                                               TextWrapping="Wrap" />
+                                    <Border Margin="0,0,0,4"
+                                            Padding="5,3"
+                                            BorderThickness="1"
+                                            CornerRadius="3">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{DynamicResource Surface.Raised}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType={x:Type ListBoxItem}}}" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource Surface.Selected}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <StackPanel>
+                                            <TextBlock FontSize="10.5"
+                                                       Foreground="{DynamicResource State.Fault}"
+                                                       Text="{Binding DisplayText}"
+                                                       TextWrapping="Wrap" />
+                                            <TextBlock Margin="0,1,0,0"
+                                                       FontFamily="{StaticResource Typography.Telemetry}"
+                                                       FontSize="9.5"
+                                                       Foreground="{DynamicResource Text.Secondary}"
+                                                       Text="{Binding LocationText}"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>

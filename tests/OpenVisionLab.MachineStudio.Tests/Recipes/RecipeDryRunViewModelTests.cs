@@ -123,6 +123,32 @@ public sealed class RecipeDryRunViewModelTests
     }
 
     [Fact]
+    public async Task EditabilityChangeInvalidatesAnInFlightResult()
+    {
+        var project = LoadProject("AutomaticTransferCell.ovmachine");
+        var sequenceId = project.Sequences[0].Id;
+        var result = CreateResult(project, sequenceId);
+        var resultSource = new TaskCompletionSource<RecipeDryRunResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var viewModel = CreateViewModel(
+            () => null,
+            _ => resultSource.Task);
+
+        viewModel.Load(project);
+        viewModel.ValidateSimulationReadinessCommand.Execute(null);
+        viewModel.RunRecipeDryRunCommand.Execute(null);
+        Assert.True(viewModel.IsRecipeDryRunRunning);
+
+        viewModel.IsEditable = false;
+        resultSource.SetResult(result);
+        await Task.Yield();
+
+        Assert.False(viewModel.HasRecipeDryRunResult);
+        Assert.False(viewModel.IsRecipeDryRunRunning);
+        Assert.False(viewModel.RunRecipeDryRunCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task DisposeSuppressesLateResultAndDisablesCommands()
     {
         var project = LoadProject("AutomaticTransferCell.ovmachine");
@@ -151,6 +177,34 @@ public sealed class RecipeDryRunViewModelTests
         Assert.False(viewModel.RunRecipeDryRunCommand.CanExecute(null));
         Assert.False(viewModel.OpenRecipeDryRunStepCommand.CanExecute(null));
         Assert.False(viewModel.PlayRecipeDryRunStepCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void DisposeNotifiesDryRunCommandsOfFinalAdmission()
+    {
+        var project = LoadProject("AutomaticTransferCell.ovmachine");
+        var viewModel = CreateViewModel(
+            () => null,
+            _ => Task.FromResult(CreateResult(project, project.Sequences[0].Id)));
+        viewModel.Load(project);
+        var commands = new ICommand[]
+        {
+            viewModel.ValidateSimulationReadinessCommand,
+            viewModel.RunRecipeDryRunCommand,
+            viewModel.OpenRecipeDryRunStepCommand,
+            viewModel.PlayRecipeDryRunStepCommand
+        };
+        var notifications = new int[commands.Length];
+        for (var index = 0; index < commands.Length; index++)
+        {
+            var commandIndex = index;
+            commands[commandIndex].CanExecuteChanged += (_, _) => notifications[commandIndex]++;
+        }
+
+        viewModel.Dispose();
+
+        Assert.All(commands, command => Assert.False(command.CanExecute(null)));
+        Assert.All(notifications, count => Assert.Equal(1, count));
     }
 
     private static RecipeDryRunViewModel CreateViewModel(

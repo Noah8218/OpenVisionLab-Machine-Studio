@@ -176,6 +176,45 @@ public sealed class AxisCommissioningViewModelTests
         Assert.False(viewModel.HomeAxisCommand.CanExecute(null));
     }
 
+    [Fact]
+    public void DisposeNotifiesCommandsOfFinalAdmission()
+    {
+        var viewModel = new AxisCommissioningViewModel(
+            (command, _) => Task.FromResult(CreateAcceptedResult(command)),
+            _ => { });
+        viewModel.ApplyProjection(
+            new AxisCommissioningProjection(
+                new AxisSnapshot("axis.x", "X Axis", AxisState.Idle, 12.5, 0),
+                new VirtualAxisDefinition
+                {
+                    Id = "axis.x",
+                    SoftLimitMin = 0,
+                    SoftLimitMax = 100,
+                    MaxVelocity = 50
+                },
+                HasSelectedAxisStage: true,
+                IsRunMode: true,
+                IsApplyingProject: false,
+                IsValidationBusy: false,
+                RuntimeDefinitionDirty: false,
+                IsRunning: true,
+                ControlOwner: SimulationControlOwner.Manual,
+                AutomaticRunActive: false,
+                SequenceRunActive: false));
+
+        var moveNotifications = 0;
+        var homeNotifications = 0;
+        viewModel.MoveAxisAbsoluteCommand.CanExecuteChanged += (_, _) => moveNotifications++;
+        viewModel.HomeAxisCommand.CanExecuteChanged += (_, _) => homeNotifications++;
+
+        viewModel.Dispose();
+
+        Assert.False(viewModel.MoveAxisAbsoluteCommand.CanExecute(null));
+        Assert.False(viewModel.HomeAxisCommand.CanExecute(null));
+        Assert.Equal(1, moveNotifications);
+        Assert.Equal(1, homeNotifications);
+    }
+
     private static SimulationCommandResult CreateAcceptedResult(SimulationCommand command) =>
         new(
             command.CommandId,

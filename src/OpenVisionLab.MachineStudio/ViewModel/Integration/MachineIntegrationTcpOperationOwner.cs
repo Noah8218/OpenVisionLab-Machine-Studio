@@ -10,6 +10,7 @@ internal sealed class MachineIntegrationTcpOperationOwner : IDisposable
     private readonly Action<bool> _setBusy;
     private readonly Action<string> _setStatus;
     private readonly Func<string> _createCancelledStatus;
+    private readonly Func<Exception, Task>? _reportExceptionAsync;
     private readonly object _gate = new();
     private CancellationTokenSource? _operationCancellation;
     private Task<MachineIntegrationOperationObservation>? _operationTask;
@@ -20,12 +21,14 @@ internal sealed class MachineIntegrationTcpOperationOwner : IDisposable
     internal MachineIntegrationTcpOperationOwner(
         Action<bool> setBusy,
         Action<string> setStatus,
-        Func<string> createCancelledStatus)
+        Func<string> createCancelledStatus,
+        Func<Exception, Task>? reportExceptionAsync = null)
     {
         _setBusy = setBusy ?? throw new ArgumentNullException(nameof(setBusy));
         _setStatus = setStatus ?? throw new ArgumentNullException(nameof(setStatus));
         _createCancelledStatus = createCancelledStatus
             ?? throw new ArgumentNullException(nameof(createCancelledStatus));
+        _reportExceptionAsync = reportExceptionAsync;
     }
 
     internal bool IsBusy
@@ -184,6 +187,11 @@ internal sealed class MachineIntegrationTcpOperationOwner : IDisposable
         catch (Exception exception)
         {
             TryPublishIfActive(() => _setStatus(exception.Message));
+            if (_reportExceptionAsync is not null)
+            {
+                await _reportExceptionAsync(exception).ConfigureAwait(true);
+            }
+
             result = new(
                 MachineIntegrationOperationKind.Tcp,
                 MachineIntegrationParticipantOutcome.Failed,

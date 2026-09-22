@@ -80,12 +80,16 @@ internal sealed class VirtualCameraInspectionWorkflow
 
     public TriggerVirtualCameraCommand CreateTriggerCommand(
         VirtualFrameDescriptor frame,
-        VisionRunResult inspectionResult,
+        VisionRunResult? inspectionResult,
         string? projectId = null,
-        long? runtimeGeneration = null)
+        long? runtimeGeneration = null,
+        bool waitForExternalResult = false)
     {
         ArgumentNullException.ThrowIfNull(frame);
-        ArgumentNullException.ThrowIfNull(inspectionResult);
+        if (inspectionResult is null && !waitForExternalResult)
+        {
+            throw new ArgumentNullException(nameof(inspectionResult));
+        }
 
         var frameEvidence = new VirtualCameraFrameEvidence(
             frame.FrameId,
@@ -95,21 +99,23 @@ internal sealed class VirtualCameraInspectionWorkflow
             frame.Width,
             frame.Height,
             frame.PixelFormat);
-        var inspectionEvidence = new VirtualCameraInspectionEvidence(
-            inspectionResult.InspectionId,
-            inspectionResult.AcquisitionId,
-            inspectionResult.CameraId,
-            inspectionResult.RecipeId,
-            inspectionResult.FrameId,
-            inspectionResult.Judgment switch
-            {
-                VisionJudgment.OK => PlaceholderInspectionDecision.Pass,
-                VisionJudgment.NG => PlaceholderInspectionDecision.Fail,
-                _ => throw new InvalidOperationException(
-                    $"Unsupported manual inspection judgment: {inspectionResult.Judgment}.")
-            },
-            inspectionResult.Message,
-            inspectionResult.Metrics);
+        var inspectionEvidence = inspectionResult is null
+            ? null
+            : new VirtualCameraInspectionEvidence(
+                inspectionResult.InspectionId,
+                inspectionResult.AcquisitionId,
+                inspectionResult.CameraId,
+                inspectionResult.RecipeId,
+                inspectionResult.FrameId,
+                inspectionResult.Judgment switch
+                {
+                    VisionJudgment.OK => PlaceholderInspectionDecision.Pass,
+                    VisionJudgment.NG => PlaceholderInspectionDecision.Fail,
+                    _ => throw new InvalidOperationException(
+                        $"Unsupported manual inspection judgment: {inspectionResult.Judgment}.")
+                },
+                inspectionResult.Message,
+                inspectionResult.Metrics);
 
         return new TriggerVirtualCameraCommand(
             frame.CameraId,
@@ -117,7 +123,8 @@ internal sealed class VirtualCameraInspectionWorkflow
             frameEvidence,
             inspectionEvidence,
             projectId,
-            runtimeGeneration);
+            runtimeGeneration,
+            waitForExternalResult);
     }
 
     private static string CreateAcquisitionId(VirtualCameraInspectionRequest request) =>

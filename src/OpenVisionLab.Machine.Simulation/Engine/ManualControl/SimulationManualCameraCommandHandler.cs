@@ -73,7 +73,8 @@ internal sealed class SimulationManualCameraCommandHandler
         var trigger = camera.Trigger(
             triggerCamera.RecipeId,
             triggerCamera.FrameEvidence,
-            triggerCamera.InspectionEvidence);
+            triggerCamera.InspectionEvidence,
+            triggerCamera.WaitForExternalResult);
         if (!trigger.IsAccepted || string.IsNullOrWhiteSpace(trigger.AcquisitionId))
         {
             return SimulationManualControlCommandHandler.Reject(

@@ -42,6 +42,17 @@ internal sealed class SimulationRuntimeState
     private TimeSpan _commandBoundaryTime;
     private string? _projectId;
     private long _runtimeGeneration;
+    private string? _resetRetrySequenceId;
+    private bool _automaticExternalInspectionRearmRequired;
+    private readonly Dictionary<string, VirtualCameraExternalSource> _automaticExternalSources =
+        new(StringComparer.Ordinal);
+    private string? _automaticExternalSequenceId;
+    private bool _automaticExternalInspectionEnabled;
+    private bool _automaticExternalRequestPublished;
+    private bool _automaticExternalResumeRealTime;
+    private TimeSpan _automaticExternalInspectionWaitElapsed;
+    private TimeSpan? _automaticExternalInspectionSimulationTimeout;
+    private AutomaticExternalInspectionClosure? _automaticExternalInspectionClosure;
 
     internal SimulationRuntimeState(TimeSpan fixedStep, double timeScale)
     {
@@ -99,6 +110,19 @@ internal sealed class SimulationRuntimeState
     internal TimeSpan CommandBoundaryTime => _commandBoundaryTime;
     internal string? ProjectId => _projectId;
     internal long RuntimeGeneration => _runtimeGeneration;
+    internal string? ResetRetrySequenceId => _resetRetrySequenceId;
+    internal bool AutomaticExternalInspectionRearmRequired =>
+        _automaticExternalInspectionRearmRequired;
+    internal bool AutomaticExternalInspectionEnabled => _automaticExternalInspectionEnabled;
+    internal bool AutomaticExternalRequestPublished => _automaticExternalRequestPublished;
+    internal bool AutomaticExternalResumeRealTime => _automaticExternalResumeRealTime;
+    internal bool IsAutomaticExternalInspectionWaiting =>
+        _automaticExternalInspectionEnabled && _automaticExternalRequestPublished;
+    internal TimeSpan AutomaticExternalInspectionWaitElapsed => _automaticExternalInspectionWaitElapsed;
+    internal TimeSpan? AutomaticExternalInspectionSimulationTimeout =>
+        _automaticExternalInspectionSimulationTimeout;
+    internal IReadOnlyDictionary<string, VirtualCameraExternalSource> AutomaticExternalSources =>
+        _automaticExternalSources;
 
     internal long NextTickIndex => _tickIndex + 1;
     internal TimeSpan NextSimulationTime => _clock.Time + _clock.FixedStep;
@@ -148,6 +172,10 @@ internal sealed class SimulationRuntimeState
         }
         _faultRuntime.Clear();
         _conditionScenarioRuntime.Clear();
+        ClearAutomaticExternalInspection(clearSources: true);
+        _automaticExternalInspectionClosure = null;
+        _resetRetrySequenceId = null;
+        _automaticExternalInspectionRearmRequired = false;
         _sequenceRuntime.Configure(runtime.CompiledSequences, runtime.SequenceExecutors);
         _automaticRunRuntime.Configure(
             configuration.AutomaticRun,
@@ -184,6 +212,10 @@ internal sealed class SimulationRuntimeState
         _pickPlaceWorkpiece = null;
         _faultRuntime.Clear();
         _conditionScenarioRuntime.Clear();
+        ClearAutomaticExternalInspection(clearSources: true);
+        _automaticExternalInspectionClosure = null;
+        _resetRetrySequenceId = null;
+        _automaticExternalInspectionRearmRequired = false;
         _sequenceRuntime.ClearConfiguration();
         _automaticRunRuntime.Configure(null, repeatDelayTicks: 0);
         _activeSequenceId = null;
@@ -195,6 +227,15 @@ internal sealed class SimulationRuntimeState
 
     internal void Reset()
     {
+        var resetRetrySequenceId = _resetRetrySequenceId;
+        if (resetRetrySequenceId is null
+            && _activeSequenceId is { } activeSequenceId
+            && _sequenceRuntime.SequenceExecutors.TryGetValue(activeSequenceId, out var activeExecutor)
+            && activeExecutor.CaptureSnapshot().Status == SequenceExecutionStatus.Faulted)
+        {
+            resetRetrySequenceId = activeSequenceId;
+        }
+
         _runMode = SimulationRunMode.Paused;
         _pendingSteps = 0;
         _sequenceRuntime.DebugState.ClearPendingSemanticStep();
@@ -216,6 +257,10 @@ internal sealed class SimulationRuntimeState
         _sequenceRuntime.ResetExecutors();
         _automaticRunRuntime.Reset();
         _conditionScenarioRuntime.Reset();
+        ClearAutomaticExternalInspection(clearSources: true);
+        _automaticExternalInspectionClosure = null;
+        _resetRetrySequenceId = resetRetrySequenceId;
+        _automaticExternalInspectionRearmRequired = false;
         _activeSequenceId = null;
         _controlOwner = SimulationControlOwner.Definition;
         _runtimeGeneration++;
@@ -236,6 +281,160 @@ internal sealed class SimulationRuntimeState
     internal bool Matches(SimulationRuntimeIdentity expected) =>
         expected.RuntimeGeneration == _runtimeGeneration
         && string.Equals(expected.ProjectId, _projectId, StringComparison.Ordinal);
+
+    internal bool TryArmAutomaticExternalInspection(
+        string sequenceId,
+        IReadOnlyDictionary<string, VirtualCameraExternalSource> sources,
+        out string error)
+    {
+        if (string.IsNullOrWhiteSpace(sequenceId))
+        {
+            error = "Automatic external inspection requires a sequence id.";
+            return false;
+        }
+
+        if (sources.Count == 0)
+        {
+            error = "Automatic external inspection requires at least one camera source.";
+            return false;
+        }
+
+        foreach (var cameraId in sources.Keys)
+        {
+            if (!_cameras.Any(camera => string.Equals(camera.Id, cameraId, StringComparison.Ordinal)))
+            {
+                error = $"Virtual camera '{cameraId}' was not found.";
+                return false;
+            }
+        }
+
+        _automaticExternalSources.Clear();
+        foreach (var (cameraId, source) in sources)
+        {
+            _automaticExternalSources.Add(cameraId, source);
+        }
+
+        _automaticExternalSequenceId = sequenceId;
+        _automaticExternalInspectionEnabled = false;
+        _automaticExternalRequestPublished = false;
+        _automaticExternalResumeRealTime = false;
+        _automaticExternalInspectionWaitElapsed = TimeSpan.Zero;
+        _automaticExternalInspectionSimulationTimeout = null;
+        _automaticExternalInspectionClosure = null;
+        _automaticExternalInspectionRearmRequired = false;
+        error = string.Empty;
+        return true;
+    }
+
+    internal void MarkExternalInspectionFailureForRetry(string sequenceId)
+    {
+        if (!string.IsNullOrWhiteSpace(sequenceId))
+        {
+            _resetRetrySequenceId = sequenceId;
+        }
+    }
+
+    internal void ClearResetRetrySequence() => _resetRetrySequenceId = null;
+
+    internal void MarkAutomaticExternalInspectionRearmRequired() =>
+        _automaticExternalInspectionRearmRequired = true;
+
+    internal bool HasArmedAutomaticExternalInspection(string sequenceId) =>
+        string.Equals(_automaticExternalSequenceId, sequenceId, StringComparison.Ordinal)
+        && _automaticExternalSources.Count > 0;
+
+    internal void BeginAutomaticExternalInspection(string sequenceId, bool resumeRealTime)
+    {
+        if (!HasArmedAutomaticExternalInspection(sequenceId))
+        {
+            throw new InvalidOperationException(
+                $"Automatic external inspection for sequence '{sequenceId}' was not armed.");
+        }
+
+        _automaticExternalInspectionEnabled = true;
+        _automaticExternalRequestPublished = false;
+        _automaticExternalResumeRealTime = resumeRealTime;
+        _automaticExternalInspectionWaitElapsed = TimeSpan.Zero;
+        _automaticExternalInspectionSimulationTimeout = null;
+    }
+
+    internal void MarkAutomaticExternalRequestPublished(TimeSpan simulationTimeout)
+    {
+        if (simulationTimeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(simulationTimeout));
+        }
+
+        _automaticExternalInspectionWaitElapsed = TimeSpan.Zero;
+        _automaticExternalInspectionSimulationTimeout = simulationTimeout;
+        _automaticExternalRequestPublished = true;
+    }
+
+    internal void ClearAutomaticExternalRequestPublished()
+    {
+        _automaticExternalRequestPublished = false;
+        _automaticExternalInspectionWaitElapsed = TimeSpan.Zero;
+        _automaticExternalInspectionSimulationTimeout = null;
+    }
+
+    internal void ClearAutomaticExternalInspection(bool clearSources = false)
+    {
+        _automaticExternalInspectionEnabled = false;
+        _automaticExternalRequestPublished = false;
+        _automaticExternalResumeRealTime = false;
+        _automaticExternalInspectionWaitElapsed = TimeSpan.Zero;
+        _automaticExternalInspectionSimulationTimeout = null;
+        _automaticExternalInspectionRearmRequired = false;
+        if (clearSources)
+        {
+            _automaticExternalSequenceId = null;
+            _automaticExternalSources.Clear();
+        }
+    }
+
+    internal bool AdvanceAutomaticExternalInspectionWait(TimeSpan elapsed)
+    {
+        if (!IsAutomaticExternalInspectionWaiting || elapsed <= TimeSpan.Zero)
+        {
+            return false;
+        }
+
+        _automaticExternalInspectionWaitElapsed += elapsed;
+        return _automaticExternalInspectionSimulationTimeout is { } timeout
+            && _automaticExternalInspectionWaitElapsed >= timeout;
+    }
+
+    internal void RecordAutomaticExternalInspectionClosure(
+        AutomaticExternalInspectionClosure closure)
+    {
+        ArgumentNullException.ThrowIfNull(closure);
+        _automaticExternalInspectionClosure = closure;
+    }
+
+    internal bool TryGetAutomaticExternalInspectionClosure(
+        string sequenceId,
+        string cameraId,
+        string acquisitionId,
+        string frameId,
+        out AutomaticExternalInspectionClosure closure)
+    {
+        if (_automaticExternalInspectionClosure is { } candidate
+            // The automatic runner can use a generated sequence alias while
+            // the published integration context keeps the authored sequence.
+            // Camera + acquisition + frame are the stable identity of the
+            // closed request, so do not discard a late Result solely because
+            // those descriptive sequence ids differ.
+            && string.Equals(candidate.CameraId, cameraId, StringComparison.Ordinal)
+            && string.Equals(candidate.AcquisitionId, acquisitionId, StringComparison.Ordinal)
+            && string.Equals(candidate.FrameId, frameId, StringComparison.Ordinal))
+        {
+            closure = candidate;
+            return true;
+        }
+
+        closure = null!;
+        return false;
+    }
 
     internal void AdvanceTick()
     {
@@ -267,7 +466,8 @@ internal sealed class SimulationRuntimeState
                 _pickPlaceWorkpiece,
                 _sequenceRuntime.DebugState.CreateSnapshot(),
                 _projectId,
-                _runtimeGeneration));
+                _runtimeGeneration,
+                _resetRetrySequenceId));
 
     internal (PickPlaceWorkpieceTransition Transition, string WorkpieceId)?
         AdvancePickPlaceWorkpiece()
@@ -292,3 +492,20 @@ internal sealed class SimulationRuntimeState
             : (transition, _pickPlaceWorkpiece.CaptureSnapshot().Id);
     }
 }
+
+internal enum AutomaticExternalInspectionClosureReason
+{
+    WallTimeout,
+    SimulationTimeout,
+    Aborted
+}
+
+internal sealed record AutomaticExternalInspectionClosure(
+    string SequenceId,
+    string StepId,
+    string CameraId,
+    string AcquisitionId,
+    string FrameId,
+    AutomaticExternalInspectionClosureReason Reason,
+    TimeSpan WaitElapsed,
+    TimeSpan? Timeout);

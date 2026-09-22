@@ -10,7 +10,11 @@ internal sealed class MainWpfInteractionHost
 
     internal MainWpfInteractionHost(Dispatcher? dispatcher = null)
     {
-        _dispatcher = dispatcher;
+        _dispatcher = dispatcher
+            ?? Application.Current?.Dispatcher
+            ?? (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA
+                ? Dispatcher.FromThread(Thread.CurrentThread)
+                : null);
     }
 
     // ShellWindow waits for save decisions and runtime shutdown before closing.

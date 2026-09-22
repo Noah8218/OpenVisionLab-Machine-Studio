@@ -7,20 +7,21 @@ using OpenVisionLab.Machine.Simulation.Axis;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
-public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase
+public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase, IDisposable
 {
     private readonly Action _definitionChanged;
     private MachineProjectDocument _project = new();
     private bool _hasValidationErrors;
     private string _validationMessage = string.Empty;
     private string _runtimeStatusText = string.Empty;
+    private bool _disposed;
 
     public MultiAxisCommissioningRecipeEditorViewModel(Action definitionChanged)
     {
         _definitionChanged = definitionChanged ?? throw new ArgumentNullException(nameof(definitionChanged));
-        CreateRecipeCommand = new RelayCommand(_ => CreateRecipe(), _ => CanCreateRecipe);
-        DeleteRecipeCommand = new RelayCommand(_ => DeleteRecipe(), _ => IsConfigured);
-        AddTargetCommand = new RelayCommand(_ => AddTarget(), _ => CanAddTarget);
+        CreateRecipeCommand = new RelayCommand(_ => CreateRecipe(), _ => !IsDisposed && CanCreateRecipe);
+        DeleteRecipeCommand = new RelayCommand(_ => DeleteRecipe(), _ => !IsDisposed && IsConfigured);
+        AddTargetCommand = new RelayCommand(_ => AddTarget(), _ => !IsDisposed && CanAddTarget);
         Validate();
     }
 
@@ -30,8 +31,8 @@ public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase
     public ICommand DeleteRecipeCommand { get; }
     public ICommand AddTargetCommand { get; }
     public bool IsConfigured => _project.MultiAxisCommissioningRecipe is not null;
-    public bool CanCreateRecipe => !IsConfigured && _project.Axes.Count >= 2;
-    public bool CanAddTarget => IsConfigured && Targets.Count < _project.Axes.Count;
+    public bool CanCreateRecipe => !IsDisposed && !IsConfigured && _project.Axes.Count >= 2;
+    public bool CanAddTarget => !IsDisposed && IsConfigured && Targets.Count < _project.Axes.Count;
     public bool IsValid => IsConfigured && !HasValidationErrors;
 
     public string Name
@@ -39,7 +40,7 @@ public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase
         get => _project.MultiAxisCommissioningRecipe?.Name ?? string.Empty;
         set
         {
-            if (_project.MultiAxisCommissioningRecipe is not { } recipe || recipe.Name == value)
+            if (IsDisposed || _project.MultiAxisCommissioningRecipe is not { } recipe || recipe.Name == value)
             {
                 return;
             }
@@ -55,7 +56,7 @@ public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase
         get => _project.MultiAxisCommissioningRecipe?.ValidationRepetitions ?? 3;
         set
         {
-            if (_project.MultiAxisCommissioningRecipe is not { } recipe
+            if (IsDisposed || _project.MultiAxisCommissioningRecipe is not { } recipe
                 || recipe.ValidationRepetitions == value)
             {
                 return;
@@ -87,6 +88,11 @@ public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase
 
     public void Load(MachineProjectDocument project)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _project = project ?? throw new ArgumentNullException(nameof(project));
         RebuildTargets();
         RaiseConfigurationChanged();
@@ -96,6 +102,11 @@ public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase
 
     public void ApplyAxisSnapshots(IReadOnlyList<AxisSnapshot> axes)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         foreach (var target in Targets)
         {
             target.ApplySnapshot(axes.FirstOrDefault(axis =>
@@ -115,6 +126,11 @@ public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase
 
     public void RefreshLocalization()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         Validate();
         ApplyAxisSnapshots(Targets
             .Where(target => target.RuntimeSnapshot is not null)
@@ -124,7 +140,7 @@ public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase
 
     private void CreateRecipe()
     {
-        if (!CanCreateRecipe)
+        if (IsDisposed || !CanCreateRecipe)
         {
             return;
         }
@@ -145,6 +161,11 @@ public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase
 
     private void DeleteRecipe()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _project.MultiAxisCommissioningRecipe = null;
         RebuildTargets();
         RaiseConfigurationChanged();
@@ -153,6 +174,11 @@ public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase
 
     private void AddTarget()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var recipe = _project.MultiAxisCommissioningRecipe;
         var axis = _project.Axes.FirstOrDefault(candidate => Targets.All(target =>
             !string.Equals(target.AxisId, candidate.Id, StringComparison.Ordinal)));
@@ -173,6 +199,11 @@ public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase
 
     private void MoveTarget(MultiAxisCommissioningTargetEditorViewModel target, int offset)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var recipe = _project.MultiAxisCommissioningRecipe;
         if (recipe is null)
         {
@@ -195,6 +226,11 @@ public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase
 
     private void RemoveTarget(MultiAxisCommissioningTargetEditorViewModel target)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var recipe = _project.MultiAxisCommissioningRecipe;
         var index = Targets.IndexOf(target);
         if (recipe is null || index < 0)
@@ -230,6 +266,11 @@ public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase
 
     private void Changed()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         Validate();
         ApplyAxisSnapshots(Targets
             .Where(target => target.RuntimeSnapshot is not null)
@@ -294,6 +335,24 @@ public sealed class MultiAxisCommissioningRecipeEditorViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanAddTarget));
     }
 
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        Targets.Clear();
+        OnPropertyChanged(nameof(CanCreateRecipe));
+        OnPropertyChanged(nameof(CanAddTarget));
+        ((RelayCommand)CreateRecipeCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)DeleteRecipeCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)AddTargetCommand).RaiseCanExecuteChanged();
+    }
+
+    private bool IsDisposed => _disposed;
+
     private bool IsTargetValid(MultiAxisCommissioningTargetDefinition target)
     {
         var axis = _project.Axes.FirstOrDefault(candidate =>
@@ -348,6 +407,8 @@ public sealed class MultiAxisCommissioningTargetEditorViewModel : ViewModelBase
             OnPropertyChanged();
             OnPropertyChanged(nameof(AxisName));
             OnPropertyChanged(nameof(Unit));
+            OnPropertyChanged(nameof(TargetText));
+            OnPropertyChanged(nameof(CurrentPositionText));
             _changed();
         }
     }

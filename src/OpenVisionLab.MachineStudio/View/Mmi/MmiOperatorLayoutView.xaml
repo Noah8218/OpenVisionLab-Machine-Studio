@@ -1,0 +1,436 @@
+<UserControl x:Class="OpenVisionLab.MachineStudio.View.Mmi.MmiOperatorLayoutView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
+             Margin="8,6,8,4">
+    <UserControl.Resources>
+        <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <conv:ProjectImageSourceConverter x:Key="ProjectImageSourceConverter" />
+    </UserControl.Resources>
+    <Border Padding="10,8"
+            Background="{DynamicResource Surface.Panel}"
+            BorderBrush="{DynamicResource Accent.Primary}"
+            BorderThickness="1"
+            CornerRadius="6">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Row="0">
+                <TextBlock FontSize="13"
+                           FontWeight="SemiBold"
+                           Text="{loc:Loc Key=Integration.MmiOperator}" />
+                <TextBlock Margin="0,2,0,0"
+                           Foreground="{DynamicResource Text.Secondary}"
+                           Text="{loc:Loc Key=Integration.MmiOperatorHint}"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+            <Border Grid.Row="0"
+                    Grid.Column="1"
+                    Margin="10,0,0,0"
+                    Padding="7,3"
+                    Style="{StaticResource StatusPillStyle}">
+                <TextBlock FontFamily="{StaticResource Typography.Telemetry}"
+                           Foreground="{DynamicResource State.Vision}"
+                           Text="{Binding ModeText}" />
+            </Border>
+
+            <Grid Grid.Row="1"
+                  Grid.ColumnSpan="2"
+                  Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.05*" />
+                    <ColumnDefinition Width="1.25*" />
+                    <ColumnDefinition Width="1.25*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        Margin="0,0,5,0"
+                        Padding="8,7"
+                        Background="{DynamicResource Surface.Raised}"
+                        BorderBrush="{DynamicResource Border.Subtle}"
+                        BorderThickness="1"
+                        CornerRadius="5">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                   Text="{loc:Loc Key=Left.MachineState}" />
+                        <TextBlock FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Text="{Binding StateText}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{DynamicResource State.Paused}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource State.Running}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Margin="0,3,0,0"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{Binding ControlOwnerText}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding ControlOwnerText}" />
+                        <TextBlock Margin="0,2,0,0"
+                                   Style="{StaticResource TelemetryTextStyle}"
+                                   Text="{Binding SimulationStatusText}"
+                                   TextWrapping="Wrap"
+                                   ToolTip="{Binding SimulationStatusText}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1"
+                        Margin="5,0"
+                        Padding="8,7"
+                        Background="{DynamicResource Surface.Raised}"
+                        BorderBrush="{DynamicResource Border.Subtle}"
+                        BorderThickness="1"
+                        CornerRadius="5">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                   Text="{loc:Loc Key=Integration.MmiActiveRecipe}" />
+                        <ComboBox x:Name="MmiActiveRecipeComboBox"
+                                  MinHeight="30"
+                                  AutomationProperties.Name="{loc:Loc Key=Integration.MmiActiveRecipe}"
+                                  IsEnabled="{Binding Integration.Setup.HasRecipeCatalogItems}"
+                                  ItemsSource="{Binding Integration.Setup.RecipeCatalogItems}"
+                                  SelectedItem="{Binding Integration.Setup.SelectedRecipe, Mode=TwoWay}"
+                                  ToolTip="{loc:Loc Key=Integration.MmiActiveRecipeTooltip}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding DisplayName}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding Path}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Margin="8,0,0,0"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{Binding AvailabilityText}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock Margin="0,3,0,0"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{Binding Integration.Setup.InspectionRecipePath}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Integration.Setup.InspectionRecipePath}" />
+                        <TextBlock Margin="0,3,0,0"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{Binding Integration.Setup.InspectionRecipeStatusText}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Integration.Setup.InspectionRecipeStatusText}" />
+                        <TextBlock Margin="0,2,0,0"
+                                   FontFamily="{StaticResource Typography.Telemetry}"
+                                   FontSize="9.5"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{Binding Integration.Setup.SetupSaveStateText}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Integration.Setup.SetupSaveStateText}" />
+                        <WrapPanel Margin="0,5,0,0">
+                            <Button x:Name="MmiAddRecipeButton"
+                                    Margin="0,0,5,0"
+                                    Command="{Binding Integration.Setup.AddRecipeCommand}"
+                                    Content="{loc:Loc Key=Integration.MmiRecipeAdd}"
+                                    Style="{StaticResource GlobalCommandButtonStyle}"
+                                    ToolTip="{loc:Loc Key=Integration.MmiRecipeAddTooltip}"
+                                    AutomationProperties.Name="{loc:Loc Key=Integration.MmiRecipeAdd}" />
+                            <Button x:Name="MmiRemoveRecipeButton"
+                                    Command="{Binding Integration.Setup.RemoveRecipeCommand}"
+                                    CommandParameter="{Binding Integration.Setup.SelectedRecipe}"
+                                    Content="{loc:Loc Key=Integration.MmiRecipeRemove}"
+                                    Style="{StaticResource GlobalCommandButtonStyle}"
+                                    ToolTip="{loc:Loc Key=Integration.MmiRecipeRemoveTooltip}"
+                                    AutomationProperties.Name="{loc:Loc Key=Integration.MmiRecipeRemove}" />
+                            <Button x:Name="MmiSaveSetupButton"
+                                    Margin="0,5,5,0"
+                                    Command="{Binding Integration.Setup.SaveSetupCommand}"
+                                    Content="{loc:Loc Key=Integration.SaveSetup}"
+                                    Style="{StaticResource PrimaryCommandButtonStyle}"
+                                    ToolTip="{loc:Loc Key=Integration.SaveSetupTooltip}"
+                                    AutomationProperties.Name="{loc:Loc Key=Integration.SaveSetup}" />
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2"
+                        Margin="5,0,0,0"
+                        Padding="8,7"
+                        Background="{DynamicResource Surface.Raised}"
+                        BorderBrush="{DynamicResource Border.Subtle}"
+                        BorderThickness="1"
+                        CornerRadius="5">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                   Text="{loc:Loc Key=Integration.MmiInspectionStatus}" />
+                        <TextBlock FontWeight="SemiBold"
+                                   Text="{Binding Camera.CurrentCameraStateText}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Camera.CurrentCameraStateText}" />
+                        <TextBlock Margin="0,2,0,0"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{Binding Camera.CurrentCameraResultText}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Camera.CurrentCameraResultText}" />
+                        <TextBlock x:Name="MmiInspectionExecutionModeTextBlock"
+                                   Margin="0,3,0,0"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{Binding Integration.InspectionExecutionModeText}"
+                                   TextWrapping="Wrap"
+                                   ToolTip="{Binding Integration.InspectionExecutionModeText}" />
+                        <TextBlock x:Name="MmiResultStatusTextBlock"
+                                   Margin="0,5,0,0"
+                                   Foreground="{DynamicResource State.Vision}"
+                                   Text="{Binding Integration.ResultStatusText}"
+                                   TextWrapping="Wrap"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Integration.ResultStatusText}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Border Grid.Row="2"
+                    Grid.ColumnSpan="2"
+                    Margin="0,8,0,0"
+                    Padding="8,7"
+                    Background="{DynamicResource Surface.Raised}"
+                    BorderBrush="{DynamicResource Border.Subtle}"
+                    BorderThickness="1"
+                    CornerRadius="5">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                               Text="{loc:Loc Key=Integration.MmiCaptureInspectionImages}" />
+                    <TextBlock Grid.Row="1"
+                               Margin="0,2,0,6"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="{loc:Loc Key=Integration.MmiCaptureInspectionImagesHint}"
+                               TextWrapping="Wrap" />
+                    <StackPanel Grid.Row="2">
+                        <TextBlock FontWeight="SemiBold"
+                                   Text="{loc:Loc Key=Integration.MmiVirtualCameraImage}" />
+                        <Border Height="120"
+                                Margin="0,4,0,0"
+                                Background="{DynamicResource Surface.Panel}"
+                                BorderBrush="{DynamicResource Border.Subtle}"
+                                BorderThickness="1"
+                                CornerRadius="4">
+                            <Grid>
+                                <Image x:Name="MmiVirtualCameraImageViewer"
+                                       Source="{Binding Camera.CurrentCameraImagePath, Converter={StaticResource ProjectImageSourceConverter}}"
+                                       Stretch="Uniform"
+                                       SnapsToDevicePixels="True"
+                                       ToolTip="{Binding Camera.CurrentCameraSourceText}" />
+                                <TextBlock Margin="8"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{loc:Loc Key=Integration.MmiVirtualCameraImageEmpty}"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap"
+                                           Visibility="{Binding Camera.HasCurrentCameraImage, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" />
+                            </Grid>
+                        </Border>
+                        <TextBlock Margin="0,4,0,0"
+                                   FontFamily="{StaticResource Typography.Telemetry}"
+                                   FontSize="9.5"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{Binding Camera.CurrentCameraSourceText}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Camera.CurrentCameraSourceText}" />
+                    </StackPanel>
+                    <Grid Grid.Row="3"
+                          Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock FontWeight="SemiBold"
+                                       Text="{loc:Loc Key=Integration.MmiTwoDImage}" />
+                            <Border Height="150"
+                                    Margin="0,4,0,0"
+                                    Background="{DynamicResource Surface.Panel}"
+                                    BorderBrush="{DynamicResource Border.Subtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="4">
+                                <Grid>
+                                    <Image x:Name="MmiTwoDImageViewer"
+                                           Source="{Binding Integration.LatestTwoDImageUri}"
+                                           Stretch="Uniform"
+                                           SnapsToDevicePixels="True"
+                                           ToolTip="{Binding Integration.LatestTwoDImageSourceText}" />
+                                    <TextBlock Margin="8"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding Integration.LatestTwoDImageStatusText}"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               Visibility="{Binding Integration.HasLatestTwoDImage, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" />
+                                </Grid>
+                            </Border>
+                            <TextBlock Margin="0,4,0,0"
+                                       FontFamily="{StaticResource Typography.Telemetry}"
+                                       FontSize="9.5"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding Integration.LatestTwoDImageSourceText}"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding Integration.LatestTwoDImageSourceText}" />
+                            <TextBlock x:Name="MmiTwoDResultStatusTextBlock"
+                                       Margin="0,2,0,0"
+                                       Foreground="{DynamicResource State.Vision}"
+                                       Text="{Binding Integration.LatestTwoDResultStatusText}"
+                                       TextWrapping="Wrap"
+                                       ToolTip="{Binding Integration.LatestTwoDResultStatusText}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock FontWeight="SemiBold"
+                                       Text="{loc:Loc Key=Integration.MmiThreeDImage}" />
+                            <Border Height="150"
+                                    Margin="0,4,0,0"
+                                    Background="{DynamicResource Surface.Panel}"
+                                    BorderBrush="{DynamicResource Border.Subtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="4">
+                                <Grid>
+                                    <Image x:Name="MmiThreeDImageViewer"
+                                           Source="{Binding Integration.LatestThreeDImageUri}"
+                                           Stretch="Uniform"
+                                           SnapsToDevicePixels="True"
+                                           ToolTip="{Binding Integration.LatestThreeDImageSourceText}" />
+                                    <TextBlock Margin="8"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding Integration.LatestThreeDImageStatusText}"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               Visibility="{Binding Integration.HasLatestThreeDImage, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" />
+                                </Grid>
+                            </Border>
+                            <TextBlock Margin="0,4,0,0"
+                                       FontFamily="{StaticResource Typography.Telemetry}"
+                                       FontSize="9.5"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding Integration.LatestThreeDImageSourceText}"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding Integration.LatestThreeDImageSourceText}" />
+                            <TextBlock x:Name="MmiThreeDResultStatusTextBlock"
+                                       Margin="0,2,0,0"
+                                       Foreground="{DynamicResource State.Vision}"
+                                       Text="{Binding Integration.LatestThreeDResultStatusText}"
+                                       TextWrapping="Wrap"
+                                       ToolTip="{Binding Integration.LatestThreeDResultStatusText}" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <WrapPanel Grid.Row="3"
+                       Grid.ColumnSpan="2"
+                       Margin="0,8,0,0">
+                <Button x:Name="MmiRunButton"
+                        Margin="0,0,5,4"
+                        Command="{Binding RunCommand}"
+                        Content="{loc:Loc Key=Shell.SimulationOn}"
+                        Style="{StaticResource SimulationOnCommandButtonStyle}"
+                        ToolTip="{loc:Loc Key=Shell.SimulationOn}"
+                        AutomationProperties.Name="{loc:Loc Key=Shell.SimulationOn}" />
+                <Button x:Name="MmiPauseButton"
+                        Margin="0,0,5,4"
+                        Command="{Binding PauseCommand}"
+                        Content="{loc:Loc Key=Shell.Pause}"
+                        Style="{StaticResource GlobalCommandButtonStyle}"
+                        ToolTip="{loc:Loc Key=Shell.Pause}"
+                        AutomationProperties.Name="{loc:Loc Key=Shell.Pause}" />
+                <Button x:Name="MmiAbortButton"
+                        Margin="0,0,5,4"
+                        Command="{Binding AbortSequenceCommand}"
+                        Content="{loc:Loc Key=Shell.AbortSequence}"
+                        Style="{StaticResource GlobalCommandButtonStyle}"
+                        ToolTip="{loc:Loc Key=Shell.AbortSequenceTooltip}"
+                        AutomationProperties.Name="{loc:Loc Key=Shell.AbortSequence}" />
+                <Button x:Name="MmiRetryButton"
+                        Margin="0,0,5,4"
+                        Command="{Binding RetrySequenceCommand}"
+                        Content="{loc:Loc Key=Shell.RetrySequence}"
+                        Style="{StaticResource GlobalCommandButtonStyle}"
+                        ToolTip="{loc:Loc Key=Shell.RetrySequenceTooltip}"
+                        AutomationProperties.Name="{loc:Loc Key=Shell.RetrySequence}" />
+                <Button x:Name="MmiResetButton"
+                        Margin="0,0,5,4"
+                        Command="{Binding ResetCommand}"
+                        Content="{loc:Loc Key=Shell.Reset}"
+                        Style="{StaticResource GlobalCommandButtonStyle}"
+                        ToolTip="{loc:Loc Key=Shell.Reset}"
+                        AutomationProperties.Name="{loc:Loc Key=Shell.Reset}" />
+                <Button x:Name="MmiCycleStartButton"
+                        Margin="0,0,5,4"
+                        Command="{Binding CycleStartCommand}"
+                        Content="{loc:Loc Key=Shell.CycleStart}"
+                        ToolTip="{loc:Loc Key=Shell.CycleStart}"
+                        AutomationProperties.Name="{loc:Loc Key=Shell.CycleStart}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource PrimaryCommandButtonStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding HasEmbeddedSequence}" Value="True" />
+                                        <Condition Binding="{Binding HasCycleStartInput}" Value="True" />
+                                        <Condition Binding="{Binding IsRunMode}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button x:Name="MmiPublishButton"
+                        Margin="0,0,5,4"
+                        Command="{Binding Integration.PublishTwoDImageHandoffCommand}"
+                        Content="{loc:Loc Key=Integration.MmiCreateTwoDRequest}"
+                        Style="{StaticResource PrimaryCommandButtonStyle}"
+                        ToolTip="{loc:Loc Key=Integration.MmiCreateTwoDRequestTooltip}"
+                        AutomationProperties.Name="{loc:Loc Key=Integration.MmiCreateTwoDRequest}" />
+                <Button x:Name="MmiRefreshButton"
+                        Margin="0,0,5,4"
+                        Command="{Binding Integration.RefreshResultsCommand}"
+                        Content="{loc:Loc Key=Integration.MmiCheckInspectionResult}"
+                        Style="{StaticResource GlobalCommandButtonStyle}"
+                        ToolTip="{loc:Loc Key=Integration.MmiCheckInspectionResultTooltip}"
+                        AutomationProperties.Name="{loc:Loc Key=Integration.MmiCheckInspectionResult}" />
+                <Button x:Name="MmiApplyResultButton"
+                        Margin="0,0,5,4"
+                        Command="{Binding Integration.ApplyResultToSimulationCommand}"
+                        Content="{loc:Loc Key=Integration.MmiApplyInspectionResult}"
+                        Style="{StaticResource GlobalCommandButtonStyle}"
+                        ToolTip="{loc:Loc Key=Integration.MmiApplyInspectionResultTooltip}"
+                        AutomationProperties.Name="{loc:Loc Key=Integration.MmiApplyInspectionResult}" />
+            </WrapPanel>
+        </Grid>
+    </Border>
+</UserControl>

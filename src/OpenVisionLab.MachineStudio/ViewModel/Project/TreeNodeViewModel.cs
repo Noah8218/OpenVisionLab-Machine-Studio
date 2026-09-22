@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Windows.Input;
 using OpenVisionLab.MachineStudio.Model;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
@@ -40,8 +39,4 @@ public sealed class TreeNodeViewModel : ViewModelBase
         set => SetProperty(ref _isExpanded, value);
     }
 
-    public ICommand AddChildCommand => new RelayCommand(_ =>
-    {
-        // Placeholder for future add-child operations.
-    });
 }

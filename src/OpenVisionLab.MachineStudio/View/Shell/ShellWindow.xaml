@@ -2,6 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:OpenVisionLab.MachineStudio.View.Shell"
+        xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+        xmlns:behavior="clr-namespace:OpenVisionLab.MachineStudio.Behavior"
         xmlns:project="clr-namespace:OpenVisionLab.MachineStudio.View.Project"
         xmlns:scene="clr-namespace:OpenVisionLab.MachineStudio.View.Scene"
         xmlns:inspector="clr-namespace:OpenVisionLab.MachineStudio.View.Inspector"
@@ -11,7 +13,13 @@
         MinHeight="720"
         Background="{DynamicResource Surface.Root}"
         ExtendsContentIntoTitleBar="True"
+        shell:ShellWindow.IsCompactLayout="{Binding Navigation.IsCompactLayout, Mode=TwoWay}"
         WindowStartupLocation="CenterScreen">
+    <b:Interaction.Behaviors>
+        <behavior:ShellKeyboardCommandBehavior
+            DeleteCommand="{Binding DeleteLayoutComponentCommand}"
+            DuplicateCommand="{Binding DuplicateLayoutSelectionCommand}" />
+    </b:Interaction.Behaviors>
     <shell:MachineFluentWindow.InputBindings>
         <KeyBinding Key="N" Modifiers="Control" Command="{Binding NewProjectCommand}" />
         <KeyBinding Key="O" Modifiers="Control" Command="{Binding OpenProjectCommand}" />

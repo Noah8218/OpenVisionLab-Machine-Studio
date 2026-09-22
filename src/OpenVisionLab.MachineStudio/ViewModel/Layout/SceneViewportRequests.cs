@@ -1,4 +1,3 @@
-using System.Windows;
 using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.MachineStudio.Model;
 
@@ -14,7 +13,7 @@ internal enum SceneViewportMoveAction
 
 internal sealed record SceneSelectionRequest(LayoutItem Item, bool Toggle);
 
-internal sealed record SceneMoveRequest(SceneViewportMoveAction Action, Vector Delta);
+internal sealed record SceneMoveRequest(SceneViewportMoveAction Action, (double X, double Y) Delta);
 
 internal sealed record SceneMarqueeSelectionRequest(
     IReadOnlyList<LayoutItem> Items,
@@ -23,9 +22,9 @@ internal sealed record SceneMarqueeSelectionRequest(
 internal sealed record SceneTransformRequest(
     SceneViewportMoveAction Action,
     LayoutTransformHandle Handle,
-    Point WorldPoint,
+    (double X, double Y) WorldPoint,
     bool PreserveAspectRatio);
 
 internal sealed record SceneLibraryComponentDropRequest(
     LayoutComponentKind Kind,
-    Point WorldPoint);
+    (double X, double Y) WorldPoint);

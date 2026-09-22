@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using OpenVisionLab.Integration.Contracts;
 
@@ -275,19 +276,41 @@ internal static class MachineIntegrationTransactionInspector
 
     internal static IntegrationResultV2 ReadResult(
         string exchangeRoot,
+        Guid transactionId) => ReadValidatedResult(exchangeRoot, transactionId).Result;
+
+    internal static MachineIntegrationValidatedResult ReadValidatedResult(
+        string exchangeRoot,
         Guid transactionId)
     {
         var root = Path.GetFullPath(RequireText(exchangeRoot, nameof(exchangeRoot)));
-        var handoff = ReadHandoff(root, transactionId);
         var transactionDirectory = MachineIntegrationTransactionFileSystem.GetTransactionDirectory(root, transactionId);
+        var handoffBytes = MachineIntegrationTransactionFileSystem.ReadMessage(
+            transactionDirectory,
+            IntegrationTransactionLayout.HandoffFileName);
+        var acknowledgementBytes = MachineIntegrationTransactionFileSystem.ReadMessage(
+            transactionDirectory,
+            IntegrationTransactionLayout.AcknowledgementFileName);
+        var resultBytes = MachineIntegrationTransactionFileSystem.ReadMessage(
+            transactionDirectory,
+            IntegrationTransactionLayout.ResultFileName);
+        var handoff = IntegrationContractJson.DeserializeHandoffV2(handoffBytes);
         var acknowledgement = IntegrationContractJson.DeserializeAcknowledgementV2(
-            MachineIntegrationTransactionFileSystem.ReadMessage(
-                transactionDirectory,
-                IntegrationTransactionLayout.AcknowledgementFileName));
-        var result = IntegrationContractJson.DeserializeResultV2(
-            MachineIntegrationTransactionFileSystem.ReadMessage(
-                transactionDirectory,
-                IntegrationTransactionLayout.ResultFileName));
+            acknowledgementBytes);
+        var result = IntegrationContractJson.DeserializeResultV2(resultBytes);
+        if (handoff.TransactionId != transactionId)
+        {
+            throw new IntegrationContractException(
+                IntegrationErrorCode.CorrelationMismatch,
+                "Handoff transaction identity does not match its directory.");
+        }
+
+        foreach (var artifact in handoff.Context.Artifacts)
+        {
+            MachineIntegrationTransactionFileSystem.EnsureNoReparsePoints(transactionDirectory, artifact.RelativePath);
+            ThrowIfInvalid(IntegrationContractValidator.ValidateArtifactFile(
+                artifact,
+                transactionDirectory));
+        }
         ThrowIfInvalid(IntegrationContractValidator.ValidateV2Sequence(
             handoff,
             acknowledgement,
@@ -310,7 +333,11 @@ internal static class MachineIntegrationTransactionInspector
                 transactionDirectory));
         }
 
-        return result;
+        return new(
+            handoff,
+            acknowledgement,
+            result,
+            Convert.ToHexString(SHA256.HashData(resultBytes)));
     }
 
     internal static IntegrationHandoffV2 ReadHandoffEnvelope(

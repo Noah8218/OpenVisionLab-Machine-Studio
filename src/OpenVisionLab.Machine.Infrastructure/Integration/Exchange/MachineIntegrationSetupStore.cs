@@ -20,8 +20,26 @@ public sealed record MachineIntegrationSetup
 {
     public string ExchangeRoot { get; init; } = string.Empty;
     public string InspectionRecipePath { get; init; } = string.Empty;
+    public IReadOnlyList<string> RecipeCatalogPaths { get; init; } = Array.Empty<string>();
     public string TwoDConsumerVersion { get; init; } = string.Empty;
     public string TwoDConsumerCommit { get; init; } = string.Empty;
+    public bool WaitForExternalResult { get; init; }
+    public bool UseThreeDHeightMap { get; init; }
+    public string ThreeDHeightMapSourcePath { get; init; } = string.Empty;
+    public string ThreeDHeightMapSourceSha256 { get; init; } = string.Empty;
+    public long ThreeDHeightMapSourceLength { get; init; }
+    public int ThreeDHeightMapWidth { get; init; }
+    public int ThreeDHeightMapHeight { get; init; }
+    public string ThreeDHeightMapPixelFormat { get; init; } = string.Empty;
+    public string ThreeDHeightMapUnit { get; init; } = "mm";
+    public string ThreeDInspectionRecipePath { get; init; } = string.Empty;
+    public string ThreeDInspectionRecipeSha256 { get; init; } = string.Empty;
+    public long ThreeDInspectionRecipeLength { get; init; }
+    public string ThreeDConsumerVersion { get; init; } = string.Empty;
+    public string ThreeDConsumerCommit { get; init; } = string.Empty;
+    public string ThreeDSequenceId { get; init; } = string.Empty;
+    public string ThreeDStepId { get; init; } = string.Empty;
+    public string ThreeDDeviceId { get; init; } = string.Empty;
     public string TcpListenAddress { get; init; } = "127.0.0.1";
     public int TcpListenPort { get; init; } = 45101;
     public string TcpPeerHost { get; init; } = "127.0.0.1";
@@ -69,8 +87,28 @@ public sealed class MachineIntegrationSetupStore
                 {
                     ExchangeRoot = settings.ExchangeRoot,
                     InspectionRecipePath = settings.InspectionRecipePath,
+                    RecipeCatalogPaths = settings.RecipeCatalogPaths is { Length: > 0 }
+                        ? settings.RecipeCatalogPaths.ToArray()
+                        : Array.Empty<string>(),
                     TwoDConsumerVersion = settings.TwoDConsumerVersion,
                     TwoDConsumerCommit = settings.TwoDConsumerCommit,
+                    WaitForExternalResult = settings.WaitForExternalResult,
+                    UseThreeDHeightMap = settings.UseThreeDHeightMap,
+                    ThreeDHeightMapSourcePath = settings.ThreeDHeightMapSourcePath,
+                    ThreeDHeightMapSourceSha256 = settings.ThreeDHeightMapSourceSha256,
+                    ThreeDHeightMapSourceLength = settings.ThreeDHeightMapSourceLength,
+                    ThreeDHeightMapWidth = settings.ThreeDHeightMapWidth,
+                    ThreeDHeightMapHeight = settings.ThreeDHeightMapHeight,
+                    ThreeDHeightMapPixelFormat = settings.ThreeDHeightMapPixelFormat,
+                    ThreeDHeightMapUnit = settings.ThreeDHeightMapUnit,
+                    ThreeDInspectionRecipePath = settings.ThreeDInspectionRecipePath,
+                    ThreeDInspectionRecipeSha256 = settings.ThreeDInspectionRecipeSha256,
+                    ThreeDInspectionRecipeLength = settings.ThreeDInspectionRecipeLength,
+                    ThreeDConsumerVersion = settings.ThreeDConsumerVersion,
+                    ThreeDConsumerCommit = settings.ThreeDConsumerCommit,
+                    ThreeDSequenceId = settings.ThreeDSequenceId,
+                    ThreeDStepId = settings.ThreeDStepId,
+                    ThreeDDeviceId = settings.ThreeDDeviceId,
                     TcpListenAddress = settings.TcpListenAddress,
                     TcpListenPort = settings.TcpListenPort,
                     TcpPeerHost = settings.TcpPeerHost,
@@ -110,8 +148,28 @@ public sealed class MachineIntegrationSetupStore
                     {
                         ExchangeRoot = settings.ExchangeRoot,
                         InspectionRecipePath = settings.InspectionRecipePath,
+                        RecipeCatalogPaths = settings.RecipeCatalogPaths is { Count: > 0 }
+                            ? settings.RecipeCatalogPaths.Where(path => !string.IsNullOrWhiteSpace(path)).ToArray()
+                            : Array.Empty<string>(),
                         TwoDConsumerVersion = settings.TwoDConsumerVersion,
                         TwoDConsumerCommit = settings.TwoDConsumerCommit,
+                        WaitForExternalResult = settings.WaitForExternalResult,
+                        UseThreeDHeightMap = settings.UseThreeDHeightMap,
+                        ThreeDHeightMapSourcePath = settings.ThreeDHeightMapSourcePath,
+                        ThreeDHeightMapSourceSha256 = settings.ThreeDHeightMapSourceSha256,
+                        ThreeDHeightMapSourceLength = settings.ThreeDHeightMapSourceLength,
+                        ThreeDHeightMapWidth = settings.ThreeDHeightMapWidth,
+                        ThreeDHeightMapHeight = settings.ThreeDHeightMapHeight,
+                        ThreeDHeightMapPixelFormat = settings.ThreeDHeightMapPixelFormat,
+                        ThreeDHeightMapUnit = settings.ThreeDHeightMapUnit,
+                        ThreeDInspectionRecipePath = settings.ThreeDInspectionRecipePath,
+                        ThreeDInspectionRecipeSha256 = settings.ThreeDInspectionRecipeSha256,
+                        ThreeDInspectionRecipeLength = settings.ThreeDInspectionRecipeLength,
+                        ThreeDConsumerVersion = settings.ThreeDConsumerVersion,
+                        ThreeDConsumerCommit = settings.ThreeDConsumerCommit,
+                        ThreeDSequenceId = settings.ThreeDSequenceId,
+                        ThreeDStepId = settings.ThreeDStepId,
+                        ThreeDDeviceId = settings.ThreeDDeviceId,
                         TcpListenAddress = settings.TcpListenAddress,
                         TcpListenPort = settings.TcpListenPort,
                         TcpPeerHost = settings.TcpPeerHost,
@@ -162,8 +220,26 @@ public sealed class MachineIntegrationSetupStore
     {
         public string ExchangeRoot { get; set; } = string.Empty;
         public string InspectionRecipePath { get; set; } = string.Empty;
+        public string[] RecipeCatalogPaths { get; set; } = Array.Empty<string>();
         public string TwoDConsumerVersion { get; set; } = string.Empty;
         public string TwoDConsumerCommit { get; set; } = string.Empty;
+        public bool WaitForExternalResult { get; set; }
+        public bool UseThreeDHeightMap { get; set; }
+        public string ThreeDHeightMapSourcePath { get; set; } = string.Empty;
+        public string ThreeDHeightMapSourceSha256 { get; set; } = string.Empty;
+        public long ThreeDHeightMapSourceLength { get; set; }
+        public int ThreeDHeightMapWidth { get; set; }
+        public int ThreeDHeightMapHeight { get; set; }
+        public string ThreeDHeightMapPixelFormat { get; set; } = string.Empty;
+        public string ThreeDHeightMapUnit { get; set; } = "mm";
+        public string ThreeDInspectionRecipePath { get; set; } = string.Empty;
+        public string ThreeDInspectionRecipeSha256 { get; set; } = string.Empty;
+        public long ThreeDInspectionRecipeLength { get; set; }
+        public string ThreeDConsumerVersion { get; set; } = string.Empty;
+        public string ThreeDConsumerCommit { get; set; } = string.Empty;
+        public string ThreeDSequenceId { get; set; } = string.Empty;
+        public string ThreeDStepId { get; set; } = string.Empty;
+        public string ThreeDDeviceId { get; set; } = string.Empty;
         public string TcpListenAddress { get; set; } = "127.0.0.1";
         public int TcpListenPort { get; set; } = 45101;
         public string TcpPeerHost { get; set; } = "127.0.0.1";

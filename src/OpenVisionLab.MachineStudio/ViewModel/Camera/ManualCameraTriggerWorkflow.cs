@@ -33,7 +33,8 @@ internal sealed record ManualCameraTriggerRequest(
     SimulationSnapshot BaselineSnapshot,
     VirtualCameraSnapshot BaselineCamera,
     VirtualCameraInspectionRequest InspectionRequest,
-    long RuntimeGeneration);
+    long RuntimeGeneration,
+    bool WaitForExternalResult = false);
 
 internal sealed record ManualCameraSessionIdentity(
     string SessionId,
@@ -46,6 +47,8 @@ internal sealed record ManualCameraSessionIdentity(
 internal sealed class ManualCameraTriggerWorkflow
 {
     private readonly VirtualCameraInspectionWorkflow _inspectionWorkflow = new();
+    private readonly Func<VirtualCameraInspectionRequest, CancellationToken, ValueTask<VirtualFrameDescriptor>> _acquireFrameAsync;
+    private readonly Func<VirtualCameraInspectionRequest, VirtualFrameDescriptor, CancellationToken, Task<VisionRunResult>> _runInspectionAsync;
     private readonly Func<SimulationSnapshot> _getCurrentSnapshot;
     private readonly Func<SimulationCommand, string, Task<SimulationCommandResult>>
         _dispatchCameraCommand;
@@ -58,7 +61,9 @@ internal sealed class ManualCameraTriggerWorkflow
         Func<SimulationCommand, string, Task<SimulationCommandResult>> dispatchCameraCommand,
         VisionExecutionEvidenceViewModel visionExecutionEvidence,
         Action<SimulationSnapshot> applyMonitorSnapshot,
-        Func<ManualCameraSessionIdentity> getCurrentSessionIdentity)
+        Func<ManualCameraSessionIdentity> getCurrentSessionIdentity,
+        Func<VirtualCameraInspectionRequest, CancellationToken, ValueTask<VirtualFrameDescriptor>>? acquireFrameAsync = null,
+        Func<VirtualCameraInspectionRequest, VirtualFrameDescriptor, CancellationToken, Task<VisionRunResult>>? runInspectionAsync = null)
     {
         _getCurrentSnapshot = getCurrentSnapshot
             ?? throw new ArgumentNullException(nameof(getCurrentSnapshot));
@@ -70,6 +75,8 @@ internal sealed class ManualCameraTriggerWorkflow
             ?? throw new ArgumentNullException(nameof(applyMonitorSnapshot));
         _getCurrentSessionIdentity = getCurrentSessionIdentity
             ?? throw new ArgumentNullException(nameof(getCurrentSessionIdentity));
+        _acquireFrameAsync = acquireFrameAsync ?? _inspectionWorkflow.AcquireFrameAsync;
+        _runInspectionAsync = runInspectionAsync ?? _inspectionWorkflow.RunInspectionAsync;
     }
 
     internal async Task<ManualCameraTriggerResult> ExecuteAsync(
@@ -81,7 +88,7 @@ internal sealed class ManualCameraTriggerWorkflow
         VirtualFrameDescriptor frame;
         try
         {
-            frame = await _inspectionWorkflow.AcquireFrameAsync(
+            frame = await _acquireFrameAsync(
                 request.InspectionRequest,
                 cancellationToken);
         }
@@ -92,19 +99,22 @@ internal sealed class ManualCameraTriggerWorkflow
             return new(ManualCameraTriggerOutcome.SourceRejected, exception.Message);
         }
 
-        VisionRunResult inspectionResult;
-        try
+        VisionRunResult? inspectionResult = null;
+        if (!request.WaitForExternalResult)
         {
-            inspectionResult = await _inspectionWorkflow.RunInspectionAsync(
-                request.InspectionRequest,
-                frame,
-                cancellationToken);
-        }
-        catch (Exception exception) when (exception is ArgumentException
-            or InvalidOperationException
-            or KeyNotFoundException)
-        {
-            return new(ManualCameraTriggerOutcome.InspectionRejected, exception.Message);
+            try
+            {
+                inspectionResult = await _runInspectionAsync(
+                    request.InspectionRequest,
+                    frame,
+                    cancellationToken);
+            }
+            catch (Exception exception) when (exception is ArgumentException
+                or InvalidOperationException
+                or KeyNotFoundException)
+            {
+                return new(ManualCameraTriggerOutcome.InspectionRejected, exception.Message);
+            }
         }
 
         if (!IsCurrentContext(request))
@@ -116,22 +126,26 @@ internal sealed class ManualCameraTriggerWorkflow
             frame,
             inspectionResult,
             request.ProjectId,
-            request.RuntimeGeneration);
-        var recorder = new DeterministicVisionExecutionRecorder(
-            request.ProjectId,
-            request.ProjectName,
-            request.ProjectPath,
-            request.ProjectJson,
-            request.BuildIdentity,
-            request.SimulationFixedStep,
-            request.BaselineSnapshot.TickIndex,
-            command.CommandId,
-            request.InspectionRequest.CameraId,
-            request.InspectionRequest.RecipeId,
-            frame.AcquisitionId,
-            frame.FrameId,
-            inspectionResult.InspectionId);
-        _visionExecutionEvidence.BeginCapture(recorder);
+            request.RuntimeGeneration,
+            request.WaitForExternalResult);
+        if (inspectionResult is not null)
+        {
+            var recorder = new DeterministicVisionExecutionRecorder(
+                request.ProjectId,
+                request.ProjectName,
+                request.ProjectPath,
+                request.ProjectJson,
+                request.BuildIdentity,
+                request.SimulationFixedStep,
+                request.BaselineSnapshot.TickIndex,
+                command.CommandId,
+                request.InspectionRequest.CameraId,
+                request.InspectionRequest.RecipeId,
+                frame.AcquisitionId,
+                frame.FrameId,
+                inspectionResult.InspectionId);
+            _visionExecutionEvidence.BeginCapture(recorder);
+        }
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -151,6 +165,11 @@ internal sealed class ManualCameraTriggerWorkflow
             throw;
         }
     }
+
+    internal ValueTask<VirtualFrameDescriptor> AcquireFrameAsync(
+        VirtualCameraInspectionRequest request,
+        CancellationToken cancellationToken = default) =>
+        _acquireFrameAsync(request, cancellationToken);
 
     private bool IsCurrentContext(ManualCameraTriggerRequest request)
     {

@@ -17,6 +17,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
     private readonly TimeSpan _simulationFixedStep;
     private readonly Func<SimulationRunControlState> _getState;
     private readonly Func<Task<bool>> _ensureRuntimeDefinitionApplied;
+    private readonly Func<CancellationToken, Task<bool>>? _prepareAutomaticExternalInspection;
     private readonly Action<bool> _setDesignMode;
     private readonly Action<bool> _setRunning;
     private readonly Action<SimulationSnapshot> _applySnapshot;
@@ -25,9 +26,12 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
     private readonly Action<string, string> _log;
     private readonly Action _notifyCommandsChanged;
     private readonly SemaphoreSlim _executionGate = new(1, 1);
+    private readonly TaskCompletionSource<bool> _operationsIdle = new(
+        TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object _lifecycleGate = new();
     private int _isBusy;
     private int _activeOperations;
+    private int _operationGeneration;
     private bool _disposeRequested;
     private bool _executionGateDisposed;
 
@@ -42,13 +46,15 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
         Action cancelVisionCapture,
         Action<string> setStatus,
         Action<string, string> log,
-        Action notifyCommandsChanged)
+        Action notifyCommandsChanged,
+        Func<CancellationToken, Task<bool>>? prepareAutomaticExternalInspection = null)
     {
         _engine = engine ?? throw new ArgumentNullException(nameof(engine));
         _simulationFixedStep = simulationFixedStep;
         _getState = getState ?? throw new ArgumentNullException(nameof(getState));
         _ensureRuntimeDefinitionApplied = ensureRuntimeDefinitionApplied
             ?? throw new ArgumentNullException(nameof(ensureRuntimeDefinitionApplied));
+        _prepareAutomaticExternalInspection = prepareAutomaticExternalInspection;
         _setDesignMode = setDesignMode ?? throw new ArgumentNullException(nameof(setDesignMode));
         _setRunning = setRunning ?? throw new ArgumentNullException(nameof(setRunning));
         _applySnapshot = applySnapshot ?? throw new ArgumentNullException(nameof(applySnapshot));
@@ -61,6 +67,32 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
     }
 
     internal bool IsBusy => Volatile.Read(ref _isBusy) != 0;
+
+    internal bool AreOperationsIdle
+    {
+        get
+        {
+            lock (_lifecycleGate)
+            {
+                return _activeOperations == 0;
+            }
+        }
+    }
+
+    internal Task WaitForOperationsAsync(CancellationToken cancellationToken = default)
+    {
+        lock (_lifecycleGate)
+        {
+            if (_activeOperations == 0)
+            {
+                return Task.CompletedTask;
+            }
+        }
+
+        return cancellationToken.CanBeCanceled
+            ? _operationsIdle.Task.WaitAsync(cancellationToken)
+            : _operationsIdle.Task;
+    }
 
     internal bool CanRun()
     {
@@ -103,6 +135,9 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
     internal Task PauseAsync(CancellationToken cancellationToken = default) =>
         ExecuteSerializedAsync(PauseCoreAsync, cancellationToken);
 
+    internal Task<bool> PauseForDesignModeAsync(CancellationToken cancellationToken = default) =>
+        ExecuteSerializedResultAsync(PauseForDesignModeCoreAsync, cancellationToken);
+
     internal Task AbortSequenceAsync(CancellationToken cancellationToken = default) =>
         ExecuteSerializedAsync(AbortSequenceCoreAsync, cancellationToken);
 
@@ -125,7 +160,9 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             return;
         }
 
-        if (!SimulationRunControlAdmissionPolicy.CanRun(_getState()))
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
+        if (!IsOperationCurrent(operationGeneration)
+            || !SimulationRunControlAdmissionPolicy.CanRun(_getState()))
         {
             return;
         }
@@ -134,19 +171,43 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
         var state = _getState();
         if (state.HasAutomaticRun)
         {
+            if (state.AutomaticExternalInspectionEnabled)
+            {
+                if (_prepareAutomaticExternalInspection is null
+                    || !await _prepareAutomaticExternalInspection(cancellationToken))
+                {
+                    _setStatus("Automatic external inspection could not be prepared.");
+                    return;
+                }
+
+                state = _getState();
+                if (!IsOperationCurrent(operationGeneration)
+                    || !SimulationRunControlAdmissionPolicy.CanRun(state))
+                {
+                    return;
+                }
+            }
+
             if (state.AutomaticRunActive)
             {
                 await DispatchPlayAsync(
                     "Automatic simulation running",
                     "Simulation resumed",
+                    operationGeneration,
                     cancellationToken);
                 return;
             }
 
-            var automaticCommand = new StartAutomaticRunCommand();
+            var automaticCommand = new StartAutomaticRunCommand(
+                waitForExternalResult: state.AutomaticExternalInspectionEnabled);
             var automaticResult = await _engine.EnqueueCommandAsync(
                 automaticCommand,
                 cancellationToken);
+            if (!IsOperationCurrent(operationGeneration))
+            {
+                return;
+            }
+
             if (!automaticResult.IsAccepted)
             {
                 _log(
@@ -161,21 +222,33 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             return;
         }
 
-        if (!await EnsureActiveSequenceStartedAsync(cancellationToken))
+        if (!await EnsureActiveSequenceStartedAsync(
+                operationGeneration,
+                cancellationToken))
         {
             return;
         }
 
-        await DispatchPlayAsync("Simulation running", "Run requested", cancellationToken);
+        await DispatchPlayAsync(
+            "Simulation running",
+            "Run requested",
+            operationGeneration,
+            cancellationToken);
     }
 
     private async Task DispatchPlayAsync(
         string acceptedStatus,
         string acceptedLogPrefix,
+        int operationGeneration,
         CancellationToken cancellationToken)
     {
         var command = new PlayCommand();
         var result = await _engine.EnqueueCommandAsync(command, cancellationToken);
+        if (!IsOperationCurrent(operationGeneration))
+        {
+            return;
+        }
+
         if (!result.IsAccepted)
         {
             _log("Simulation", $"Run rejected · {result.ErrorCode}: {result.Detail}");
@@ -194,8 +267,14 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             return;
         }
 
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
         var command = new PauseCommand();
         var result = await _engine.EnqueueCommandAsync(command, cancellationToken);
+        if (!IsOperationCurrent(operationGeneration))
+        {
+            return;
+        }
+
         if (!result.IsAccepted)
         {
             _log("Simulation", $"Pause rejected · {result.ErrorCode}: {result.Detail}");
@@ -205,6 +284,40 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
         _setRunning(false);
         _setStatus("Simulation paused");
         _log("Simulation", $"Pause requested · {ShortCommandId(command)}");
+    }
+
+    private async Task<bool> PauseForDesignModeCoreAsync(CancellationToken cancellationToken)
+    {
+        var state = _getState();
+        if (!state.IsRunning)
+        {
+            return true;
+        }
+
+        if (!SimulationRunControlAdmissionPolicy.CanPause(state))
+        {
+            _log("Simulation", "Design mode pause rejected by the current run-control state.");
+            return false;
+        }
+
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
+        var command = new PauseCommand();
+        var result = await _engine.EnqueueCommandAsync(command, cancellationToken);
+        if (!IsOperationCurrent(operationGeneration))
+        {
+            return false;
+        }
+
+        if (!result.IsAccepted)
+        {
+            _log("Simulation", $"Design mode pause rejected · {result.ErrorCode}: {result.Detail}");
+            return false;
+        }
+
+        _setRunning(false);
+        _setStatus("Simulation paused before entering Design mode");
+        _log("Simulation", $"Design mode pause requested · {ShortCommandId(command)}");
+        return true;
     }
 
     private async Task AbortSequenceCoreAsync(CancellationToken cancellationToken)
@@ -220,8 +333,14 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             return;
         }
 
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
         var command = new AbortSequenceCommand(sequenceId);
         var result = await _engine.EnqueueCommandAsync(command, cancellationToken);
+        if (!IsOperationCurrent(operationGeneration))
+        {
+            return;
+        }
+
         if (!result.IsAccepted)
         {
             _setStatus(OpenVisionLanguageService.T(
@@ -247,14 +366,21 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             return;
         }
 
-        var sequenceId = _getState().ActiveSequenceId;
+        var state = _getState();
+        var sequenceId = state.ResetRetrySequenceId ?? state.ActiveSequenceId;
         if (sequenceId is null)
         {
             return;
         }
 
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
         var command = new RetrySequenceCommand(sequenceId);
         var result = await _engine.EnqueueCommandAsync(command, cancellationToken);
+        if (!IsOperationCurrent(operationGeneration))
+        {
+            return;
+        }
+
         if (!result.IsAccepted)
         {
             _setStatus(OpenVisionLanguageService.T(
@@ -288,15 +414,23 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             return;
         }
 
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
         if (state.ControlOwner != SimulationControlOwner.Manual
             && !state.HasAutomaticRun
-            && !await EnsureActiveSequenceStartedAsync(cancellationToken))
+            && !await EnsureActiveSequenceStartedAsync(
+                operationGeneration,
+                cancellationToken))
         {
             return;
         }
 
         var command = new StepCommand();
         var result = await _engine.EnqueueCommandAsync(command, cancellationToken);
+        if (!IsOperationCurrent(operationGeneration))
+        {
+            return;
+        }
+
         if (!result.IsAccepted)
         {
             _log("Simulation", $"Step rejected · {result.ErrorCode}: {result.Detail}");
@@ -316,8 +450,14 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             return;
         }
 
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
         var command = new ResetCommand();
         var result = await _engine.EnqueueCommandAsync(command, cancellationToken);
+        if (!IsOperationCurrent(operationGeneration))
+        {
+            return;
+        }
+
         if (!result.IsAccepted)
         {
             _log("Simulation", $"Reset rejected · {result.ErrorCode}: {result.Detail}");
@@ -337,8 +477,14 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             return;
         }
 
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
         var command = new SetVirtualInputCommand("di.cycle-start", true);
         var result = await _engine.EnqueueCommandAsync(command, cancellationToken);
+        if (!IsOperationCurrent(operationGeneration))
+        {
+            return;
+        }
+
         if (!result.IsAccepted)
         {
             _log("I/O", $"Cycle Start rejected · {result.ErrorCode}: {result.Detail}");
@@ -349,7 +495,9 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
         _log("I/O", $"Cycle Start input requested · {ShortCommandId(command)}");
     }
 
-    private async Task<bool> EnsureActiveSequenceStartedAsync(CancellationToken cancellationToken)
+    private async Task<bool> EnsureActiveSequenceStartedAsync(
+        int operationGeneration,
+        CancellationToken cancellationToken)
     {
         var state = _getState();
         if (!state.HasEmbeddedSequence)
@@ -378,6 +526,11 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
         var result = await _engine.EnqueueCommandAsync(
             new StartSequenceCommand(state.ActiveSequenceId),
             cancellationToken);
+        if (!IsOperationCurrent(operationGeneration))
+        {
+            return false;
+        }
+
         if (result.IsAccepted)
         {
             return true;
@@ -431,6 +584,62 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
         }
     }
 
+    private bool IsOperationCurrent(int operationGeneration)
+    {
+        lock (_lifecycleGate)
+        {
+            return !_disposeRequested
+                && operationGeneration == _operationGeneration;
+        }
+    }
+
+    private async Task<bool> ExecuteSerializedResultAsync(
+        Func<CancellationToken, Task<bool>> operation,
+        CancellationToken cancellationToken)
+    {
+        BeginOperation();
+        try
+        {
+            await _executionGate.WaitAsync(cancellationToken);
+            try
+            {
+                if (!CanEnterExecution())
+                {
+                    return false;
+                }
+
+                SetBusy(true);
+                return await operation(cancellationToken);
+            }
+            finally
+            {
+                try
+                {
+                    SetBusy(false);
+                }
+                finally
+                {
+                    _executionGate.Release();
+                }
+            }
+        }
+        finally
+        {
+            EndOperation();
+        }
+    }
+
+    internal void InvalidatePendingExecution()
+    {
+        lock (_lifecycleGate)
+        {
+            if (!_disposeRequested)
+            {
+                Interlocked.Increment(ref _operationGeneration);
+            }
+        }
+    }
+
     private void BeginOperation()
     {
         lock (_lifecycleGate)
@@ -447,6 +656,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
     private void EndOperation()
     {
         var disposeGate = false;
+        var operationsIdle = false;
         lock (_lifecycleGate)
         {
             _activeOperations--;
@@ -455,6 +665,13 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
                 _executionGateDisposed = true;
                 disposeGate = true;
             }
+
+            operationsIdle = _disposeRequested && _activeOperations == 0;
+        }
+
+        if (operationsIdle)
+        {
+            _operationsIdle.TrySetResult(true);
         }
 
         if (disposeGate)
@@ -486,10 +703,12 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             }
 
             _disposeRequested = true;
+            Interlocked.Increment(ref _operationGeneration);
             if (_activeOperations == 0)
             {
                 _executionGateDisposed = true;
                 disposeGate = true;
+                _operationsIdle.TrySetResult(true);
             }
         }
 

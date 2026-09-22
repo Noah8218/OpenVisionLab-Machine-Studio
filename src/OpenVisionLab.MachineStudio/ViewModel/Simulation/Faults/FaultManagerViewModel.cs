@@ -52,6 +52,7 @@ public sealed class FaultManagerViewModel : ViewModelBase, IDisposable
     private ICommand? _injectCommand;
     private ICommand? _clearSelectedCommand;
     private ICommand? _clearAllCommand;
+    private int _operationGeneration;
     private int _disposed;
 
     public FaultManagerViewModel(
@@ -129,7 +130,13 @@ public sealed class FaultManagerViewModel : ViewModelBase, IDisposable
 
     internal void SetEnabled(bool value, bool invalidateCommands)
     {
-        if (!IsDisposed && SetProperty(ref _isEnabled, value) && invalidateCommands)
+        if (IsDisposed || !SetProperty(ref _isEnabled, value))
+        {
+            return;
+        }
+
+        Interlocked.Increment(ref _operationGeneration);
+        if (invalidateCommands)
         {
             CommandManager.InvalidateRequerySuggested();
         }
@@ -323,11 +330,12 @@ public sealed class FaultManagerViewModel : ViewModelBase, IDisposable
 
     private async Task InjectAsync()
     {
-        if (IsDisposed)
+        if (IsDisposed || !IsEnabled)
         {
             return;
         }
 
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
         var target = SelectedTarget;
         if (target is null)
         {
@@ -339,6 +347,11 @@ public sealed class FaultManagerViewModel : ViewModelBase, IDisposable
             SelectedKind.Kind,
             target.Id,
             forcedValue));
+        if (!IsOperationCurrent(operationGeneration))
+        {
+            return;
+        }
+
         OperationStatusText = result.IsAccepted
             ? Format("Fault.Injected", FormatKind(SelectedKind.Kind), target.Name)
             : FormatRejection(result);
@@ -346,11 +359,12 @@ public sealed class FaultManagerViewModel : ViewModelBase, IDisposable
 
     private async Task ClearSelectedAsync()
     {
-        if (IsDisposed)
+        if (IsDisposed || !IsEnabled)
         {
             return;
         }
 
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
         var fault = SelectedActiveFault;
         if (fault is null)
         {
@@ -358,6 +372,11 @@ public sealed class FaultManagerViewModel : ViewModelBase, IDisposable
         }
 
         var result = await _dispatch(new ClearSimulationFaultCommand(fault.Kind, fault.TargetId));
+        if (!IsOperationCurrent(operationGeneration))
+        {
+            return;
+        }
+
         OperationStatusText = result.IsAccepted
             ? Format("Fault.Cleared", FormatKind(fault.Kind), fault.TargetName)
             : FormatRejection(result);
@@ -365,22 +384,23 @@ public sealed class FaultManagerViewModel : ViewModelBase, IDisposable
 
     private async Task ClearAllAsync()
     {
-        if (IsDisposed)
+        if (IsDisposed || !IsEnabled)
         {
             return;
         }
 
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
         var activeFaults = ActiveFaults.ToArray();
         var clearedCount = 0;
         foreach (var fault in activeFaults)
         {
-            if (IsDisposed)
+            if (!IsOperationCurrent(operationGeneration))
             {
                 return;
             }
 
             var result = await _dispatch(new ClearSimulationFaultCommand(fault.Kind, fault.TargetId));
-            if (IsDisposed)
+            if (!IsOperationCurrent(operationGeneration))
             {
                 return;
             }
@@ -427,10 +447,20 @@ public sealed class FaultManagerViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
-        Interlocked.Exchange(ref _disposed, 1);
+        if (Interlocked.Exchange(ref _disposed, 1) == 0)
+        {
+            Interlocked.Increment(ref _operationGeneration);
+            (_injectCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+            (_clearSelectedCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+            (_clearAllCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        }
     }
 
     private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
+
+    private bool IsOperationCurrent(int operationGeneration) => !IsDisposed
+        && IsEnabled
+        && operationGeneration == Volatile.Read(ref _operationGeneration);
 
     private static string FormatKind(SimulationFaultKind kind) => kind switch
     {

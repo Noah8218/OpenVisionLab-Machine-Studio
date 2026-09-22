@@ -9,6 +9,7 @@
             <MenuItem Header="{loc:Loc Key=Shell.Open}" Command="{Binding OpenProjectCommand}" InputGestureText="Ctrl+O" Style="{StaticResource MachineSubmenuItemStyle}" />
             <MenuItem Header="{loc:Loc Key=Shell.Save}" Command="{Binding SaveProjectCommand}" InputGestureText="Ctrl+S" Style="{StaticResource MachineSubmenuItemStyle}" />
             <MenuItem Header="{loc:Loc Key=Shell.SaveAs}" Command="{Binding SaveProjectAsCommand}" InputGestureText="Ctrl+Shift+S" Style="{StaticResource MachineSubmenuItemStyle}" />
+            <MenuItem Header="{loc:Loc Key=SupportDiagnostics.Export}" Command="{Binding ExportSupportDiagnosticsCommand}" Style="{StaticResource MachineSubmenuItemStyle}" />
             <Separator Margin="8,3" Background="{DynamicResource Border.Default}" />
             <MenuItem Header="{loc:Loc Key=Shell.Exit}" Command="{Binding ExitCommand}" Style="{StaticResource MachineSubmenuItemStyle}" />
         </MenuItem>

@@ -21,7 +21,22 @@ internal readonly record struct SimulationRunControlState(
     bool HasActiveFaults,
     SimulationControlOwner ControlOwner,
     SequenceExecutionStatus? ActiveSequenceStatus,
-    string? ActiveSequenceId);
+    string? ActiveSequenceId)
+{
+    internal string? ResetRetrySequenceId { get; init; }
+
+    /// <summary>
+    /// True only when the user has explicitly enabled the persisted external
+    /// Result mode for the automatic Sequence start.
+    /// </summary>
+    internal bool AutomaticExternalInspectionEnabled { get; init; }
+
+    /// <summary>
+    /// True while the automatic Sequence is paused at an external Result
+    /// boundary. Run/step must not turn that wait into a mock timeout path.
+    /// </summary>
+    internal bool AutomaticExternalInspectionWaiting { get; init; }
+}
 
 /// <summary>
 /// Owns shell-facing run-control admission decisions over an immutable state snapshot.
@@ -31,7 +46,11 @@ internal static class SimulationRunControlAdmissionPolicy
 {
     internal static bool CanRun(SimulationRunControlState state)
     {
-        if (state.IsApplyingProject || state.IsValidationBusy || state.IsRunning)
+        if (state.IsApplyingProject
+            || state.IsValidationBusy
+            || state.IsRunning
+            || state.AutomaticExternalInspectionWaiting
+            || state.ResetRetrySequenceId is not null)
         {
             return false;
         }
@@ -76,7 +95,10 @@ internal static class SimulationRunControlAdmissionPolicy
             && !state.IsValidationBusy
             && !state.RuntimeDefinitionDirty
             && !state.HasActiveFaults
-            && state.ActiveSequenceStatus == SequenceExecutionStatus.Faulted;
+            && ((state.ActiveSequenceStatus == SequenceExecutionStatus.Faulted
+                    && state.ActiveSequenceId is not null)
+                || (state.ResetRetrySequenceId is not null
+                    && state.ActiveSequenceStatus == SequenceExecutionStatus.Ready));
 
     internal static bool CanStep(SimulationRunControlState state)
     {
@@ -84,6 +106,7 @@ internal static class SimulationRunControlAdmissionPolicy
             || state.IsValidationBusy
             || !state.IsRunMode
             || state.IsRunning
+            || state.AutomaticExternalInspectionWaiting
             || state.RuntimeDefinitionDirty)
         {
             return false;

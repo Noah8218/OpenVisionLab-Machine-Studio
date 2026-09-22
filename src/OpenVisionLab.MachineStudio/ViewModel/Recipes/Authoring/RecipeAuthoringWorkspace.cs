@@ -98,7 +98,8 @@ public sealed class RecipeAuthoringWorkspace : IDisposable
             setup.ApplyProcessBlocks,
             ApplyConnectionProcessBlockTimeouts,
             OnConnectionCheckpointTemplateApplied,
-            OpenProcessBlockSequenceStep);
+            OpenProcessBlockSequenceStep,
+            _setStatus);
         ProcessPlanReview = new ProcessPlanReviewViewModel(
             () => Connections.IsEditable,
             () => Connections.ProcessBlocks.IsProcessBlockPreviewVisible,
@@ -297,6 +298,8 @@ public sealed class RecipeAuthoringWorkspace : IDisposable
             return;
         }
 
+        ExitPlayback();
+        ProcessPlanReview.Clear();
         _disposed = true;
         DetachEventHandlers();
         Connections.Dispose();

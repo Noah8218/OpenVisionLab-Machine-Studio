@@ -8,13 +8,14 @@ namespace OpenVisionLab.MachineStudio.ViewModel;
 /// Edits the persisted scalar initial value of one authored analog channel.
 /// Runtime analog state remains owned by the Core/IO/Simulation boundary.
 /// </summary>
-public sealed class AnalogIoAuthoringViewModel : ViewModelBase
+public sealed class AnalogIoAuthoringViewModel : ViewModelBase, IDisposable
 {
     private readonly ChannelDefinition _channel;
     private readonly Action _definitionChanged;
     private string _initialValueText;
     private bool _hasValidationErrors;
     private string _validationMessage = string.Empty;
+    private int _disposed;
 
     public AnalogIoAuthoringViewModel(
         ChannelDefinition channel,
@@ -47,6 +48,11 @@ public sealed class AnalogIoAuthoringViewModel : ViewModelBase
         get => _initialValueText;
         set
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             value ??= string.Empty;
             if (string.Equals(_initialValueText, value, StringComparison.Ordinal))
             {
@@ -95,9 +101,16 @@ public sealed class AnalogIoAuthoringViewModel : ViewModelBase
 
     public void RefreshLocalization()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         OnPropertyChanged(nameof(KindText));
         Validate();
     }
+
+    public void Dispose() => Interlocked.Exchange(ref _disposed, 1);
 
     private void Validate()
     {
@@ -129,4 +142,6 @@ public sealed class AnalogIoAuthoringViewModel : ViewModelBase
 
     private static string FormatValue(double value) =>
         value.ToString("R", CultureInfo.CurrentCulture);
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

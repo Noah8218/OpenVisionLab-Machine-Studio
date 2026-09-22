@@ -29,18 +29,36 @@ public sealed record RuntimeWatchTarget(RuntimeWatchKind Kind, string Id, string
 
 public sealed class RuntimeWatchItem : ViewModelBase
 {
+    private RuntimeWatchTarget _target;
     private string _valueText = string.Empty;
 
-    public RuntimeWatchItem(RuntimeWatchTarget target) => Target = target;
+    public RuntimeWatchItem(RuntimeWatchTarget target)
+    {
+        _target = target ?? throw new ArgumentNullException(nameof(target));
+    }
 
-    public RuntimeWatchTarget Target { get; }
-    public string Name => Target.Name;
-    public string KindText => Target.Kind.ToString();
+    public RuntimeWatchTarget Target => _target;
+    public string Name => _target.Name;
+    public string KindText => _target.Kind.ToString();
 
     public string ValueText
     {
         get => _valueText;
         internal set => SetProperty(ref _valueText, value);
+    }
+
+    internal void UpdateTarget(RuntimeWatchTarget target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        if (_target == target)
+        {
+            return;
+        }
+
+        _target = target;
+        OnPropertyChanged(nameof(Target));
+        OnPropertyChanged(nameof(Name));
+        OnPropertyChanged(nameof(KindText));
     }
 }
 
@@ -89,6 +107,7 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
     private ICommand? _addWatchCommand;
     private ICommand? _removeWatchCommand;
     private ICommand? _clearTimelineCommand;
+    private int _operationGeneration;
     private int _disposed;
 
     public RuntimeDebuggerViewModel(Func<SimulationCommand, Task<SimulationCommandResult>> dispatch)
@@ -105,8 +124,12 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
     public ObservableCollection<RuntimeWatchTarget> WatchTargets { get; } = new();
     public ObservableCollection<RuntimeWatchItem> Watches { get; } = new();
     public ObservableCollection<RuntimeTimelineItem> Timeline => _timeline.Items;
+    public IReadOnlyList<RuntimeTimelineFilterItem> TimelineFilters => _timeline.FilterOptions;
+    public IReadOnlyList<RuntimeTimelineFilterItem> TimelineSeverityFilters => _timeline.SeverityFilterOptions;
     public ObservableCollection<RuntimeAlarmItem> Alarms => _alarmCollection.Alarms;
     public ObservableCollection<RuntimeAlarmItem> AlarmHistory => _alarmCollection.AlarmHistory;
+    public ObservableCollection<RuntimeAlarmItem> VisibleAlarmHistory => _alarmCollection.VisibleAlarmHistory;
+    public IReadOnlyList<RuntimeAlarmHistoryFilterItem> AlarmHistoryFilters => _alarmCollection.AlarmHistoryFilters;
 
     public RuntimeWatchTarget? SelectedWatchTarget
     {
@@ -165,6 +188,8 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
     public bool HasTimeline => _timeline.HasItems;
     public bool HasAlarms => _alarmCollection.HasAlarms;
     public bool HasAlarmHistory => _alarmCollection.HasAlarmHistory;
+    public bool HasVisibleAlarmHistory => _alarmCollection.HasVisibleAlarmHistory;
+    public bool HasAlarmHistoryEmptyState => _alarmCollection.HasAlarmHistoryEmptyState;
     public bool HasWatches => Watches.Count > 0;
     public int UnacknowledgedAlarmCount => _alarmCollection.UnacknowledgedAlarmCount;
 
@@ -219,8 +244,58 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
     public string AlarmSummaryText => _alarmCollection.AlarmSummaryText;
     public string AlarmAcknowledgementSummaryText => _alarmCollection.AlarmAcknowledgementSummaryText;
     public string AlarmHistorySummaryText => _alarmCollection.AlarmHistorySummaryText;
+    public string AlarmHistoryEmptyText => _alarmCollection.AlarmHistoryEmptyText;
+
+    public RuntimeAlarmHistoryFilterItem? SelectedAlarmHistoryFilter
+    {
+        get => _alarmCollection.SelectedAlarmHistoryFilter;
+        set
+        {
+            if (IsDisposed || !_alarmCollection.SetHistoryFilter(value?.State))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(SelectedAlarmHistoryFilter));
+        }
+    }
 
     public string TimelineSummaryText => _timeline.SummaryText;
+
+    public string TimelineEmptyText => T(
+        "Debugger.TimelineEmptyFiltered",
+        "선택한 조건의 이벤트가 없습니다.",
+        "No events match the selected filters.");
+
+    public RuntimeTimelineFilterItem? SelectedTimelineFilter
+    {
+        get => _timeline.SelectedFilter;
+        set
+        {
+            if (IsDisposed || !_timeline.SetCategory(value?.Key))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(SelectedTimelineFilter));
+            RefreshTimelinePresentation();
+        }
+    }
+
+    public RuntimeTimelineFilterItem? SelectedTimelineSeverityFilter
+    {
+        get => _timeline.SelectedSeverityFilter;
+        set
+        {
+            if (IsDisposed || !_timeline.SetSeverity(value?.Key))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(SelectedTimelineSeverityFilter));
+            RefreshTimelinePresentation();
+        }
+    }
 
     public string OperationStatusText
     {
@@ -259,7 +334,7 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
 
     public ICommand ClearTimelineCommand => _clearTimelineCommand ??= new RelayCommand(
         _ => ClearTimeline(),
-        _ => !IsDisposed && Timeline.Count > 0,
+        _ => !IsDisposed && _timeline.HasEvents,
         useCommandManagerRequery: false);
 
     public ICommand AcknowledgeAlarmCommand => _alarmCollection.AcknowledgeAlarmCommand;
@@ -273,17 +348,27 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        Interlocked.Increment(ref _operationGeneration);
         var projectChanged = !string.Equals(_projectId, project.Id, StringComparison.Ordinal);
         _projectId = project.Id;
 
         if (resetSession || projectChanged)
         {
+            _latestSnapshot = null;
+            OperationStatusText = T(
+                "Debugger.ReadyHint",
+                "일시정지 후 다음 시퀀스 경계로 이동하거나 중단점을 설정하세요.",
+                "Pause to move to the next sequence boundary or configure a breakpoint.");
             Watches.Clear();
             _timeline.Clear();
             _alarmCollection.Reset();
             _defaultWatchApplied = false;
             SelectedWatch = null;
             OnPropertyChanged(nameof(HasTimeline));
+            OnPropertyChanged(nameof(TimelineFilters));
+            OnPropertyChanged(nameof(SelectedTimelineFilter));
+            OnPropertyChanged(nameof(TimelineSeverityFilters));
+            OnPropertyChanged(nameof(SelectedTimelineSeverityFilter));
             OnPropertyChanged(nameof(HasWatches));
         }
 
@@ -384,11 +469,6 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
 
     public void InvalidateCommands()
     {
-        if (IsDisposed)
-        {
-            return;
-        }
-
         (_semanticStepCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         (_toggleBreakpointCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         (_addWatchCommand as RelayCommand)?.RaiseCanExecuteChanged();
@@ -424,7 +504,9 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        Interlocked.Increment(ref _operationGeneration);
         _alarmCollection.PropertyChanged -= OnAlarmCollectionPropertyChanged;
+        InvalidateCommands();
     }
 
     private SequenceExecutionSnapshot? ActiveSequence => _latestSnapshot?.Sequences
@@ -444,11 +526,17 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
         if (ActiveSequence is not { } sequence)
         {
             return;
         }
         var result = await _dispatch(new StepSequenceCommand(sequence.SequenceId));
+        if (IsDisposed || operationGeneration != Volatile.Read(ref _operationGeneration))
+        {
+            return;
+        }
+
         OperationStatusText = result.IsAccepted
             ? T("Debugger.StepAccepted", "다음 시퀀스 경계까지 실행했습니다.", "Advanced to the next sequence boundary.")
             : FormatRejected(result);
@@ -461,6 +549,7 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
         if (SelectedBreakpoint is not { } breakpoint)
         {
             return;
@@ -470,6 +559,11 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
             breakpoint.SequenceId,
             breakpoint.StepId,
             enable));
+        if (IsDisposed || operationGeneration != Volatile.Read(ref _operationGeneration))
+        {
+            return;
+        }
+
         OperationStatusText = result.IsAccepted
             ? T(
                 enable ? "Debugger.BreakpointSet" : "Debugger.BreakpointRemoved",
@@ -563,18 +657,31 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
         IReadOnlyList<RuntimeWatchTarget> targets = _watchTargetCatalog.Build(
             _latestSnapshot,
             SequenceName);
-        var selectedKey = SelectedWatchTarget is null ? null : $"{SelectedWatchTarget.Kind}:{SelectedWatchTarget.Id}";
-        var currentKeys = WatchTargets.Select(item => $"{item.Kind}:{item.Id}");
-        if (currentKeys.SequenceEqual(targets.Select(item => $"{item.Kind}:{item.Id}"), StringComparer.Ordinal))
+        (RuntimeWatchKind Kind, string Id)? selectedKey = SelectedWatchTarget is null
+            ? null
+            : (SelectedWatchTarget.Kind, SelectedWatchTarget.Id);
+        if (WatchTargets.SequenceEqual(targets))
         {
             return;
         }
+
+        var targetsByKey = targets.ToDictionary(item => (item.Kind, item.Id));
+        foreach (var watch in Watches)
+        {
+            if (targetsByKey.TryGetValue((watch.Target.Kind, watch.Target.Id), out var target))
+            {
+                watch.UpdateTarget(target);
+            }
+        }
+
         WatchTargets.Clear();
         foreach (var target in targets)
         {
             WatchTargets.Add(target);
         }
-        SelectedWatchTarget = WatchTargets.FirstOrDefault(item => $"{item.Kind}:{item.Id}" == selectedKey)
+        SelectedWatchTarget = WatchTargets.FirstOrDefault(item => selectedKey is { }
+            && item.Kind == selectedKey.Value.Kind
+            && item.Id == selectedKey.Value.Id)
             ?? WatchTargets.FirstOrDefault();
     }
 
@@ -582,6 +689,11 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
     {
         OnPropertyChanged(nameof(HasTimeline));
         OnPropertyChanged(nameof(TimelineSummaryText));
+        OnPropertyChanged(nameof(TimelineEmptyText));
+        OnPropertyChanged(nameof(TimelineFilters));
+        OnPropertyChanged(nameof(SelectedTimelineFilter));
+        OnPropertyChanged(nameof(TimelineSeverityFilters));
+        OnPropertyChanged(nameof(SelectedTimelineSeverityFilter));
         InvalidateCommands();
     }
 

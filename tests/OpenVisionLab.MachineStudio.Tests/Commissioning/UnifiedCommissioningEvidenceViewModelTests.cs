@@ -8,6 +8,29 @@ namespace OpenVisionLab.MachineStudio.Tests;
 public sealed class UnifiedCommissioningEvidenceViewModelTests
 {
     [Fact]
+    public void ResetNotifiesClearedPresentationState()
+    {
+        OpenVisionLanguageService.Load();
+        var statuses = new List<string>();
+        var logs = new List<string>();
+        var viewModel = CreateViewModel(
+            canExport: false,
+            canImport: false,
+            statuses,
+            logs,
+            () => null);
+        var changedProperties = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        viewModel.Reset();
+
+        Assert.Contains(nameof(UnifiedCommissioningEvidenceViewModel.LatestEvidence), changedProperties);
+        Assert.Contains(nameof(UnifiedCommissioningEvidenceViewModel.CanExport), changedProperties);
+        Assert.Contains(nameof(UnifiedCommissioningEvidenceViewModel.CanImport), changedProperties);
+        Assert.Contains(nameof(UnifiedCommissioningEvidenceViewModel.StatusText), changedProperties);
+    }
+
+    [Fact]
     public void ExportWithoutReadyInputsDoesNotWriteOrChangeArtifact()
     {
         OpenVisionLanguageService.Load();

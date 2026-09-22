@@ -8,7 +8,7 @@ using OpenVisionLab.MachineStudio.View.Dialogs;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
-public sealed class CameraImageSourceEditorViewModel : ViewModelBase
+public sealed class CameraImageSourceEditorViewModel : ViewModelBase, IDisposable
 {
     private readonly Action<CameraImageSourceApplicationResult> _sourceApplied;
     private readonly Func<string, string?> _selectSourceFile;
@@ -22,6 +22,7 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase
     private string _validationErrorKey = "Camera.SourceFileRequired";
     private string _normalizedPath = string.Empty;
     private bool _needsProjectSave;
+    private int _disposed;
 
     public CameraImageSourceEditorViewModel(Action<string, string> sourceApplied)
         : this(AdaptLegacySourceApplied(sourceApplied), CameraImageSourceFileDialogHost.SelectSourceFile)
@@ -60,6 +61,11 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase
         get => _pathText;
         set
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             if (SetProperty(ref _pathText, value ?? string.Empty))
             {
                 RefreshValidation();
@@ -72,6 +78,11 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase
         get => _width;
         set
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             if (SetProperty(ref _width, value))
             {
                 RefreshValidation();
@@ -84,6 +95,11 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase
         get => _height;
         set
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             if (SetProperty(ref _height, value))
             {
                 RefreshValidation();
@@ -96,6 +112,11 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase
         get => _pixelFormatText;
         set
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             if (SetProperty(ref _pixelFormatText, value ?? string.Empty))
             {
                 RefreshValidation();
@@ -123,9 +144,9 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase
     }
 
     public bool HasError => !string.IsNullOrEmpty(_validationErrorKey);
-    public bool CanBrowse => Definition is not null && !string.IsNullOrWhiteSpace(_projectPath);
-    public bool CanApply => CanBrowse && IsDirty && !HasError;
-    public bool CanRevert => Definition is not null && IsDirty;
+    public bool CanBrowse => !IsDisposed && Definition is not null && !string.IsNullOrWhiteSpace(_projectPath);
+    public bool CanApply => !IsDisposed && CanBrowse && IsDirty && !HasError;
+    public bool CanRevert => !IsDisposed && Definition is not null && IsDirty;
     public string ValidationText => HasError
         ? OpenVisionLanguageService.T(_validationErrorKey)
         : IsDirty
@@ -140,6 +161,11 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase
 
     public void Load(MachineProjectDocument project, string? projectPath, string? cameraId)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _project = project ?? throw new ArgumentNullException(nameof(project));
         _projectPath = string.IsNullOrWhiteSpace(projectPath) ? null : Path.GetFullPath(projectPath);
         _cameraId = cameraId;
@@ -149,12 +175,22 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase
 
     public void SelectCamera(string? cameraId)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _cameraId = cameraId;
         Synchronize();
     }
 
     public void SetProjectPath(string? projectPath, bool isSaved)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _projectPath = string.IsNullOrWhiteSpace(projectPath) ? null : Path.GetFullPath(projectPath);
         if (isSaved)
         {
@@ -163,7 +199,13 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase
         RefreshValidation();
     }
 
-    public void RefreshLocalization() => OnPropertyChanged(nameof(ValidationText));
+    public void RefreshLocalization()
+    {
+        if (!IsDisposed)
+        {
+            OnPropertyChanged(nameof(ValidationText));
+        }
+    }
 
     private void Browse()
     {
@@ -222,6 +264,11 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase
 
     private void Synchronize()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var source = Definition?.Camera?.SingleImageSource;
         _pathText = source?.SourceRelativePath ?? string.Empty;
         _width = source?.Width ?? 1;
@@ -236,6 +283,11 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase
 
     private void RefreshValidation()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (TryValidate(out var errorKey, out var normalizedPath))
         {
             _validationErrorKey = string.Empty;
@@ -313,4 +365,18 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase
         ArgumentNullException.ThrowIfNull(sourceApplied);
         return result => sourceApplied(result.CameraId ?? string.Empty, result.Detail);
     }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        (BrowseCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (ApplyCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (RevertCommand as RelayCommand)?.RaiseCanExecuteChanged();
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

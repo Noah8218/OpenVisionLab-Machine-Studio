@@ -10,7 +10,51 @@ namespace OpenVisionLab.Machine.Simulation.Engine;
 internal sealed class DeterministicSimulationCommandTraceStore
 {
     private readonly object _sync = new();
+    private readonly int _capacity;
     private readonly List<DeterministicSimulationCommandTraceEntry> _entries = new();
+    private long _droppedEntryCount;
+
+    public DeterministicSimulationCommandTraceStore(
+        int capacity = SimulationSettings.DefaultCommandTraceEntryCapacity)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(capacity);
+        _capacity = capacity;
+    }
+
+    public int Count
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _entries.Count;
+            }
+        }
+    }
+
+    public int Capacity => _capacity;
+
+    public bool IsComplete
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _droppedEntryCount == 0;
+            }
+        }
+    }
+
+    public long DroppedEntryCount
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _droppedEntryCount;
+            }
+        }
+    }
 
     public ImmutableArray<DeterministicSimulationCommandTraceEntry> Snapshot()
     {
@@ -20,29 +64,50 @@ internal sealed class DeterministicSimulationCommandTraceStore
         }
     }
 
-    public DeterministicSimulationCommandTracePackage CreatePackage(TimeSpan fixedStep) =>
-        DeterministicSimulationCommandTracePackage.Create(fixedStep, Snapshot());
+    public DeterministicSimulationCommandTracePackage CreatePackage(TimeSpan fixedStep)
+    {
+        lock (_sync)
+        {
+            if (_droppedEntryCount > 0)
+            {
+                throw new InvalidOperationException(
+                    $"The command trace is incomplete; {_droppedEntryCount} entries were dropped.");
+            }
+
+            return DeterministicSimulationCommandTracePackage.Create(
+                fixedStep,
+                _entries.ToImmutableArray());
+        }
+    }
 
     public void Clear()
     {
         lock (_sync)
         {
             _entries.Clear();
+            _droppedEntryCount = 0;
         }
     }
 
-    public void Capture(SimulationCommand command, SimulationCommandResult result)
+    public bool Capture(SimulationCommand command, SimulationCommandResult result)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(result);
 
         lock (_sync)
         {
+            if (_entries.Count >= _capacity)
+            {
+                _droppedEntryCount++;
+                return false;
+            }
+
             _entries.Add(
                 DeterministicSimulationCommandTraceEntry.Capture(
                     _entries.Count + 1,
                     command,
                     result));
+            return true;
         }
     }
 }

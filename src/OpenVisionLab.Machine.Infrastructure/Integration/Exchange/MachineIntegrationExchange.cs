@@ -64,6 +64,11 @@ public static class MachineIntegrationExchange
         Guid transactionId) =>
         MachineIntegrationTransactionInspector.ReadResult(exchangeRoot, transactionId);
 
+    public static MachineIntegrationValidatedResult ReadValidatedResult(
+        string exchangeRoot,
+        Guid transactionId) =>
+        MachineIntegrationTransactionInspector.ReadValidatedResult(exchangeRoot, transactionId);
+
     public static IReadOnlyList<MachineIntegrationTransactionDiagnostic> DiagnoseTransactions(
         string exchangeRoot) =>
         MachineIntegrationTransactionInspector.DiagnoseTransactions(exchangeRoot);

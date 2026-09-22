@@ -173,6 +173,7 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
             return;
         }
 
+        _axisDriveTuningEditor?.Dispose();
         _axisDriveTuningEditor = value;
         OnPropertyChanged(nameof(AxisDriveTuningEditor));
     }
@@ -184,6 +185,7 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
             return;
         }
 
+        _analogIoAuthoring?.Dispose();
         _analogIoAuthoring = value;
         OnPropertyChanged(nameof(AnalogIoAuthoring));
     }
@@ -195,6 +197,7 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
             return;
         }
 
+        ClearEditors();
         _projectTree.PropertyChanged -= OnProjectTreePropertyChanged;
         _layout.PropertyChanged -= OnLayoutPropertyChanged;
     }

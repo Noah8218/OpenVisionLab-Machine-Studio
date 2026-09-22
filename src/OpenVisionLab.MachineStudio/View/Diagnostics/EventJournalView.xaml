@@ -100,7 +100,7 @@
             </ToggleButton>
             <Border x:Name="EvidenceDrawerContent"
                     Grid.Row="0"
-                    Height="210"
+                    Height="270"
                     BorderBrush="{DynamicResource Border.Subtle}"
                     BorderThickness="0,1,0,0">
                 <Border.Style>
@@ -113,20 +113,71 @@
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
-                <ListBox Margin="4"
-                         ItemsSource="{Binding LogMessages}"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <logging:LogView Margin="6,2"
-                                             FontFamily="{StaticResource Typography.Telemetry}"
-                                             FontSize="11"
-                                             Foreground="{DynamicResource Text.Primary}"
-                                             Text="{Binding}"
-                                             TextWrapping="Wrap" />
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                <Grid Margin="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.15*" />
+                        <ColumnDefinition Width="1.85*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0"
+                            Margin="0,0,4,0"
+                            Padding="8"
+                            Background="{DynamicResource Surface.Raised}"
+                            BorderBrush="{DynamicResource Border.Subtle}"
+                            BorderThickness="1"
+                            CornerRadius="4">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid Grid.Row="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center"
+                                           FontWeight="SemiBold"
+                                           Text="{loc:Loc Key=SupportDiagnostics.Preview}" />
+                                <Button Grid.Column="1"
+                                        Margin="8,0,0,0"
+                                        Padding="8,3"
+                                        Command="{Binding ExportSupportDiagnosticsCommand}"
+                                        Content="{loc:Loc Key=SupportDiagnostics.Export}"
+                                        AutomationProperties.Name="{loc:Loc Key=SupportDiagnostics.Export}" />
+                            </Grid>
+                            <TextBlock Grid.Row="1"
+                                       Margin="0,4,0,4"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding SupportDiagnostics.StatusText}"
+                                       TextWrapping="Wrap" />
+                            <ScrollViewer Grid.Row="2"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <TextBlock FontFamily="{StaticResource Typography.Telemetry}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource Text.Primary}"
+                                           Text="{Binding SupportDiagnostics.PreviewText}"
+                                           TextWrapping="Wrap" />
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                    <ListBox Grid.Column="1"
+                             Margin="4,0,0,0"
+                             ItemsSource="{Binding LogMessages}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <logging:LogView Margin="6,2"
+                                                 FontFamily="{StaticResource Typography.Telemetry}"
+                                                 FontSize="11"
+                                                 Foreground="{DynamicResource Text.Primary}"
+                                                 Text="{Binding}"
+                                                 TextWrapping="Wrap" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
             </Border>
         </Grid>
     </Border>

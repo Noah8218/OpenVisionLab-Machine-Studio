@@ -40,12 +40,10 @@
                     </Style>
                 </ScrollViewer.Style>
                 <StackPanel>
-                    <ListBox Margin="3"
-                             ItemsSource="{Binding Properties.Items}"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                        <ListBox.Style>
-                            <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
+                    <ItemsControl Margin="3"
+                                  ItemsSource="{Binding Properties.Items}">
+                        <ItemsControl.Style>
+                            <Style TargetType="ItemsControl">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Layout.HasSelection}" Value="True">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -61,8 +59,8 @@
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </ListBox.Style>
-                        <ListBox.ItemTemplate>
+                        </ItemsControl.Style>
+                        <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Grid Margin="6,4">
                                     <Grid.ColumnDefinitions>
@@ -77,13 +75,21 @@
                                                ToolTip="{Binding Value}" />
                                 </Grid>
                             </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
                     <Border x:Name="AnalogIoAuthoringPanel"
-                            IsEnabled="{Binding IsSceneEditable}"
-                            Style="{StaticResource InspectorCardStyle}"
                             Visibility="{Binding HasSelectedAnalogChannel, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource InspectorCardStyle}">
+                                <Setter Property="IsEnabled" Value="True" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsDryRunPlaybackActive}" Value="True">
+                                        <Setter Property="IsEnabled" Value="False" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
                         <StackPanel DataContext="{Binding AnalogIoAuthoring}">
                             <TextBlock Style="{StaticResource SectionCaptionStyle}"
                                        Text="{loc:Loc Key=Io.AnalogAuthoring}" />
@@ -398,9 +404,17 @@
                         </StackPanel>
                     </Border>
 
-                    <Border IsEnabled="{Binding IsSceneEditable}"
-                            Style="{StaticResource InspectorCardStyle}"
-                            Visibility="{Binding Layout.HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Border Visibility="{Binding Layout.HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource InspectorCardStyle}">
+                                <Setter Property="IsEnabled" Value="True" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsDryRunPlaybackActive}" Value="True">
+                                        <Setter Property="IsEnabled" Value="False" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
                         <StackPanel DataContext="{Binding Layout.SelectedComponentEditor}">
                             <TextBlock Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Inspector.AuthoredProperties}" />
                             <Grid Margin="0,0,0,6">
@@ -417,6 +431,25 @@
                                      Height="30"
                                      Text="{Binding Name, Mode=TwoWay}"
                                      ToolTip="{Binding Name}" />
+                            <Border Margin="0,6,0,0"
+                                    Padding="8,6"
+                                    Background="{DynamicResource Surface.Panel}"
+                                    CornerRadius="4">
+                                <TextBlock x:Name="PropertyValidationMessage"
+                                           Text="{Binding ValidationMessage}"
+                                           TextWrapping="Wrap">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource State.Running}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasValidationErrors}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Border>
 
                             <TextBlock Margin="0,10,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Inspector.LayoutTransform}" />
                             <TextBlock x:Name="AspectRatioHintText"
@@ -503,20 +536,6 @@
                                 <ComboBox ItemsSource="{Binding InspectionStateOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding WorkpieceInspectionStateId, Mode=TwoWay}" />
                             </StackPanel>
 
-                            <Border Margin="0,12,0,0" Padding="8,6" Background="{DynamicResource Surface.Panel}" CornerRadius="4">
-                                <TextBlock x:Name="PropertyValidationMessage" Text="{Binding ValidationMessage}" TextWrapping="Wrap">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="{DynamicResource State.Running}" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasValidationErrors}" Value="True">
-                                                    <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Border>
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -686,6 +705,48 @@
                                                 Content="{loc:Loc Key=Debugger.ClearTimeline}"
                                                 Style="{StaticResource GlobalCommandButtonStyle}" />
                                     </Grid>
+                                    <Grid Margin="0,5,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{loc:Loc Key=Debugger.TimelineFilterLabel}"
+                                                   TextWrapping="Wrap" />
+                                        <ComboBox x:Name="DebuggerTimelineFilterComboBox"
+                                                  Grid.Column="1"
+                                                  Margin="8,0,0,0"
+                                                  HorizontalAlignment="Stretch"
+                                                  AutomationProperties.Name="{loc:Loc Key=Debugger.TimelineFilterLabel}"
+                                                  DisplayMemberPath="DisplayText"
+                                                  ItemsSource="{Binding RuntimeDebugger.TimelineFilters}"
+                                                  SelectedItem="{Binding RuntimeDebugger.SelectedTimelineFilter, Mode=TwoWay}" />
+                                    </Grid>
+                                    <Grid Margin="0,5,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{loc:Loc Key=Debugger.TimelineSeverityFilterLabel}"
+                                                   TextWrapping="Wrap" />
+                                        <ComboBox x:Name="DebuggerTimelineSeverityFilterComboBox"
+                                                  Grid.Column="1"
+                                                  Margin="8,0,0,0"
+                                                  HorizontalAlignment="Stretch"
+                                                  AutomationProperties.Name="{loc:Loc Key=Debugger.TimelineSeverityFilterLabel}"
+                                                  DisplayMemberPath="DisplayText"
+                                                  ItemsSource="{Binding RuntimeDebugger.TimelineSeverityFilters}"
+                                                  SelectedItem="{Binding RuntimeDebugger.SelectedTimelineSeverityFilter, Mode=TwoWay}" />
+                                    </Grid>
+                                    <TextBlock x:Name="DebuggerTimelineEmptyTextBlock"
+                                               Margin="3,8,3,3"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding RuntimeDebugger.TimelineEmptyText}"
+                                               TextWrapping="Wrap"
+                                               Visibility="{Binding RuntimeDebugger.HasTimeline, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" />
                                     <ListBox x:Name="DebuggerTimelineList"
                                              Margin="0,5,0,0"
                                              MaxHeight="220"
@@ -696,6 +757,10 @@
                                                 <StackPanel Margin="3,3">
                                                     <TextBlock Style="{StaticResource TelemetryTextStyle}"
                                                                Text="{Binding HeaderText}" />
+                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                               Text="{Binding CommandIdText}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding CommandIdTooltip}" />
                                                     <TextBlock FontWeight="SemiBold"
                                                                Text="{Binding Category}" />
                                                     <TextBlock Foreground="{DynamicResource Text.Secondary}"
@@ -783,11 +848,34 @@
                                          <StackPanel Margin="0,5,0,0">
                                              <TextBlock Foreground="{DynamicResource Text.Secondary}"
                                                         Text="{Binding RuntimeDebugger.AlarmHistorySummaryText}" />
+                                             <TextBlock Margin="0,5,0,0"
+                                                        Foreground="{DynamicResource Text.Secondary}"
+                                                        Text="{loc:Loc Key=Debugger.AlarmHistoryFilterHint}"
+                                                        TextWrapping="Wrap" />
+                                             <StackPanel Margin="0,5,0,0"
+                                                         Orientation="Horizontal">
+                                                 <TextBlock VerticalAlignment="Center"
+                                                            Text="{loc:Loc Key=Debugger.AlarmHistoryFilter}" />
+                                                 <ComboBox x:Name="DebuggerAlarmHistoryFilterComboBox"
+                                                           Margin="7,0,0,0"
+                                                           MinWidth="150"
+                                                           ItemsSource="{Binding RuntimeDebugger.AlarmHistoryFilters}"
+                                                           DisplayMemberPath="DisplayText"
+                                                           SelectedItem="{Binding RuntimeDebugger.SelectedAlarmHistoryFilter, Mode=TwoWay}"
+                                                           AutomationProperties.AutomationId="DebuggerAlarmHistoryFilter"
+                                                           AutomationProperties.Name="{loc:Loc Key=Debugger.AlarmHistoryFilter}" />
+                                             </StackPanel>
+                                             <TextBlock x:Name="DebuggerAlarmHistoryEmptyTextBlock"
+                                                        Margin="0,5,0,0"
+                                                        Foreground="{DynamicResource Text.Secondary}"
+                                                        Text="{Binding RuntimeDebugger.AlarmHistoryEmptyText}"
+                                                        TextWrapping="Wrap"
+                                                        Visibility="{Binding RuntimeDebugger.HasAlarmHistoryEmptyState, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                              <ListBox x:Name="DebuggerAlarmHistoryList"
                                                       Margin="0,5,0,0"
                                                       MaxHeight="170"
                                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                                      ItemsSource="{Binding RuntimeDebugger.AlarmHistory}">
+                                                      ItemsSource="{Binding RuntimeDebugger.VisibleAlarmHistory}">
                                                  <ListBox.ItemTemplate>
                                                      <DataTemplate>
                                                          <StackPanel Margin="3,3">
@@ -1329,7 +1417,8 @@
                                         Style="{StaticResource GlobalCommandButtonStyle}"
                                         Command="{Binding CancelScenarioBatchCommand}" />
                             </WrapPanel>
-                            <TextBlock Margin="0,7,0,0"
+                            <TextBlock x:Name="ScenarioBatchStatusText"
+                                       Margin="0,7,0,0"
                                        FontWeight="SemiBold"
                                        Text="{Binding BatchStatusText}"
                                        TextWrapping="Wrap" />
@@ -1349,12 +1438,21 @@
                                        Foreground="{DynamicResource Text.Secondary}"
                                        Text="{loc:Loc Key=Simulation.EvidenceExchangeHint}"
                                        TextWrapping="Wrap" />
+                            <TextBlock Margin="0,4,0,0"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Simulation.ResultReportHint}"
+                                       TextWrapping="Wrap" />
                             <WrapPanel Margin="0,8,0,0">
                                 <Button Margin="0,0,6,4"
                                         Content="{loc:Loc Key=Simulation.ExportEvidence}"
                                         Style="{StaticResource GlobalCommandButtonStyle}"
                                         Command="{Binding ExportSimulationEvidenceCommand}"
                                         AutomationProperties.Name="{loc:Loc Key=Simulation.ExportEvidence}" />
+                                <Button Margin="0,0,6,4"
+                                        Content="{loc:Loc Key=Simulation.ExportReport}"
+                                        Style="{StaticResource GlobalCommandButtonStyle}"
+                                        Command="{Binding ExportSimulationReportCommand}"
+                                        AutomationProperties.Name="{loc:Loc Key=Simulation.ExportReport}" />
                                 <Button Margin="0,0,6,4"
                                         Content="{loc:Loc Key=Simulation.ImportEvidence}"
                                         Style="{StaticResource GlobalCommandButtonStyle}"
@@ -1525,7 +1623,8 @@
                                            Text="{Binding SelectedEquipmentStatus.SecondaryValue}" />
                             </Grid>
                             <StackPanel x:Name="ManualCommissioningPanel"
-                                        Margin="0,10,0,0">
+                                        Margin="0,10,0,0"
+                                        DataContext="{Binding ManualEquipment}">
                                 <StackPanel.Style>
                                     <Style TargetType="StackPanel">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -1549,7 +1648,8 @@
                             </StackPanel>
                             <local:AxisCommissioningPanelView x:Name="AxisCommissioningContent" />
                             <StackPanel x:Name="SensorCommissioningPanel"
-                                        Margin="0,10,0,0">
+                                        Margin="0,10,0,0"
+                                        DataContext="{Binding ManualEquipment}">
                                 <StackPanel.Style>
                                     <Style TargetType="StackPanel">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -1622,7 +1722,8 @@
                                            TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel x:Name="CylinderCommissioningPanel"
-                                        Margin="0,10,0,0">
+                                        Margin="0,10,0,0"
+                                        DataContext="{Binding ManualEquipment}">
                                 <StackPanel.Style>
                                     <Style TargetType="StackPanel">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -1683,7 +1784,8 @@
                                            TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel x:Name="ConveyorCommissioningPanel"
-                                        Margin="0,10,0,0">
+                                        Margin="0,10,0,0"
+                                        DataContext="{Binding ManualEquipment}">
                                 <StackPanel.Style>
                                     <Style TargetType="StackPanel">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -1990,6 +2092,96 @@
                                        Foreground="{DynamicResource Text.Secondary}"
                                        Text="{loc:Loc Key=Integration.Hint}"
                                        TextWrapping="Wrap" />
+                            <TextBlock x:Name="IntegrationSetupWorkflowStatusTextBlock"
+                                       Margin="0,0,0,8"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding Integration.SetupWorkflowStatusText}"
+                                       ToolTip="{Binding Integration.SetupWorkflowStatusText}"
+                                       TextWrapping="Wrap" />
+                            <Expander x:Name="MmiRecipeManagerExpander"
+                                      Margin="0,0,0,8"
+                                      IsExpanded="True"
+                                      Header="{loc:Loc Key=Integration.MmiRecipeManager}"
+                                      AutomationProperties.AutomationId="MmiRecipeManagerExpander"
+                                      AutomationProperties.Name="{loc:Loc Key=Integration.MmiRecipeManager}">
+                                <StackPanel Margin="0,7,0,0">
+                                    <TextBlock FontSize="10"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{loc:Loc Key=Integration.MmiRecipeManagerHint}"
+                                               TextWrapping="Wrap" />
+                                    <ListBox x:Name="MmiRecipeList"
+                                             Margin="0,7,0,0"
+                                             Height="140"
+                                             ItemsSource="{Binding Integration.Setup.RecipeCatalogItems}"
+                                             SelectedItem="{Binding Integration.Setup.SelectedRecipe, Mode=TwoWay}"
+                                             AutomationProperties.AutomationId="MmiRecipeList"
+                                             AutomationProperties.Name="{loc:Loc Key=Integration.MmiRecipeManager}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="2,3">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                    </Grid.RowDefinitions>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock FontWeight="SemiBold"
+                                                               Text="{Binding DisplayName}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding Path}" />
+                                                    <TextBlock Grid.Column="1"
+                                                               Margin="8,0,0,0"
+                                                               Foreground="{DynamicResource State.Success}"
+                                                               Text="{Binding ActiveText}" />
+                                                    <TextBlock Grid.Row="1"
+                                                               Foreground="{DynamicResource Text.Secondary}"
+                                                               FontSize="10"
+                                                               Text="{Binding AvailabilityText}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Grid.Row="1"
+                                                               Grid.Column="1"
+                                                               Margin="8,0,0,0"
+                                                               Foreground="{DynamicResource Text.Secondary}"
+                                                               FontFamily="{StaticResource Typography.Telemetry}"
+                                                               FontSize="9"
+                                                               Text="{Binding Path}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding Path}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                    <Grid Margin="0,7,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="7" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="AddMmiRecipeButton"
+                                                Command="{Binding Integration.Setup.AddRecipeCommand}"
+                                                Content="{loc:Loc Key=Integration.MmiRecipeAdd}"
+                                                ToolTip="{loc:Loc Key=Integration.MmiRecipeAddTooltip}"
+                                                AutomationProperties.AutomationId="AddMmiRecipeButton"
+                                                AutomationProperties.Name="{loc:Loc Key=Integration.MmiRecipeAdd}" />
+                                        <Button x:Name="RemoveMmiRecipeButton"
+                                                Grid.Column="2"
+                                                Command="{Binding Integration.Setup.RemoveRecipeCommand}"
+                                                CommandParameter="{Binding Integration.Setup.SelectedRecipe}"
+                                                Content="{loc:Loc Key=Integration.MmiRecipeRemove}"
+                                                ToolTip="{loc:Loc Key=Integration.MmiRecipeRemoveTooltip}"
+                                                AutomationProperties.AutomationId="RemoveMmiRecipeButton"
+                                                AutomationProperties.Name="{loc:Loc Key=Integration.MmiRecipeRemove}" />
+                                    </Grid>
+                                    <TextBlock Margin="0,5,0,0"
+                                               FontSize="10"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding Integration.Setup.RecipeCatalogStatusText}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Expander>
                             <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
                                        Text="{loc:Loc Key=Integration.ExchangeRoot}" />
                             <Grid>
@@ -2072,6 +2264,176 @@
                                        Foreground="{DynamicResource Text.Secondary}"
                                        Text="{Binding Integration.Setup.TwoDConsumerIdentityStatusText}"
                                        TextWrapping="Wrap" />
+                            <CheckBox x:Name="IntegrationWaitForExternalResultCheckBox"
+                                      Margin="0,9,0,0"
+                                      IsChecked="{Binding Integration.Setup.WaitForExternalResult, Mode=TwoWay}"
+                                      IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                      ToolTip="{loc:Loc Key=Integration.WaitForExternalResultTooltip}"
+                                      AutomationProperties.AutomationId="IntegrationWaitForExternalResultCheckBox"
+                                      AutomationProperties.Name="{loc:Loc Key=Integration.WaitForExternalResultCompactLabel}">
+                                <TextBlock Text="{loc:Loc Key=Integration.WaitForExternalResultCompactLabel}"
+                                           TextWrapping="NoWrap" />
+                            </CheckBox>
+                            <CheckBox x:Name="IntegrationUseThreeDHeightMapCheckBox"
+                                      Margin="0,7,0,0"
+                                      IsChecked="{Binding Integration.Setup.UseThreeDHeightMap, Mode=TwoWay}"
+                                      IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                      ToolTip="{loc:Loc Key=Integration.UseThreeDHeightMapTooltip}"
+                                      AutomationProperties.AutomationId="IntegrationUseThreeDHeightMapCheckBox"
+                                      AutomationProperties.Name="{loc:Loc Key=Integration.UseThreeDHeightMap}">
+                                <TextBlock Text="{loc:Loc Key=Integration.UseThreeDHeightMap}"
+                                           TextWrapping="Wrap" />
+                            </CheckBox>
+                            <TextBlock Margin="0,3,0,0"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding Integration.Setup.ThreeDSetupStatusText}"
+                                       TextWrapping="Wrap" />
+                            <Expander Margin="0,7,0,0"
+                                      Header="{loc:Loc Key=Integration.ThreeDSetup}"
+                                      IsExpanded="False"
+                                      AutomationProperties.AutomationId="Integration.ThreeDSetupExpander"
+                                      AutomationProperties.Name="{loc:Loc Key=Integration.ThreeDSetup}">
+                                <StackPanel Margin="0,7,0,0">
+                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{loc:Loc Key=Integration.ThreeDSetupHint}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,7,0,0"
+                                               Style="{StaticResource InspectorFieldLabelStyle}"
+                                               Text="{loc:Loc Key=Integration.ThreeDHeightMapSource}" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="IntegrationThreeDHeightMapSourceTextBox"
+                                                 MinHeight="28"
+                                                 HorizontalScrollBarVisibility="Auto"
+                                                 Text="{Binding Integration.Setup.ThreeDHeightMapSourcePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 TextWrapping="NoWrap"
+                                                 IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                                 ToolTip="{Binding Integration.Setup.ThreeDHeightMapSourcePath}"
+                                                 AutomationProperties.AutomationId="IntegrationThreeDHeightMapSourceTextBox"
+                                                 AutomationProperties.Name="{loc:Loc Key=Integration.ThreeDHeightMapSource}" />
+                                        <Button Grid.Column="1"
+                                                Margin="6,0,0,0"
+                                                Command="{Binding Integration.Setup.BrowseHeightMapSourceCommand}"
+                                                Content="{loc:Loc Key=Integration.Browse}"
+                                                IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                                AutomationProperties.AutomationId="BrowseIntegrationThreeDHeightMapSourceButton"
+                                                AutomationProperties.Name="{loc:Loc Key=Integration.Browse}" />
+                                    </Grid>
+                                    <TextBlock Margin="0,3,0,0"
+                                               FontSize="10"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding Integration.Setup.ThreeDHeightMapSourceStatusText}"
+                                               TextWrapping="Wrap" />
+                                    <Grid Margin="0,6,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="7" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
+                                                       Text="{loc:Loc Key=Integration.ThreeDHeightMapWidth}" />
+                                            <TextBox MinHeight="28"
+                                                     Text="{Binding Integration.Setup.ThreeDHeightMapWidthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                                     AutomationProperties.AutomationId="IntegrationThreeDHeightMapWidthTextBox"
+                                                     AutomationProperties.Name="{loc:Loc Key=Integration.ThreeDHeightMapWidth}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
+                                                       Text="{loc:Loc Key=Integration.ThreeDHeightMapHeight}" />
+                                            <TextBox MinHeight="28"
+                                                     Text="{Binding Integration.Setup.ThreeDHeightMapHeightText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                                     AutomationProperties.AutomationId="IntegrationThreeDHeightMapHeightTextBox"
+                                                     AutomationProperties.Name="{loc:Loc Key=Integration.ThreeDHeightMapHeight}" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock Margin="0,6,0,0"
+                                               Style="{StaticResource InspectorFieldLabelStyle}"
+                                               Text="{loc:Loc Key=Integration.ThreeDHeightMapPixelFormat}" />
+                                    <TextBox MinHeight="28"
+                                             Text="{Binding Integration.Setup.ThreeDHeightMapPixelFormat, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                             AutomationProperties.AutomationId="IntegrationThreeDHeightMapPixelFormatTextBox"
+                                             AutomationProperties.Name="{loc:Loc Key=Integration.ThreeDHeightMapPixelFormat}" />
+                                    <TextBlock Margin="0,6,0,0"
+                                               Style="{StaticResource InspectorFieldLabelStyle}"
+                                               Text="{loc:Loc Key=Integration.ThreeDHeightMapUnit}" />
+                                    <TextBox MinHeight="28"
+                                             Text="{Binding Integration.Setup.ThreeDHeightMapUnit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                             AutomationProperties.AutomationId="IntegrationThreeDHeightMapUnitTextBox"
+                                             AutomationProperties.Name="{loc:Loc Key=Integration.ThreeDHeightMapUnit}" />
+                                    <TextBlock Margin="0,6,0,0"
+                                               Style="{StaticResource InspectorFieldLabelStyle}"
+                                               Text="{loc:Loc Key=Integration.ThreeDInspectionRecipe}" />
+                                    <TextBox MinHeight="28"
+                                             Text="{Binding Integration.Setup.ThreeDInspectionRecipePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                             ToolTip="{Binding Integration.Setup.ThreeDInspectionRecipePath}"
+                                             AutomationProperties.AutomationId="IntegrationThreeDInspectionRecipeTextBox"
+                                             AutomationProperties.Name="{loc:Loc Key=Integration.ThreeDInspectionRecipe}" />
+                                    <TextBlock Margin="0,3,0,0"
+                                               FontSize="10"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding Integration.Setup.ThreeDInspectionRecipeStatusText}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,6,0,0"
+                                               Style="{StaticResource InspectorFieldLabelStyle}"
+                                               Text="{loc:Loc Key=Integration.ThreeDConsumerVersion}" />
+                                    <TextBox MinHeight="28"
+                                             Text="{Binding Integration.Setup.ThreeDConsumerVersion, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                             AutomationProperties.AutomationId="IntegrationThreeDConsumerVersionTextBox"
+                                             AutomationProperties.Name="{loc:Loc Key=Integration.ThreeDConsumerVersion}" />
+                                    <TextBlock Margin="0,6,0,0"
+                                               Style="{StaticResource InspectorFieldLabelStyle}"
+                                               Text="{loc:Loc Key=Integration.ThreeDConsumerCommit}" />
+                                    <TextBox MinHeight="28"
+                                             FontFamily="{StaticResource Typography.Telemetry}"
+                                             FontSize="9.5"
+                                             HorizontalScrollBarVisibility="Auto"
+                                             Text="{Binding Integration.Setup.ThreeDConsumerCommit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                             TextWrapping="NoWrap"
+                                             AutomationProperties.AutomationId="IntegrationThreeDConsumerCommitTextBox"
+                                             AutomationProperties.Name="{loc:Loc Key=Integration.ThreeDConsumerCommit}" />
+                                    <TextBlock Margin="0,3,0,0"
+                                               FontSize="10"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding Integration.Setup.ThreeDConsumerIdentityStatusText}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,6,0,0"
+                                               Style="{StaticResource InspectorFieldLabelStyle}"
+                                               Text="{loc:Loc Key=Integration.ThreeDSequenceId}" />
+                                    <TextBox MinHeight="28"
+                                             Text="{Binding Integration.Setup.ThreeDSequenceId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                             AutomationProperties.AutomationId="IntegrationThreeDSequenceIdTextBox"
+                                             AutomationProperties.Name="{loc:Loc Key=Integration.ThreeDSequenceId}" />
+                                    <TextBlock Margin="0,6,0,0"
+                                               Style="{StaticResource InspectorFieldLabelStyle}"
+                                               Text="{loc:Loc Key=Integration.ThreeDStepId}" />
+                                    <TextBox MinHeight="28"
+                                             Text="{Binding Integration.Setup.ThreeDStepId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                             AutomationProperties.AutomationId="IntegrationThreeDStepIdTextBox"
+                                             AutomationProperties.Name="{loc:Loc Key=Integration.ThreeDStepId}" />
+                                    <TextBlock Margin="0,6,0,0"
+                                               Style="{StaticResource InspectorFieldLabelStyle}"
+                                               Text="{loc:Loc Key=Integration.ThreeDDeviceId}" />
+                                    <TextBox MinHeight="28"
+                                             Text="{Binding Integration.Setup.ThreeDDeviceId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             IsEnabled="{Binding Integration.CanEditTcpSetup}"
+                                             AutomationProperties.AutomationId="IntegrationThreeDDeviceIdTextBox"
+                                             AutomationProperties.Name="{loc:Loc Key=Integration.ThreeDDeviceId}" />
+                                </StackPanel>
+                            </Expander>
                             <Expander Margin="0,10,0,0"
                                       IsExpanded="True"
                                       Header="{loc:Loc Key=Integration.TcpSetup}">
@@ -2152,10 +2514,15 @@
                                                      Grid.Column="2"
                                                      Margin="0,3,0,0"
                                                      MinHeight="28"
-                                                     PasswordChanged="OnIntegrationTcpSharedKeyPasswordChanged"
                                                      IsEnabled="{Binding Integration.CanEditTcpSetup}"
                                                      AutomationProperties.AutomationId="IntegrationTcpSharedKeyBox"
-                                                     AutomationProperties.Name="{loc:Loc Key=Integration.TcpSharedKey}" />
+                                                     AutomationProperties.Name="{loc:Loc Key=Integration.TcpSharedKey}">
+                                            <b:Interaction.Behaviors>
+                                                <behavior:PasswordBoxBehavior
+                                                    PasswordChangedCommand="{Binding Integration.SetSessionSharedKeyCommand}"
+                                                    ResetToken="{Binding Integration.Setup.ResetVersion}" />
+                                            </b:Interaction.Behaviors>
+                                        </PasswordBox>
                                     </Grid>
                                     <TextBlock x:Name="IntegrationTcpSharedKeyStatusTextBlock"
                                                Margin="0,5,0,0"
@@ -2171,21 +2538,28 @@
                                         </Grid.ColumnDefinitions>
                                         <Button x:Name="StartIntegrationTcpListenerButton"
                                                 Command="{Binding Integration.StartTcpListenerCommand}"
-                                                MinHeight="34"
+                                                Height="48"
+                                                HorizontalContentAlignment="Stretch"
+                                                VerticalContentAlignment="Center"
                                                 Style="{StaticResource PrimaryCommandButtonStyle}"
                                                 AutomationProperties.AutomationId="StartIntegrationTcpListenerButton"
                                                 AutomationProperties.Name="{loc:Loc Key=Integration.StartTcpListener}">
                                             <TextBlock Text="{loc:Loc Key=Integration.StartTcpListener}"
+                                                       HorizontalAlignment="Stretch"
                                                        TextAlignment="Center"
                                                        TextWrapping="Wrap" />
                                         </Button>
                                         <Button x:Name="StopIntegrationTcpListenerButton"
                                                 Grid.Column="2"
                                                 Command="{Binding Integration.StopTcpListenerCommand}"
-                                                MinHeight="34"
+                                                Height="48"
+                                                HorizontalContentAlignment="Stretch"
+                                                VerticalContentAlignment="Center"
+                                                Style="{StaticResource GlobalCommandButtonStyle}"
                                                 AutomationProperties.AutomationId="StopIntegrationTcpListenerButton"
                                                 AutomationProperties.Name="{loc:Loc Key=Integration.StopTcpListener}">
                                             <TextBlock Text="{loc:Loc Key=Integration.StopTcpListener}"
+                                                       HorizontalAlignment="Stretch"
                                                        TextAlignment="Center"
                                                        TextWrapping="Wrap" />
                                         </Button>
@@ -2198,35 +2572,62 @@
                                         </Grid.ColumnDefinitions>
                                         <Button x:Name="PingIntegrationTcpPeerButton"
                                                 Command="{Binding Integration.PingTcpPeerCommand}"
-                                                MinHeight="34"
+                                                Height="48"
+                                                HorizontalContentAlignment="Stretch"
+                                                VerticalContentAlignment="Center"
+                                                Style="{StaticResource GlobalCommandButtonStyle}"
                                                 AutomationProperties.AutomationId="PingIntegrationTcpPeerButton"
                                                 AutomationProperties.Name="{loc:Loc Key=Integration.PingTcpPeer}">
                                             <TextBlock Text="{loc:Loc Key=Integration.PingTcpPeer}"
+                                                       HorizontalAlignment="Stretch"
                                                        TextAlignment="Center"
                                                        TextWrapping="Wrap" />
                                         </Button>
                                         <Button x:Name="PushIntegrationTcpTransactionButton"
                                                 Grid.Column="2"
                                                 Command="{Binding Integration.PushLatestTransactionCommand}"
-                                                MinHeight="34"
+                                                Height="48"
+                                                HorizontalContentAlignment="Stretch"
+                                                VerticalContentAlignment="Center"
+                                                Style="{StaticResource GlobalCommandButtonStyle}"
                                                 AutomationProperties.AutomationId="PushIntegrationTcpTransactionButton"
                                                 AutomationProperties.Name="{loc:Loc Key=Integration.PushTcpTransaction}">
                                             <TextBlock Text="{loc:Loc Key=Integration.PushTcpTransaction}"
+                                                       HorizontalAlignment="Stretch"
                                                        TextAlignment="Center"
                                                        TextWrapping="Wrap" />
                                         </Button>
                                     </Grid>
-                                    <Button x:Name="PullIntegrationTcpTransactionButton"
+                                     <Button x:Name="PullIntegrationTcpTransactionButton"
                                             Margin="0,6,0,0"
                                             Command="{Binding Integration.PullLatestTransactionCommand}"
-                                            MinHeight="34"
+                                            Height="48"
+                                            HorizontalContentAlignment="Stretch"
+                                            VerticalContentAlignment="Center"
+                                            Style="{StaticResource GlobalCommandButtonStyle}"
                                             AutomationProperties.AutomationId="PullIntegrationTcpTransactionButton"
                                             AutomationProperties.Name="{loc:Loc Key=Integration.PullTcpTransaction}">
                                         <TextBlock Text="{loc:Loc Key=Integration.PullTcpTransaction}"
+                                                   HorizontalAlignment="Stretch"
                                                    TextAlignment="Center"
-                                                   TextWrapping="Wrap" />
-                                    </Button>
-                                    <TextBlock x:Name="IntegrationTcpListenerStatusTextBlock"
+                                                    TextWrapping="Wrap" />
+                                     </Button>
+                                     <Button x:Name="CancelIntegrationTcpTransactionButton"
+                                             Margin="0,6,0,0"
+                                             Command="{Binding Integration.CancelLatestTransactionCommand}"
+                                             Height="48"
+                                             HorizontalContentAlignment="Stretch"
+                                             VerticalContentAlignment="Center"
+                                             Style="{StaticResource GlobalCommandButtonStyle}"
+                                             ToolTip="{loc:Loc Key=Integration.CancelTcpTransactionTooltip}"
+                                             AutomationProperties.AutomationId="CancelIntegrationTcpTransactionButton"
+                                             AutomationProperties.Name="{loc:Loc Key=Integration.CancelTcpTransaction}">
+                                         <TextBlock Text="{loc:Loc Key=Integration.CancelTcpTransaction}"
+                                                    HorizontalAlignment="Stretch"
+                                                    TextAlignment="Center"
+                                                    TextWrapping="Wrap" />
+                                     </Button>
+                                     <TextBlock x:Name="IntegrationTcpListenerStatusTextBlock"
                                                Margin="0,6,0,0"
                                                FontSize="10"
                                                Foreground="{DynamicResource Text.Secondary}"
@@ -2257,7 +2658,6 @@
                                 <Button x:Name="ResetIntegrationSetupButton"
                                         Grid.Column="2"
                                         Command="{Binding Integration.Setup.ResetSetupCommand}"
-                                        Click="OnResetIntegrationSetupClicked"
                                         Content="{loc:Loc Key=Integration.ResetSetup}"
                                         ToolTip="{loc:Loc Key=Integration.ResetSetupTooltip}"
                                         AutomationProperties.AutomationId="ResetIntegrationSetupButton"
@@ -2284,8 +2684,24 @@
                                         Content="{loc:Loc Key=Integration.RefreshResults}"
                                         ToolTip="{loc:Loc Key=Integration.RefreshResultsTooltip}"
                                         AutomationProperties.AutomationId="RefreshIntegrationResultsButton"
-                                        AutomationProperties.Name="{loc:Loc Key=Integration.RefreshResults}" />
+                                         AutomationProperties.Name="{loc:Loc Key=Integration.RefreshResults}" />
                             </Grid>
+                            <Button x:Name="ApplyIntegrationResultToSimulationButton"
+                                    Margin="0,7,0,0"
+                                    Height="48"
+                                    HorizontalContentAlignment="Stretch"
+                                    VerticalContentAlignment="Center"
+                                    Command="{Binding Integration.ApplyResultToSimulationCommand}"
+                                    IsEnabled="{Binding Integration.CanApplyResultToSimulation}"
+                                    Style="{StaticResource PrimaryCommandButtonStyle}"
+                                    ToolTip="{loc:Loc Key=Integration.ApplyResultToSimulationTooltip}"
+                                    AutomationProperties.AutomationId="ApplyIntegrationResultToSimulationButton"
+                                    AutomationProperties.Name="{loc:Loc Key=Integration.ApplyResultToSimulation}">
+                                <TextBlock HorizontalAlignment="Stretch"
+                                           Text="{loc:Loc Key=Integration.ApplyResultToSimulation}"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap" />
+                            </Button>
                             <Grid Margin="0,10,0,0">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -2359,6 +2775,132 @@
                                        Text="{Binding Integration.StatusText}"
                                        TextWrapping="Wrap"
                                        ToolTip="{Binding Integration.StatusText}" />
+                            <Expander x:Name="MachineIntegrationTransactionHistoryExpander"
+                                      Margin="0,7,0,0"
+                                      Header="{loc:Loc Key=Integration.TransactionHistory}"
+                                      IsExpanded="False"
+                                      AutomationProperties.AutomationId="MachineIntegrationTransactionHistoryExpander"
+                                      AutomationProperties.Name="{loc:Loc Key=Integration.TransactionHistory}">
+                                <StackPanel Margin="0,5,0,0">
+                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{loc:Loc Key=Integration.TransactionHistoryHint}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,5,0,0"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{loc:Loc Key=Integration.TransactionHistoryFilterHint}"
+                                               TextWrapping="Wrap" />
+                                    <StackPanel Margin="0,5,0,0"
+                                                Orientation="Horizontal">
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Text="{loc:Loc Key=Integration.TransactionHistoryFilter}" />
+                                        <ComboBox x:Name="MachineIntegrationTransactionHistoryFilter"
+                                                  Margin="7,0,0,0"
+                                                  MinWidth="150"
+                                                  ItemsSource="{Binding Integration.TransactionHistoryFilters}"
+                                                  DisplayMemberPath="DisplayText"
+                                                  SelectedItem="{Binding Integration.SelectedTransactionHistoryFilter, Mode=TwoWay}"
+                                                  AutomationProperties.AutomationId="MachineIntegrationTransactionHistoryFilter"
+                                                  AutomationProperties.Name="{loc:Loc Key=Integration.TransactionHistoryFilter}" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="MachineIntegrationTransactionHistoryEmptyText"
+                                               Margin="0,5,0,0"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding Integration.TransactionHistoryEmptyText}"
+                                               TextWrapping="Wrap"
+                                               Visibility="{Binding Integration.HasTransactionHistoryEmptyState, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    <ListBox x:Name="MachineIntegrationTransactionHistoryList"
+                                             Margin="0,5,0,0"
+                                             MaxHeight="180"
+                                             ItemsSource="{Binding Integration.VisibleTransactionHistoryRows}"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             AutomationProperties.AutomationId="MachineIntegrationTransactionHistoryList"
+                                             AutomationProperties.Name="{loc:Loc Key=Integration.TransactionHistory}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="3,3">
+                                                    <TextBlock FontWeight="SemiBold"
+                                                               Text="{Binding ShortTransactionId}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding FullTransactionId}" />
+                                                    <TextBlock Style="{StaticResource TelemetryTextStyle}"
+                                                               Text="{Binding Handoff.CreatedAtUtc}" />
+                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                               Text="{Binding Handoff.Context.Modality}" />
+                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                               Text="{Binding Handoff.Context.InputKind}" />
+                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                               Text="{Binding StatusText}"
+                                                               TextWrapping="Wrap"
+                                                               ToolTip="{Binding StatusText}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
+                            </Expander>
+                            <Expander x:Name="MachineIntegrationTransactionDiagnosticsExpander"
+                                      Margin="0,7,0,0"
+                                      Header="{loc:Loc Key=Integration.TransactionDiagnostics}"
+                                      IsExpanded="False"
+                                      AutomationProperties.AutomationId="MachineIntegrationTransactionDiagnosticsExpander"
+                                      AutomationProperties.Name="{loc:Loc Key=Integration.TransactionDiagnostics}">
+                                <StackPanel Margin="0,5,0,0">
+                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{loc:Loc Key=Integration.TransactionDiagnosticsFilterHint}"
+                                               TextWrapping="Wrap" />
+                                    <StackPanel Margin="0,5,0,0"
+                                                Orientation="Horizontal">
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Text="{loc:Loc Key=Integration.TransactionDiagnosticsFilter}" />
+                                        <ComboBox x:Name="MachineIntegrationTransactionDiagnosticsFilter"
+                                                  Margin="7,0,0,0"
+                                                  MinWidth="150"
+                                                  ItemsSource="{Binding Integration.TransactionDiagnosticFilters}"
+                                                  DisplayMemberPath="DisplayText"
+                                                  SelectedItem="{Binding Integration.SelectedTransactionDiagnosticFilter, Mode=TwoWay}"
+                                                  AutomationProperties.AutomationId="MachineIntegrationTransactionDiagnosticsFilter"
+                                                  AutomationProperties.Name="{loc:Loc Key=Integration.TransactionDiagnosticsFilter}" />
+                                    </StackPanel>
+                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding Integration.TransactionDiagnosticReadError}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock x:Name="MachineIntegrationTransactionDiagnosticsEmptyText"
+                                               Margin="0,5,0,0"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding Integration.TransactionDiagnosticsEmptyText}"
+                                               TextWrapping="Wrap"
+                                               Visibility="{Binding Integration.HasTransactionDiagnosticsEmptyState, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    <ListBox x:Name="MachineIntegrationTransactionDiagnosticsList"
+                                             Margin="0,5,0,0"
+                                             MaxHeight="180"
+                                             ItemsSource="{Binding Integration.VisibleTransactionDiagnostics}"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             AutomationProperties.AutomationId="MachineIntegrationTransactionDiagnosticsList"
+                                             AutomationProperties.Name="{loc:Loc Key=Integration.TransactionDiagnostics}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="3,3">
+                                                    <TextBlock FontWeight="SemiBold"
+                                                               Text="{Binding State}" />
+                                                    <TextBlock Style="{StaticResource TelemetryTextStyle}"
+                                                               Text="{Binding TransactionId}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding TransactionId}" />
+                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                               Text="{Binding Detail}"
+                                                               TextWrapping="Wrap" />
+                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                               Text="{Binding DirectoryPath}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding DirectoryPath}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
+                            </Expander>
                         </StackPanel>
                     </Border>
                     <Border>
@@ -2591,9 +3133,18 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Inspector.ActiveFaults}" />
-                                <TextBlock Grid.Column="1"
-                                           Foreground="{DynamicResource State.Fault}"
-                                           Text="{Binding FaultManager.ActiveFaultCountText}" />
+                                <TextBlock Grid.Column="1" Text="{Binding FaultManager.ActiveFaultCountText}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding FaultManager.HasActiveFaults}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource State.Fault}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                             </Grid>
                             <ListBox x:Name="ActiveFaultListBox"
                                      MinHeight="46"

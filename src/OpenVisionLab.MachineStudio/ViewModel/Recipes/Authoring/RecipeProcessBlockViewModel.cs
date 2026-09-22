@@ -12,7 +12,7 @@ namespace OpenVisionLab.MachineStudio.ViewModel;
 /// Owns process-block selection, plan preview, filtering, and managed timeout edits.
 /// Project mutation remains delegated to the workbench through the supplied callbacks.
 /// </summary>
-public sealed class RecipeProcessBlockViewModel : ViewModelBase
+public sealed class RecipeProcessBlockViewModel : ViewModelBase, IDisposable
 {
     private enum ProcessBlockItemFilter
     {
@@ -46,6 +46,7 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
     private bool _isUnloadBlockSelected = true;
     private ProcessBlockItemFilter _filter;
     private string _timeoutText = "5000";
+    private int _disposed;
 
     public RecipeProcessBlockViewModel(
         Func<IReadOnlyList<SemiconductorProcessBlockKind>, int> applyProcessBlock,
@@ -57,14 +58,14 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
         _applyProcessBlockTimeouts = applyProcessBlockTimeouts;
         _clearCompetingPreviews = clearCompetingPreviews;
         _createStationSkeletonItem = createStationSkeletonItem;
-        _previewCommand = new RelayCommand(_ => OpenProcessBlockPlan(), _ => IsEditable);
-        _applyCommand = new RelayCommand(_ => ApplyProcessBlock(), _ => IsEditable && _preview?.CanApply == true);
-        _cancelCommand = new RelayCommand(_ => ClearPreviewForCompetingSetup(), _ => IsProcessBlockPreviewVisible);
+        _previewCommand = new RelayCommand(_ => OpenProcessBlockPlan(), _ => !IsDisposed && IsEditable);
+        _applyCommand = new RelayCommand(_ => ApplyProcessBlock(), _ => !IsDisposed && IsEditable && _preview?.CanApply == true);
+        _cancelCommand = new RelayCommand(_ => ClearPreviewForCompetingSetup(), _ => !IsDisposed && IsProcessBlockPreviewVisible);
         _previewTimeoutsCommand = new RelayCommand(
             _ => PreviewProcessBlockTimeouts(),
-            _ => IsEditable && IsProcessBlockPreviewVisible && IsProcessBlockTimeoutValid && CompatibleProcessBlockTimeoutCount > 0);
-        _applyTimeoutsCommand = new RelayCommand(_ => ApplyProcessBlockTimeouts(), _ => IsEditable && _timeoutPreview?.CanApply == true);
-        _cancelTimeoutsCommand = new RelayCommand(_ => ClearProcessBlockTimeoutPreview(), _ => IsProcessBlockTimeoutPreviewVisible);
+            _ => !IsDisposed && IsEditable && IsProcessBlockPreviewVisible && IsProcessBlockTimeoutValid && CompatibleProcessBlockTimeoutCount > 0);
+        _applyTimeoutsCommand = new RelayCommand(_ => ApplyProcessBlockTimeouts(), _ => !IsDisposed && IsEditable && _timeoutPreview?.CanApply == true);
+        _cancelTimeoutsCommand = new RelayCommand(_ => ClearProcessBlockTimeoutPreview(), _ => !IsDisposed && IsProcessBlockTimeoutPreviewVisible);
     }
 
     public ObservableCollection<SemiconductorStationSkeletonItemPresentation> ProcessBlockConnectionItems { get; } = new();
@@ -84,7 +85,7 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
         get => _isEditable;
         set
         {
-            if (!SetProperty(ref _isEditable, value)) return;
+            if (IsDisposed || !SetProperty(ref _isEditable, value)) return;
             _previewCommand.RaiseCanExecuteChanged();
             _applyCommand.RaiseCanExecuteChanged();
             _previewTimeoutsCommand.RaiseCanExecuteChanged();
@@ -116,6 +117,7 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
         get => _timeoutText;
         set
         {
+            if (IsDisposed) return;
             if (!SetProperty(ref _timeoutText, value)) return;
             ClearProcessBlockTimeoutPreview();
             OnPropertyChanged(nameof(IsProcessBlockTimeoutValid));
@@ -152,17 +154,25 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
     public SemiconductorProcessBlockItemPresentation? SelectedProcessBlockItem
     {
         get => _selectedItem;
-        set => SetProperty(ref _selectedItem, value);
+        set
+        {
+            if (!IsDisposed)
+            {
+                SetProperty(ref _selectedItem, value);
+            }
+        }
     }
 
     public void Load(MachineProjectDocument project)
     {
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
         _project = project ?? throw new ArgumentNullException(nameof(project));
         ClearPreviewForCompetingSetup();
     }
 
     internal void RefreshDefinitionPreservingPlan(Action reload, string? selectedComponentId = null)
     {
+        if (IsDisposed) return;
         var kinds = _preview?.Kinds.ToArray();
         var selectedStepId = SelectedProcessBlockItem?.StepId;
         _isPreservingPlan = kinds is not null;
@@ -176,6 +186,7 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
 
     internal void PreservePlanAcross(Action reload)
     {
+        if (IsDisposed) return;
         var kinds = _preview?.Kinds.ToArray();
         _isPreservingPlan = kinds is not null;
         try { reload(); }
@@ -189,16 +200,24 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
 
     public SemiconductorProcessBlockItemPresentation? SelectProcessBlockStep(string? stepId)
     {
+        if (IsDisposed) return null;
         var item = ProcessBlockItems.FirstOrDefault(candidate => string.Equals(candidate.StepId, stepId, StringComparison.Ordinal));
         SelectedProcessBlockItem = null;
         SelectedProcessBlockItem = item;
         return item;
     }
 
-    internal void ClearPreviewForCompetingSetup() => ClearProcessBlockPreview();
+    internal void ClearPreviewForCompetingSetup()
+    {
+        if (!IsDisposed)
+        {
+            ClearProcessBlockPreview();
+        }
+    }
 
     private void OpenProcessBlockPlan()
     {
+        if (IsDisposed) return;
         var existingKinds = _project is null
             ? []
             : _composer.RecognizeExistingKinds(_project);
@@ -210,7 +229,7 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
 
     private void PreviewProcessBlockPlan()
     {
-        if (_project is null) return;
+        if (IsDisposed || _project is null) return;
         _clearCompetingPreviews();
         var selectedStepId = SelectedProcessBlockItem?.StepId;
         _preview = _composer.Preview(_project, SelectedProcessBlockKinds());
@@ -251,6 +270,7 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
 
     private void SetProcessBlockItemFilter(ProcessBlockItemFilter filter)
     {
+        if (IsDisposed) return;
         if (_filter == filter) return;
         _filter = filter;
         ClearProcessBlockTimeoutPreview();
@@ -263,6 +283,7 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
 
     private void RefreshVisibleProcessBlockItems()
     {
+        if (IsDisposed) return;
         var selectedStepId = SelectedProcessBlockItem?.StepId;
         VisibleProcessBlockItems.Clear();
         foreach (var item in ProcessBlockItems.Where(item => _filter switch
@@ -287,11 +308,13 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
     private string FormatProcessBlockFilter(string key, int count) => Format("Connections.ProcessBlockFilterCountFormat", OpenVisionLanguageService.T(key), count);
     private void SetProcessBlockSelection(ref bool field, bool value, string propertyName)
     {
+        if (IsDisposed) return;
         if (!SetProperty(ref field, value, propertyName)) return;
         if (IsProcessBlockPreviewVisible) PreviewProcessBlockPlan();
     }
     private void SetProcessBlockSelections(IEnumerable<SemiconductorProcessBlockKind> kinds)
     {
+        if (IsDisposed) return;
         var selected = kinds.ToHashSet();
         _isLoadBlockSelected = selected.Contains(SemiconductorProcessBlockKind.Load);
         _isAlignBlockSelected = selected.Contains(SemiconductorProcessBlockKind.Align);
@@ -312,7 +335,7 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
     }
     private void PreviewProcessBlockTimeouts()
     {
-        if (_project is null || !int.TryParse(ProcessBlockTimeoutText, NumberStyles.Integer, CultureInfo.CurrentCulture, out var timeout) || timeout < 0) return;
+        if (IsDisposed || _project is null || !int.TryParse(ProcessBlockTimeoutText, NumberStyles.Integer, CultureInfo.CurrentCulture, out var timeout) || timeout < 0) return;
         _timeoutPreview = _composer.PreviewTimeoutAdjustment(_project, VisibleProcessBlockItems.Where(item => item.CanAdjustTimeout).Select(item => item.StepId), timeout);
         ProcessBlockTimeoutItems.Clear();
         foreach (var entry in _timeoutPreview.Entries)
@@ -321,11 +344,13 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
     }
     private void ApplyProcessBlockTimeouts()
     {
+        if (IsDisposed) return;
         if (_timeoutPreview is not { CanApply: true } preview) return;
         if (_applyProcessBlockTimeouts(preview) <= 0) PreviewProcessBlockTimeouts();
     }
     private void ClearProcessBlockTimeoutPreview()
     {
+        if (IsDisposed) return;
         if (_timeoutPreview is null && ProcessBlockTimeoutItems.Count == 0) return;
         _timeoutPreview = null; ProcessBlockTimeoutItems.Clear(); RaiseProcessBlockTimeoutChanged();
     }
@@ -336,10 +361,12 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
     }
     private void ApplyProcessBlock()
     {
+        if (IsDisposed) return;
         if (_preview is { CanApply: true } preview) _applyProcessBlock(preview.Kinds);
     }
     private void ClearProcessBlockPreview()
     {
+        if (IsDisposed) return;
         var wasVisible = IsProcessBlockPreviewVisible;
         _preview = null; ClearProcessBlockTimeoutPreview(); ProcessBlockConnectionItems.Clear(); ProcessBlockItems.Clear(); VisibleProcessBlockItems.Clear(); SelectedProcessBlockItem = null; RaiseProcessBlockChanged();
         if (wasVisible && !_isPreservingPlan) ProcessBlockPreviewClosed?.Invoke(this, EventArgs.Empty);
@@ -349,6 +376,29 @@ public sealed class RecipeProcessBlockViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsProcessBlockPreviewVisible)); OnPropertyChanged(nameof(ProcessBlockKindText)); OnPropertyChanged(nameof(ProcessBlockSummaryText)); OnPropertyChanged(nameof(ProcessBlockApplyText)); OnPropertyChanged(nameof(SelectedProcessBlockCount)); OnPropertyChanged(nameof(ExistingProcessBlockCount)); OnPropertyChanged(nameof(HasProcessBlockSelection)); OnPropertyChanged(nameof(HasProcessBlockPlanError)); OnPropertyChanged(nameof(ProcessBlockValidationText)); OnPropertyChanged(nameof(CompatibleProcessBlockTimeoutCount)); OnPropertyChanged(nameof(ProcessBlockTimeoutScopeText)); OnPropertyChanged(nameof(ProcessBlockTimeoutValidationText));
         _applyCommand.RaiseCanExecuteChanged(); _cancelCommand.RaiseCanExecuteChanged(); _previewTimeoutsCommand.RaiseCanExecuteChanged();
     }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _preview = null;
+        _timeoutPreview = null;
+        _selectedItem = null;
+        ProcessBlockConnectionItems.Clear();
+        ProcessBlockItems.Clear();
+        VisibleProcessBlockItems.Clear();
+        ProcessBlockTimeoutItems.Clear();
+        RaiseProcessBlockChanged();
+        RaiseProcessBlockTimeoutChanged();
+        _previewCommand.RaiseCanExecuteChanged();
+        _cancelCommand.RaiseCanExecuteChanged();
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
+
     private SequenceDefinition? ResolveRecipeSequence()
     {
         var sequenceId = _project?.Simulation.AutomaticRun?.SequenceId ?? _project?.Sequences.FirstOrDefault()?.Id;

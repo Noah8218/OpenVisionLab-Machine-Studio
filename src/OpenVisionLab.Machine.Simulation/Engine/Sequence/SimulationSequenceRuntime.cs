@@ -61,4 +61,30 @@ internal sealed class SimulationSequenceRuntime
         && _sequenceExecutors.TryGetValue(activeSequenceId, out var executor)
             ? executor.CaptureSnapshot().CurrentStepId
             : null;
+
+    internal bool TryGetCurrentVisionWaitTimeout(
+        string? activeSequenceId,
+        out string sequenceId,
+        out string stepId,
+        out TimeSpan timeout)
+    {
+        sequenceId = string.Empty;
+        stepId = string.Empty;
+        timeout = TimeSpan.Zero;
+        if (activeSequenceId is null
+            || !_sequenceExecutors.TryGetValue(activeSequenceId, out var executor))
+        {
+            return false;
+        }
+
+        var snapshot = executor.CaptureSnapshot();
+        sequenceId = snapshot.ActiveSequenceId ?? snapshot.SequenceId;
+        stepId = snapshot.CurrentStepId ?? string.Empty;
+        return _compiledSequences.TryGetValue(sequenceId, out var sequence)
+            && !string.IsNullOrWhiteSpace(stepId)
+            && sequence.TryGetStep(stepId, out var step)
+            && step is WaitVisionResultStep waitVision
+            && waitVision.Timeout > TimeSpan.Zero
+            && (timeout = waitVision.Timeout) > TimeSpan.Zero;
+    }
 }

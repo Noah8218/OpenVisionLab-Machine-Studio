@@ -125,7 +125,11 @@ public sealed class LayoutAuthoringWorkspace : IDisposable
     public bool TryAddComponent(LayoutComponentKind kind, double? worldX = null, double? worldY = null) =>
         _mutations.TryAdd(kind, worldX, worldY);
 
-    public void Reset() => _history.Reset();
+    public void Reset()
+    {
+        _history.Reset();
+        InvalidateCommands();
+    }
 
     public void InvalidateCommands()
     {

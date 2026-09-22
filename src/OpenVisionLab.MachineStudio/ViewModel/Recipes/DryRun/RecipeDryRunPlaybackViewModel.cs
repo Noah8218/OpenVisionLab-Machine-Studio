@@ -162,6 +162,7 @@ public sealed class RecipeDryRunPlaybackViewModel : ViewModelBase
         _index = -1;
         _setLayoutEditable(_isDesignMode());
         RaisePlaybackChanged();
+        _setStatus("Ready");
     }
 
     internal void InvalidateCommands()

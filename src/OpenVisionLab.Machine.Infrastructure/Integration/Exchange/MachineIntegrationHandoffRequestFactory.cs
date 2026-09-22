@@ -73,11 +73,15 @@ public sealed record MachineIntegrationHandoffRequestInput(
     string InspectionRecipePath,
     MachineIntegrationFrameEvidence FrameEvidence,
     IntegrationApplicationIdentity Producer,
-    IntegrationApplicationIdentity Consumer);
+    IntegrationApplicationIdentity Consumer,
+    IntegrationInspectionModality Modality = IntegrationInspectionModality.TwoD,
+    IntegrationInspectionInputKind InputKind = IntegrationInspectionInputKind.Image,
+    string Unit = "mm",
+    MachineIntegrationArtifactEvidence? InspectionRecipeEvidence = null);
 
 /// <summary>
 /// Verifies a project-owned camera source against immutable frame evidence and
-/// creates the external two-dimensional inspection request. It is independent
+/// creates the external inspection request. It is independent
 /// of the WPF host and Simulation project.
 /// </summary>
 public sealed class MachineIntegrationHandoffRequestFactory
@@ -114,6 +118,19 @@ public sealed class MachineIntegrationHandoffRequestFactory
                 return null;
             }
 
+            if (input.InspectionRecipeEvidence is { } expectedRecipe)
+            {
+                var recipeInfo = new FileInfo(Path.GetFullPath(input.InspectionRecipePath));
+                if (recipeInfo.Length != expectedRecipe.ContentLength
+                    || !string.Equals(
+                        Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(recipeInfo.FullName))),
+                        expectedRecipe.ContentSha256,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return null;
+                }
+            }
+
             return new MachineInspectionHandoffRequest(
                 input.ProjectId,
                 input.ProjectSchema,
@@ -122,22 +139,24 @@ public sealed class MachineIntegrationHandoffRequestFactory
                 input.CameraId,
                 input.AcquisitionId,
                 input.FrameEvidence.FrameId,
-                "mm",
+                input.Unit,
                 projectPath,
                 source.FullPath,
                 Path.GetFullPath(input.InspectionRecipePath),
-                IntegrationInspectionModality.TwoD,
-                IntegrationInspectionInputKind.Image,
+                input.Modality,
+                input.InputKind,
                 input.Producer,
                 input.Consumer)
             {
-                ProjectionProfile = MachineCoordinateProjectionContract.CreateDefault(
-                    MachineCoordinateProjectionContract.CreateProjectionId(
-                        input.ProjectId,
-                        input.CameraId,
-                        input.AcquisitionId),
-                    input.SourceWidth,
-                    input.SourceHeight)
+                ProjectionProfile = input.Modality == IntegrationInspectionModality.TwoD
+                    ? MachineCoordinateProjectionContract.CreateDefault(
+                        MachineCoordinateProjectionContract.CreateProjectionId(
+                            input.ProjectId,
+                            input.CameraId,
+                            input.AcquisitionId),
+                        input.SourceWidth,
+                        input.SourceHeight)
+                    : null
             };
         }
         catch (Exception exception) when (exception is IOException

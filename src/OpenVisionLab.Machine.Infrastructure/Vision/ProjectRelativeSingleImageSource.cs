@@ -54,6 +54,40 @@ public sealed class ProjectRelativeSingleImageSource : IVirtualImageSource
 
     public string PixelFormat { get; }
 
+    /// <summary>
+    /// Rechecks the project asset identity without retaining its bytes. This is
+    /// used when a persisted execution artifact is reopened so an unchanged
+    /// project document cannot make a replaced source file look current.
+    /// </summary>
+    public bool MatchesContentHash(string expectedContentSha256)
+    {
+        if (string.IsNullOrWhiteSpace(expectedContentSha256)
+            || expectedContentSha256.Length != 64
+            || expectedContentSha256.Any(character => !Uri.IsHexDigit(character)))
+        {
+            return false;
+        }
+
+        var asset = _pathResolver.ResolveExistingFile(_asset.RelativePath);
+        using var stream = new FileStream(
+            asset.FullPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 64 * 1024,
+            FileOptions.SequentialScan);
+        if (stream.Length == 0)
+        {
+            return false;
+        }
+
+        var hash = SHA256.HashData(stream);
+        return string.Equals(
+            Convert.ToHexString(hash),
+            expectedContentSha256,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     public async ValueTask<VirtualFrameDescriptor> AcquireAsync(
         VirtualAcquisitionContext context,
         CancellationToken cancellationToken = default)

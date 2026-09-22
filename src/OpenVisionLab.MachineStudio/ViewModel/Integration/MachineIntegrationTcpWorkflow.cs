@@ -1,4 +1,5 @@
 using System.Net;
+using OpenVisionLab.Integration.Contracts;
 using OpenVisionLab.Integration.Transport.Tcp;
 using OpenVisionLab.Machine.Infrastructure.Integration;
 
@@ -137,6 +138,19 @@ internal sealed class MachineIntegrationTcpWorkflow : IAsyncDisposable
             (exchange, token) => exchange.PullTransactionAsync(peer, transactionId, token),
             cancellationToken);
 
+    public Task<TcpIntegrationCancellationReceipt> CancelTransactionAsync(
+        string exchangeRoot,
+        byte[] sharedKey,
+        TcpIntegrationEndpoint peer,
+        IntegrationCancelRequestV2 request,
+        CancellationToken cancellationToken = default) =>
+        ExecuteCancellationClientAsync(
+            exchangeRoot,
+            sharedKey,
+            peer,
+            request,
+            cancellationToken);
+
     public async ValueTask DisposeAsync()
     {
         MachineIntegrationTcpExchange? listener;
@@ -169,6 +183,21 @@ internal sealed class MachineIntegrationTcpWorkflow : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(operation);
         await using var exchange = new MachineIntegrationTcpExchange(exchangeRoot, sharedKey);
         return await operation(exchange, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<TcpIntegrationCancellationReceipt> ExecuteCancellationClientAsync(
+        string exchangeRoot,
+        byte[] sharedKey,
+        TcpIntegrationEndpoint peer,
+        IntegrationCancelRequestV2 request,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(sharedKey);
+        ArgumentNullException.ThrowIfNull(request);
+        await using var exchange = new MachineIntegrationTcpExchange(exchangeRoot, sharedKey);
+        return await exchange.CancelTransactionAsync(peer, request, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private void ThrowIfDisposed()

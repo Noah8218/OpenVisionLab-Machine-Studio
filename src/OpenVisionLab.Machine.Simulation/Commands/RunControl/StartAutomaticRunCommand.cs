@@ -6,10 +6,15 @@ namespace OpenVisionLab.Machine.Simulation.Commands;
 /// </summary>
 public sealed class StartAutomaticRunCommand : SimulationCommand
 {
-    public StartAutomaticRunCommand(bool beginRealTime = true)
+    public StartAutomaticRunCommand(
+        bool beginRealTime = true,
+        bool waitForExternalResult = false)
     {
         BeginRealTime = beginRealTime;
+        WaitForExternalResult = waitForExternalResult;
     }
 
     public bool BeginRealTime { get; }
+
+    public bool WaitForExternalResult { get; }
 }

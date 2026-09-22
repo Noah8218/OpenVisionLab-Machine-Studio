@@ -133,4 +133,45 @@ public sealed class AnalogIoAuthoringViewModelTests
         Assert.NotNull(viewModel.AnalogIoAuthoring);
         Assert.Equal(2.5, viewModel.AnalogIoAuthoring!.InitialValue);
     }
+
+    [Fact]
+    public void ReplacedAnalogEditorCannotMutatePreviousChannel()
+    {
+        var firstChannel = new ChannelDefinition
+        {
+            Id = "ai.first",
+            Name = "First",
+            Kind = ChannelKind.AnalogInput,
+            InitialValue = 1.5
+        };
+        var secondChannel = new ChannelDefinition
+        {
+            Id = "ao.second",
+            Name = "Second",
+            Kind = ChannelKind.AnalogOutput,
+            InitialValue = 2.5
+        };
+        var project = new MachineProjectDocument
+        {
+            Name = "Analog selection lifetime",
+            Channels = [firstChannel, secondChannel]
+        };
+
+        using var viewModel = new MainViewModel(project);
+        var channelsNode = viewModel.ProjectTree.Roots
+            .Single()
+            .Children
+            .Single(node => node.Kind == TreeNodeKind.Channels);
+        var firstNode = channelsNode.Children.Single(node => node.Id == firstChannel.Id);
+        var secondNode = channelsNode.Children.Single(node => node.Id == secondChannel.Id);
+
+        viewModel.ProjectTree.SelectedNode = firstNode;
+        var replacedEditor = Assert.IsType<AnalogIoAuthoringViewModel>(viewModel.AnalogIoAuthoring);
+
+        viewModel.ProjectTree.SelectedNode = secondNode;
+        replacedEditor.InitialValueText = "99.0";
+
+        Assert.Equal(1.5, firstChannel.InitialValue);
+        Assert.Equal(2.5, secondChannel.InitialValue);
+    }
 }

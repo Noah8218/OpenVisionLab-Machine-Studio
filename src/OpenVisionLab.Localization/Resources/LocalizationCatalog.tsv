@@ -11,7 +11,7 @@ Simulation.FaultHoldTicks	유지 Tick	Hold ticks
 Simulation.RestartSequence	장애 해제 후 시퀀스 재시작	Restart sequence after clear
 Simulation.RecoverySequence	복구 시퀀스	Recovery sequence
 Simulation.FaultScheduleDisabled	예약 장애 사용 안 함	Scheduled fault disabled
-Simulation.FaultScheduleInvalid	장애 주입과 해제 Tick은 시나리오 기간 안에 있어야 하며 복구 대상을 선택해야 합니다.	Injection and clear ticks must fit within the scenario, and a recovery target must be selected.
+Simulation.FaultScheduleInvalid	장애 주입 및 해제 Tick은 시나리오 기간 내에 있어야 하며 복구 대상을 선택해야 합니다.	Injection and clear ticks must fit within the scenario, and a recovery target must be selected.
 Simulation.RecoveryClearOnly	장애 해제만	Clear only
 Simulation.RecoveryRestart	{0} 재시작	Restart {0}
 Shell.Edit	편집	Edit
@@ -355,6 +355,10 @@ Connections.CheckpointTemplateAppliedStatus	대표 종료 상태 검증점 {0:N0
 Connections.CheckpointTemplateNoChangesStatus	적용할 새 대표 검증점이 없습니다.	There are no new representative checks to apply.
 Connections.ValidationPassed	모든 연결 유효	All connections valid
 Connections.ValidationErrors	연결 확인 필요	Check connections
+Connections.ValidationIssueLocationFormat	레이아웃 {0} · 구성요소 {1} · 대상 {2} · 속성 {3}	Layout {0} · component {1} · target {2} · property {3}
+Connections.ValidationSequenceLocationFormat	시퀀스 {0} · 단계 {1}	sequence {0} · step {1}
+Connections.ValidationTargetSelectedStatus	오류 대상 '{0}'을(를) 선택했습니다. 수정 후 준비 확인을 다시 실행하십시오.	Selected validation target '{0}'. Correct it, then run readiness again.
+Connections.ValidationTargetUnavailableStatus	오류 대상 '{0}'을(를) 찾을 수 없습니다. 프로젝트를 다시 불러오고 준비 확인을 다시 실행하십시오.	Validation target '{0}' is unavailable. Reload the project and run readiness again.
 Connections.Valid	유효	Valid
 Connections.CheckRequired	확인 필요	Check required
 Connections.Behavior	동작 바인딩	Behavior binding
@@ -376,11 +380,19 @@ Connections.CheckReadinessTooltip	현재 프로젝트 전체를 컴파일해 실
 Connections.ReadinessNotChecked	미확인	Not checked
 Connections.ReadinessPassed	실행 준비 완료	Ready to run
 Connections.ReadinessFailed	실행 준비 오류	Not ready
+Connections.ReadinessStale	만료됨	Stale
 Connections.ReadinessNotCheckedDetail	운전 전에 시뮬레이션 준비 확인을 실행하십시오.	Check simulation readiness before Run.
 Connections.ReadinessPassedDetail	현재 연결과 시퀀스가 컴파일되었습니다. 이 확인은 시뮬레이션을 시작하지 않습니다.	The current connections and sequence compile successfully. This check does not start simulation.
 Connections.ReadinessFailedDetail	실행할 수 없습니다: {0}	Cannot run: {0}
+Connections.ReadinessStaleDetail	프로젝트 revision이 {0}에서 {1}(으)로 변경되어 준비 확인이 만료되었습니다. 다시 준비 확인을 실행하십시오.	Readiness is stale because the project revision changed from {0} to {1}. Run readiness again.
 Connections.ReadinessPassedStatus	시뮬레이션 준비 확인을 통과했습니다. 시뮬레이션은 시작되지 않았습니다.	Simulation readiness passed. Simulation was not started.
 Connections.ReadinessFailedStatus	시뮬레이션 준비 확인에서 오류가 발견되었습니다.	Simulation readiness found an error.
+Connections.ReadinessComparisonInitial	이번 준비 확인 결과를 기준으로 삼았습니다.	This readiness result is the baseline.
+Connections.ReadinessComparisonUnchanged	이전 준비 확인과 동일합니다.	Readiness is unchanged from the previous check.
+Connections.ReadinessComparisonImproved	이전 준비 확인보다 개선되었습니다.	Readiness improved from the previous check.
+Connections.ReadinessComparisonRegressed	이전 준비 확인보다 악화되었습니다.	Readiness regressed from the previous check.
+Connections.ReadinessComparisonChanged	준비 확인 결과가 변경되었습니다.	Readiness result changed.
+Connections.ReadinessComparisonRerunRequired	편집 후 준비 확인을 다시 실행해야 합니다.	Run readiness again after editing.
 Connections.PreviewStep	단계 미리보기	Preview step
 Connections.PreviewStepTooltip	준비 확인을 통과한 뒤 이 단계만 격리된 고정 스텝 시뮬레이션으로 실행합니다.	After readiness passes, run only this step in an isolated fixed-step simulation.
 Connections.PreviewCompleted	미리보기 완료	Preview completed
@@ -536,11 +548,23 @@ Shell.New	새 프로젝트	New
 Shell.Open	열기	Open
 Shell.Save	저장	Save
 Shell.SaveAs	다른 이름으로 저장	Save As
+Shell.NewTooltip	새 프로젝트를 만듭니다. (Ctrl+N)	Create a new project (Ctrl+N)
+Shell.OpenTooltip	프로젝트를 엽니다. (Ctrl+O)	Open a project (Ctrl+O)
+Shell.SaveTooltip	프로젝트를 저장합니다. (Ctrl+S)	Save the project (Ctrl+S)
 Shell.Exit	종료	Exit
 Shell.Design	설계	Design
 Shell.Run	운전	Run
+Shell.DesignTransitionPending	일시정지 후 설계 모드로 전환 중	Pausing before entering Design mode
+Shell.DesignTransitionRunRequested	설계 모드 요청이 취소되었습니다. 안전한 일시정지를 완료하는 중입니다.	Design mode request canceled; completing the safe pause
+Shell.DesignTransitionRejected	설계 모드 전환 실패: 시뮬레이션 일시정지가 거부되었습니다.	Design mode transition failed: simulation pause was rejected.
+Shell.DesignTransitionTimeout	설계 모드 전환 실패: 시뮬레이션 일시정지 시간이 초과되었습니다.	Design mode transition failed: simulation pause timed out.
+Shell.DesignTransitionFailed	설계 모드 전환 실패: 일시정지 중 오류가 발생했습니다.	Design mode transition failed: the pause operation raised an error.
+Shell.DesignTransitionCompleted	시뮬레이션이 일시정지되어 설계 모드로 전환되었습니다.	The simulation is paused and Design mode is ready.
+Shell.DesignTransitionCanceled	설계 모드 요청이 취소되었습니다. 시뮬레이션은 일시정지 상태입니다.	The Design mode request was canceled. The simulation is paused.
 Shell.SimulationOn	시뮬레이션 시작	Simulation ON
+Shell.SimulationOnTooltip	작성한 머신을 빌드하고 자동 시뮬레이션을 시작합니다. (F5)	Build the authored machine and start automatic simulation (F5)
 Shell.Pause	일시정지	Pause
+Shell.PauseTooltip	시뮬레이션을 일시정지합니다. (F6)	Pause simulation (F6)
 Shell.AbortSequence	시퀀스 중단	Abort sequence
 Shell.AbortSequenceTooltip	활성 시퀀스를 중단합니다. Reset 후 다시 시작할 수 있습니다.	Abort the active sequence. Reset is required before starting again.
 Shell.SequenceAbortedStatus	시퀀스가 중단되었습니다. Reset 후 다시 시작할 수 있습니다.	The sequence was aborted. Reset is required before starting again.
@@ -550,8 +574,11 @@ Shell.RetrySequenceTooltip	오류 원인을 해제한 뒤 시퀀스를 처음부
 Shell.SequenceRetriedStatus	시퀀스를 재시도했습니다. 자동 반복은 중지된 상태입니다.	The sequence was retried from its entry step. Automatic continuation remains stopped.
 Shell.SequenceRetryRejectedStatus	시퀀스 재시도가 거부되었습니다.	Sequence retry was rejected.
 Shell.Step	단계 실행	Step
+Shell.StepTooltip	5 ms 단위로 한 Tick 진행합니다. (F10)	Advance one 5 ms tick (F10)
 Shell.Reset	초기화	Reset
+Shell.ResetTooltip	시뮬레이션을 초기화합니다.	Reset simulation
 Shell.CycleStart	사이클 시작	Cycle Start
+Shell.CycleStartTooltip	Cycle Start 디지털 입력을 ON으로 설정합니다.	Set the Cycle Start digital input to ON
 Shell.Language	언어	Language
 Shell.LanguageTooltip	표시 언어를 선택합니다.	Select the display language.
 Shell.RunSummary	운전 요약	Run Summary
@@ -593,9 +620,51 @@ Project.OpenFailedInvalidFileDetail	파일 내용이 올바른 Machine Studio �
 Project.OpenFailedNotFoundDetail	프로젝트 파일을 찾을 수 없습니다.	The project file could not be found.
 Project.OpenFailedAccessDetail	프로젝트 파일을 읽을 권한이 없습니다.	The project file cannot be read with the current permissions.
 Project.OpenFailedReadDetail	프로젝트 파일을 읽는 동안 파일 시스템 오류가 발생했습니다.	A file-system error occurred while reading the project file.
+Project.RecoveredFromBackupStatus	백업 파일(.bak)에서 프로젝트를 열었습니다. 원본 파일은 변경하지 않았습니다. 다른 이름으로 저장(Ctrl+Shift+S)하여 복구 사본을 만드세요.	Project opened from its .bak backup. The primary file was not changed. Use Save As (Ctrl+Shift+S) to create a recovery copy.
 Project.SaveFailedStatus	프로젝트를 저장하지 못했습니다	The project could not be saved
 Project.SaveFailedTitle	프로젝트 저장 실패	Project save failed
 Project.SaveFailedMessage	프로젝트 파일을 안전하게 저장하지 못했습니다.{0}{0}{1}	The project file could not be saved safely.{0}{0}{1}
+Project.Diagnostics	프로젝트 진단	Project diagnostics
+ProjectDiagnostics.Title	프로젝트 진단 및 복구	Project diagnostics and recovery
+ProjectDiagnostics.Findings	진단 결과	Diagnostic findings
+ProjectDiagnostics.Refresh	진단 새로 고침	Refresh diagnostics
+ProjectDiagnostics.Preview	복구 미리보기	Preview recovery
+ProjectDiagnostics.PreviewTitle	복구 미리보기	Recovery preview
+ProjectDiagnostics.Apply	복구 적용	Apply recovery
+ProjectDiagnostics.Cancel	미리보기 취소	Cancel preview
+ProjectDiagnostics.ApplyHint	현재 문서에 저장하지 않은 변경이 없을 때만 적용할 수 있습니다.	Apply is available only when the current document has no unsaved changes.
+ProjectDiagnostics.NoPath	저장된 프로젝트 경로 없음	No saved project path
+ProjectDiagnostics.CurrentNoPath	아직 저장되지 않은 프로젝트입니다.	This project has not been saved yet.
+ProjectDiagnostics.CurrentUnsaved	현재 문서에 저장하지 않은 변경이 있습니다. 복구 적용 전 저장하거나 변경을 취소하세요.	The current document has unsaved changes. Save or discard them before applying recovery.
+ProjectDiagnostics.CurrentClean	현재 문서는 저장 기준과 일치합니다.	The current document matches its saved baseline.
+ProjectDiagnostics.LoadedFromBackupNotice	백업 파일(.bak)에서 문서를 열었습니다. 기본 파일은 변경되지 않았습니다. 다른 이름으로 저장(Ctrl+Shift+S)하여 복구 사본을 만드세요.	The document was opened from its .bak backup. The primary file was not changed. Use Save As (Ctrl+Shift+S) to create a recovery copy.
+ProjectDiagnostics.RunHint	진단을 실행하세요.	Run diagnostics.
+ProjectDiagnostics.ErrorsSummary	진단에서 오류 {0}개를 찾았습니다.	Diagnostics found {0} error(s).
+ProjectDiagnostics.WarningsSummary	진단에서 확인이 필요한 항목 {0}개를 찾았습니다.	Diagnostics found {0} item(s) that need attention.
+ProjectDiagnostics.NoPathSummary	저장된 프로젝트가 없어 파일 진단을 실행할 수 없습니다.	No saved project path is available for file diagnostics.
+ProjectDiagnostics.HealthySummary	프로젝트 상태가 정상입니다.	Project health is good.
+ProjectDiagnostics.RecoveryPreview	백업 '{0}'을(를) '{1}'에 적용합니다. 프로젝트 '{2}', 스키마 {3}, 원본 해시 {4}	Apply backup '{0}' to '{1}'. Project '{2}', schema {3}, source hash {4}
+ProjectDiagnostics.SeverityInformation	정보	Info
+ProjectDiagnostics.SeverityWarning	주의	Warning
+ProjectDiagnostics.SeverityError	오류	Error
+ProjectDiagnostics.UnsavedChanges	현재 문서에 저장하지 않은 변경이 있습니다.	The current document has unsaved changes.
+ProjectDiagnostics.PrimaryHealthy	기본 프로젝트 파일을 읽을 수 있습니다. 스키마 {0}	The primary project file is readable. Schema {0}
+ProjectDiagnostics.PrimaryDiffers	디스크의 프로젝트 내용이 현재 문서와 다릅니다.	The disk project differs from the current document.
+ProjectDiagnostics.PrimaryMissing	기본 프로젝트 파일을 찾을 수 없습니다.	The primary project file is missing.
+ProjectDiagnostics.PrimaryUnreadable	기본 프로젝트 파일을 읽을 수 없습니다.	The primary project file cannot be read.
+ProjectDiagnostics.PrimaryInvalid	기본 프로젝트 파일 형식이 올바르지 않습니다.	The primary project file is invalid.
+ProjectDiagnostics.UnsupportedSchema	기본 파일 스키마 {0}은(는) 지원되지 않습니다.	The primary file schema {0} is unsupported.
+ProjectDiagnostics.RecoveryAvailable	검증된 .bak 백업으로 복구할 수 있습니다. 먼저 미리보기를 확인하세요.	A validated .bak backup is available. Review the preview first.
+ProjectDiagnostics.RecoveryUnavailableItem	복구 가능한 백업이 없습니다.	No recoverable backup is available.
+ProjectDiagnostics.BackupInvalid	백업 파일 형식이 올바르지 않습니다.	The backup file is invalid.
+ProjectDiagnostics.BackupUnreadable	백업 파일을 읽을 수 없습니다.	The backup file cannot be read.
+ProjectDiagnostics.InspectionFailed	프로젝트 진단에 실패했습니다.	Project diagnostics failed.
+ProjectDiagnostics.InspectionFailedItem	프로젝트 진단에 실패했습니다.	Project diagnostics failed.
+ProjectDiagnostics.RecoveryUnavailable	복구 가능한 백업을 찾지 못했습니다. 진단을 다시 실행하세요.	No recoverable backup was found. Run diagnostics again.
+ProjectDiagnostics.PreviewFailed	백업 미리보기에 실패했습니다: {0}	Backup preview failed: {0}
+ProjectDiagnostics.RecoveryApplied	백업 복구를 적용하고 프로젝트를 다시 열었습니다.	The backup was applied and the project was reopened.
+ProjectDiagnostics.RecoveryRejected	복구 적용이 거부되었습니다. 프로젝트 상태와 미리보기를 다시 확인하세요.	Recovery was rejected. Check the project state and preview again.
+ProjectDiagnostics.ApplyFailed	복구 적용에 실패했습니다: {0}	Recovery apply failed: {0}
 MessageBox.Message	메시지	Message
 MessageBox.OK	확인	OK
 MessageBox.Cancel	취소	Cancel
@@ -649,6 +718,22 @@ Shell.SimulationJournal	시뮬레이션 기록	Simulation journal
 Shell.Evidence	증거	Evidence
 Shell.EvidenceDrawer	이벤트 증거 펼치기 또는 접기	Expand or collapse event evidence
 Shell.EvidenceDrawerHint	결정적 시뮬레이션 이벤트 증거를 표시하거나 숨깁니다.	Show or hide deterministic simulation event evidence.
+SupportDiagnostics.Preview	지원 진단 미리보기	Support diagnostics preview
+SupportDiagnostics.Export	지원 진단 사본 내보내기	Export support diagnostics
+SupportDiagnostics.PreviewReady	지원 진단 항목을 확인한 뒤 내보내기를 선택하세요.	Review the support diagnostics before choosing export.
+SupportDiagnostics.PreviewFailed	지원 진단 미리보기 실패	Support diagnostic preview failed.
+SupportDiagnostics.Exported	민감정보를 제외한 지원 진단 사본을 내보냈습니다.	Exported the redacted support diagnostic copy.
+SupportDiagnostics.ExportFailed	지원 진단 사본을 내보내지 못했습니다.	The support diagnostic copy could not be exported.
+SupportDiagnostics.Unavailable	지원 진단 내보내기를 사용할 수 없습니다.	Support diagnostic export is unavailable.
+SupportDiagnostics.Version	버전	Version
+SupportDiagnostics.Source	소스	Source
+SupportDiagnostics.Project	프로젝트	Project
+SupportDiagnostics.Run	실행 ID	Run ID
+SupportDiagnostics.Errors	오류	Errors
+SupportDiagnostics.Queue	큐/시간 제한	Queue/timeout
+SupportDiagnostics.Artifacts	상대 경로 산출물	Relative artifacts
+SupportDiagnostics.Excluded	제외 항목	Excluded
+SupportDiagnostics.Replay	재생	Replay
 Shell.MachineLayout	머신 레이아웃	Machine Layout
 Shell.SimulationWorkspace	시뮬레이션 작업공간	Simulation Workspace
 Shell.Sequence	시퀀스	Sequence
@@ -777,6 +862,7 @@ Camera.ResetForManualHint	자동 또는 시퀀스 운전 중입니다. 초기화
 Camera.PauseBeforeTriggerHint	일시정지한 뒤 트리거하여 획득을 고정 Tick으로 진행하세요.	Pause, then trigger acquisition so fixed ticks remain under your control.
 Camera.TriggerReadyHint	트리거한 뒤 단계 실행으로 노출과 전송을 정확히 한 Tick씩 진행하세요.	Trigger, then use Step to advance exposure and transfer exactly one tick at a time.
 Camera.StepAcquisitionHint	단계 실행으로 노출과 전송을 정확히 한 Tick씩 진행하세요.	Use Step to advance exposure and transfer exactly one tick at a time.
+Camera.ExternalResultPendingHint	외부 Result를 새로고침한 뒤 명시적으로 시뮬레이션에 적용하세요.	Refresh the external Result, then explicitly apply it to Simulation.
 Camera.ActionStartManual	카메라 수동 운전 시작	Start camera manual control
 Camera.ActionTrigger	카메라 트리거	Trigger camera
 Camera.CommandAccepted	{0} 명령 승인 · {1}	{0} accepted · {1}
@@ -790,6 +876,24 @@ Camera.InspectionId	검사 ID	Inspection ID
 Camera.InspectionMessage	검사 메시지	Inspection message
 Camera.InspectionMetrics	검사 메트릭	Inspection metrics
 Camera.ExecutionEvidence	실행 증거	Execution evidence
+Camera.ResultSource	결과 출처	Result source
+Camera.ResultSourceMock	모의 · 결정적 모델 (실제 검사 아님)	Mock · deterministic model (not a real inspection)
+Camera.ResultSourceExternalVerified	외부 결과 · 상관관계 확인됨 (외부 실행)	External result · correlation verified (external execution)
+Camera.ResultSourceExternalUnverified	외부 결과 · 미검증	External result · not verified
+Camera.ResultSourcePending	결과 대기 · 아직 검증되지 않음	Result pending · not yet verified
+Camera.ResultSourceNone	결과 출처 없음	No result source
+Camera.VerificationLevel	검증 수준	Verification level
+Camera.VerificationExternal	외부 결과 상관관계·입력 해시 확인 (정확도 검증 아님)	External result correlation and input hash confirmed (not accuracy validation)
+Camera.VerificationModelOnly	모델/논리 증거만 · 실제 검사 아님	Model/logic evidence only · not a real inspection
+Camera.VerificationNotVerified	미검증	Not verified
+Camera.InputHash	입력 SHA-256	Input SHA-256
+Camera.ModelKind	모델 종류	Model kind
+Camera.ModelDeterministicMock	결정적 모의 실행기	Deterministic mock runner
+Camera.ModelExternalAdapter	외부 어댑터 · {0} {1}	External adapter · {0} {1}
+Camera.ModelUnknownAdapter	알 수 없는 외부 어댑터	Unknown external adapter
+Camera.ClockMode	클록 모드	Clock mode
+Camera.ClockFixedStep	고정 스텝 시뮬레이션 ({0} ms/tick)	Fixed-step simulation ({0} ms/tick)
+Camera.ClockUnknown	클록 모드 알 수 없음	Clock mode unavailable
 Camera.EvidenceNone	저장된 실행 증거 없음	No saved execution evidence
 Camera.EvidenceCapturing	실행 증거 수집 중	Capturing execution evidence
 Camera.EvidenceSaved	프로젝트 실행 증거 저장됨	Project execution evidence saved
@@ -801,12 +905,19 @@ Camera.EvidenceNoComparison	비교할 이전 실행 증거 없음	No prior execu
 Camera.EvidenceMatch	이전 실행 증거와 일치	Matches prior execution evidence
 Camera.EvidenceMismatch	이전 실행 증거와 불일치 · {0}	Differs from prior execution evidence · {0}
 Integration.Workspace	통합 워크스페이스	Integration workspace
-Integration.Hint	교환 설정을 저장한 뒤 명시적으로 Handoff를 게시하고 Result를 새로고침합니다. 이 화면은 소비자 검사를 자동 실행하지 않습니다.	Save the exchange setup, then explicitly publish a Handoff and refresh Result. This screen never runs the consumer inspection automatically.
+Integration.Hint	교환 설정을 저장한 뒤 Handoff 게시, Result 새로고침, 시뮬레이션 적용을 각각 명시적으로 실행합니다.	Save the exchange setup, then explicitly publish the Handoff, refresh Result, and apply it to Simulation.
+Integration.SetupStepExchange	1/6 교환 폴더를 선택하고 설정을 저장하세요.	1/6 Choose the exchange folder and save setup.
+Integration.SetupStepRecipe	2/6 사용할 2D 검사 레시피를 선택하세요.	2/6 Choose the 2D inspection recipe to use.
+Integration.SetupStepConsumer	3/6 2D 소비자 버전과 40자리 source commit을 입력하세요.	3/6 Enter the 2D consumer version and 40-character source commit.
+Integration.SetupStepTcp	4/6 TCP 수신·상대 주소와 포트를 확인하세요.	4/6 Check the TCP listen/peer addresses and ports.
+Integration.SetupStepKey	5/6 세션 공유 키를 입력하거나 허용된 환경 변수를 준비하세요.	5/6 Enter a session shared key or prepare the approved environment variable.
+Integration.SetupStepSave	6/6 변경 사항을 저장한 뒤 명시적 연결 또는 Handoff를 실행하세요.	6/6 Save the changes before an explicit connection or Handoff.
+Integration.SetupReady	설정 준비 완료. 수신 시작, 상대 Ping 또는 명시적 Handoff 중 하나를 선택하세요.	Setup ready. Choose Start listening, Ping peer, or an explicit Handoff.
 Integration.ExchangeRoot	교환 폴더	Exchange folder
 Integration.Browse	찾아보기	Browse
 Integration.BrowseExchangeRootTooltip	Machine Studio와 소비자가 공유할 로컬 교환 폴더를 선택합니다.	Choose the local exchange folder shared by Machine Studio and the consumer.
 Integration.SaveSetup	설정 저장	Save setup
-Integration.SaveSetupTooltip	교환 폴더, 레시피 경로, 소비자 버전을 로컬 설정으로 저장합니다. 작업은 자동 실행하지 않습니다.	Save the exchange folder, recipe path, and consumer version locally. No operation runs automatically.
+Integration.SaveSetupTooltip	교환 폴더, 레시피 경로, 소비자 버전, 외부 Result 대기 옵션을 로컬 설정으로 저장합니다. 작업은 자동 실행하지 않습니다.	Save the exchange folder, recipe path, consumer version, and external Result waiting option locally. No operation runs automatically.
 Integration.ResetSetup	초기화	Reset
 Integration.ResetSetupTooltip	저장된 통합 설정을 지우고 Handoff/Result 화면을 초기화합니다.	Clear the saved integration setup and reset the Handoff/Result projection.
 Integration.Recipe	2D 검사 레시피	2D inspection recipe
@@ -814,16 +925,51 @@ Integration.BrowseRecipeTooltip	2D 소비자가 읽을 로컬 검사 레시피 �
 Integration.ConsumerVersion	2D 소비자 버전	2D consumer version
 Integration.ConsumerCommit	2D 소비자 source commit	2D consumer source commit
 Integration.ConsumerCommitTooltip	2D 소비자 clean build의 40자리 source commit을 입력합니다.	Enter the 40-character source commit from the 2D consumer clean build.
+Integration.WaitForExternalResult	카메라 전송 후 외부 Result 대기	Wait for external Result after camera transfer
+Integration.WaitForExternalResultCompactLabel	Result 대기	Wait for Result
+Integration.WaitForExternalResultTooltip	다음 수동 카메라 트리거 또는 외부 자동 Sequence에서 로컬 판정을 만들지 않고 전송 완료 상태를 유지합니다. 자동 Sequence는 Result를 확인하면 적용하고, 수동 경로의 새로고침·적용은 자동 실행하지 않습니다.	For the next manual camera trigger or external automatic Sequence, keep the transferred frame pending without a local decision. Automatic Sequence applies a validated Result; manual refresh and apply remain explicit.
+Integration.UseThreeDHeightMap	3D HeightMap 자동 입력 사용	Use automatic 3D HeightMap input
+Integration.UseThreeDHeightMapTooltip	저장된 C3D HeightMap과 3D consumer identity를 자동 Sequence의 외부 검사 입력으로 사용합니다. 설정 저장 전에는 실행하지 않습니다.	Use the saved C3D HeightMap and 3D consumer identity as the automatic Sequence external-inspection input. Nothing runs before setup is saved.
+Integration.ThreeDSetup	3D HeightMap 자동 설정	3D HeightMap automatic setup
+Integration.ThreeDSetupHint	C3D 원본, c3d recipe, clean consumer identity, 그리고 정확한 Sequence/Step/Device binding을 저장합니다. source와 recipe hash가 바뀌면 새 요청을 만들지 않습니다.	Save the C3D source, c3d recipe, clean consumer identity, and exact Sequence/Step/Device binding. A changed source or recipe hash cannot create a new request.
+Integration.ThreeDHeightMapSource	3D HeightMap C3D 원본	3D HeightMap C3D source
+Integration.ThreeDHeightMapWidth	HeightMap width	HeightMap width
+Integration.ThreeDHeightMapHeight	HeightMap height	HeightMap height
+Integration.ThreeDHeightMapPixelFormat	HeightMap pixel format	HeightMap pixel format
+Integration.ThreeDHeightMapUnit	HeightMap unit	HeightMap unit
+Integration.ThreeDInspectionRecipe	3D c3d 검사 레시피	3D c3d inspection recipe
+Integration.ThreeDConsumerVersion	3D consumer 버전	3D consumer version
+Integration.ThreeDConsumerCommit	3D consumer source commit	3D consumer source commit
+Integration.ThreeDSequenceId	자동 Sequence ID	Automatic Sequence ID
+Integration.ThreeDStepId	3D Trigger step ID	3D Trigger step ID
+Integration.ThreeDDeviceId	3D 입력 device ID	3D input device ID
 Integration.PublishTwoD	2D/Image 게시	Publish 2D/Image
 Integration.PublishTwoDShort	2D/Image 게시	Publish 2D/Image
 Integration.PublishTwoDTooltip	완료된 가상 카메라 프레임과 명시적 소비자 identity로 Handoff만 게시합니다. 소비자 검사는 실행하지 않습니다.	Publish only a Handoff using a completed virtual-camera frame and explicit consumer identity. The consumer inspection is not run.
 Integration.RefreshResults	Result 새로고침	Refresh Result
 Integration.RefreshResultsTooltip	현재 프로젝트의 Handoff, acknowledgement, Result를 교환 폴더에서 읽습니다. 검사를 실행하지 않습니다.	Read the current project's Handoff, acknowledgement, and Result from the exchange folder. No inspection is run.
+Integration.ApplyResultToSimulation	Result를 시뮬레이션에 적용	Apply Result to Simulation
+Integration.ApplyResultToSimulationTooltip	현재 프로세스에서 게시한 Handoff와 정확히 일치하는 검증된 Result만 일시정지된 시뮬레이션에 적용합니다.	Apply only a validated Result that exactly matches a Handoff published by this process to the paused Simulation.
 Integration.HandoffStatus	Handoff 상태	Handoff status
 Integration.AcknowledgementStatus	Acknowledgement 상태	Acknowledgement status
 Integration.ResultStatus	Result 상태	Result status
 Integration.ProjectionStatus	좌표 투영	Coordinate projection
 Integration.LastTransaction	최근 거래	Latest transaction
+Integration.TransactionHistory	거래 이력	Transaction history
+Integration.TransactionHistoryHint	현재 프로젝트에서 발견한 Handoff와 상태를 최신순으로 표시합니다. 거래 ID는 짧게 보이며 전체 ID는 항목 도구 설명에서 확인할 수 있습니다. 새로고침은 읽기만 수행합니다.	Shows Handoffs and their status for the current project, newest first. Transaction IDs are shown in short form; the full ID is available in the item tooltip. Refresh only reads the exchange folder.
+Integration.TransactionHistoryFilter	이력 상태	History state
+Integration.TransactionHistoryFilterHint	상태를 선택해 거래 이력을 좁혀 봅니다.	Select a state to narrow transaction history.
+Integration.TransactionHistoryFilterAll	전체 상태	All states
+Integration.TransactionHistoryFilterPendingReview	검토 대기	Pending review
+Integration.TransactionHistoryFilterReviewed	검토됨	Reviewed
+Integration.TransactionHistoryFilterRejected	거절됨	Rejected
+Integration.TransactionHistoryFilterPublished	결과 게시됨	Result published
+Integration.TransactionHistoryFilterResultReadFailed	결과 읽기 실패	Result read failed
+Integration.NoTransactionHistory	현재 프로젝트에 거래 이력이 없습니다.	No transaction history is available for the current project.
+Integration.NoMatchingTransactionHistory	선택한 상태의 거래 이력이 없습니다.	No transaction history matches the selected state.
+Integration.TransactionDiagnostics	거래 저장 진단	Transaction storage diagnostics
+Integration.TransactionDiagnosticsFilter	진단 상태	Diagnostic state
+Integration.TransactionDiagnosticsFilterHint	상태를 선택해 거래 저장 진단을 좁혀 봅니다. 새로고침은 읽기만 수행합니다.	Select a state to narrow transaction storage diagnostics. Refresh only reads the exchange folder.
 Integration.ThreeDReadOnlyHint	ThreeD/HeightMap Result는 3D Studio가 게시하며 이 화면은 새로고침으로만 읽습니다.	ThreeD/HeightMap Results are published by 3D Studio and are read here only through Refresh Result.
 Integration.TcpSetup	직접 TCP 연결	Direct TCP connection
 Integration.TcpSetupHint	로컬 거래 폴더와 TCP 주소를 저장합니다. 복원만으로 수신이나 연결을 시작하지 않으며 공유 키는 저장하지 않습니다.	Save the local transaction folder and TCP endpoints. Restore never starts listening or connects, and the shared key is never saved.
@@ -837,6 +983,41 @@ Integration.StopTcpListener	수신 중지	Stop listening
 Integration.PingTcpPeer	상대 Ping	Ping peer
 Integration.PushTcpTransaction	최근 전송	Push latest
 Integration.PullTcpTransaction	ACK/Result 받기	Pull ACK/Result
+Integration.CancelTcpTransaction	검사 취소 요청	Request inspection cancellation
+Integration.CancelTcpTransactionTooltip	현재 ACK가 수락된 실행 중인 거래에 취소 요청을 보냅니다. 최종 Cancelled Result는 해당 검사 프로그램이 게시합니다.	Send a cancellation request for the current accepted transaction. The inspection consumer publishes the final Cancelled Result.
+Integration.MmiRecipeManager	MMI 레시피 관리	MMI recipe management
+Integration.MmiRecipeManagerHint	상위 MMI에서 하위 2D 검사 프로그램에 사용할 레시피를 등록하고 활성 레시피를 선택합니다. 레시피 Step 편집은 2D Recipe Manager에서 수행합니다.	Register recipes for the subordinate 2D inspection program and select the active recipe in the supervisory MMI. Edit recipe steps in the 2D Recipe Manager.
+Integration.MmiRecipeAdd	레시피 추가	Add recipe
+Integration.MmiRecipeAddTooltip	로컬 2D 검사 레시피 파일을 MMI 목록에 추가하고 활성 레시피로 선택합니다.	Add a local 2D inspection recipe file to the MMI list and select it as active.
+Integration.MmiRecipeRemove	목록에서 제거	Remove from list
+Integration.MmiRecipeRemoveTooltip	선택한 레시피를 MMI 목록에서만 제거합니다. 원본 파일은 삭제하지 않습니다.	Remove the selected recipe from the MMI list only. The source file is not deleted.
+Integration.MmiRecipeAvailable	파일 사용 가능	File available
+Integration.MmiRecipeMissing	파일 없음	File missing
+Integration.RecipeWrongTarget	3D 레시피가 선택되었습니다. 2D 검사 레시피를 선택하세요.	A 3D recipe is selected. Choose a 2D inspection recipe.
+Integration.MmiRecipeActive	활성	Active
+Integration.MmiOperator	MMI 운전 레이아웃	MMI operator layout
+Integration.MmiOperatorHint	장비 레이아웃을 보면서 활성 2D 레시피, 운전 상태, 검사 결과를 한 화면에서 확인하고 제어합니다.	Monitor the machine layout and control the active 2D recipe, run state, and inspection result from one screen.
+Integration.MmiActiveRecipe	활성 2D 레시피	Active 2D recipe
+Integration.MmiActiveRecipeTooltip	다음 2D Handoff에 사용할 MMI 레시피를 선택합니다. 변경 후 설정 저장을 누르세요.	Select the MMI recipe for the next 2D Handoff. Save setup after changing it.
+Integration.MmiSetupUnsaved	변경 사항이 저장되지 않았습니다. 다음 요청 전에 설정 저장을 누르세요.	Unsaved changes. Save setup before creating the next request.
+Integration.MmiSetupSaved	저장된 통합 설정을 사용합니다.	Using the saved integration setup.
+Integration.MmiInspectionStatus	검사 상태	Inspection status
+Integration.MmiModeExternal	외부 검사 운전: Result를 받을 때까지 시퀀스를 완료하지 않습니다.	External inspection: the sequence does not complete until a Result is received.
+Integration.MmiModeSimulation	모의 판정 운전: 외부 검사 없이 로컬 시뮬레이션 결과로 진행합니다.	Simulation decision: continue with the local simulation result without external inspection.
+Integration.MmiImageViewer	2D/3D 프로젝트 이미지 뷰어	2D/3D project image viewer
+Integration.MmiImageViewerHint	2D/3D Studio가 교환 거래에 게시한 이미지 아티팩트를 표시합니다. 3D는 현재 HeightMap/C3D 입력이면 이미지 미리보기 게시까지 대기합니다.	Displays image artifacts published by 2D/3D Studio in the exchange transaction. For 3D HeightMap/C3D input, waits until an image preview artifact is published.
+Integration.MmiCaptureInspectionImages	촬영·검사 이미지	Capture and inspection images
+Integration.MmiCaptureInspectionImagesHint	가상 촬영 이미지와 2D/3D 검사 결과 이미지를 구분해 표시합니다. 아래 명령은 요청 생성·결과 확인·결과 적용을 각각 명시적으로 수행합니다.	Shows the virtual capture separately from 2D/3D inspection result images. The commands below explicitly create a request, read a result, or apply a result.
+Integration.MmiCreateTwoDRequest	2D 검사 요청 만들기	Create 2D inspection request
+Integration.MmiCreateTwoDRequestTooltip	완료된 가상 카메라 프레임으로 2D Handoff 요청만 만듭니다. 하위 검사 프로그램의 검사는 여기서 실행하지 않습니다.	Create only a 2D Handoff request from the completed virtual-camera frame. The subordinate inspection is not run here.
+Integration.MmiCheckInspectionResult	검사 결과 확인	Check inspection result
+Integration.MmiCheckInspectionResultTooltip	현재 프로젝트의 Handoff, acknowledgement, Result를 교환 폴더에서 읽습니다. 검사를 실행하지 않습니다.	Read the current project's Handoff, acknowledgement, and Result from the exchange folder. No inspection is run.
+Integration.MmiApplyInspectionResult	검사 결과 적용	Apply inspection result
+Integration.MmiApplyInspectionResultTooltip	현재 프로세스가 만든 Handoff와 일치하는 검증된 Result만 일시정지된 시뮬레이션에 적용합니다.	Apply only a validated Result matching a Handoff created by this process to the paused Simulation.
+Integration.MmiVirtualCameraImage	가상 카메라 입력 이미지	Virtual camera input image
+Integration.MmiVirtualCameraImageEmpty	가상 촬영 후 프로젝트 이미지가 여기에 표시됩니다.	Acquire a virtual frame to show the project image here.
+Integration.MmiTwoDImage	2D Studio 이미지	2D Studio image
+Integration.MmiThreeDImage	3D Studio 이미지	3D Studio image
 Inspector.DigitalIo	디지털 I/O	Digital I/O
 Inspector.FaultManager	장애 관리자	Fault manager
 Inspector.RuntimeDebugger	시퀀스 디버거	Sequence debugger
@@ -910,9 +1091,12 @@ Sequence.Tagline	결정적 자동 사이클을 작성합니다.	Author the deter
 Sequence.NewStep	새 단계	New step
 Sequence.Add	추가	Add
 Sequence.Delete	삭제	Delete
+Sequence.AddTooltip	완료 단계 앞에 새 단계를 추가합니다.	Insert a new step before the final Complete step.
+Sequence.DeleteTooltip	선택한 종료 단계가 아닌 단계를 삭제합니다.	Delete the selected non-terminal step.
 Sequence.MoveUp	위로 이동	Move up
 Sequence.MoveDown	아래로 이동	Move down
 Sequence.Name	이름	Name
+Sequence.Step	단계	Step
 Sequence.Action	동작	Action
 Sequence.Target	대상	Target
 Sequence.Value	값	Value
@@ -922,9 +1106,43 @@ Sequence.Error	오류	Error
 Sequence.Failure	실패	Failure
 Sequence.StepId	단계 ID	Step ID
 Sequence.Validation	검증	Validation
+Sequence.ValidationInitial	검증 결과 {0}건을 기준으로 삼았습니다.	Validation baseline: {0} issue(s).
+Sequence.ValidationUnchanged	검증 결과가 동일합니다: {0}건	Validation unchanged: {0} issue(s).
+Sequence.ValidationImproved	검증 결과가 개선되었습니다: {0}건 → {1}건	Validation improved: {0} → {1} issue(s).
+Sequence.ValidationRegressed	검증 결과가 악화되었습니다: {0}건 → {1}건	Validation regressed: {0} → {1} issue(s).
+Sequence.ValidationChanged	검증 항목이 변경되었습니다: {0}건 → {1}건	Validation changed: {0} → {1} issue(s).
+Sequence.ValidationIssueLocationFormat	시퀀스 {0} · 단계 {1} · 대상 {2} · 속성 {3}	Sequence {0} · step {1} · target {2} · property {3}
 Sequence.ExpectedCheckpoint	종료 상태 검증	End-state check
 Sequence.ExpectedCheckpointTooltip	이 단계가 끝날 때 선택한 장비 상태를 검증합니다.	Validate the selected equipment state when this step ends.
 Sequence.ExpectedState	기대 상태	Expected
+Sequence.NoSequenceSelected	선택한 시퀀스 없음	No sequence selected
+Sequence.SelectSequenceHint	시퀀스를 선택해 단계를 편집하세요.	Select a sequence to edit steps.
+Sequence.SelectEditableHint	편집 가능한 시퀀스와 호환되는 대상을 선택하세요.	Select an editable sequence and a compatible target.
+Sequence.ValidSummary	유효 · {0}개 단계	VALID · {0} steps
+Sequence.InvalidSummary	유효하지 않음 · {0}건	INVALID · {0} issue(s)
+Sequence.StructuralLinear	선형 경로: 설계 모드에서 추가·삭제·순서 변경을 사용할 수 있습니다.	Linear path: add, remove, and reorder are available in Design mode.
+Sequence.StructuralBranched	분기 경로: 필드만 편집할 수 있으며 구조 명령은 잠겨 있습니다.	Branched path: edit fields only; structural commands are locked.
+Sequence.StepValid	유효	Valid
+Sequence.ExpectedStateFormat	기대 상태: {0} = {1}	Expected: {0} = {1}
+Sequence.Action.None	없음	None
+Sequence.Action.MoveAxis	축 이동	Move axis
+Sequence.Action.SetChannel	채널 설정	Set channel
+Sequence.Action.Wait	대기	Wait
+Sequence.Action.TriggerCamera	카메라 트리거	Trigger camera
+Sequence.Action.CallSubsequence	하위 시퀀스 호출	Call subsequence
+Sequence.Action.WaitSignal	신호 대기	Wait for signal
+Sequence.Action.SetSignal	신호 설정	Set signal
+Sequence.Action.WaitAxisDone	축 완료 대기	Wait for axis
+Sequence.Action.Complete	완료	Complete
+Sequence.Action.WaitVisionResult	검사 결과 대기	Wait for vision result
+Sequence.Template.set-output-on	출력 ON 설정	Set output ON
+Sequence.Template.set-output-off	출력 OFF 설정	Set output OFF
+Sequence.Template.wait-input-on	입력 ON 대기	Wait for input ON
+Sequence.Template.wait-input-off	입력 OFF 대기	Wait for input OFF
+Sequence.Template.move-axis-home	축 원점 이동	Move axis to home
+Sequence.Template.wait-axis-done	축 완료 대기	Wait for axis done
+Sequence.Template.trigger-camera	가상 카메라 트리거	Trigger virtual camera
+Sequence.Template.call-subsequence	하위 시퀀스 호출	Call subsequence
 Simulation.ScenarioSummary	시나리오: {0} | 모드: {1} | 시드: {2} | 기간: {3}사이클	Scenario: {0} | Mode: {1} | Seed: {2} | Duration: {3} cycles
 Simulation.WorkspaceRunning	시뮬레이션 실행 중 | 사이클 {0} | 활성 {1} | 알람 {2} | {3}	Simulation running | cycle {0} | {1} active | {2} alarm | {3}
 Simulation.WorkspacePaused	시뮬레이션 일시정지 | 사이클 {0} | 활성 {1} | 알람 {2} | {3}	Simulation paused | cycle {0} | {1} active | {2} alarm | {3}
@@ -998,6 +1216,7 @@ Simulation.ClearBaseline	기준선 해제	Clear baseline
 Simulation.GoToMismatch	첫 불일치로 이동	Go to first mismatch
 Simulation.BatchIdle	반복 검증 대기	Repeat validation ready
 Simulation.BatchRunning	반복 검증 실행 중: {0} / {1}	Repeat validation running: {0} / {1}
+Simulation.BatchCancelRequested	취소 요청됨 · 확인 대기 중: {0} / {1}	Cancellation requested · waiting for confirmation: {0} / {1}
 Simulation.BatchCanceled	반복 검증이 취소되었습니다.	Repeat validation canceled.
 Simulation.BatchPassed	반복 검증 통과: {0}회	Repeat validation passed: {0} runs
 Simulation.BatchMismatch	반복 검증에서 불일치가 발견되었습니다.	Repeat validation found a mismatch.
@@ -1022,10 +1241,14 @@ Simulation.BatchArtifactStale	저장된 증거가 현재 프로젝트 또는 시
 Simulation.BatchArtifactSaveFailed	결과를 저장하지 못해 메모리에만 유지합니다.	Result could not be saved and remains in memory.
 Simulation.BatchBaselineClearedStatus	승인 기준선을 해제했습니다.	Accepted baseline cleared.
 Simulation.ExportEvidence	증거 내보내기	Export evidence
+Simulation.ExportReport	결과 보고서 내보내기	Export result report
 Simulation.ImportEvidence	증거 가져오기	Import evidence
 Simulation.EvidenceExchangeHint	현재 테스트 시나리오 결과와 승인 기준선을 하나의 파일로 옮깁니다. 실행·재생·알람 확인 상태는 저장하지 않습니다.	Move the current Test Scenario result and accepted baseline as one file. Runtime, replay, and alarm acknowledgement state are not saved.
+Simulation.ResultReportHint	현재 반복 검증 결과를 사람이 읽는 결정적 Markdown 보고서로 저장합니다.	Save the current repeat-validation result as a human-readable deterministic Markdown report.
 Simulation.EvidenceExported	결정적 시뮬레이션 증거를 내보냈습니다.	Deterministic simulation evidence exported.
 Simulation.EvidenceExportFailed	시뮬레이션 증거를 내보내지 못했습니다.	Simulation evidence could not be exported.
+Simulation.ReportExported	결정적 시뮬레이션 결과 보고서를 내보냈습니다.	Deterministic simulation result report exported.
+Simulation.ReportExportFailed	시뮬레이션 결과 보고서를 내보내지 못했습니다.	Simulation result report could not be exported.
 Simulation.EvidenceImported	결정적 시뮬레이션 증거를 가져왔습니다. 실행하지 않았습니다.	Deterministic simulation evidence imported without execution.
 Simulation.EvidenceImportRejected	현재 프로젝트 또는 시나리오와 일치하지 않아 증거를 가져오지 않았습니다.	Evidence was not imported because it is not valid for the current project or scenario.
 Simulation.UnifiedCommissioningEvidence	통합 커미셔닝 증거	Unified commissioning evidence
@@ -1040,23 +1263,24 @@ Simulation.UnifiedEvidenceExportFailed	통합 커미셔닝 증거를 내보내�
 Simulation.UnifiedEvidenceImportRejected	현재 프로젝트 또는 시나리오와 일치하지 않아 통합 증거를 가져오지 않았습니다.	Unified commissioning evidence was not imported because it is invalid for the current context.
 Simulation.UnifiedEvidenceVisionIncluded	실행 증거 포함	included
 Simulation.UnifiedEvidenceVisionOmitted	실행 증거 없음	not included
-Simulation.CommandTrace	명령 trace	Command trace
-Simulation.CommandTraceHint	캡처 시작 후 적용된 일시정지형 결정적 명령 경계를 파일로 저장하고, 동일한 일시정지 runtime에서 재생합니다. runtime 설정·실시간 명령·카메라 획득은 trace에 포함되지 않습니다.	After Start capture, save applied paused deterministic command boundaries and replay them against the same paused runtime. Runtime setup, real-time commands, and camera acquisition are not included in the trace.
+Simulation.CommandTrace	명령 추적	Command trace
+Simulation.CommandTraceHint	캡처 시작 후 적용된 일시정지형 결정적 명령 경계를 파일로 저장하고, 동일한 일시정지 런타임에서 재생합니다. 런타임 설정·실시간 명령·카메라 획득은 추적 기록에 포함되지 않습니다.	After Start capture, save applied paused deterministic command boundaries and replay them against the same paused runtime. Runtime setup, real-time commands, and camera acquisition are not included in the trace.
 Simulation.StartCommandTraceCapture	캡처 시작	Start capture
-Simulation.ExportCommandTrace	Trace 내보내기	Export trace
-Simulation.ReplayCommandTrace	Trace 재생	Replay trace
-Simulation.CommandTraceUnavailable	명령 trace를 사용할 수 없습니다.	Command trace is unavailable.
+Simulation.ExportCommandTrace	명령 추적 내보내기	Export trace
+Simulation.ReplayCommandTrace	명령 추적 재생	Replay trace
+Simulation.CommandTraceUnavailable	명령 추적을 사용할 수 없습니다.	Command trace is unavailable.
 Simulation.CommandTraceIdle	캡처를 시작하면 새 명령 경계를 기록합니다.	Start capture to record new command boundaries.
-Simulation.CommandTraceSetupOnly	현재 trace에는 runtime 초기화가 포함되어 있습니다. 캡처 시작을 눌러 재생용 경계를 설정하세요.	The current trace contains runtime initialization. Start capture to define a replayable boundary.
-Simulation.CommandTraceCaptureStarted	새 명령 trace 캡처 경계를 설정했습니다. 이후 적용된 명령을 기록합니다.	A new command trace capture boundary is set. Subsequent applied commands will be recorded.
-Simulation.CommandTraceReady	{0}개 명령 경계 · hash {1}	{0} command boundaries · hash {1}
-Simulation.CommandTraceReadyNonReplayable	{0}개 명령 경계 · replay 불가 항목 포함 · hash {1}	{0} command boundaries · contains non-replayable entries · hash {1}
-Simulation.CommandTraceExported	{0}개 명령 trace를 내보냈습니다. hash {1}	Exported {0} command-trace entries. Hash {1}.
-Simulation.CommandTraceExportFailed	명령 trace를 내보내지 못했습니다.	Command trace could not be exported.
-Simulation.CommandTraceInvalidFile	명령 trace 파일을 읽거나 검증하지 못했습니다.	The command trace file could not be loaded or validated.
-Simulation.CommandTraceReplayed	{0}개 명령 trace를 재생했습니다. hash {1}	Replayed {0} command-trace entries. Hash {1}.
-Simulation.CommandTraceReplayStatus	최근 재생: {0}개 명령 경계 · hash {1}	Last replay: {0} command boundaries · hash {1}
-Simulation.CommandTraceReplayFailed	명령 trace를 재생하지 않았습니다: {0}	Command trace was not replayed: {0}
+Simulation.CommandTraceSetupOnly	현재 추적 기록에는 런타임 초기화가 포함되어 있습니다. 캡처 시작을 눌러 재생용 경계를 설정하세요.	The current trace contains runtime initialization. Start capture to define a replayable boundary.
+Simulation.CommandTraceCaptureStarted	새 명령 추적 캡처 경계를 설정했습니다. 이후 적용된 명령을 기록합니다.	A new command trace capture boundary is set. Subsequent applied commands will be recorded.
+Simulation.CommandTraceReady	{0}개 명령 경계 · 해시 {1}	{0} command boundaries · hash {1}
+Simulation.CommandTraceReadyNonReplayable	{0}개 명령 경계 · 재생할 수 없는 항목 포함 · 해시 {1}	{0} command boundaries · contains non-replayable entries · hash {1}
+Simulation.CommandTraceIncomplete	명령 추적이 불완전합니다. {0}개 경계를 보관하지 못했습니다.	Command trace is incomplete. {0} command boundaries were not retained.
+Simulation.CommandTraceExported	{0}개 명령 추적을 내보냈습니다. 해시 {1}	Exported {0} command-trace entries. Hash {1}.
+Simulation.CommandTraceExportFailed	명령 추적을 내보내지 못했습니다.	Command trace could not be exported.
+Simulation.CommandTraceInvalidFile	명령 추적 파일을 읽거나 검증하지 못했습니다.	The command trace file could not be loaded or validated.
+Simulation.CommandTraceReplayed	{0}개 명령 추적을 재생했습니다. 해시 {1}	Replayed {0} command-trace entries. Hash {1}.
+Simulation.CommandTraceReplayStatus	최근 재생: {0}개 명령 경계 · 해시 {1}	Last replay: {0} command boundaries · hash {1}
+Simulation.CommandTraceReplayFailed	명령 추적을 재생하지 않았습니다: {0}	Command trace was not replayed: {0}
 Equipment.MachineFrame	머신 프레임	Machine frame
 Equipment.LinearStageMotor	리니어 스테이지 / 모터	Linear stage / motor
 Equipment.RotaryStageMotor	회전 스테이지 / 모터	Rotary stage / motor
@@ -1103,6 +1327,7 @@ Equipment.State.Faulted	고장	FAULTED
 Equipment.State.Aborted	중단됨	ABORTED
 Equipment.State.Exposing	노출 중	EXPOSING
 Equipment.State.Transferring	전송 중	TRANSFERRING
+Equipment.State.AwaitingExternalResult	외부 결과 대기	AWAITING EXTERNAL RESULT
 Equipment.State.FrameReady	프레임 준비	FRAME READY
 Equipment.State.Retracted	후퇴	RETRACTED
 Equipment.State.Extending	전진 중	EXTENDING
@@ -1137,6 +1362,9 @@ Properties.Conveyor	컨베이어	Conveyor
 Properties.Workpiece	워크피스	Workpiece
 Properties.Id	ID	Id
 Properties.Name	이름	Name
+Properties.Value	값	Value
+LayoutValidation.LayoutNameRequired	레이아웃 이름이 필요합니다.	Every layout requires a name.
+LayoutValidation.ComponentNameRequired	모든 레이아웃 구성요소에 이름이 필요합니다.	Every layout component requires a name.
 Properties.X	X	X
 Properties.Y	Y	Y
 Properties.Rotation	회전	Rotation
@@ -1277,6 +1505,14 @@ Debugger.AddWatch	Watch 추가	Add watch
 Debugger.RemoveWatch	Watch 제거	Remove watch
 Debugger.Timeline	구조화 타임라인	Structured timeline
 Debugger.ClearTimeline	기록 지우기	Clear
+Debugger.TimelineFilterLabel	이벤트 필터	Event filter
+Debugger.TimelineFilterAll	전체 이벤트	All events
+Debugger.TimelineSeverityFilterLabel	심각도 필터	Severity filter
+Debugger.TimelineSeverityFilterAll	전체 심각도	All severities
+Debugger.TimelineCommandId	명령 ID · {0}	Command ID · {0}
+Debugger.TimelineNoCommand	명령 없음	No command
+Debugger.TimelineEmpty	선택한 카테고리의 이벤트가 없습니다.	No events match this category.
+Debugger.TimelineEmptyFiltered	선택한 조건의 이벤트가 없습니다.	No events match the selected filters.
 Debugger.AlarmsRecovery	알람 및 복구	Alarms and recovery
 Debugger.AlarmRecoveryHint	주입 고장은 해제하고, 원인이 제거된 뒤 Reset으로 런타임을 복구합니다.	Clear injected faults and use Reset after the underlying cause is removed.
 Debugger.ReadyHint	일시정지 후 다음 시퀀스 경계로 이동하거나 중단점을 설정하세요.	Pause to move to the next sequence boundary or configure a breakpoint.
@@ -1305,6 +1541,10 @@ Debugger.AlarmAcknowledgedAction	확인됨	Acknowledged
 Debugger.AlarmAcknowledgedStatus	알람을 확인 처리했습니다.	Alarm acknowledged.
 Debugger.AlarmHistory	알람 기록	Alarm history
 Debugger.NoAlarmHistory	알람 기록 없음	No alarm history
+Debugger.AlarmHistoryFilterHint	알람 이력을 상태별로 좁혀 볼 수 있습니다.	Filter alarm history by lifecycle state.
+Debugger.AlarmHistoryFilter	이력 필터	History filter
+Debugger.AlarmHistoryFilterAll	전체 기록	All history
+Debugger.NoMatchingAlarmHistory	선택한 상태의 알람 이력이 없습니다.	No alarm history matches the selected state.
 Debugger.AlarmHistoryCount	알람 기록 {0}/200건	Alarm history {0}/200
 Debugger.AlarmActive	활성	Active
 Debugger.AlarmCleared	해제됨	Cleared

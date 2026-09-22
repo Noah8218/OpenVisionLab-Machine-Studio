@@ -15,7 +15,8 @@ internal enum ProjectLifecycleTransitionKind
 internal sealed record ProjectLifecycleTransition(
     ProjectLifecycleTransitionKind Kind,
     MachineProjectDocument Project,
-    string? Path);
+    string? Path,
+    ProjectDocumentLoadResult? LoadResult = null);
 
 internal sealed record ProjectSaveLifecycleResult(
     ProjectDocumentSaveReceipt Receipt,
@@ -175,27 +176,47 @@ internal sealed class ProjectLifecycleCoordinator
     internal Task<bool> TryResolveUnsavedChangesAsync() =>
         _operationGate.RunAsync(ResolveUnsavedChangesCoreAsync);
 
+    internal Task<bool> ApplyProjectRecoveryAsync(ProjectDocumentRecoveryPreview preview) =>
+        _operationGate.RunAsync(() => ApplyProjectRecoveryCoreAsync(preview));
+
     private Task<bool> ResolveUnsavedChangesCoreAsync() =>
         ResolveUnsavedChangesResultAsync();
 
     private async Task<bool> ResolveUnsavedChangesResultAsync() =>
         (await _projectUnsavedChangesWorkflow.ResolveAsync()).IsAccepted;
 
-    private async Task<bool> ApplyOpenedProjectAsync(
-        MachineProjectDocument project,
-        string path)
+    private async Task<bool> ApplyOpenedProjectAsync(ProjectDocumentLoadResult loadResult)
     {
-        if (!await _applyProject(project))
+        ArgumentNullException.ThrowIfNull(loadResult);
+        if (!await _applyProject(loadResult.Document))
         {
             return false;
         }
 
-        _projectSession.SetCurrentPath(path);
+        _projectSession.SetCurrentPath(loadResult.ProjectPath);
         _onTransitionCompleted(new(
             ProjectLifecycleTransitionKind.ProjectOpened,
-            project,
-            _projectSession.CurrentPath));
+            loadResult.Document,
+            _projectSession.CurrentPath,
+            loadResult));
         return true;
+    }
+
+    private async Task<bool> ApplyProjectRecoveryCoreAsync(ProjectDocumentRecoveryPreview preview)
+    {
+        ArgumentNullException.ThrowIfNull(preview);
+        if (HasUnsavedChanges
+            || !string.Equals(
+                NormalizePath(preview.ProjectPath),
+                CurrentPath,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        await _projectFileStore.RestoreBackupAsync(preview);
+        var recoveredProject = await _projectFileStore.LoadWithProvenanceAsync(preview.ProjectPath);
+        return await ApplyOpenedProjectAsync(recoveredProject);
     }
 
     private async Task<bool> CreateNewProjectCoreAsync()
@@ -221,8 +242,8 @@ internal sealed class ProjectLifecycleCoordinator
             return;
         }
 
-        var project = await _projectFileStore.LoadAsync(_startupSamplePath);
-        if (!await _applyProject(project))
+        var loadResult = await _projectFileStore.LoadWithProvenanceAsync(_startupSamplePath);
+        if (!await _applyProject(loadResult.Document))
         {
             return;
         }
@@ -230,8 +251,9 @@ internal sealed class ProjectLifecycleCoordinator
         _projectSession.SetCurrentPath(null);
         _onTransitionCompleted(new(
             ProjectLifecycleTransitionKind.BundledSampleOpened,
-            project,
-            null));
+            loadResult.Document,
+            null,
+            loadResult));
     }
 
     private async Task<ProjectSaveLifecycleResult> SaveProjectCoreAsync(string path)

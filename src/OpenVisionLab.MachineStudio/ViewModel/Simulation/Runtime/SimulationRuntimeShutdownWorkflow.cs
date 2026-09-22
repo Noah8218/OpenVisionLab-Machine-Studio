@@ -26,6 +26,7 @@ internal sealed class SimulationRuntimeShutdownWorkflow
     private readonly SimulationRunControlWorkflow _simulationRunControlWorkflow;
     private readonly Action<SimulationRuntimeShutdownDiagnostic> _recordDiagnostic;
     private readonly Func<Action, Task> _dispatch;
+    private readonly Func<Action, Task> _dispatchAfterDispose;
     private readonly BoundedShutdownCoordinator _shutdownCoordinator = new();
     private int _shutdownRequested;
 
@@ -35,7 +36,8 @@ internal sealed class SimulationRuntimeShutdownWorkflow
         SimulationRuntimeResourceOwner runtimeResources,
         SimulationRunControlWorkflow simulationRunControlWorkflow,
         Action<SimulationRuntimeShutdownDiagnostic> recordDiagnostic,
-        Func<Action, Task> dispatch)
+        Func<Action, Task> dispatch,
+        Func<Action, Task>? dispatchAfterDispose = null)
     {
         _engine = engine ?? throw new ArgumentNullException(nameof(engine));
         _runtimeLoop = runtimeLoop ?? throw new ArgumentNullException(nameof(runtimeLoop));
@@ -46,6 +48,7 @@ internal sealed class SimulationRuntimeShutdownWorkflow
         _recordDiagnostic = recordDiagnostic
             ?? throw new ArgumentNullException(nameof(recordDiagnostic));
         _dispatch = dispatch ?? throw new ArgumentNullException(nameof(dispatch));
+        _dispatchAfterDispose = dispatchAfterDispose ?? dispatch;
     }
 
     internal bool IsShutdownRequested => Volatile.Read(ref _shutdownRequested) != 0;
@@ -68,16 +71,7 @@ internal sealed class SimulationRuntimeShutdownWorkflow
         ArgumentNullException.ThrowIfNull(shutdownTask);
         if (shutdownTask.IsCompleted)
         {
-            try
-            {
-                shutdownTask.GetAwaiter().GetResult();
-            }
-            catch (Exception exception)
-            {
-                Trace.TraceError(exception.ToString());
-            }
-
-            CompleteDisposeIfSafe(completeApplicationDispose);
+            _ = CompleteDisposeAfterShutdownAsync(shutdownTask, completeApplicationDispose);
             return;
         }
 
@@ -91,11 +85,12 @@ internal sealed class SimulationRuntimeShutdownWorkflow
         SimulationEngineTerminationResult? termination = null;
         try
         {
-            RecordDiagnostic(
+            await RecordDiagnosticAsync(
                 SimulationOperationalDiagnosticKind.ShutdownRequested,
                 SimulationLogSeverity.Info,
                 "Machine Studio runtime shutdown requested.",
-                stage);
+                stage).ConfigureAwait(false);
+            _simulationRunControlWorkflow.Dispose();
             stage = "EngineStop";
             var stopTask = _engine.StopAsync(CancellationToken.None);
             _runtimeResources.RequestCancellation();
@@ -116,6 +111,12 @@ internal sealed class SimulationRuntimeShutdownWorkflow
             stage = "RuntimeTask";
             await BoundedShutdownCoordinator.AwaitStageAsync(
                 _runtimeLoop.RuntimeTask,
+                stage,
+                deadline);
+
+            stage = "RunControl";
+            await BoundedShutdownCoordinator.AwaitStageAsync(
+                _simulationRunControlWorkflow.WaitForOperationsAsync(),
                 stage,
                 deadline);
 
@@ -147,7 +148,8 @@ internal sealed class SimulationRuntimeShutdownWorkflow
                             || eventConsumption.ConsumedEventCount != eventJournal.StoredEventCount
                             || eventConsumption.LastConsumedEventIndex != eventJournal.LastEventIndex)));
             stage = "ResourceDispose";
-            _runtimeResources.TryDisposeIfSafe();
+            await _dispatch(() => _runtimeResources.TryDisposeIfSafe())
+                .ConfigureAwait(false);
             var outcome = termination.IsFaulted
                 ? RuntimeShutdownOutcome.Faulted
                 : journalIncomplete
@@ -173,13 +175,13 @@ internal sealed class SimulationRuntimeShutdownWorkflow
                 ? SimulationLogSeverity.Info
                 : SimulationLogSeverity.Alarm;
             var resultStage = journalIncomplete ? "EventJournal" : stage;
-            RecordDiagnostic(
+            await RecordDiagnosticAsync(
                 diagnosticKind,
                 diagnosticSeverity,
                 message,
                 resultStage,
                 termination,
-                termination.Exception);
+                termination.Exception).ConfigureAwait(false);
             return new(
                 outcome,
                 stopwatch.Elapsed,
@@ -191,36 +193,36 @@ internal sealed class SimulationRuntimeShutdownWorkflow
         }
         catch (RuntimeShutdownTimeoutException exception)
         {
-            RecordDiagnostic(
+            await RecordDiagnosticAsync(
                 SimulationOperationalDiagnosticKind.ShutdownTimedOut,
                 SimulationLogSeverity.Alarm,
                 $"Machine Studio runtime shutdown timed out during {exception.Stage}.",
                 exception.Stage,
                 termination,
-                exception);
+                exception).ConfigureAwait(false);
             throw;
         }
         catch (OperationCanceledException) when (deadline.IsCancellationRequested)
         {
             var exception = new RuntimeShutdownTimeoutException(stage);
-            RecordDiagnostic(
+            await RecordDiagnosticAsync(
                 SimulationOperationalDiagnosticKind.ShutdownTimedOut,
                 SimulationLogSeverity.Alarm,
                 $"Machine Studio runtime shutdown timed out during {stage}.",
                 stage,
                 termination,
-                exception);
+                exception).ConfigureAwait(false);
             throw exception;
         }
         catch (Exception exception)
         {
-            RecordDiagnostic(
+            await RecordDiagnosticAsync(
                 SimulationOperationalDiagnosticKind.ShutdownFaulted,
                 SimulationLogSeverity.Alarm,
                 $"Machine Studio runtime shutdown failed during {stage}: {exception.Message}",
                 stage,
                 termination,
-                exception);
+                exception).ConfigureAwait(false);
             return new(RuntimeShutdownOutcome.Faulted, stopwatch.Elapsed, stage, termination, exception);
         }
     }
@@ -238,7 +240,19 @@ internal sealed class SimulationRuntimeShutdownWorkflow
             Trace.TraceError(exception.ToString());
         }
 
-        if (!TryCompleteRuntimeDisposeIfSafe())
+        bool runtimeDisposed;
+        try
+        {
+            runtimeDisposed = await TryCompleteRuntimeDisposeIfSafeAsync()
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceError(exception.ToString());
+            return;
+        }
+
+        if (!runtimeDisposed)
         {
             return;
         }
@@ -253,7 +267,7 @@ internal sealed class SimulationRuntimeShutdownWorkflow
             // The shutdown task may complete on a worker continuation; the shell
             // callback owns WPF-bound ViewModel disposal and must use the existing
             // composition dispatch boundary.
-            await _dispatch(() => InvokeApplicationDispose(completeApplicationDispose))
+            await _dispatch(completeApplicationDispose)
                 .ConfigureAwait(false);
         }
         catch (Exception exception)
@@ -262,16 +276,20 @@ internal sealed class SimulationRuntimeShutdownWorkflow
         }
     }
 
-    private bool TryCompleteRuntimeDisposeIfSafe()
+    private async Task<bool> TryCompleteRuntimeDisposeIfSafeAsync()
     {
-        var runtimeDisposed = _runtimeResources.IsDisposed;
-        try
+        if (!_simulationRunControlWorkflow.AreOperationsIdle)
         {
-            runtimeDisposed |= _runtimeResources.TryDisposeIfSafe();
+            return false;
         }
-        catch (Exception exception)
+
+        var runtimeDisposed = _runtimeResources.IsDisposed;
+        if (!runtimeDisposed)
         {
-            Trace.TraceError(exception.ToString());
+            var disposedByDispatch = false;
+            await _dispatchAfterDispose(() => disposedByDispatch = _runtimeResources.TryDisposeIfSafe())
+                .ConfigureAwait(false);
+            runtimeDisposed |= disposedByDispatch;
         }
 
         if (!runtimeDisposed)
@@ -284,34 +302,12 @@ internal sealed class SimulationRuntimeShutdownWorkflow
         return true;
     }
 
-    private static void InvokeApplicationDispose(Action completeApplicationDispose)
-    {
-        try
-        {
-            completeApplicationDispose();
-        }
-        catch (Exception exception)
-        {
-            Trace.TraceError(exception.ToString());
-        }
-    }
-
-    private void CompleteDisposeIfSafe(Action? completeApplicationDispose)
-    {
-        if (!TryCompleteRuntimeDisposeIfSafe() || completeApplicationDispose is null)
-        {
-            return;
-        }
-
-        InvokeApplicationDispose(completeApplicationDispose);
-    }
-
-    private void RecordDiagnostic(
+    private Task RecordDiagnosticAsync(
         SimulationOperationalDiagnosticKind kind,
         SimulationLogSeverity severity,
         string message,
         string stage,
         SimulationEngineTerminationResult? termination = null,
         Exception? exception = null) =>
-        _recordDiagnostic(new(kind, severity, message, stage, termination, exception));
+        _dispatch(() => _recordDiagnostic(new(kind, severity, message, stage, termination, exception)));
 }

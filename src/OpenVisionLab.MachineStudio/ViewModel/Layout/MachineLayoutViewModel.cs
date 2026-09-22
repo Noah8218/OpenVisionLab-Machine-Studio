@@ -319,6 +319,11 @@ public sealed class MachineLayoutViewModel : ViewModelBase, IDisposable
 
     public void RefreshLocalization()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         LibraryItems = CreateLibraryItems();
         OnPropertyChanged(nameof(LibraryItems));
         OnPropertyChanged(nameof(SelectionSummaryText));

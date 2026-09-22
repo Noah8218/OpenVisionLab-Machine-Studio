@@ -124,7 +124,8 @@ internal sealed class RuntimeObservabilityPresenter
                 termination.Operation,
                 termination.Outcome,
                 ExceptionType: exception?.GetType().FullName,
-                ExceptionMessage: exception?.Message),
+                ExceptionMessage: exception?.Message,
+                ExceptionDetail: exception?.ToString()),
             writeToLogger: true);
     }
 
@@ -170,7 +171,8 @@ internal sealed class RuntimeObservabilityPresenter
                 termination?.Outcome,
                 ExceptionType: exception?.GetType().FullName,
                 ExceptionMessage: exception?.Message,
-                ShutdownStage: stage),
+                ShutdownStage: stage,
+                ExceptionDetail: exception?.ToString()),
             writeToLogger: true);
     }
 }

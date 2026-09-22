@@ -9,6 +9,74 @@ namespace OpenVisionLab.MachineStudio.Tests;
 public sealed class SimulationRuntimeShutdownWorkflowTests
 {
     [Fact]
+    public async Task ShutdownDiagnosticsUseExistingUiDispatchBoundary()
+    {
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings
+            {
+                FixedStep = TimeSpan.FromMilliseconds(1),
+                TimeScale = 1
+            });
+        using var loop = new SimulationRuntimeLoop(
+            engine,
+            static action =>
+            {
+                action();
+                return Task.CompletedTask;
+            },
+            _ => { },
+            _ => { },
+            static () => { },
+            _ => { },
+            _ => { },
+            _ => { },
+            _ => { },
+            _ => { },
+            _ => { });
+        var workspace = new SimulationWorkspaceViewModel();
+        var resources = new SimulationRuntimeResourceOwner(engine, loop, workspace);
+        var runControl = CreateRunControlWorkflow(engine);
+        var diagnostics = new List<SimulationRuntimeShutdownDiagnostic>();
+        var dispatchDepth = 0;
+        var diagnosticsOutsideDispatch = 0;
+        var workflow = new SimulationRuntimeShutdownWorkflow(
+            engine,
+            loop,
+            resources,
+            runControl,
+            diagnostic =>
+            {
+                if (Volatile.Read(ref dispatchDepth) == 0)
+                {
+                    Interlocked.Increment(ref diagnosticsOutsideDispatch);
+                }
+
+                diagnostics.Add(diagnostic);
+            },
+            action =>
+            {
+                Interlocked.Increment(ref dispatchDepth);
+                try
+                {
+                    action();
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref dispatchDepth);
+                }
+
+                return Task.CompletedTask;
+            });
+
+        loop.Start(new SimulationRuntimeConfiguration([], [], []));
+        var result = await workflow.ShutdownAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(RuntimeShutdownOutcome.Completed, result.Outcome);
+        Assert.NotEmpty(diagnostics);
+        Assert.Equal(0, Volatile.Read(ref diagnosticsOutsideDispatch));
+    }
+
+    [Fact]
     public async Task StopsAndDisposesRuntimeWithoutConstructingMainViewModel()
     {
         using var engine = new FixedStepSimulationEngine(
@@ -93,7 +161,7 @@ public sealed class SimulationRuntimeShutdownWorkflowTests
         var workspace = new SimulationWorkspaceViewModel();
         var resources = new SimulationRuntimeResourceOwner(engine, loop, workspace);
         var runControl = CreateRunControlWorkflow(engine);
-        var dispatchCount = 0;
+        var applicationDisposeCalls = 0;
         var workflow = new SimulationRuntimeShutdownWorkflow(
             engine,
             loop,
@@ -102,7 +170,6 @@ public sealed class SimulationRuntimeShutdownWorkflowTests
             _ => { },
             action =>
             {
-                Interlocked.Increment(ref dispatchCount);
                 action();
                 return Task.CompletedTask;
             });
@@ -122,14 +189,18 @@ public sealed class SimulationRuntimeShutdownWorkflowTests
         });
         workflow.CompleteDisposeAfterShutdown(
             delayedShutdownTask,
-            () => callback.SetResult(resources.IsDisposed));
+            () =>
+            {
+                Interlocked.Increment(ref applicationDisposeCalls);
+                callback.SetResult(resources.IsDisposed);
+            });
 
         releaseDisposeDispatch.TrySetResult(true);
 
         Assert.Equal(RuntimeShutdownOutcome.Completed, shutdownResult.Outcome);
         Assert.True(await callback.Task);
         Assert.True(resources.IsDisposed);
-        Assert.Equal(1, Volatile.Read(ref dispatchCount));
+        Assert.Equal(1, Volatile.Read(ref applicationDisposeCalls));
     }
 
     [Fact]
@@ -189,6 +260,103 @@ public sealed class SimulationRuntimeShutdownWorkflowTests
         Assert.Equal("EventJournal", result.Stage);
         Assert.Equal("EventJournal", diagnostics[^1].Stage);
         Assert.Contains("incomplete canonical event evidence", diagnostics[^1].Message);
+    }
+
+    [Fact]
+    public async Task ShutdownWaitsForActiveRunControlOperationBeforeCompleting()
+    {
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings
+            {
+                FixedStep = TimeSpan.FromMilliseconds(1),
+                TimeScale = 1
+            });
+        using var loop = new SimulationRuntimeLoop(
+            engine,
+            static action =>
+            {
+                action();
+                return Task.CompletedTask;
+            },
+            _ => { },
+            _ => { },
+            static () => { },
+            _ => { },
+            _ => { },
+            _ => { },
+            _ => { },
+            _ => { },
+            _ => { });
+        var workspace = new SimulationWorkspaceViewModel();
+        var resources = new SimulationRuntimeResourceOwner(engine, loop, workspace);
+        var definitionRelease = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var runControl = new SimulationRunControlWorkflow(
+            engine,
+            TimeSpan.FromMilliseconds(1),
+            () => new SimulationRunControlState(
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                SimulationControlOwner.Manual,
+                null,
+                null),
+            async () =>
+            {
+                await definitionRelease.Task;
+                return true;
+            },
+            _ => { },
+            _ => { },
+            _ => { },
+            () => { },
+            _ => { },
+            (_, _) => { },
+            () => { });
+        var workflow = new SimulationRuntimeShutdownWorkflow(
+            engine,
+            loop,
+            resources,
+            runControl,
+            _ => { },
+            static action =>
+            {
+                action();
+                return Task.CompletedTask;
+            });
+
+        loop.Start(new SimulationRuntimeConfiguration([], [], []));
+        var runTask = runControl.RunAsync();
+        await Task.Yield();
+        Assert.False(runTask.IsCompleted);
+        var shutdownTask = workflow.ShutdownAsync(TimeSpan.FromMilliseconds(100));
+
+        var shutdown = await shutdownTask;
+        Assert.Equal(RuntimeShutdownOutcome.TimedOut, shutdown.Outcome);
+        Assert.Equal("RunControl", shutdown.Stage);
+
+        var applicationDisposeCalls = 0;
+        workflow.CompleteDisposeAfterShutdown(
+            shutdownTask,
+            () => applicationDisposeCalls++);
+        Assert.Equal(0, applicationDisposeCalls);
+
+        definitionRelease.TrySetResult(true);
+        await runTask;
+        runControl.Dispose();
+        Assert.True(resources.TryDisposeIfSafe());
     }
 
     private static async Task WaitForAsync(Func<bool> condition)

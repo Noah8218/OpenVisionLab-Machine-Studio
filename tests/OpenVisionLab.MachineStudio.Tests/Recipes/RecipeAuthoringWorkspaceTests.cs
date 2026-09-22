@@ -175,6 +175,40 @@ public sealed class RecipeAuthoringWorkspaceTests
     }
 
     [Fact]
+    public async Task DisposeExitsActivePlaybackAndDisablesPlaybackCommands()
+    {
+        using var host = new AuthoringHost(LoadTransferCell());
+        host.Load();
+        var connections = host.Workspace.Connections;
+        connections.ValidateSimulationReadinessCommand.Execute(null);
+        await RunDryRunAsync(connections.DryRun);
+        connections.PlayRecipeDryRunStepCommand.Execute(connections.DryRun.Timeline[0]);
+
+        Assert.True(host.Workspace.Playback.IsActive);
+        Assert.True(host.Workspace.Playback.NextStepCommand.CanExecute(null));
+        Assert.True(host.Workspace.Playback.ExitCommand.CanExecute(null));
+        var commands = new[]
+        {
+            host.Workspace.Playback.PreviousStepCommand,
+            host.Workspace.Playback.NextStepCommand,
+            host.Workspace.Playback.ExitCommand
+        };
+        var notifications = new int[commands.Length];
+        for (var index = 0; index < commands.Length; index++)
+        {
+            var commandIndex = index;
+            commands[commandIndex].CanExecuteChanged += (_, _) => notifications[commandIndex]++;
+        }
+
+        host.Workspace.Dispose();
+
+        Assert.False(host.Workspace.Playback.IsActive);
+        Assert.False(host.Workspace.Playback.NextStepCommand.CanExecute(null));
+        Assert.False(host.Workspace.Playback.ExitCommand.CanExecute(null));
+        Assert.All(notifications, count => Assert.Equal(1, count));
+    }
+
+    [Fact]
     public void CameraWorkflowUsesTheCurrentProjectAndKeepsRepeatedCreationInert()
     {
         var previous = new MachineProjectDocument { Name = "Previous" };
@@ -261,6 +295,40 @@ public sealed class RecipeAuthoringWorkspaceTests
         Assert.NotEmpty(host.Editor.Steps);
         Assert.NotEmpty(host.Layout.Items);
         Assert.Empty(host.Calls);
+    }
+
+    [Fact]
+    public void DisposeClearsActiveProcessPlanReviewAndDisablesReviewCommands()
+    {
+        using var host = new AuthoringHost(LoadProcessPlan());
+        host.Load();
+        var blocks = host.Workspace.Connections.ProcessBlocks;
+        blocks.PreviewProcessBlockCommand.Execute(null);
+        var item = blocks.VisibleProcessBlockItems.First(step => step.CanOpenSequenceStep);
+        host.Workspace.Connections.OpenSequenceStepCommand.Execute(item);
+
+        Assert.True(host.Workspace.ProcessPlanReview.HasReturnContext);
+        Assert.True(host.Workspace.ProcessPlanReview.ReturnToProcessPlanCommand.CanExecute(null));
+        var commands = new[]
+        {
+            host.Workspace.ProcessPlanReview.ReturnToProcessPlanCommand,
+            host.Workspace.ProcessPlanReview.PreviousStepCommand,
+            host.Workspace.ProcessPlanReview.NextStepCommand
+        };
+        var notifications = new int[commands.Length];
+        for (var index = 0; index < commands.Length; index++)
+        {
+            var commandIndex = index;
+            commands[commandIndex].CanExecuteChanged += (_, _) => notifications[commandIndex]++;
+        }
+
+        host.Workspace.Dispose();
+
+        Assert.False(host.Workspace.ProcessPlanReview.HasReturnContext);
+        Assert.False(host.Workspace.ProcessPlanReview.ReturnToProcessPlanCommand.CanExecute(null));
+        Assert.False(host.Workspace.ProcessPlanReview.PreviousStepCommand.CanExecute(null));
+        Assert.False(host.Workspace.ProcessPlanReview.NextStepCommand.CanExecute(null));
+        Assert.All(notifications, count => Assert.Equal(1, count));
     }
 
     [Fact]

@@ -23,6 +23,7 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
     private readonly Func<Task> _refreshResults;
     private readonly Func<Func<Task>, Task> _invokeOnUiThreadAsync;
     private readonly Action<string> _setStatus;
+    private readonly Action<Exception>? _handleException;
     private readonly MachineIntegrationSharedKeyStore _sharedKeyStore = new();
     private readonly MachineIntegrationTcpWorkflow _tcpWorkflow = new();
     private readonly MachineIntegrationTcpOperationOwner _tcpOperationOwner;
@@ -37,7 +38,8 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
         Func<MachineIntegrationTransactionSummary?> latestTransactionProvider,
         Func<Task> refreshResults,
         Action<string> setStatus,
-        Func<Func<Task>, Task>? invokeOnUiThreadAsync = null)
+        Func<Func<Task>, Task>? invokeOnUiThreadAsync = null,
+        Action<Exception>? handleException = null)
     {
         _settingsProvider = settingsProvider ?? throw new ArgumentNullException(nameof(settingsProvider));
         _latestTransactionProvider = latestTransactionProvider
@@ -45,10 +47,12 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
         _refreshResults = refreshResults ?? throw new ArgumentNullException(nameof(refreshResults));
         _invokeOnUiThreadAsync = invokeOnUiThreadAsync ?? ExecuteImmediatelyAsync;
         _setStatus = setStatus ?? throw new ArgumentNullException(nameof(setStatus));
+        _handleException = handleException;
         _tcpOperationOwner = new(
             isBusy => IsTcpBusy = isBusy,
             _setStatus,
-            () => L("TcpCancelled", "TCP 작업을 취소했습니다.", "TCP action cancelled."));
+            () => L("TcpCancelled", "TCP 작업을 취소했습니다.", "TCP action cancelled."),
+            ReportOperationExceptionAsync);
         _tcpListenerStatusText = L(
             "TcpStopped",
             "TCP 수신 중지됨",
@@ -79,6 +83,10 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
             async _ => await PullLatestTransactionAsync(),
             _ => CanPullLatestTransaction,
             useCommandManagerRequery: false);
+        CancelLatestTransactionCommand = new RelayCommand(
+            async _ => await CancelLatestTransactionAsync(),
+            _ => CanCancelLatestTransaction,
+            useCommandManagerRequery: false);
     }
 
     internal RelayCommand StartTcpListenerCommand { get; }
@@ -86,6 +94,7 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
     internal RelayCommand PingTcpPeerCommand { get; }
     internal RelayCommand PushLatestTransactionCommand { get; }
     internal RelayCommand PullLatestTransactionCommand { get; }
+    internal RelayCommand CancelLatestTransactionCommand { get; }
 
     internal bool IsTcpListening
     {
@@ -127,6 +136,10 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
         private set => SetProperty(ref _sharedKeyStatusText, value);
     }
 
+    internal bool IsSharedKeyReady => _sharedKeyStore.Status is
+        MachineIntegrationSharedKeyStatus.SessionReady
+        or MachineIntegrationSharedKeyStatus.EnvironmentReady;
+
     internal string LastTcpTransferText
     {
         get => _lastTcpTransferText;
@@ -139,7 +152,19 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
     internal bool CanPullLatestTransaction =>
         !IsTcpBusy && !IsCloseAdmissionRequested && _latestTransactionProvider() is not null;
 
-    internal bool IsCloseAdmissionRequested => _tcpOperationOwner.IsCloseAdmissionRequested;
+    internal bool CanCancelLatestTransaction
+    {
+        get
+        {
+            var transaction = _latestTransactionProvider();
+            return !IsTcpBusy
+                && !IsCloseAdmissionRequested
+                && transaction is { HasAcknowledgement: true, HasResult: false };
+        }
+    }
+
+    internal bool IsCloseAdmissionRequested => _tcpOperationOwner.IsCloseAdmissionRequested
+        || _tcpOperationOwner.IsDisposed;
 
     internal void RefreshLocalization()
     {
@@ -147,8 +172,15 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
         OnPropertyChanged(nameof(CanEditTcpSetup));
     }
 
-    internal void SetSessionSharedKey(string? encodedKey) =>
+    internal void SetSessionSharedKey(string? encodedKey)
+    {
+        var wasReady = IsSharedKeyReady;
         SharedKeyStatusText = DescribeSharedKeyStatus(_sharedKeyStore.SetSessionKey(encodedKey));
+        if (wasReady != IsSharedKeyReady)
+        {
+            OnPropertyChanged(nameof(IsSharedKeyReady));
+        }
+    }
 
     internal void SetSessionCloseAdmission(bool isRequested)
     {
@@ -278,16 +310,89 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
             refreshAfterTransfer: true);
     }
 
+    internal Task CancelLatestTransactionAsync()
+    {
+        var transaction = _latestTransactionProvider();
+        if (transaction is not { HasAcknowledgement: true, HasResult: false })
+        {
+            _setStatus(L(
+                "ChooseCancellationTransaction",
+                "취소할 실행 중인 거래가 없습니다.",
+                "No active transaction is available to cancel."));
+            return Task.CompletedTask;
+        }
+
+        var cancellationRequest = new IntegrationCancelRequestV2(
+            IntegrationContractSchema.V2,
+            IntegrationMessageKind.CancelRequest,
+            Guid.NewGuid(),
+            transaction.Handoff.TransactionId,
+            transaction.Handoff.MessageId,
+            DateTimeOffset.UtcNow,
+            transaction.Handoff.Producer,
+            L(
+                "CancelReason",
+                "Machine Studio 작업자 취소 요청",
+                "Machine Studio operator cancellation request"));
+        return RunTcpOperationAsync(
+            L("TcpCancelling", "검사 취소를 요청하는 중입니다.", "Requesting inspection cancellation."),
+            async cancellationToken =>
+            {
+                var settings = _settingsProvider();
+                var key = AcquireSharedKey();
+                try
+                {
+                    var receipt = await _tcpWorkflow.CancelTransactionAsync(
+                            settings.ExchangeRoot,
+                            key,
+                            new TcpIntegrationEndpoint(settings.PeerHost, settings.PeerPort),
+                            cancellationRequest,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    var statusText = string.Format(
+                        CultureInfo.CurrentCulture,
+                        L(
+                            "TcpCancellationFormat",
+                            "검사 취소 {0} · 거래 {1} · 멱등 {2}",
+                            "Inspection cancellation {0} · transaction {1} · idempotent {2}"),
+                        receipt.Status,
+                        receipt.TransactionId.ToString("D"),
+                        receipt.Idempotent);
+                    if (!await DispatchPresentationAsync(() => LastTcpTransferText = statusText)
+                            .ConfigureAwait(false))
+                    {
+                        return;
+                    }
+
+                    await _invokeOnUiThreadAsync(async () =>
+                    {
+                        if (!_tcpOperationOwner.IsDisposed)
+                        {
+                            await _refreshResults().ConfigureAwait(true);
+                        }
+                    }).ConfigureAwait(false);
+                    await DispatchPresentationAsync(() => _setStatus(statusText))
+                        .ConfigureAwait(false);
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(key);
+                }
+            });
+    }
+
     internal void RefreshCommandState()
     {
         OnPropertyChanged(nameof(CanPushLatestTransaction));
         OnPropertyChanged(nameof(CanPullLatestTransaction));
+        OnPropertyChanged(nameof(CanCancelLatestTransaction));
         OnPropertyChanged(nameof(CanEditTcpSetup));
         StartTcpListenerCommand.RaiseCanExecuteChanged();
         StopTcpListenerCommand.RaiseCanExecuteChanged();
         PingTcpPeerCommand.RaiseCanExecuteChanged();
         PushLatestTransactionCommand.RaiseCanExecuteChanged();
         PullLatestTransactionCommand.RaiseCanExecuteChanged();
+        CancelLatestTransactionCommand.RaiseCanExecuteChanged();
     }
 
     private Task<MachineIntegrationOperationObservation> RunTcpTransferAsync(
@@ -358,6 +463,20 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
             return Task.CompletedTask;
         }).ConfigureAwait(false);
         return published;
+    }
+
+    private Task ReportOperationExceptionAsync(Exception exception)
+    {
+        if (_handleException is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        return _invokeOnUiThreadAsync(() =>
+        {
+            _tcpOperationOwner.TryPublishIfActive(() => _handleException(exception));
+            return Task.CompletedTask;
+        });
     }
 
     private static Task ExecuteImmediatelyAsync(Func<Task> operation) => operation();
@@ -452,11 +571,16 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
             return;
         }
 
+        var wasListening = _isTcpListening;
         IsTcpListening = false;
         TcpListenerStatusText = L(
             "TcpStopped",
             "TCP 수신 중지됨",
             "TCP listener stopped");
+        if (!wasListening)
+        {
+            RefreshCommandState();
+        }
         _sharedKeyStore.Dispose();
         _tcpWorkflow.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }

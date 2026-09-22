@@ -50,7 +50,17 @@ public sealed class RecipeDryRunViewModel : ViewModelBase, IDisposable
     private bool _isEditable = true;
     private bool? _readinessPassed;
     private string? _readinessError;
+    private string _readinessComparisonText = string.Empty;
+    private string _lastReadinessSignature = string.Empty;
+    private bool _lastReadinessPassed;
+    private bool _hasReadinessSnapshot;
+    private long _projectRevision = 1;
+    private long? _readinessProjectRevision;
+    private bool _readinessStale;
+    private long _readinessStaleFromRevision;
+    private long _readinessStaleToRevision;
     private int _definitionRevision;
+    private int _editabilityGeneration;
     private bool _isRecipeDryRunRunning;
     private RecipeDryRunResult? _recipeDryRunResult;
     private RecipeDryRunStepPresentation? _selectedRecipeDryRunStep;
@@ -81,6 +91,8 @@ public sealed class RecipeDryRunViewModel : ViewModelBase, IDisposable
             _ => !IsDisposed
                  && IsEditable
                  && ReadinessPassed == true
+                 && !_readinessStale
+                 && _readinessProjectRevision == _projectRevision
                  && !IsRecipeDryRunRunning
                  && ResolveRecipeSequenceId() is not null);
         _openRecipeDryRunStepCommand = new RelayCommand(
@@ -108,24 +120,34 @@ public sealed class RecipeDryRunViewModel : ViewModelBase, IDisposable
                 return;
             }
 
+            Interlocked.Increment(ref _editabilityGeneration);
             RaiseCommandsCanExecuteChanged();
         }
     }
 
     public bool? ReadinessPassed => _readinessPassed;
+    public bool IsReadinessStale => _readinessStale;
     public string ReadinessStatusText => OpenVisionLanguageService.T(
-        _readinessPassed switch
+        _readinessStale
+            ? "Connections.ReadinessStale"
+            : _readinessPassed switch
         {
             true => "Connections.ReadinessPassed",
             false => "Connections.ReadinessFailed",
             null => "Connections.ReadinessNotChecked"
         });
-    public string ReadinessDetailText => _readinessPassed switch
-    {
-        true => OpenVisionLanguageService.T("Connections.ReadinessPassedDetail"),
-        false => Format("Connections.ReadinessFailedDetail", _readinessError ?? string.Empty),
-        null => OpenVisionLanguageService.T("Connections.ReadinessNotCheckedDetail")
-    };
+    public string ReadinessDetailText => _readinessStale
+        ? Format(
+            "Connections.ReadinessStaleDetail",
+            _readinessStaleFromRevision,
+            _readinessStaleToRevision)
+        : _readinessPassed switch
+        {
+            true => OpenVisionLanguageService.T("Connections.ReadinessPassedDetail"),
+            false => Format("Connections.ReadinessFailedDetail", _readinessError ?? string.Empty),
+            null => OpenVisionLanguageService.T("Connections.ReadinessNotCheckedDetail")
+        };
+    public string ReadinessComparisonText => _readinessComparisonText;
     public bool IsRecipeDryRunRunning
     {
         get => _isRecipeDryRunRunning;
@@ -184,15 +206,66 @@ public sealed class RecipeDryRunViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var readinessPassed = preserveReadiness ? _readinessPassed : null;
-        var readinessError = preserveReadiness ? _readinessError : null;
+        var sameProject = ReferenceEquals(_project, project);
+        var readinessPassed = preserveReadiness && sameProject ? _readinessPassed : null;
+        var readinessError = preserveReadiness && sameProject ? _readinessError : null;
+        if (!sameProject)
+        {
+            _hasReadinessSnapshot = false;
+            _lastReadinessSignature = string.Empty;
+            _readinessProjectRevision = null;
+            _readinessStale = false;
+            _readinessStaleFromRevision = 0;
+            _readinessStaleToRevision = 0;
+        }
+
         _project = project;
         _definitionRevision++;
         _readinessPassed = readinessPassed;
         _readinessError = readinessError;
+        if (!preserveReadiness && sameProject && _hasReadinessSnapshot)
+        {
+            _readinessComparisonText = OpenVisionLanguageService.T("Connections.ReadinessComparisonRerunRequired");
+        }
+        else if (!preserveReadiness)
+        {
+            _readinessComparisonText = string.Empty;
+        }
         ClearRecipeDryRun();
         RaiseReadinessChanged();
         _runRecipeDryRunCommand.RaiseCanExecuteChanged();
+    }
+
+    internal void SetProjectRevision(long revision)
+    {
+        if (IsDisposed || revision == _projectRevision)
+        {
+            return;
+        }
+
+        var previousRevision = _projectRevision;
+        _projectRevision = revision;
+        var hasReadinessEvidence = _hasReadinessSnapshot
+            || _readinessProjectRevision is not null
+            || _readinessPassed is not null;
+        if (!hasReadinessEvidence)
+        {
+            return;
+        }
+
+        if (!_readinessStale)
+        {
+            _readinessStaleFromRevision = _readinessProjectRevision ?? previousRevision;
+        }
+
+        _readinessStaleToRevision = revision;
+        _readinessStale = true;
+        _readinessPassed = null;
+        _readinessError = null;
+        _readinessProjectRevision = null;
+        _readinessComparisonText = OpenVisionLanguageService.T("Connections.ReadinessComparisonRerunRequired");
+        ClearRecipeDryRun();
+        RaiseReadinessChanged();
     }
 
     private void ValidateSimulationReadiness()
@@ -204,6 +277,26 @@ public sealed class RecipeDryRunViewModel : ViewModelBase, IDisposable
 
         _readinessError = _validateSimulationReadiness();
         _readinessPassed = _readinessError is null;
+        _readinessProjectRevision = _projectRevision;
+        _readinessStale = false;
+        _readinessStaleFromRevision = 0;
+        _readinessStaleToRevision = 0;
+        var signature = _readinessPassed == true
+            ? "passed"
+            : $"failed|{_readinessError}";
+        var comparisonKey = !_hasReadinessSnapshot
+            ? "Connections.ReadinessComparisonInitial"
+            : string.Equals(signature, _lastReadinessSignature, StringComparison.Ordinal)
+                ? "Connections.ReadinessComparisonUnchanged"
+                : _lastReadinessPassed && !_readinessPassed.Value
+                    ? "Connections.ReadinessComparisonRegressed"
+                    : !_lastReadinessPassed && _readinessPassed.Value
+                        ? "Connections.ReadinessComparisonImproved"
+                        : "Connections.ReadinessComparisonChanged";
+        _readinessComparisonText = OpenVisionLanguageService.T(comparisonKey);
+        _lastReadinessSignature = signature;
+        _lastReadinessPassed = _readinessPassed == true;
+        _hasReadinessSnapshot = true;
         RaiseReadinessChanged();
     }
 
@@ -221,11 +314,20 @@ public sealed class RecipeDryRunViewModel : ViewModelBase, IDisposable
         }
 
         var revision = _definitionRevision;
+        var projectRevision = _projectRevision;
+        var editabilityGeneration = Volatile.Read(ref _editabilityGeneration);
         IsRecipeDryRunRunning = true;
         try
         {
             var result = await _runRecipeDryRun(sequenceId);
-            if (IsDisposed || revision != _definitionRevision || ReadinessPassed != true)
+            if (IsDisposed
+                || revision != _definitionRevision
+                || projectRevision != _projectRevision
+                || editabilityGeneration != Volatile.Read(ref _editabilityGeneration)
+                || !IsEditable
+                || ReadinessPassed != true
+                || _readinessStale
+                || _readinessProjectRevision != projectRevision)
             {
                 return;
             }
@@ -490,8 +592,10 @@ public sealed class RecipeDryRunViewModel : ViewModelBase, IDisposable
         }
 
         OnPropertyChanged(nameof(ReadinessPassed));
+        OnPropertyChanged(nameof(IsReadinessStale));
         OnPropertyChanged(nameof(ReadinessStatusText));
         OnPropertyChanged(nameof(ReadinessDetailText));
+        OnPropertyChanged(nameof(ReadinessComparisonText));
         RaiseCommandsCanExecuteChanged();
     }
 
@@ -588,6 +692,10 @@ public sealed class RecipeDryRunViewModel : ViewModelBase, IDisposable
     {
         Interlocked.Exchange(ref _disposed, 1);
         _isRecipeDryRunRunning = false;
+        _validateSimulationReadinessCommand.RaiseCanExecuteChanged();
+        _runRecipeDryRunCommand.RaiseCanExecuteChanged();
+        _openRecipeDryRunStepCommand.RaiseCanExecuteChanged();
+        _playRecipeDryRunStepCommand.RaiseCanExecuteChanged();
     }
 
     private bool IsDisposed => Volatile.Read(ref _disposed) != 0;

@@ -26,6 +26,7 @@ public enum MachineProjectLayoutValidationErrorCode
     SensorOutputChannelMustBeDigitalInput,
     SensorTargetComponentRequired,
     SensorTargetComponentNotFound,
+    SensorTargetComponentMustBeInSameLayout,
     SensorDelayInvalid,
     CylinderDeviceBindingInvalid,
     CylinderChannelIdRequired,

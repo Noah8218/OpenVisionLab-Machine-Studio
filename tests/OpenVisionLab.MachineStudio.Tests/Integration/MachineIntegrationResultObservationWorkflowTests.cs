@@ -18,8 +18,168 @@ public sealed class MachineIntegrationResultObservationWorkflowTests
 
         Assert.Equal(0, transactionCount);
         Assert.Equal(0, workflow.TransactionCount);
+        Assert.Empty(workflow.CurrentTransactions);
+        Assert.Empty(workflow.TransactionDiagnostics);
         Assert.Null(workflow.LatestTransaction);
         Assert.Null(workflow.LatestResult);
+    }
+
+    [Fact]
+    public async Task RefreshAsyncClassifiesMalformedResultAsReadErrorWithoutFailingRefresh()
+    {
+        using var fixture = new TestRoot();
+        var handoff = fixture.PublishHandoff();
+        var acknowledgement = new IntegrationAcknowledgementV2(
+            IntegrationContractSchema.V2,
+            IntegrationMessageKind.Acknowledgement,
+            Guid.NewGuid(),
+            handoff.TransactionId,
+            handoff.MessageId,
+            handoff.CreatedAtUtc,
+            handoff.Context.ConsumerBuild,
+            IntegrationAcknowledgementStatus.Accepted,
+            null);
+        var transactionDirectory = Path.Combine(
+            fixture.ExchangeRoot,
+            IntegrationTransactionLayout.TransactionsDirectoryName,
+            handoff.TransactionId.ToString("D"));
+        File.WriteAllBytes(
+            Path.Combine(transactionDirectory, IntegrationTransactionLayout.AcknowledgementFileName),
+            IntegrationContractJson.SerializeCanonical(acknowledgement));
+        File.WriteAllText(
+            Path.Combine(transactionDirectory, IntegrationTransactionLayout.ResultFileName),
+            "{ malformed-result }");
+        using var workflow = CreateWorkflow(fixture.ExchangeRoot, () => Task.CompletedTask);
+
+        var transactionCount = await workflow.RefreshAsync();
+
+        Assert.Equal(1, transactionCount);
+        Assert.Null(workflow.LatestResult);
+        Assert.NotNull(workflow.ResultReadError);
+    }
+
+    [Fact]
+    public async Task RefreshAsyncPublishesCurrentProjectTransactionHistorySnapshot()
+    {
+        using var fixture = new TestRoot();
+        var first = fixture.PublishHandoff();
+        var second = fixture.PublishHandoff();
+        using var workflow = CreateWorkflow(fixture.ExchangeRoot, () => Task.CompletedTask);
+
+        var transactionCount = await workflow.RefreshAsync();
+
+        Assert.Equal(2, transactionCount);
+        Assert.Equal(2, workflow.TransactionCount);
+        Assert.Equal(
+            new[] { first.TransactionId, second.TransactionId }.OrderBy(id => id),
+            workflow.CurrentTransactions.Select(transaction => transaction.Handoff.TransactionId).OrderBy(id => id));
+        Assert.All(workflow.CurrentTransactions, transaction =>
+        {
+            Assert.False(transaction.HasAcknowledgement);
+            Assert.False(transaction.HasResult);
+            });
+    }
+
+    [Fact]
+    public async Task RefreshAsyncDoesNotPublishAfterProjectContextChanges()
+    {
+        using var fixture = new TestRoot();
+        fixture.PublishHandoff();
+        var projectId = "project-1";
+        var synchronizationContext = new QueuedSynchronizationContext();
+        var previousContext = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(synchronizationContext);
+        try
+        {
+            using var workflow = new MachineIntegrationResultObservationWorkflow(
+                () => fixture.ExchangeRoot,
+                () => projectId,
+                () => true,
+                () => false,
+                () => Task.CompletedTask,
+                operation => operation(),
+                _ => { });
+            var refreshTask = workflow.RefreshAsync();
+
+            projectId = "project-2";
+            Assert.True(workflow.RefreshContext());
+            synchronizationContext.RunNext();
+
+            Assert.Null(await refreshTask.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.Empty(workflow.CurrentTransactions);
+            Assert.Empty(workflow.TransactionDiagnostics);
+            Assert.Null(workflow.LatestTransaction);
+            Assert.Equal(0, workflow.TransactionCount);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previousContext);
+        }
+    }
+
+    [Fact]
+    public async Task RefreshAsyncDoesNotPublishAfterReset()
+    {
+        using var fixture = new TestRoot();
+        fixture.PublishHandoff();
+        var synchronizationContext = new QueuedSynchronizationContext();
+        var previousContext = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(synchronizationContext);
+        try
+        {
+            using var workflow = CreateWorkflow(fixture.ExchangeRoot, () => Task.CompletedTask);
+            var refreshTask = workflow.RefreshAsync();
+
+            workflow.Reset();
+            synchronizationContext.RunNext();
+
+            Assert.Null(await refreshTask.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.Empty(workflow.CurrentTransactions);
+            Assert.Empty(workflow.TransactionDiagnostics);
+            Assert.Null(workflow.LatestTransaction);
+            Assert.Equal(0, workflow.TransactionCount);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previousContext);
+        }
+    }
+
+    [Fact]
+    public async Task RefreshAsyncPublishesReadOnlyTransactionDiagnostics()
+    {
+        using var fixture = new TestRoot();
+        var published = fixture.PublishHandoff();
+        var transactionsRoot = Path.Combine(
+            fixture.ExchangeRoot,
+            IntegrationTransactionLayout.TransactionsDirectoryName);
+        Directory.CreateDirectory(transactionsRoot);
+        Directory.CreateDirectory(Path.Combine(
+            transactionsRoot,
+            $".{Guid.NewGuid():D}.{Guid.NewGuid():N}.staging"));
+        Directory.CreateDirectory(Path.Combine(transactionsRoot, "unexpected"));
+        Directory.CreateDirectory(Path.Combine(
+            transactionsRoot,
+            ".quarantine",
+            $"{Guid.NewGuid():D}.20260910000000000.{Guid.NewGuid():N}"));
+        using var workflow = CreateWorkflow(fixture.ExchangeRoot, () => Task.CompletedTask);
+
+        await workflow.RefreshAsync();
+
+        Assert.Null(workflow.DiagnosticReadError);
+        Assert.Contains(
+            workflow.TransactionDiagnostics,
+            diagnostic => diagnostic.TransactionId == published.TransactionId
+                && diagnostic.State == MachineIntegrationTransactionState.Published);
+        Assert.Contains(
+            workflow.TransactionDiagnostics,
+            diagnostic => diagnostic.State == MachineIntegrationTransactionState.Staging);
+        Assert.Contains(
+            workflow.TransactionDiagnostics,
+            diagnostic => diagnostic.State == MachineIntegrationTransactionState.Invalid);
+        Assert.Contains(
+            workflow.TransactionDiagnostics,
+            diagnostic => diagnostic.State == MachineIntegrationTransactionState.Quarantined);
     }
 
     [Fact]

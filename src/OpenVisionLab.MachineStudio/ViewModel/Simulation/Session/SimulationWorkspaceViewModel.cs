@@ -608,6 +608,8 @@ public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisp
 
         isDisposed = true;
         OpenVisionLanguageService.LanguageChanged -= OnLanguageChanged;
+        loadScenarioProfileCommand.RaiseCanExecuteChanged();
+        resetScenarioCommand.RaiseCanExecuteChanged();
     }
 
     private void LoadScenarioProfile()

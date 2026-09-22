@@ -117,11 +117,6 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
 
     public void InvalidateCommands()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
         ((RelayCommand)StartBlankLayoutCommand).RaiseCanExecuteChanged();
         ((AsyncRelayCommand)OpenBundledSampleCommand).RaiseCanExecuteChanged();
     }
@@ -168,5 +163,6 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
         _disposed = true;
         OpenVisionLanguageService.LanguageChanged -= OnLanguageChanged;
         LanguageChanged = null;
+        InvalidateCommands();
     }
 }

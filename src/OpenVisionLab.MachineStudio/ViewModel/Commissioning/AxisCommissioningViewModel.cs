@@ -28,6 +28,12 @@ internal sealed record AxisCommissioningProjection(
 /// </summary>
 public sealed class AxisCommissioningViewModel : ViewModelBase, IDisposable
 {
+    private static readonly string[] ModePresentationPropertyNames =
+    [
+        nameof(CanMoveAxisAbsolute),
+        nameof(CanMoveAxisRelative), nameof(CanMoveAxisVelocity), nameof(CanJogAxis)
+    ];
+
     private readonly Func<SimulationCommand, string, Task<SimulationCommandResult>> _dispatch;
     private readonly Action<Exception> _onCommandException;
     private int _disposed;
@@ -57,6 +63,7 @@ public sealed class AxisCommissioningViewModel : ViewModelBase, IDisposable
     private ICommand? _endAxisJogCommand;
     private ICommand? _homeAxisCommand;
     private ICommand? _stopAxisMotionCommand;
+    private AxisCommissioningProjection? _lastProjection;
 
     public AxisCommissioningViewModel(
         Func<SimulationCommand, string, Task<SimulationCommandResult>> dispatch,
@@ -348,6 +355,8 @@ public sealed class AxisCommissioningViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        var isModeOnlyChange = IsModeOnlyChange(_lastProjection, projection);
+        _lastProjection = projection;
         var axisChanged = !string.Equals(
             _currentAxis?.Id,
             projection.Snapshot?.Id,
@@ -372,16 +381,18 @@ public sealed class AxisCommissioningViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(AxisTargetPositionText));
         }
 
-        NotifyProjectionChanged(invalidateCommands);
+        if (isModeOnlyChange)
+        {
+            NotifyModeProjectionChanged(invalidateCommands);
+        }
+        else
+        {
+            NotifyProjectionChanged(invalidateCommands);
+        }
     }
 
     internal void InvalidateCommands()
     {
-        if (IsDisposed)
-        {
-            return;
-        }
-
         RaiseCanExecuteChanged(_moveAxisAbsoluteCommand);
         RaiseCanExecuteChanged(_moveAxisRelativeCommand);
         RaiseCanExecuteChanged(_moveAxisVelocityCommand);
@@ -579,6 +590,36 @@ public sealed class AxisCommissioningViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private void NotifyModeProjectionChanged(bool invalidateCommands)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        foreach (var propertyName in ModePresentationPropertyNames)
+        {
+            OnPropertyChanged(propertyName);
+        }
+
+        if (invalidateCommands)
+        {
+            InvalidateCommands();
+        }
+    }
+
+    private static bool IsModeOnlyChange(
+        AxisCommissioningProjection? previous,
+        AxisCommissioningProjection current)
+    {
+        if (previous is null || previous.IsRunMode == current.IsRunMode)
+        {
+            return false;
+        }
+
+        return (previous with { IsRunMode = current.IsRunMode }) == current;
+    }
+
     private static string LocalizeRuntimeState(string state) =>
         OpenVisionLanguageService.T($"Equipment.State.{state}", state, state);
 
@@ -605,6 +646,7 @@ public sealed class AxisCommissioningViewModel : ViewModelBase, IDisposable
         _axisJogInteractionActive = false;
         _axisJogAxisId = null;
         _axisJogStartTask = null;
+        InvalidateCommands();
     }
 
     private bool IsDisposed => Volatile.Read(ref _disposed) != 0;

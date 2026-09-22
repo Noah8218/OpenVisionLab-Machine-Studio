@@ -20,7 +20,8 @@ internal sealed record ManualCameraTriggerRequestInput(
     string? SelectedRecipe,
     VirtualCameraDefinition? CameraDefinition,
     VirtualSingleImageSourceDefinition? SourceDefinition,
-    int SimulationSeed);
+    int SimulationSeed,
+    bool WaitForExternalResult = false);
 
 /// <summary>
 /// Builds the immutable input for one manual camera trigger. Runtime state,
@@ -75,6 +76,7 @@ internal sealed class ManualCameraTriggerRequestFactory
                     axis => axis.Id,
                     axis => axis.Position,
                     StringComparer.Ordinal)),
-            snapshot.RuntimeGeneration);
+            snapshot.RuntimeGeneration,
+            input.WaitForExternalResult);
     }
 }

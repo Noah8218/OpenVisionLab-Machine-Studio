@@ -4,6 +4,7 @@ using System.Windows.Data;
 using System.Windows.Markup;
 using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Sequences;
+using OpenVisionLab.Machine.Sequence.Authoring;
 using OpenVisionLab.MachineStudio.Models.Simulation;
 
 namespace OpenVisionLab.MachineStudio.Localization;
@@ -110,6 +111,28 @@ public sealed class LocalizedSequenceNameConverter : IValueConverter
             $"{sequence.Id}.name",
             sequence.Name);
     }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        Binding.DoNothing;
+}
+
+public sealed class LocalizedSequenceActionConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is SequenceStepAction action
+            ? OpenVisionLanguageService.T($"Sequence.Action.{action}", action.ToString(), action.ToString())
+            : value?.ToString() ?? string.Empty;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        Binding.DoNothing;
+}
+
+public sealed class LocalizedSequenceTemplateNameConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is SequenceStepTemplateDefinition template
+            ? OpenVisionLanguageService.T($"Sequence.Template.{template.Id}", template.Name, template.Name)
+            : value?.ToString() ?? string.Empty;
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         Binding.DoNothing;

@@ -473,6 +473,264 @@ public sealed class RecipeConnectionWorkbenchViewModelTests
     }
 
     [Fact]
+    public void DisposeNotifiesParentCommandsOfFinalAdmission()
+    {
+        var project = new ProjectDocumentStore().Load(File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "Samples",
+            "AutomaticTransferCell.ovmachine")));
+        var viewModel = CreateViewModel(() => { }, () => { }, () => { });
+        viewModel.Load(project);
+        var row = viewModel.Rows.First(item => item.HasSequenceUse);
+        Assert.True(viewModel.OpenSequenceStepCommand.CanExecute(row));
+
+        var notifications = 0;
+        viewModel.OpenSequenceStepCommand.CanExecuteChanged += (_, _) => notifications++;
+
+        viewModel.Dispose();
+
+        Assert.False(viewModel.OpenSequenceStepCommand.CanExecute(row));
+        Assert.Equal(1, notifications);
+    }
+
+    [Fact]
+    public void DisposeClosesStationSetupCommandsOfChildOwner()
+    {
+        var viewModel = CreateViewModel(() => { }, () => { }, () => { });
+        viewModel.Load(new MachineProjectDocument { Name = "Station disposal test" });
+        var station = viewModel.StationSetups;
+        Assert.True(station.PreviewStationSkeletonCommand.CanExecute(null));
+        station.PreviewStationSkeletonCommand.Execute(null);
+
+        var notifications = 0;
+        station.PreviewStationSkeletonCommand.CanExecuteChanged += (_, _) => notifications++;
+
+        viewModel.Dispose();
+
+        Assert.False(station.PreviewStationSkeletonCommand.CanExecute(null));
+        Assert.Equal(1, notifications);
+
+        station.PreviewStationSkeletonCommand.Execute(null);
+        Assert.False(station.IsStationSkeletonPreviewVisible);
+    }
+
+    [Fact]
+    public void DisposeClosesCheckpointTemplateCommandsOfChildOwner()
+    {
+        var project = new ProjectDocumentStore().Load(File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "Samples",
+            "AutomaticTransferCell.ovmachine")));
+        var viewModel = CreateViewModel(() => { }, () => { }, () => { });
+        viewModel.Load(project);
+        var checkpoint = viewModel.CheckpointTemplate;
+        Assert.True(checkpoint.PreviewCommand.CanExecute(null));
+        checkpoint.PreviewCommand.Execute(null);
+        Assert.True(checkpoint.IsPreviewVisible);
+
+        var notifications = 0;
+        checkpoint.PreviewCommand.CanExecuteChanged += (_, _) => notifications++;
+
+        viewModel.Dispose();
+
+        Assert.False(checkpoint.PreviewCommand.CanExecute(null));
+        Assert.Equal(1, notifications);
+        Assert.False(checkpoint.IsPreviewVisible);
+
+        checkpoint.PreviewCommand.Execute(null);
+        Assert.False(checkpoint.IsPreviewVisible);
+    }
+
+    [Fact]
+    public void DisposeClosesLoadLockCommandsOfChildOwner()
+    {
+        var project = new ProjectDocumentStore().Load(File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "SemiconductorRecipes",
+            "05-LoadLockEntry.ovmachine")));
+        var viewModel = CreateViewModel(() => { }, () => { }, () => { });
+        viewModel.Load(project);
+        var loadLock = viewModel.LoadLocks;
+        Assert.True(loadLock.PreviewCommand.CanExecute(null));
+        loadLock.PreviewCommand.Execute(null);
+        Assert.True(loadLock.IsVisible);
+
+        var notifications = 0;
+        loadLock.PreviewCommand.CanExecuteChanged += (_, _) => notifications++;
+
+        viewModel.Dispose();
+
+        Assert.False(loadLock.PreviewCommand.CanExecute(null));
+        Assert.Equal(1, notifications);
+        Assert.False(loadLock.IsVisible);
+
+        loadLock.PreviewCommand.Execute(null);
+        Assert.False(loadLock.IsVisible);
+    }
+
+    [Fact]
+    public void DisposeClosesProcessBlockCommandsOfChildOwner()
+    {
+        var project = new ProjectDocumentStore().Load(File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "Samples",
+            "AutomaticTransferCell.ovmachine")));
+        var viewModel = CreateViewModel(() => { }, () => { }, () => { });
+        viewModel.Load(project);
+        var processBlocks = viewModel.ProcessBlocks;
+        Assert.True(processBlocks.PreviewProcessBlockCommand.CanExecute(null));
+        processBlocks.PreviewProcessBlockCommand.Execute(null);
+        Assert.True(processBlocks.IsProcessBlockPreviewVisible);
+
+        var notifications = 0;
+        processBlocks.PreviewProcessBlockCommand.CanExecuteChanged += (_, _) => notifications++;
+
+        viewModel.Dispose();
+
+        Assert.False(processBlocks.PreviewProcessBlockCommand.CanExecute(null));
+        Assert.Equal(1, notifications);
+        Assert.False(processBlocks.IsProcessBlockPreviewVisible);
+
+        processBlocks.PreviewProcessBlockCommand.Execute(null);
+        Assert.False(processBlocks.IsProcessBlockPreviewVisible);
+    }
+
+    [Fact]
+    public void DisposeClosesWaferHandlerCommandsOfSemanticChildOwner()
+    {
+        var project = new ProjectDocumentStore().Load(File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "SemiconductorRecipes",
+            "04-WaferOcrInspection.ovmachine")));
+        var viewModel = CreateViewModel(() => { }, () => { }, () => { });
+        viewModel.Load(project);
+        var waferHandler = viewModel.SemanticSetups.WaferHandler;
+        Assert.True(waferHandler.PreviewCommand.CanExecute(null));
+        waferHandler.PreviewCommand.Execute(null);
+        Assert.True(waferHandler.IsVisible);
+
+        var notifications = 0;
+        waferHandler.PreviewCommand.CanExecuteChanged += (_, _) => notifications++;
+
+        viewModel.Dispose();
+
+        Assert.False(waferHandler.PreviewCommand.CanExecute(null));
+        Assert.Equal(1, notifications);
+        Assert.False(waferHandler.IsVisible);
+
+        waferHandler.PreviewCommand.Execute(null);
+        Assert.False(waferHandler.IsVisible);
+    }
+
+    [Fact]
+    public void DisposeClosesPrealignerCommandsOfSemanticChildOwner()
+    {
+        var project = new ProjectDocumentStore().Load(File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "SemiconductorRecipes",
+            "03-WaferPrealigner.ovmachine")));
+        var viewModel = CreateViewModel(() => { }, () => { }, () => { });
+        viewModel.Load(project);
+        var prealigner = viewModel.SemanticSetups.Prealigner;
+        Assert.True(prealigner.PreviewCommand.CanExecute(null));
+        prealigner.PreviewCommand.Execute(null);
+        Assert.True(prealigner.IsVisible);
+
+        var notifications = 0;
+        prealigner.PreviewCommand.CanExecuteChanged += (_, _) => notifications++;
+
+        viewModel.Dispose();
+
+        Assert.False(prealigner.PreviewCommand.CanExecute(null));
+        Assert.Equal(1, notifications);
+        Assert.False(prealigner.IsVisible);
+
+        prealigner.PreviewCommand.Execute(null);
+        Assert.False(prealigner.IsVisible);
+    }
+
+    [Fact]
+    public void DisposeClosesInspectionHandoffCommandsOfSemanticChildOwner()
+    {
+        var project = new ProjectDocumentStore().Load(File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "SemiconductorRecipes",
+            "04-WaferOcrInspection.ovmachine")));
+        var viewModel = CreateViewModel(() => { }, () => { }, () => { });
+        viewModel.Load(project);
+        var inspectionHandoff = viewModel.SemanticSetups.InspectionHandoff;
+        Assert.True(inspectionHandoff.PreviewCommand.CanExecute(null));
+        inspectionHandoff.PreviewCommand.Execute(null);
+        Assert.True(inspectionHandoff.IsVisible);
+
+        var notifications = 0;
+        inspectionHandoff.PreviewCommand.CanExecuteChanged += (_, _) => notifications++;
+
+        viewModel.Dispose();
+
+        Assert.False(inspectionHandoff.PreviewCommand.CanExecute(null));
+        Assert.Equal(1, notifications);
+        Assert.False(inspectionHandoff.IsVisible);
+
+        inspectionHandoff.PreviewCommand.Execute(null);
+        Assert.False(inspectionHandoff.IsVisible);
+    }
+
+    [Fact]
+    public void DisposeClosesInspectionSortRouterCommandsOfSemanticChildOwner()
+    {
+        var project = new ProjectDocumentStore().Load(File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "SemiconductorRecipes",
+            "10-MetrologySorter.ovmachine")));
+        var viewModel = CreateViewModel(() => { }, () => { }, () => { });
+        viewModel.Load(project);
+        var sortRouter = viewModel.SemanticSetups.InspectionSortRouter;
+        Assert.True(sortRouter.PreviewCommand.CanExecute(null));
+        sortRouter.PreviewCommand.Execute(null);
+        Assert.True(sortRouter.IsVisible);
+
+        var notifications = 0;
+        sortRouter.PreviewCommand.CanExecuteChanged += (_, _) => notifications++;
+
+        viewModel.Dispose();
+
+        Assert.False(sortRouter.PreviewCommand.CanExecute(null));
+        Assert.Equal(1, notifications);
+        Assert.False(sortRouter.IsVisible);
+
+        sortRouter.PreviewCommand.Execute(null);
+        Assert.False(sortRouter.IsVisible);
+    }
+
+    [Fact]
+    public void DisposeClosesOhtHandoffCommandsOfSemanticChildOwner()
+    {
+        var project = new ProjectDocumentStore().Load(File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "SemiconductorRecipes",
+            "08-DryEtchTransfer.ovmachine")));
+        var viewModel = CreateViewModel(() => { }, () => { }, () => { });
+        viewModel.Load(project);
+        var ohtHandoff = viewModel.SemanticSetups.OhtHandoff;
+        Assert.True(ohtHandoff.PreviewCommand.CanExecute(null));
+        ohtHandoff.PreviewCommand.Execute(null);
+        Assert.True(ohtHandoff.IsVisible);
+
+        var notifications = 0;
+        ohtHandoff.PreviewCommand.CanExecuteChanged += (_, _) => notifications++;
+
+        viewModel.Dispose();
+
+        Assert.False(ohtHandoff.PreviewCommand.CanExecute(null));
+        Assert.Equal(1, notifications);
+        Assert.False(ohtHandoff.IsVisible);
+
+        ohtHandoff.PreviewCommand.Execute(null);
+        Assert.False(ohtHandoff.IsVisible);
+    }
+
+    [Fact]
     public void TargetStepCommandMatchesSequenceStructureEditability()
     {
         var project = new MachineProjectDocument { Name = "Connection structure gate" };

@@ -37,7 +37,7 @@
                 <Button Command="{Binding NewProjectCommand}"
                         AutomationProperties.Name="{loc:Loc Key=Shell.New}"
                         Style="{StaticResource QuietCommandButtonStyle}"
-                        ToolTip="New project (Ctrl+N)">
+                        ToolTip="{loc:Loc Key=Shell.NewTooltip}">
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
                         <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.New}" />
@@ -46,7 +46,7 @@
                 <Button Command="{Binding OpenProjectCommand}"
                         AutomationProperties.Name="{loc:Loc Key=Shell.Open}"
                         Style="{StaticResource QuietCommandButtonStyle}"
-                        ToolTip="Open project (Ctrl+O)">
+                        ToolTip="{loc:Loc Key=Shell.OpenTooltip}">
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="FolderOpen24" Foreground="{DynamicResource Accent.Primary}" />
                         <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.Open}" />
@@ -55,7 +55,7 @@
                 <Button Command="{Binding SaveProjectCommand}"
                         AutomationProperties.Name="{loc:Loc Key=Shell.Save}"
                         Style="{StaticResource QuietCommandButtonStyle}"
-                        ToolTip="Save project (Ctrl+S)">
+                        ToolTip="{loc:Loc Key=Shell.SaveTooltip}">
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Save24" Foreground="{DynamicResource Accent.Primary}" />
                         <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.Save}" />
@@ -89,7 +89,7 @@
                 <Button Command="{Binding RunCommand}"
                         AutomationProperties.Name="{loc:Loc Key=Shell.SimulationOn}"
                         Style="{StaticResource SimulationOnCommandButtonStyle}"
-                        ToolTip="Build the authored machine and start automatic simulation (F5)">
+                        ToolTip="{loc:Loc Key=Shell.SimulationOnTooltip}">
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Play24" Foreground="{DynamicResource State.Running}" />
                         <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.SimulationOn}" />
@@ -109,7 +109,7 @@
                 <Button Command="{Binding PauseCommand}"
                         AutomationProperties.Name="{loc:Loc Key=Shell.Pause}"
                         Style="{StaticResource QuietCommandButtonStyle}"
-                        ToolTip="Pause simulation (F6)">
+                        ToolTip="{loc:Loc Key=Shell.PauseTooltip}">
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Pause24" Foreground="{DynamicResource State.Paused}" />
                         <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.Pause}" />
@@ -140,7 +140,7 @@
                 <Button Command="{Binding StepCommand}"
                         AutomationProperties.Name="{loc:Loc Key=Shell.Step}"
                         Style="{StaticResource QuietCommandButtonStyle}"
-                        ToolTip="Advance one 5 ms tick (F10)">
+                        ToolTip="{loc:Loc Key=Shell.StepTooltip}">
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Next24" Foreground="{DynamicResource Text.Secondary}" />
                         <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.Step}" />
@@ -149,7 +149,7 @@
                 <Button Command="{Binding ResetCommand}"
                         AutomationProperties.Name="{loc:Loc Key=Shell.Reset}"
                         Style="{StaticResource QuietCommandButtonStyle}"
-                        ToolTip="Reset simulation">
+                        ToolTip="{loc:Loc Key=Shell.ResetTooltip}">
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="ArrowReset24" Foreground="{DynamicResource State.Warning}" />
                         <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.Reset}" />
@@ -158,7 +158,7 @@
                 <Button MinWidth="58"
                         AutomationProperties.Name="{loc:Loc Key=Shell.CycleStart}"
                         Command="{Binding CycleStartCommand}"
-                        ToolTip="Set the Cycle Start digital input to ON">
+                        ToolTip="{loc:Loc Key=Shell.CycleStartTooltip}">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource PrimaryCommandButtonStyle}">
                             <Setter Property="Visibility" Value="Collapsed" />

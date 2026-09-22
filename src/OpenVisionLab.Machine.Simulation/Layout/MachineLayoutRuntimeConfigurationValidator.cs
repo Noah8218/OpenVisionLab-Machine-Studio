@@ -37,8 +37,8 @@ internal static class MachineLayoutRuntimeConfigurationValidator
 
         var componentsById = new SortedDictionary<string, LayoutComponentRuntimeConfiguration>(
             StringComparer.Ordinal);
-        var simulationOwnedInputIds = new HashSet<string>(StringComparer.Ordinal);
-        var actuatorCommandIds = new HashSet<string>(StringComparer.Ordinal);
+        var simulationOwnedInputIds = new Dictionary<string, string>(StringComparer.Ordinal);
+        var actuatorCommandIds = new Dictionary<string, string>(StringComparer.Ordinal);
 
         foreach (var component in components)
         {
@@ -50,41 +50,58 @@ internal static class MachineLayoutRuntimeConfigurationValidator
                     nameof(components));
             }
 
-            if (component is DigitalSensorRuntimeConfiguration sensor &&
-                !simulationOwnedInputIds.Add(sensor.OutputChannelId))
+            if (component is DigitalSensorRuntimeConfiguration sensor)
             {
-                throw new ArgumentException(
-                    $"Digital-input channel '{sensor.OutputChannelId}' is owned by more than one sensor.",
+                ClaimResource(
+                    simulationOwnedInputIds,
+                    sensor.OutputChannelId,
+                    sensor.Id,
+                    "Digital-input channel",
+                    "sensor",
                     nameof(components));
             }
 
             if (component is PneumaticCylinderRuntimeConfiguration cylinder)
             {
-                if (!actuatorCommandIds.Add(cylinder.ExtendCommandChannelId))
-                {
-                    throw new ArgumentException(
-                        $"Digital-output channel '{cylinder.ExtendCommandChannelId}' commands more than one cylinder.",
-                        nameof(components));
-                }
-
-                if (!simulationOwnedInputIds.Add(cylinder.ExtendedSensorChannelId)
-                    || !simulationOwnedInputIds.Add(cylinder.RetractedSensorChannelId))
-                {
-                    throw new ArgumentException(
-                        $"Cylinder '{cylinder.Id}' feedback channels must each have one simulation owner.",
-                        nameof(components));
-                }
+                ClaimResource(
+                    actuatorCommandIds,
+                    cylinder.ExtendCommandChannelId,
+                    cylinder.Id,
+                    "Digital-output channel",
+                    "pneumatic cylinder",
+                    nameof(components));
+                ClaimResource(
+                    simulationOwnedInputIds,
+                    cylinder.ExtendedSensorChannelId,
+                    cylinder.Id,
+                    "Digital-input channel",
+                    "pneumatic cylinder",
+                    nameof(components));
+                ClaimResource(
+                    simulationOwnedInputIds,
+                    cylinder.RetractedSensorChannelId,
+                    cylinder.Id,
+                    "Digital-input channel",
+                    "pneumatic cylinder",
+                    nameof(components));
             }
 
             if (component is ConveyorRuntimeConfiguration conveyor)
             {
-                if (!actuatorCommandIds.Add(conveyor.RunCommandChannelId)
-                    || !actuatorCommandIds.Add(conveyor.ReverseCommandChannelId))
-                {
-                    throw new ArgumentException(
-                        $"Conveyor '{conveyor.Id}' command channels must each control one actuator.",
-                        nameof(components));
-                }
+                ClaimResource(
+                    actuatorCommandIds,
+                    conveyor.RunCommandChannelId,
+                    conveyor.Id,
+                    "Digital-output channel",
+                    "conveyor",
+                    nameof(components));
+                ClaimResource(
+                    actuatorCommandIds,
+                    conveyor.ReverseCommandChannelId,
+                    conveyor.Id,
+                    "Digital-output channel",
+                    "conveyor",
+                    nameof(components));
             }
         }
 
@@ -122,7 +139,7 @@ internal static class MachineLayoutRuntimeConfigurationValidator
 
         var loadLocksById = new SortedDictionary<string, LoadLockRuntimeConfiguration>(
             StringComparer.Ordinal);
-        var controlledDoorIds = new HashSet<string>(StringComparer.Ordinal);
+        var controlledDoorIds = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var loadLock in loadLocks)
         {
             ArgumentNullException.ThrowIfNull(loadLock);
@@ -133,25 +150,38 @@ internal static class MachineLayoutRuntimeConfigurationValidator
 
             ValidateLoadLockDoor(loadLock, loadLock.OuterDoorComponentId, componentsById, controlledDoorIds);
             ValidateLoadLockDoor(loadLock, loadLock.InnerDoorComponentId, componentsById, controlledDoorIds);
-            if (!actuatorCommandIds.Add(loadLock.EvacuateCommandChannelId)
-                || !actuatorCommandIds.Add(loadLock.VentCommandChannelId))
-            {
-                throw new ArgumentException(
-                    $"Load-lock '{loadLock.Id}' command channels must each control one equipment state.",
-                    nameof(loadLocks));
-            }
-
-            if (!simulationOwnedInputIds.Add(loadLock.VacuumReadySensorChannelId)
-                || !simulationOwnedInputIds.Add(loadLock.AtmosphereReadySensorChannelId))
-            {
-                throw new ArgumentException(
-                    $"Load-lock '{loadLock.Id}' feedback channels must each have one simulation owner.",
-                    nameof(loadLocks));
-            }
+            ClaimResource(
+                actuatorCommandIds,
+                loadLock.EvacuateCommandChannelId,
+                loadLock.Id,
+                "Digital-output channel",
+                "load-lock",
+                nameof(loadLocks));
+            ClaimResource(
+                actuatorCommandIds,
+                loadLock.VentCommandChannelId,
+                loadLock.Id,
+                "Digital-output channel",
+                "load-lock",
+                nameof(loadLocks));
+            ClaimResource(
+                simulationOwnedInputIds,
+                loadLock.VacuumReadySensorChannelId,
+                loadLock.Id,
+                "Digital-input channel",
+                "load-lock",
+                nameof(loadLocks));
+            ClaimResource(
+                simulationOwnedInputIds,
+                loadLock.AtmosphereReadySensorChannelId,
+                loadLock.Id,
+                "Digital-input channel",
+                "load-lock",
+                nameof(loadLocks));
         }
 
         var waferHandlersById = new SortedDictionary<string, WaferHandlerRuntimeConfiguration>(StringComparer.Ordinal);
-        var controlledWorkpieceIds = new HashSet<string>(StringComparer.Ordinal);
+        var controlledWorkpieceIds = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var handler in waferHandlers)
         {
             ArgumentNullException.ThrowIfNull(handler);
@@ -166,24 +196,45 @@ internal static class MachineLayoutRuntimeConfigurationValidator
                 throw new ArgumentException($"Wafer-handler '{handler.Id}' workpiece '{handler.WorkpieceComponentId}' must identify an active workpiece.", nameof(waferHandlers));
             }
 
-            if (!controlledWorkpieceIds.Add(handler.WorkpieceComponentId))
+            if (controlledWorkpieceIds.TryGetValue(
+                    handler.WorkpieceComponentId,
+                    out string? existingHandler))
             {
                 throw new ArgumentException(
-                    $"Workpiece '{handler.WorkpieceComponentId}' cannot be controlled by more than one wafer-handler.",
+                    $"Workpiece '{handler.WorkpieceComponentId}' cannot be controlled by more than one wafer-handler; " +
+                    $"existing owner '{existingHandler}', conflicting owner '{handler.Id}'.",
                     nameof(waferHandlers));
             }
 
-            if (!actuatorCommandIds.Add(handler.PickCommandChannelId)
-                || !actuatorCommandIds.Add(handler.PlaceCommandChannelId))
-            {
-                throw new ArgumentException($"Wafer-handler '{handler.Id}' commands must each control one equipment state.", nameof(waferHandlers));
-            }
-
-            if (!simulationOwnedInputIds.Add(handler.HoldingFeedbackChannelId)
-                || !simulationOwnedInputIds.Add(handler.PlacedFeedbackChannelId))
-            {
-                throw new ArgumentException($"Wafer-handler '{handler.Id}' feedback channels must each have one simulation owner.", nameof(waferHandlers));
-            }
+            controlledWorkpieceIds.Add(handler.WorkpieceComponentId, handler.Id);
+            ClaimResource(
+                actuatorCommandIds,
+                handler.PickCommandChannelId,
+                handler.Id,
+                "Digital-output channel",
+                "wafer-handler",
+                nameof(waferHandlers));
+            ClaimResource(
+                actuatorCommandIds,
+                handler.PlaceCommandChannelId,
+                handler.Id,
+                "Digital-output channel",
+                "wafer-handler",
+                nameof(waferHandlers));
+            ClaimResource(
+                simulationOwnedInputIds,
+                handler.HoldingFeedbackChannelId,
+                handler.Id,
+                "Digital-input channel",
+                "wafer-handler",
+                nameof(waferHandlers));
+            ClaimResource(
+                simulationOwnedInputIds,
+                handler.PlacedFeedbackChannelId,
+                handler.Id,
+                "Digital-input channel",
+                "wafer-handler",
+                nameof(waferHandlers));
         }
 
         var inspectionSortRoutersById = new SortedDictionary<string, InspectionSortRouterRuntimeConfiguration>(StringComparer.Ordinal);
@@ -215,11 +266,20 @@ internal static class MachineLayoutRuntimeConfigurationValidator
                 throw new ArgumentException($"Inspection sorter '{sorter.Id}' route commands must match the referenced conveyor Run channels.", nameof(inspectionSortRouters));
             }
 
-            if (!simulationOwnedInputIds.Add(sorter.PassRoutedFeedbackChannelId)
-                || !simulationOwnedInputIds.Add(sorter.NgRoutedFeedbackChannelId))
-            {
-                throw new ArgumentException($"Inspection sorter '{sorter.Id}' feedback channels must each have one simulation owner.", nameof(inspectionSortRouters));
-            }
+            ClaimResource(
+                simulationOwnedInputIds,
+                sorter.PassRoutedFeedbackChannelId,
+                sorter.Id,
+                "Digital-input channel",
+                "inspection sorter",
+                nameof(inspectionSortRouters));
+            ClaimResource(
+                simulationOwnedInputIds,
+                sorter.NgRoutedFeedbackChannelId,
+                sorter.Id,
+                "Digital-input channel",
+                "inspection sorter",
+                nameof(inspectionSortRouters));
         }
 
         var inspectionHandoffsById = new SortedDictionary<string, InspectionHandoffRuntimeConfiguration>(StringComparer.Ordinal);
@@ -231,20 +291,31 @@ internal static class MachineLayoutRuntimeConfigurationValidator
                 throw new ArgumentException($"Inspection handoff id '{handoff.Id}' is duplicated.", nameof(inspectionHandoffs));
             }
 
-            if (!actuatorCommandIds.Add(handoff.ResultAcceptedCommandChannelId))
-            {
-                throw new ArgumentException($"Inspection handoff '{handoff.Id}' result-accepted command must control one equipment state.", nameof(inspectionHandoffs));
-            }
-
-            if (!simulationOwnedInputIds.Add(handoff.InspectionReadyFeedbackChannelId)
-                || !simulationOwnedInputIds.Add(handoff.InspectionCompleteFeedbackChannelId))
-            {
-                throw new ArgumentException($"Inspection handoff '{handoff.Id}' feedback channels must each have one simulation owner.", nameof(inspectionHandoffs));
-            }
+            ClaimResource(
+                actuatorCommandIds,
+                handoff.ResultAcceptedCommandChannelId,
+                handoff.Id,
+                "Digital-output channel",
+                "inspection handoff",
+                nameof(inspectionHandoffs));
+            ClaimResource(
+                simulationOwnedInputIds,
+                handoff.InspectionReadyFeedbackChannelId,
+                handoff.Id,
+                "Digital-input channel",
+                "inspection handoff",
+                nameof(inspectionHandoffs));
+            ClaimResource(
+                simulationOwnedInputIds,
+                handoff.InspectionCompleteFeedbackChannelId,
+                handoff.Id,
+                "Digital-input channel",
+                "inspection handoff",
+                nameof(inspectionHandoffs));
         }
 
         var ohtHandoffsById = new SortedDictionary<string, OhtHandoffRuntimeConfiguration>(StringComparer.Ordinal);
-        var ohtConveyorIds = new HashSet<string>(StringComparer.Ordinal);
+        var ohtConveyorIds = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var handoff in ohtHandoffs)
         {
             ArgumentNullException.ThrowIfNull(handoff);
@@ -261,21 +332,32 @@ internal static class MachineLayoutRuntimeConfigurationValidator
                 throw new ArgumentException($"OHT handoff '{handoff.Id}' transport must identify one active conveyor and its command channels.", nameof(ohtHandoffs));
             }
 
-            if (!ohtConveyorIds.Add(handoff.TransportConveyorComponentId))
-            {
-                throw new ArgumentException($"Conveyor '{handoff.TransportConveyorComponentId}' cannot be controlled by more than one OHT handoff.", nameof(ohtHandoffs));
-            }
-
-            if (!simulationOwnedInputIds.Add(handoff.HandoffReadyFeedbackChannelId)
-                || !simulationOwnedInputIds.Add(handoff.CarrierTransferredFeedbackChannelId))
-            {
-                throw new ArgumentException($"OHT handoff '{handoff.Id}' feedback channels must each have one simulation owner.", nameof(ohtHandoffs));
-            }
+            ClaimResource(
+                ohtConveyorIds,
+                handoff.TransportConveyorComponentId,
+                handoff.Id,
+                "Conveyor component",
+                "OHT handoff",
+                nameof(ohtHandoffs));
+            ClaimResource(
+                simulationOwnedInputIds,
+                handoff.HandoffReadyFeedbackChannelId,
+                handoff.Id,
+                "Digital-input channel",
+                "OHT handoff",
+                nameof(ohtHandoffs));
+            ClaimResource(
+                simulationOwnedInputIds,
+                handoff.CarrierTransferredFeedbackChannelId,
+                handoff.Id,
+                "Digital-input channel",
+                "OHT handoff",
+                nameof(ohtHandoffs));
         }
 
         var prealignersById = new SortedDictionary<string, PrealignerRuntimeConfiguration>(StringComparer.Ordinal);
-        var prealignerStageIds = new HashSet<string>(StringComparer.Ordinal);
-        var prealignerClampIds = new HashSet<string>(StringComparer.Ordinal);
+        var prealignerStageIds = new Dictionary<string, string>(StringComparer.Ordinal);
+        var prealignerClampIds = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var prealigner in prealigners)
         {
             ArgumentNullException.ThrowIfNull(prealigner);
@@ -297,22 +379,41 @@ internal static class MachineLayoutRuntimeConfigurationValidator
                 throw new ArgumentException($"Pre-aligner '{prealigner.Id}' clamp must identify one active pneumatic cylinder.", nameof(prealigners));
             }
 
-            if (!prealignerStageIds.Add(prealigner.RotaryStageComponentId)
-                || !prealignerClampIds.Add(prealigner.ClampCylinderComponentId))
-            {
-                throw new ArgumentException($"Pre-aligner '{prealigner.Id}' stage and clamp must each have one semantic owner.", nameof(prealigners));
-            }
-
-            if (!actuatorCommandIds.Add(prealigner.AlignmentAcceptedCommandChannelId))
-            {
-                throw new ArgumentException($"Pre-aligner '{prealigner.Id}' accept command must control one equipment state.", nameof(prealigners));
-            }
-
-            if (!simulationOwnedInputIds.Add(prealigner.AlignmentReadyFeedbackChannelId)
-                || !simulationOwnedInputIds.Add(prealigner.AlignmentCompleteFeedbackChannelId))
-            {
-                throw new ArgumentException($"Pre-aligner '{prealigner.Id}' feedback channels must each have one simulation owner.", nameof(prealigners));
-            }
+            ClaimResource(
+                prealignerStageIds,
+                prealigner.RotaryStageComponentId,
+                prealigner.Id,
+                "Rotary-stage component",
+                "pre-aligner",
+                nameof(prealigners));
+            ClaimResource(
+                prealignerClampIds,
+                prealigner.ClampCylinderComponentId,
+                prealigner.Id,
+                "Clamp-cylinder component",
+                "pre-aligner",
+                nameof(prealigners));
+            ClaimResource(
+                actuatorCommandIds,
+                prealigner.AlignmentAcceptedCommandChannelId,
+                prealigner.Id,
+                "Digital-output channel",
+                "pre-aligner",
+                nameof(prealigners));
+            ClaimResource(
+                simulationOwnedInputIds,
+                prealigner.AlignmentReadyFeedbackChannelId,
+                prealigner.Id,
+                "Digital-input channel",
+                "pre-aligner",
+                nameof(prealigners));
+            ClaimResource(
+                simulationOwnedInputIds,
+                prealigner.AlignmentCompleteFeedbackChannelId,
+                prealigner.Id,
+                "Digital-input channel",
+                "pre-aligner",
+                nameof(prealigners));
         }
 
         return new(
@@ -336,7 +437,7 @@ internal static class MachineLayoutRuntimeConfigurationValidator
         LoadLockRuntimeConfiguration loadLock,
         string componentId,
         IReadOnlyDictionary<string, LayoutComponentRuntimeConfiguration> componentsById,
-        ISet<string> controlledDoorIds)
+        IDictionary<string, string> controlledDoorIds)
     {
         if (!componentsById.TryGetValue(componentId, out var component)
             || component is not PneumaticCylinderRuntimeConfiguration)
@@ -345,11 +446,32 @@ internal static class MachineLayoutRuntimeConfigurationValidator
                 $"Load-lock '{loadLock.Id}' door '{componentId}' must identify a pneumatic cylinder.");
         }
 
-        if (!controlledDoorIds.Add(componentId))
+        ClaimResource(
+            controlledDoorIds,
+            componentId,
+            loadLock.Id,
+            "Pneumatic-cylinder component",
+            "load-lock",
+            nameof(controlledDoorIds));
+    }
+
+    private static void ClaimResource(
+        IDictionary<string, string> owners,
+        string resourceId,
+        string ownerId,
+        string resourceKind,
+        string ownerKind,
+        string parameterName)
+    {
+        if (owners.TryGetValue(resourceId, out string? existingOwner))
         {
             throw new ArgumentException(
-                $"Pneumatic cylinder '{componentId}' cannot be controlled by more than one load-lock.");
+                $"{resourceKind} '{resourceId}' is already owned by '{existingOwner}'; " +
+                $"conflicting {ownerKind} owner '{ownerId}' is not allowed.",
+                parameterName);
         }
+
+        owners.Add(resourceId, ownerId);
     }
 
     private static void ValidateWorkpiecePlacement(

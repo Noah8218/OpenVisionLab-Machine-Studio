@@ -36,6 +36,10 @@ internal static class DeterministicSimulationCommandTraceCommandCodec
                 arguments = EmptyArguments;
                 return true;
 
+            case FastForwardCommand fastForward:
+                arguments = Serialize(new { tickBudget = fastForward.TickBudget });
+                return true;
+
             case PlayCommand:
             case StartManualControlCommand:
                 arguments = EmptyArguments;
@@ -182,7 +186,18 @@ internal static class DeterministicSimulationCommandTraceCommandCodec
                 return true;
 
             case StartAutomaticRunCommand automatic:
-                arguments = Serialize(new { beginRealTime = automatic.BeginRealTime });
+                arguments = Serialize(new
+                {
+                    beginRealTime = automatic.BeginRealTime,
+                    waitForExternalResult = automatic.WaitForExternalResult
+                });
+                if (automatic.WaitForExternalResult)
+                {
+                    replayabilityReason =
+                        "Automatic external inspection depends on preflighted frame input and a live consumer; it is not replayable.";
+                    return false;
+                }
+
                 if (automatic.BeginRealTime)
                 {
                     replayabilityReason =
@@ -215,6 +230,18 @@ internal static class DeterministicSimulationCommandTraceCommandCodec
                 arguments = EmptyArguments;
                 replayabilityReason =
                     "Camera frame evidence is an external acquisition input and is not replayable by this trace.";
+                return false;
+
+            case ApplyExternalInspectionResultCommand:
+                arguments = EmptyArguments;
+                replayabilityReason =
+                    "An external inspection Result is validated file input and is not replayable by this trace.";
+                return false;
+
+            case ArmAutomaticExternalInspectionCommand:
+                arguments = EmptyArguments;
+                replayabilityReason =
+                    "Automatic external inspection source metadata is preflighted file input and is not replayable by this trace.";
                 return false;
 
             default:
@@ -253,6 +280,8 @@ internal static class DeterministicSimulationCommandTraceCommandCodec
         commandType switch
         {
             nameof(PauseCommand) => new PauseCommand(),
+            nameof(FastForwardCommand) => new FastForwardCommand(
+                RequiredPositiveInt(arguments, "tickBudget")),
             nameof(StepCommand) => new StepCommand(),
             nameof(ResetCommand) => new ResetCommand(),
             nameof(StartManualControlCommand) => new StartManualControlCommand(),
@@ -317,7 +346,8 @@ internal static class DeterministicSimulationCommandTraceCommandCodec
                 RequiredString(arguments, "stepId"),
                 RequiredBoolean(arguments, "isEnabled")),
             nameof(StartAutomaticRunCommand) => new StartAutomaticRunCommand(
-                RequiredBoolean(arguments, "beginRealTime")),
+                RequiredBoolean(arguments, "beginRealTime"),
+                OptionalBoolean(arguments, "waitForExternalResult")),
             nameof(StartConditionScenarioCommand) => new StartConditionScenarioCommand(
                 DeserializeProfile(RequiredString(arguments, "profileJson"))),
             _ => throw new InvalidOperationException(
@@ -376,10 +406,39 @@ internal static class DeterministicSimulationCommandTraceCommandCodec
         };
     }
 
+    private static bool OptionalBoolean(JsonElement arguments, string name)
+    {
+        if (arguments.ValueKind != JsonValueKind.Object
+            || !arguments.TryGetProperty(name, out var value))
+        {
+            return false;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => throw new JsonException($"Argument '{name}' must be a Boolean.")
+        };
+    }
+
     private static double RequiredDouble(JsonElement arguments, string name)
     {
         var value = RequiredString(arguments, name);
         return double.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
+    }
+
+    private static int RequiredPositiveInt(JsonElement arguments, string name)
+    {
+        var value = RequiredProperty(arguments, name);
+        if (value.ValueKind != JsonValueKind.Number
+            || !value.TryGetInt32(out var parsed)
+            || parsed <= 0)
+        {
+            throw new JsonException($"Argument '{name}' must be a positive integer.");
+        }
+
+        return parsed;
     }
 
     private static TEnum RequiredEnum<TEnum>(JsonElement arguments, string name)

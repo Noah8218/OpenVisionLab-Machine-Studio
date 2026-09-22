@@ -17,23 +17,22 @@ public sealed class ProjectOpenWorkflowTests
             await new ProjectDocumentFileStore().SaveAsync(
                 new MachineProjectDocument { Name = "Loaded project" },
                 path);
-            MachineProjectDocument? appliedProject = null;
-            string? appliedPath = null;
+            ProjectDocumentLoadResult? appliedLoad = null;
             Exception? failure = null;
             var workflow = CreateWorkflow(
                 resolveUnsavedChanges: () => Task.FromResult(true),
-                applyOpenedProject: (project, projectPath) =>
+                applyOpenedProject: loadResult =>
                 {
-                    appliedProject = project;
-                    appliedPath = projectPath;
+                    appliedLoad = loadResult;
                     return Task.FromResult(true);
                 },
                 handleLoadFailure: exception => failure = exception);
 
             Assert.True(await workflow.OpenAsync(path));
-            Assert.NotNull(appliedProject);
-            Assert.Equal("Loaded project", appliedProject.Name);
-            Assert.Equal(Path.GetFullPath(path), appliedPath);
+            Assert.NotNull(appliedLoad);
+            Assert.Equal("Loaded project", appliedLoad.Document.Name);
+            Assert.Equal(Path.GetFullPath(path), appliedLoad.ProjectPath);
+            Assert.Equal(ProjectDocumentLoadSource.Primary, appliedLoad.Source);
             Assert.Null(failure);
         }
         finally
@@ -54,7 +53,7 @@ public sealed class ProjectOpenWorkflowTests
             Exception? failure = null;
             var workflow = CreateWorkflow(
                 resolveUnsavedChanges: () => Task.FromResult(true),
-                applyOpenedProject: (_, _) =>
+                applyOpenedProject: _ =>
                 {
                     applyCount++;
                     return Task.FromResult(true);
@@ -89,7 +88,7 @@ public sealed class ProjectOpenWorkflowTests
                     resolveCount++;
                     return Task.FromResult(false);
                 },
-                applyOpenedProject: (_, _) =>
+                applyOpenedProject: _ =>
                 {
                     applyCount++;
                     return Task.FromResult(true);
@@ -106,9 +105,49 @@ public sealed class ProjectOpenWorkflowTests
         }
     }
 
+    [Fact]
+    public async Task Mch003_RecoveredOpenPassesBackupProvenanceWithoutWritingFiles()
+    {
+        var directory = CreateTestDirectory();
+        try
+        {
+            var path = Path.Combine(directory, "recovered.ovmachine");
+            var fileStore = new ProjectDocumentFileStore();
+            await fileStore.SaveAsync(new MachineProjectDocument { Name = "Backup project" }, path);
+            await fileStore.SaveAsync(new MachineProjectDocument { Name = "Current project" }, path);
+            await File.WriteAllTextAsync(path, "corrupted primary");
+            var primaryBefore = await File.ReadAllBytesAsync(path);
+            var backupBefore = await File.ReadAllBytesAsync(path + ".bak");
+            ProjectDocumentLoadResult? appliedLoad = null;
+
+            var workflow = CreateWorkflow(
+                resolveUnsavedChanges: () => Task.FromResult(true),
+                applyOpenedProject: loadResult =>
+                {
+                    appliedLoad = loadResult;
+                    return Task.FromResult(true);
+                },
+                handleLoadFailure: _ => { });
+
+            Assert.True(await workflow.OpenAsync(path));
+            Assert.NotNull(appliedLoad);
+            Assert.Equal("Backup project", appliedLoad.Document.Name);
+            Assert.Equal(Path.GetFullPath(path), appliedLoad.ProjectPath);
+            Assert.Equal(Path.GetFullPath(path + ".bak"), appliedLoad.SourcePath);
+            Assert.Equal(ProjectDocumentLoadSource.Backup, appliedLoad.Source);
+            Assert.Equal(ProjectDocumentRecoveryReason.PrimaryInvalid, appliedLoad.RecoveryReason);
+            Assert.Equal(primaryBefore, await File.ReadAllBytesAsync(path));
+            Assert.Equal(backupBefore, await File.ReadAllBytesAsync(path + ".bak"));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static ProjectOpenWorkflow CreateWorkflow(
         Func<Task<bool>> resolveUnsavedChanges,
-        Func<MachineProjectDocument, string, Task<bool>> applyOpenedProject,
+        Func<ProjectDocumentLoadResult, Task<bool>> applyOpenedProject,
         Action<Exception> handleLoadFailure) =>
         new(
             new ProjectDocumentFileStore(),

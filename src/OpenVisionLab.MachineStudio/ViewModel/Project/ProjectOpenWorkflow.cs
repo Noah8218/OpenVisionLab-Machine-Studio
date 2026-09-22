@@ -13,13 +13,13 @@ internal sealed class ProjectOpenWorkflow
 {
     private readonly ProjectDocumentFileStore _projectStore;
     private readonly Func<Task<bool>> _resolveUnsavedChanges;
-    private readonly Func<MachineProjectDocument, string, Task<bool>> _applyOpenedProject;
+    private readonly Func<ProjectDocumentLoadResult, Task<bool>> _applyOpenedProject;
     private readonly Action<Exception> _handleLoadFailure;
 
     internal ProjectOpenWorkflow(
         ProjectDocumentFileStore projectStore,
         Func<Task<bool>> resolveUnsavedChanges,
-        Func<MachineProjectDocument, string, Task<bool>> applyOpenedProject,
+        Func<ProjectDocumentLoadResult, Task<bool>> applyOpenedProject,
         Action<Exception> handleLoadFailure)
     {
         ArgumentNullException.ThrowIfNull(projectStore);
@@ -35,8 +35,8 @@ internal sealed class ProjectOpenWorkflow
 
     internal async Task<bool> OpenAsync(string path, bool replaceCurrent = false)
     {
-        var project = await TryLoadAsync(path);
-        if (project is null)
+        var loadResult = await TryLoadAsync(path);
+        if (loadResult is null)
         {
             return false;
         }
@@ -48,21 +48,21 @@ internal sealed class ProjectOpenWorkflow
                 return false;
             }
 
-            project = await TryLoadAsync(path);
-            if (project is null)
+            loadResult = await TryLoadAsync(path);
+            if (loadResult is null)
             {
                 return false;
             }
         }
 
-        return await _applyOpenedProject(project, path);
+        return await _applyOpenedProject(loadResult);
     }
 
-    private async Task<MachineProjectDocument?> TryLoadAsync(string path)
+    private async Task<ProjectDocumentLoadResult?> TryLoadAsync(string path)
     {
         try
         {
-            return await _projectStore.LoadAsync(path);
+            return await _projectStore.LoadWithProvenanceAsync(path);
         }
         catch (Exception exception) when (exception is IOException
                                                or UnauthorizedAccessException

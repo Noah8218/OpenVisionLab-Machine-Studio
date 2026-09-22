@@ -39,6 +39,7 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
     private readonly SimulationScenarioBatchParticipant _batchParticipant = new();
     private bool _isBatchRunning;
     private bool _batchWasCanceled;
+    private bool _batchCancellationRequested;
     private int _batchCompletedRuns;
     private bool _disposed;
 
@@ -105,7 +106,7 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
             useCommandManagerRequery: false);
         CancelCommand = new RelayCommand(
             _ => CancelBatch(),
-            _ => _isBatchRunning,
+            _ => _isBatchRunning && !_batchCancellationRequested,
             useCommandManagerRequery: false);
         AcceptBaselineCommand = new RelayCommand(
             _ => AcceptBatchBaseline(),
@@ -130,17 +131,22 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
     public bool IsBatchRunning => _isBatchRunning;
     public bool IsScenarioConfigurationEnabled => !_isBatchRunning && !_isOtherValidationRunning();
     public int BatchCompletedRuns => _batchCompletedRuns;
-    public bool CanRunScenarioBatch => !_isBatchRunning && _canRunFromParent();
-    public bool CanAcceptBatchBaseline => !_isBatchRunning
+    public bool IsBatchCancellationRequested => _batchCancellationRequested;
+    public bool CanRunScenarioBatch => !_disposed
+        && !_isBatchRunning
+        && !_isOtherValidationRunning()
+        && _canRunFromParent();
+    public bool CanAcceptBatchBaseline => !_disposed && !_isBatchRunning
         && LatestBatchResult is { IsComplete: true, IsSuccess: true, Runs.Length: > 0 };
-    public bool CanClearBatchBaseline => !_isBatchRunning && AcceptedBatchBaseline is not null;
-    public bool CanNavigateToBatchMismatch => !_isBatchRunning
+    public bool CanClearBatchBaseline => !_disposed && !_isBatchRunning && AcceptedBatchBaseline is not null;
+    public bool CanNavigateToBatchMismatch => !_disposed && !_isBatchRunning
         && LatestBatchResult?.FirstMismatch is not null;
-    public bool CanExportEvidence => !_isBatchRunning
+    public bool CanExportEvidence => !_disposed && !_isBatchRunning
         && _canExportFromParent()
         && LatestBatchResult is { IsComplete: true }
         && LatestBatchResult.HasValidEvidenceHash();
-    public bool CanImportEvidence => !_isBatchRunning
+    public bool CanExportReport => CanExportEvidence;
+    public bool CanImportEvidence => !_disposed && !_isBatchRunning
         && !_isOtherValidationRunning()
         && _canImportFromParent();
 
@@ -174,15 +180,27 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
 
     public void Reset()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         _artifactStore.Reset();
         _batchWasCanceled = false;
+        _batchCancellationRequested = false;
         _batchCompletedRuns = 0;
         RaiseChanged(invalidateCommands: false);
     }
 
     public void Restore()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         _batchWasCanceled = false;
+        _batchCancellationRequested = false;
         _batchCompletedRuns = 0;
         var projectPath = _getProjectPath();
         _artifactStore.Restore(projectPath, CreateArtifactContext);
@@ -201,11 +219,21 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
 
     public void RelinkProjectPath(string projectPath)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         _artifactStore.RelinkProjectPath(projectPath);
     }
 
     public void PersistBatchArtifacts()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         var errorDetail = _artifactStore.Persist(_getProjectPath(), CreateArtifactContext);
         if (errorDetail is not null)
         {
@@ -235,6 +263,11 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
 
     public void PersistForProjectPath(string projectPath)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         RelinkProjectPath(projectPath);
         PersistBatchArtifacts();
     }
@@ -244,9 +277,15 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
         DeterministicSimulationRunResultPackage? acceptedBaseline,
         bool notifyPresentation = true)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         _artifactStore.SetImportedPackages(batchResult, acceptedBaseline);
         _batchCompletedRuns = batchResult.CompletedRuns;
         _batchWasCanceled = false;
+        _batchCancellationRequested = false;
         if (notifyPresentation)
         {
             RaiseChanged();
@@ -278,6 +317,31 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
         return false;
     }
 
+    internal bool TryExportReport(string path)
+    {
+        if (!CanExportReport || string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        if (_artifactStore.TryExportReport(path, out var errorDetail))
+        {
+            _setStatus(OpenVisionLanguageService.T(
+                "Simulation.ReportExported",
+                "결정적 시뮬레이션 결과 보고서를 내보냈습니다.",
+                "Deterministic simulation result report exported."));
+            _log("Deterministic simulation result report exported");
+            return true;
+        }
+
+        _setStatus(OpenVisionLanguageService.T(
+            "Simulation.ReportExportFailed",
+            "시뮬레이션 결과 보고서를 내보내지 못했습니다.",
+            "Simulation result report could not be exported."));
+        _log($"Deterministic simulation result report export failed · {errorDetail}");
+        return false;
+    }
+
     internal bool TryImportEvidence(string path)
     {
         if (!CanImportEvidence || string.IsNullOrWhiteSpace(path))
@@ -298,6 +362,7 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
                 "Deterministic simulation evidence imported without execution."));
             _batchCompletedRuns = LatestBatchResult?.CompletedRuns ?? 0;
             _batchWasCanceled = false;
+            _batchCancellationRequested = false;
             _log($"Portable simulation evidence imported · {ShortHash(evidenceHash)}");
             RaiseChanged();
             return true;
@@ -307,11 +372,37 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
         return false;
     }
 
-    internal void NotifyRuntimeChanged(bool invalidateCommands = true) => RaiseChanged(invalidateCommands);
+    internal void NotifyRuntimeChanged(bool invalidateCommands = true)
+    {
+        if (_disposed)
+        {
+            return;
+        }
 
-    internal void RefreshLocalization() => RaiseChanged(invalidateCommands: false);
+        RaiseChanged(invalidateCommands);
+    }
 
-    internal void CancelBatch() => _batchParticipant.Cancel();
+    internal void RefreshLocalization()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        RaiseChanged(invalidateCommands: false);
+    }
+
+    internal void CancelBatch()
+    {
+        if (_disposed || !_isBatchRunning || _batchCancellationRequested)
+        {
+            return;
+        }
+
+        _batchCancellationRequested = true;
+        _ = DispatchPresentationAsync(() => RaiseChanged());
+        _batchParticipant.Cancel();
+    }
 
     internal void InvalidateCommands()
     {
@@ -328,6 +419,11 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
     private async Task<SimulationScenarioBatchParticipantResult> RunScenarioBatchAsync(
         CancellationToken cancellationToken)
     {
+        if (!CanRunScenarioBatch)
+        {
+            return new(SimulationScenarioBatchParticipantOutcome.Idle);
+        }
+
         if (!await _ensureRuntimeDefinitionApplied())
         {
             return new(SimulationScenarioBatchParticipantOutcome.Idle);
@@ -371,6 +467,7 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
         {
             acceptedBaseline = AcceptedBatchBaseline;
             _batchWasCanceled = false;
+            _batchCancellationRequested = false;
             _batchCompletedRuns = 0;
             _artifactStore.SetLatestBatchResult(null);
             _resetUnifiedEvidence();
@@ -404,6 +501,7 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
                 cancellationToken);
             await DispatchPresentationAsync(() =>
             {
+                _batchCancellationRequested = false;
                 _artifactStore.SetLatestBatchResult(batchResult);
                 _setStatus(batchResult.IsSuccess
                     ? OpenVisionLanguageService.T("Simulation.BatchPassedStatus")
@@ -421,6 +519,7 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
             await DispatchPresentationAsync(() =>
             {
                 _batchWasCanceled = true;
+                _batchCancellationRequested = false;
                 _setStatus(OpenVisionLanguageService.T("Simulation.BatchCanceled"));
                 _log($"Sequential batch canceled after {_batchCompletedRuns} completed run(s)");
             });
@@ -430,6 +529,7 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
         {
             await DispatchPresentationAsync(() =>
             {
+                _batchCancellationRequested = false;
                 SetBatchRunning(false);
                 RaiseChanged();
             });
@@ -514,11 +614,13 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
         OnPropertyChanged(nameof(IsBatchRunning));
         OnPropertyChanged(nameof(IsScenarioConfigurationEnabled));
         OnPropertyChanged(nameof(BatchCompletedRuns));
+        OnPropertyChanged(nameof(IsBatchCancellationRequested));
         OnPropertyChanged(nameof(CanRunScenarioBatch));
         OnPropertyChanged(nameof(CanAcceptBatchBaseline));
         OnPropertyChanged(nameof(CanClearBatchBaseline));
         OnPropertyChanged(nameof(CanNavigateToBatchMismatch));
         OnPropertyChanged(nameof(CanExportEvidence));
+        OnPropertyChanged(nameof(CanExportReport));
         OnPropertyChanged(nameof(CanImportEvidence));
         OnPropertyChanged(nameof(BatchStatusText));
         OnPropertyChanged(nameof(BatchResultText));
@@ -537,6 +639,7 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
         new(
             _isBatchRunning,
             _batchWasCanceled,
+            _batchCancellationRequested,
             _batchCompletedRuns,
             _workspace.BatchRepetitionCount,
             LatestBatchResult,
@@ -575,5 +678,6 @@ public sealed class SimulationScenarioBatchViewModel : ViewModelBase, IDisposabl
 
         _disposed = true;
         _batchParticipant.Dispose();
+        InvalidateCommands();
     }
 }

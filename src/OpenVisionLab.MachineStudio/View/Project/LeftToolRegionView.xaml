@@ -3,8 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
              xmlns:behavior="clr-namespace:OpenVisionLab.MachineStudio.Behavior"
+             xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
     <UserControl.Resources>
+        <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <DataTemplate x:Key="LayoutComponentIconTemplate">
             <Viewbox Stretch="Uniform">
                 <Border Width="48"
@@ -147,6 +149,7 @@
                 <TabControl SelectedIndex="{Binding Navigation.SelectedLeftToolTabIndex, Mode=TwoWay}">
                     <TabItem Header="{loc:Loc Key=Shell.Project}">
                         <TreeView ItemsSource="{Binding ProjectTree.Roots}"
+                                  HorizontalContentAlignment="Stretch"
                                   ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                             <TreeView.Resources>
                                 <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#20394B" />
@@ -156,15 +159,23 @@
                             <b:Interaction.Behaviors>
                                 <behavior:TreeViewSelectedItemBehavior SelectedItem="{Binding ProjectTree.SelectedNode, Mode=TwoWay}" />
                             </b:Interaction.Behaviors>
+                            <TreeView.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <VirtualizingStackPanel HorizontalAlignment="Stretch"
+                                                             Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType={x:Type TreeView}}}" />
+                                </ItemsPanelTemplate>
+                            </TreeView.ItemsPanel>
                             <TreeView.ItemContainerStyle>
                                 <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
                                     <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
                                     <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                                    <Setter Property="HorizontalAlignment" Value="Stretch" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                 </Style>
                             </TreeView.ItemContainerStyle>
                             <TreeView.ItemTemplate>
                                 <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                                    <Grid>
+                                    <Grid Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType={x:Type TreeViewItem}}}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -284,6 +295,100 @@
                                     Content="{loc:Loc Key=Left.RemoveSelected}" />
                         </Grid>
                     </TabItem>
+                    <TabItem Header="{loc:Loc Key=Project.Diagnostics}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="4">
+                                <Border Style="{StaticResource InspectorCardStyle}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                                   Text="{loc:Loc Key=ProjectDiagnostics.Title}" />
+                                        <TextBlock Margin="0,3,0,0"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{Binding ProjectDiagnostics.PathText}"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Margin="0,6,0,0"
+                                                   Text="{Binding ProjectDiagnostics.CurrentStateText}"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Margin="0,6,0,0"
+                                                   Foreground="{DynamicResource State.Warning}"
+                                                   Text="{Binding ProjectDiagnostics.LoadSourceNoticeText}"
+                                                   TextWrapping="Wrap"
+                                                   Visibility="{Binding ProjectDiagnostics.HasLoadSourceNotice, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        <TextBlock Margin="0,6,0,0"
+                                                   FontWeight="SemiBold"
+                                                   Text="{Binding ProjectDiagnostics.SummaryText}"
+                                                   TextWrapping="Wrap" />
+                                        <StackPanel Margin="0,8,0,0"
+                                                    Orientation="Horizontal">
+                                            <Button MinHeight="34"
+                                                    Padding="9,0"
+                                                    Command="{Binding ProjectDiagnostics.RefreshCommand}"
+                                                    Content="{loc:Loc Key=ProjectDiagnostics.Refresh}" />
+                                            <Button MinHeight="34"
+                                                    Padding="9,0"
+                                                    Command="{Binding ProjectDiagnostics.PreviewRecoveryCommand}"
+                                                    Content="{loc:Loc Key=ProjectDiagnostics.Preview}"
+                                                    IsEnabled="{Binding ProjectDiagnostics.CanPreviewRecovery}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource InspectorCardStyle}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                                   Text="{loc:Loc Key=ProjectDiagnostics.Findings}" />
+                                        <ListBox Margin="0,5,0,0"
+                                                 ItemsSource="{Binding ProjectDiagnostics.Items}"
+                                                 BorderThickness="0"
+                                                 Background="Transparent"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Margin="0,3,0,3">
+                                                        <TextBlock FontWeight="SemiBold"
+                                                                   Text="{Binding SeverityText}" />
+                                                        <TextBlock Margin="0,2,0,0"
+                                                                   Text="{Binding MessageText}"
+                                                                   TextWrapping="Wrap" />
+                                                        <TextBlock Margin="0,2,0,0"
+                                                                   FontSize="10"
+                                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                                   Text="{Binding DetailText}"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource InspectorCardStyle}"
+                                        Visibility="{Binding ProjectDiagnostics.HasRecoveryPreview, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                                   Text="{loc:Loc Key=ProjectDiagnostics.PreviewTitle}" />
+                                        <TextBlock Margin="0,4,0,0"
+                                                   Text="{Binding ProjectDiagnostics.RecoveryPreviewText}"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Margin="0,5,0,0"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{loc:Loc Key=ProjectDiagnostics.ApplyHint}"
+                                                   TextWrapping="Wrap" />
+                                        <StackPanel Margin="0,8,0,0"
+                                                    Orientation="Horizontal">
+                                            <Button MinHeight="34"
+                                                    Padding="9,0"
+                                                    Command="{Binding ProjectDiagnostics.ApplyRecoveryCommand}"
+                                                    Content="{loc:Loc Key=ProjectDiagnostics.Apply}" />
+                                            <Button MinHeight="34"
+                                                    Padding="9,0"
+                                                    Command="{Binding ProjectDiagnostics.CancelRecoveryPreviewCommand}"
+                                                    Content="{loc:Loc Key=ProjectDiagnostics.Cancel}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
                 </TabControl>
             </Grid>
 
@@ -368,7 +473,7 @@
                                        Grid.Column="1"
                                        Margin="0,7,0,0"
                                        Style="{StaticResource TelemetryTextStyle}"
-                                       Text="{Binding CameraCountText}" />
+                                       Text="{Binding Camera.CameraCountText}" />
                         </Grid>
                     </Border>
                     <Border Style="{StaticResource InspectorCardStyle}">
@@ -383,7 +488,7 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Foreground="{DynamicResource Text.Secondary}" Text="State" />
+                                <TextBlock Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Left.State}" />
                                 <TextBlock Grid.Column="1"
                                            HorizontalAlignment="Right"
                                            Style="{StaticResource TelemetryTextStyle}"

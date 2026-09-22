@@ -96,6 +96,22 @@ public sealed class SimulationScenarioProfileTests
         Assert.Equal("normal", workspace.SelectedScenarioProfile.ProfileId);
     }
 
+    [Fact]
+    public void DisposeNotifiesScenarioCommandsOfFinalAdmission()
+    {
+        using var workspace = new SimulationWorkspaceViewModel();
+        var notifications = new int[2];
+        workspace.LoadScenarioProfileCommand.CanExecuteChanged += (_, _) => notifications[0]++;
+        workspace.ResetScenarioCommand.CanExecuteChanged += (_, _) => notifications[1]++;
+
+        workspace.Dispose();
+
+        Assert.False(workspace.LoadScenarioProfileCommand.CanExecute(null));
+        Assert.False(workspace.ResetScenarioCommand.CanExecute(null));
+        Assert.Equal(1, notifications[0]);
+        Assert.Equal(1, notifications[1]);
+    }
+
     private static string WriteProfile(string json)
     {
         string directory = Path.Combine(Path.GetTempPath(), "OpenVisionLab-Machine-Studio", "scenario-profile-tests");

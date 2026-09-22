@@ -12,6 +12,52 @@ using OpenVisionLab.Machine.Simulation.Sequences;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
+public enum RecipeConnectionValidationTargetKind
+{
+    Layout,
+    Component,
+    SequenceStep
+}
+
+public sealed record RecipeConnectionValidationIssue(
+    MachineProjectLayoutValidationErrorCode Code,
+    string? LayoutId,
+    string? ComponentId,
+    string? TargetId,
+    string PropertyName,
+    string Message)
+{
+    public string? SequenceId { get; init; }
+    public string? StepId { get; init; }
+    public RecipeConnectionValidationTargetKind TargetKind =>
+        SequenceId is not null && StepId is not null
+            ? RecipeConnectionValidationTargetKind.SequenceStep
+            : ComponentId is not null
+                ? RecipeConnectionValidationTargetKind.Component
+                : RecipeConnectionValidationTargetKind.Layout;
+    public string DisplayText => $"{Code}: {Message}";
+    public string LocationText
+    {
+        get
+        {
+            var location = string.Format(
+                CultureInfo.CurrentCulture,
+                OpenVisionLanguageService.T("Connections.ValidationIssueLocationFormat"),
+                LayoutId ?? "layout",
+                ComponentId ?? "layout",
+                TargetId ?? "—",
+                PropertyName);
+            return SequenceId is null || StepId is null
+                ? location
+                : $"{location} · {string.Format(
+                    CultureInfo.CurrentCulture,
+                    OpenVisionLanguageService.T("Connections.ValidationSequenceLocationFormat"),
+                    SequenceId,
+                    StepId)}";
+        }
+    }
+}
+
 public sealed class RecipeConnectionRowViewModel : ViewModelBase
 {
     private bool _hasPreviewResult;
@@ -38,6 +84,12 @@ public sealed class RecipeConnectionRowViewModel : ViewModelBase
     public required bool IsConnected { get; init; }
     public required bool IsValid { get; init; }
     public required string ValidationText { get; init; }
+    public IReadOnlyList<RecipeConnectionValidationIssue> ValidationIssues { get; init; } =
+        Array.Empty<RecipeConnectionValidationIssue>();
+    public string ValidationPropertyText => ValidationIssues.FirstOrDefault()?.PropertyName ?? string.Empty;
+    public string ValidationDetailText => ValidationIssues.FirstOrDefault() is { } issue
+        ? $"{ValidationText} · {issue.LocationText}"
+        : ValidationText;
 
     public string StatusText => OpenVisionLanguageService.T(
         IsValid ? "Connections.Valid" : "Connections.CheckRequired");
@@ -140,10 +192,12 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase, IDisposa
     private readonly Action<int> _checkpointTemplateApplied;
     private readonly RecipeConnectionRowCatalog _rowCatalog = new();
     private readonly RelayCommand _openSequenceStepCommand;
+    private readonly Action<string> _setStatus;
     private readonly RelayCommand _addSequenceStepCommand;
     private readonly RelayCommand _createVirtualCameraWorkflowCommand;
     private MachineProjectDocument? _project;
     private RecipeConnectionRowViewModel? _selectedRow;
+    private RecipeConnectionValidationIssue? _selectedValidationIssue;
     private bool _isSynchronizingSelection;
     private bool _isEditable = true;
     private int _disposed;
@@ -171,11 +225,13 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase, IDisposa
         Func<IReadOnlyList<SemiconductorProcessBlockKind>, int> applyProcessBlock,
         Func<SemiconductorManagedTimeoutAdjustmentPreview, int> applyProcessBlockTimeouts,
         Action<int> checkpointTemplateApplied,
-        Action<string, string>? openProcessBlockSequenceStep = null)
+        Action<string, string>? openProcessBlockSequenceStep = null,
+        Action<string>? setStatus = null)
     {
         _selectComponent = selectComponent;
         _openSequenceStep = openSequenceStep;
         _openProcessBlockSequenceStep = openProcessBlockSequenceStep ?? openSequenceStep;
+        _setStatus = setStatus ?? (_ => { });
         _addSequenceStep = addSequenceStep;
         _applyVirtualCameraWorkflow = applyVirtualCameraWorkflow;
         _checkpointTemplateApplied = checkpointTemplateApplied;
@@ -231,6 +287,7 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase, IDisposa
     }
 
     public ObservableCollection<RecipeConnectionRowViewModel> Rows { get; } = new();
+    public ObservableCollection<RecipeConnectionValidationIssue> ValidationIssues { get; } = new();
     public RecipeProcessBlockViewModel ProcessBlocks { get; }
     public RecipeDryRunViewModel DryRun { get; }
     public RecipeSequenceStepPreviewViewModel SequenceStepPreview { get; }
@@ -278,6 +335,20 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase, IDisposa
         }
     }
 
+    public RecipeConnectionValidationIssue? SelectedValidationIssue
+    {
+        get => _selectedValidationIssue;
+        set
+        {
+            if (IsDisposed || !SetProperty(ref _selectedValidationIssue, value) || value is null)
+            {
+                return;
+            }
+
+            NavigateToValidationIssue(value);
+        }
+    }
+
     public bool HasRows => Rows.Count > 0;
     public bool CanCreateVirtualCameraWorkflow => _project is not null
         && !_project.Devices.Any(device => device.Kind == DeviceKind.Camera);
@@ -291,7 +362,8 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase, IDisposa
         OpenVisionLanguageService.T("Connections.CheckpointCoverageFormat"),
         CheckpointStepCount,
         RecipeStepCount);
-    public bool HasValidationErrors => Rows.Any(row => !row.IsValid);
+    public bool HasValidationErrors => ValidationIssues.Count != 0;
+    public int ValidationIssueCount => ValidationIssues.Count;
     public string SummaryText => string.Format(
         CultureInfo.CurrentCulture,
         OpenVisionLanguageService.T("Connections.SummaryFormat"),
@@ -311,6 +383,8 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase, IDisposa
     public bool? ReadinessPassed => DryRun.ReadinessPassed;
     public string ReadinessStatusText => DryRun.ReadinessStatusText;
     public string ReadinessDetailText => DryRun.ReadinessDetailText;
+    public string ReadinessComparisonText => DryRun.ReadinessComparisonText;
+    public bool IsReadinessStale => DryRun.IsReadinessStale;
     public bool IsRecipeDryRunRunning => DryRun.IsRecipeDryRunRunning;
     public RecipeDryRunResult? RecipeDryRunResult => DryRun.RecipeDryRunResult;
     public bool HasRecipeDryRunResult => DryRun.HasRecipeDryRunResult;
@@ -354,6 +428,13 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase, IDisposa
         try
         {
             Rows.Clear();
+            ValidationIssues.Clear();
+            SelectedValidationIssue = null;
+            foreach (var issue in _rowCatalog.BuildValidationIssues(project, validation))
+            {
+                ValidationIssues.Add(issue);
+            }
+
             foreach (var row in _rowCatalog.BuildRows(
                          project,
                          validation,
@@ -372,6 +453,8 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase, IDisposa
         _createVirtualCameraWorkflowCommand.RaiseCanExecuteChanged();
         RaiseSummaryChanged();
     }
+
+    internal void SetProjectRevision(long revision) => DryRun.SetProjectRevision(revision);
 
     public void RefreshDefinitionPreservingProcessBlockPlan(string? selectedComponentId = null)
     {
@@ -451,6 +534,61 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase, IDisposa
                 break;
         }
     }
+
+    private void NavigateToValidationIssue(RecipeConnectionValidationIssue issue)
+    {
+        var row = string.IsNullOrWhiteSpace(issue.ComponentId)
+            ? null
+            : Rows.FirstOrDefault(candidate =>
+                string.Equals(candidate.ComponentId, issue.ComponentId, StringComparison.Ordinal));
+        SelectedRow = row;
+        if (row is null)
+        {
+            SetValidationNavigationStatus(issue);
+            return;
+        }
+
+        if (row.FirstSequenceId is { } sequenceId
+            && row.FirstSequenceStepId is { } stepId)
+        {
+            if (HasSequenceStep(sequenceId, stepId))
+            {
+                _openSequenceStep(sequenceId, stepId);
+                return;
+            }
+
+            SetValidationNavigationStatus(issue with
+            {
+                SequenceId = sequenceId,
+                StepId = stepId
+            });
+            return;
+        }
+
+        _setStatus(string.Format(
+            CultureInfo.CurrentCulture,
+            OpenVisionLanguageService.T("Connections.ValidationTargetSelectedStatus"),
+            row.Name));
+    }
+
+    private void SetValidationNavigationStatus(RecipeConnectionValidationIssue issue)
+    {
+        var targetId = !string.IsNullOrWhiteSpace(issue.StepId)
+            ? $"{issue.SequenceId}/{issue.StepId}"
+            : !string.IsNullOrWhiteSpace(issue.ComponentId)
+                ? issue.ComponentId
+                : issue.LayoutId ?? "layout";
+        _setStatus(string.Format(
+            CultureInfo.CurrentCulture,
+            OpenVisionLanguageService.T("Connections.ValidationTargetUnavailableStatus"),
+            targetId));
+    }
+
+    private bool HasSequenceStep(string sequenceId, string stepId) =>
+        _project?.Sequences.Any(sequence =>
+            string.Equals(sequence.Id, sequenceId, StringComparison.Ordinal)
+            && sequence.Steps.Any(step =>
+                string.Equals(step.Id, stepId, StringComparison.Ordinal))) == true;
 
     private void CreateVirtualCameraWorkflow()
     {
@@ -565,6 +703,7 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase, IDisposa
         OnPropertyChanged(nameof(CheckpointStepCount));
         OnPropertyChanged(nameof(CheckpointCoverageText));
         OnPropertyChanged(nameof(HasValidationErrors));
+        OnPropertyChanged(nameof(ValidationIssueCount));
         OnPropertyChanged(nameof(SummaryText));
         OnPropertyChanged(nameof(ValidationSummaryText));
     }
@@ -598,6 +737,14 @@ public sealed class RecipeConnectionWorkbenchViewModel : ViewModelBase, IDisposa
         DryRun.PropertyChanged -= OnDryRunPropertyChanged;
         SequenceStepPreview.Dispose();
         DryRun.Dispose();
+        StationSetups.Dispose();
+        CheckpointTemplate.Dispose();
+        LoadLocks.Dispose();
+        ProcessBlocks.Dispose();
+        SemanticSetups.Dispose();
+        _openSequenceStepCommand.RaiseCanExecuteChanged();
+        _addSequenceStepCommand.RaiseCanExecuteChanged();
+        _createVirtualCameraWorkflowCommand.RaiseCanExecuteChanged();
     }
 
     private bool IsDisposed => Volatile.Read(ref _disposed) != 0;

@@ -1,4 +1,3 @@
-using System.Windows;
 using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.MachineStudio.ViewModel;
@@ -40,7 +39,7 @@ public sealed class SceneViewportInteractionWorkflowTests
         var workflow = new SceneViewportInteractionWorkflow(layout, (_, _, _) => true);
 
         workflow.HandleMove(new SceneMoveRequest(SceneViewportMoveAction.Begin, default));
-        workflow.HandleMove(new SceneMoveRequest(SceneViewportMoveAction.Update, new Vector(13, 17)));
+        workflow.HandleMove(new SceneMoveRequest(SceneViewportMoveAction.Update, (13, 17)));
         workflow.HandleMove(new SceneMoveRequest(SceneViewportMoveAction.Commit, default));
 
         Assert.Equal(initial.CurrentX + 10, item.CurrentX);
@@ -54,7 +53,7 @@ public sealed class SceneViewportInteractionWorkflowTests
         workflow.HandleTransform(new SceneTransformRequest(
             SceneViewportMoveAction.Update,
             LayoutTransformHandle.BottomRight,
-            new Point(item.CurrentX + 40, item.CurrentY + 30),
+            (item.CurrentX + 40, item.CurrentY + 30),
             PreserveAspectRatio: false));
         workflow.HandleTransform(new SceneTransformRequest(
             SceneViewportMoveAction.Cancel,
@@ -87,7 +86,7 @@ public sealed class SceneViewportInteractionWorkflowTests
 
         workflow.HandleLibraryComponentDrop(new SceneLibraryComponentDropRequest(
             LayoutComponentKind.Conveyor,
-            new Point(45, 185)));
+            (45, 185)));
 
         Assert.Equal(LayoutComponentKind.Conveyor, addedKind);
         Assert.Equal(45, addedX);

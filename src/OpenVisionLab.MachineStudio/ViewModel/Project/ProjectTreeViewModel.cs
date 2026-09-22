@@ -11,6 +11,7 @@ namespace OpenVisionLab.MachineStudio.ViewModel;
 
 public sealed class ProjectTreeViewModel : ViewModelBase
 {
+    private ICommand? _newProjectCommand;
     private TreeNodeViewModel? _selectedNode;
 
     public ObservableCollection<TreeNodeViewModel> Roots { get; } = new();
@@ -21,7 +22,7 @@ public sealed class ProjectTreeViewModel : ViewModelBase
         set => SetProperty(ref _selectedNode, value);
     }
 
-    public ICommand NewProjectCommand => new RelayCommand(_ => LoadProject(new MachineProjectDocument()));
+    public ICommand NewProjectCommand => _newProjectCommand ??= new RelayCommand(_ => LoadProject(new MachineProjectDocument()));
 
     public void LoadProject(MachineProjectDocument document)
     {

@@ -281,6 +281,17 @@ public sealed class MachineProjectLayoutBehaviorBindingValidator
                     component.Id,
                     $"Digital sensor target component '{sensor.TargetComponentId}' is ambiguous."));
             }
+            else if (!string.Equals(
+                         matchingComponents[0].Layout.Id,
+                         layout.Id,
+                         StringComparison.Ordinal))
+            {
+                errors.Add(Error(
+                    MachineProjectLayoutValidationErrorCode.SensorTargetComponentMustBeInSameLayout,
+                    layout.Id,
+                    component.Id,
+                    $"Digital sensor target component '{sensor.TargetComponentId}' must be in the same layout."));
+            }
         }
 
         if (sensor.OnDelayMilliseconds < 0 || sensor.OffDelayMilliseconds < 0)

@@ -87,6 +87,26 @@ public sealed class MachineIntegrationTcpControlViewModelTests
     }
 
     [Fact]
+    public async Task TcpFailureKeepsStatusAndForwardsStructuredExceptionContext()
+    {
+        var expected = new InvalidOperationException("TCP settings rejected");
+        var statuses = new List<string>();
+        Exception? captured = null;
+        using var viewModel = new MachineIntegrationTcpControlViewModel(
+            () => throw expected,
+            () => null,
+            () => Task.CompletedTask,
+            statuses.Add,
+            handleException: exception => captured = exception);
+
+        await viewModel.StartTcpListenerAsync();
+
+        Assert.Same(expected, captured);
+        Assert.Contains(expected.Message, statuses);
+        Assert.False(viewModel.IsTcpBusy);
+    }
+
+    [Fact]
     public async Task ConcurrentTcpOperationsUseOneActiveOperation()
     {
         using var fixture = new TestRoot();
@@ -159,6 +179,35 @@ public sealed class MachineIntegrationTcpControlViewModelTests
         await operation;
 
         Assert.Equal(statusCountBeforeDispose, statuses.Count);
+    }
+
+    [Fact]
+    public void DisposeDisablesTcpCommandsAndNotifiesBindings()
+    {
+        using var fixture = new TestRoot();
+        using var viewModel = CreateViewModel(fixture);
+        var commands = new[]
+        {
+            viewModel.StartTcpListenerCommand,
+            viewModel.StopTcpListenerCommand,
+            viewModel.PingTcpPeerCommand,
+            viewModel.PushLatestTransactionCommand,
+            viewModel.PullLatestTransactionCommand
+        };
+        var notifications = new int[commands.Length];
+        for (var index = 0; index < commands.Length; index++)
+        {
+            var commandIndex = index;
+            commands[commandIndex].CanExecuteChanged += (_, _) => notifications[commandIndex]++;
+        }
+
+        Assert.True(viewModel.StartTcpListenerCommand.CanExecute(null));
+        Assert.True(viewModel.PingTcpPeerCommand.CanExecute(null));
+
+        viewModel.Dispose();
+
+        Assert.All(commands, command => Assert.False(command.CanExecute(null)));
+        Assert.All(notifications, count => Assert.Equal(1, count));
     }
 
     [Fact]

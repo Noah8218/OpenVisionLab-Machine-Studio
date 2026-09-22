@@ -24,6 +24,7 @@ public sealed class SimulationScenarioBatchPresentationTests
         var running = new SimulationScenarioBatchPresentationState(
             IsBatchRunning: true,
             BatchWasCanceled: false,
+            BatchCancellationRequested: false,
             BatchCompletedRuns: 2,
             BatchRepetitionCount: 3,
             LatestBatchResult: result,
@@ -62,6 +63,15 @@ public sealed class SimulationScenarioBatchPresentationTests
         Assert.Equal(
             OpenVisionLanguageService.T("Simulation.BatchCanceled"),
             presentation.GetBatchStatusText(canceled));
+
+        var cancelRequested = running with { BatchCancellationRequested = true };
+        Assert.Equal(
+            string.Format(
+                CultureInfo.CurrentCulture,
+                OpenVisionLanguageService.T("Simulation.BatchCancelRequested"),
+                2,
+                3),
+            presentation.GetBatchStatusText(cancelRequested));
     }
 
     [Fact]
@@ -84,6 +94,7 @@ public sealed class SimulationScenarioBatchPresentationTests
         var state = new SimulationScenarioBatchPresentationState(
             IsBatchRunning: false,
             BatchWasCanceled: false,
+            BatchCancellationRequested: false,
             BatchCompletedRuns: 2,
             BatchRepetitionCount: 2,
             LatestBatchResult: result,

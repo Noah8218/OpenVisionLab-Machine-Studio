@@ -17,11 +17,13 @@ internal sealed record SimulationSessionStartup
     internal required Action<bool> SetDesignMode { get; init; }
     internal required Action<bool> SetRunning { get; init; }
     internal required Action<SimulationSnapshot> ApplySnapshot { get; init; }
+    internal Func<SimulationSnapshot, bool>? CanApplySnapshot { get; init; }
     internal required Action CancelVisionCapture { get; init; }
     internal required Action<string> SetStatus { get; init; }
     internal required Action<string, string> Log { get; init; }
     internal required Action NotifyCommandsChanged { get; init; }
     internal required Func<Action, Task> Dispatch { get; init; }
+    internal Func<Action, Task>? DispatchAfterDispose { get; init; }
     internal required Action<SimulationSnapshot> PublishSnapshot { get; init; }
     internal required Action OnInitialRuntimeApplied { get; init; }
     internal required Action<string> OnInitialConfigurationRejected { get; init; }
@@ -30,6 +32,7 @@ internal sealed record SimulationSessionStartup
     internal required Action<Exception> OnUnhandledException { get; init; }
     internal Action<SimulationEvent>? OnCanonicalEvent { get; init; }
     internal Action<SimulationEventJournalSnapshot>? OnCanonicalJournalCompleted { get; init; }
+    internal Func<CancellationToken, Task<bool>>? PrepareAutomaticExternalInspection { get; init; }
     internal required SimulationWorkspaceViewModel Workspace { get; init; }
     internal SimulationScenarioBatchViewModel? ScenarioBatch { get; init; }
     internal MultiAxisCommissioningViewModel? MultiAxisCommissioning { get; init; }
@@ -61,7 +64,9 @@ internal sealed class SimulationSessionCoordinator : IDisposable
     private bool _started;
     private bool _disposeRequested;
 
-    internal SimulationSessionCoordinator(TimeSpan fixedStep)
+    internal SimulationSessionCoordinator(
+        TimeSpan fixedStep,
+        TimeSpan? automaticExternalInspectionWallTimeout = null)
     {
         if (fixedStep <= TimeSpan.Zero)
         {
@@ -69,7 +74,12 @@ internal sealed class SimulationSessionCoordinator : IDisposable
         }
 
         _fixedStep = fixedStep;
-        _engine = new FixedStepSimulationEngine(new SimulationSettings { FixedStep = fixedStep });
+        _engine = new FixedStepSimulationEngine(new SimulationSettings
+        {
+            FixedStep = fixedStep,
+            AutomaticExternalInspectionWallTimeout = automaticExternalInspectionWallTimeout
+                ?? SimulationSettings.DefaultAutomaticExternalInspectionWallTimeout
+        });
     }
 
     internal ISimulationEngine Engine => _engine;
@@ -109,7 +119,8 @@ internal sealed class SimulationSessionCoordinator : IDisposable
                 startup.CancelVisionCapture,
                 startup.SetStatus,
                 startup.Log,
-                startup.NotifyCommandsChanged);
+                startup.NotifyCommandsChanged,
+                startup.PrepareAutomaticExternalInspection);
             _runtimeLoop = new(
                 _engine,
                 startup.Dispatch,
@@ -121,7 +132,8 @@ internal sealed class SimulationSessionCoordinator : IDisposable
                 startup.OnTerminated,
                 startup.OnUnhandledException,
                 startup.OnCanonicalEvent,
-                startup.OnCanonicalJournalCompleted);
+                startup.OnCanonicalJournalCompleted,
+                startup.CanApplySnapshot);
             _runtimeResources = new(
                 _engine,
                 _runtimeLoop,
@@ -134,7 +146,8 @@ internal sealed class SimulationSessionCoordinator : IDisposable
                 _runtimeResources,
                 _runControl,
                 startup.RecordShutdownDiagnostic,
-                startup.Dispatch);
+                startup.Dispatch,
+                startup.DispatchAfterDispose);
             _closeWorkflow = new(
                 startup.ResolveUnsavedChanges,
                 startup.ObserveProjectSave,

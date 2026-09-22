@@ -57,6 +57,7 @@ public sealed class RecipeDryRunPlaybackViewModelTests
         Assert.True(layoutEditable);
         Assert.Null(viewModel.CurrentStep);
         Assert.Empty(viewModel.TitleText);
+        Assert.Equal("Ready", status);
         Assert.False(viewModel.ExitCommand.CanExecute(null));
     }
 

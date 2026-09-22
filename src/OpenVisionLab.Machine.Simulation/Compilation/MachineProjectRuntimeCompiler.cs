@@ -57,7 +57,9 @@ public enum MachineProjectRuntimeCompilationErrorCode
     PickPlaceWorkpieceInvalid,
     RuntimeConfigurationInvalid,
     UnexpectedFailure,
-    TimeScaleInvalid
+    TimeScaleInvalid,
+    DeviceIdRequired,
+    DuplicateDeviceId
 }
 
 public sealed record MachineProjectRuntimeCompilationError(
@@ -190,6 +192,14 @@ public sealed class MachineProjectRuntimeCompiler
             channelDefinitions!,
             errors);
 
+        ValidateDeviceIdentity(deviceDefinitions!, errors);
+        if (errors.Any(error => error.Code is
+                MachineProjectRuntimeCompilationErrorCode.DeviceIdRequired or
+                MachineProjectRuntimeCompilationErrorCode.DuplicateDeviceId))
+        {
+            return Failure(errors);
+        }
+
         IReadOnlyList<CompiledSequence> sequences = Array.Empty<CompiledSequence>();
         if (!HasErrorsInDependencies(errors))
         {
@@ -315,6 +325,32 @@ public sealed class MachineProjectRuntimeCompiler
             StringComparer.Ordinal);
     }
 
+    private static void ValidateDeviceIdentity(
+        IEnumerable<DeviceDefinition> definitions,
+        ICollection<MachineProjectRuntimeCompilationError> errors)
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (DeviceDefinition definition in definitions)
+        {
+            if (string.IsNullOrWhiteSpace(definition.Id))
+            {
+                errors.Add(Error(
+                    MachineProjectRuntimeCompilationErrorCode.DeviceIdRequired,
+                    definition.Id,
+                    "Every device requires a stable id."));
+                continue;
+            }
+
+            if (!ids.Add(definition.Id))
+            {
+                errors.Add(Error(
+                    MachineProjectRuntimeCompilationErrorCode.DuplicateDeviceId,
+                    definition.Id,
+                    $"Device id '{definition.Id}' is duplicated."));
+            }
+        }
+    }
+
 
 
 
@@ -332,7 +368,9 @@ public sealed class MachineProjectRuntimeCompiler
             MachineProjectRuntimeCompilationErrorCode.DuplicateCameraId or
             MachineProjectRuntimeCompilationErrorCode.CameraDecisionInvalid or
             MachineProjectRuntimeCompilationErrorCode.CameraLegacyValueInvalid or
-            MachineProjectRuntimeCompilationErrorCode.CameraDelayInvalid);
+            MachineProjectRuntimeCompilationErrorCode.CameraDelayInvalid or
+            MachineProjectRuntimeCompilationErrorCode.DeviceIdRequired or
+            MachineProjectRuntimeCompilationErrorCode.DuplicateDeviceId);
 
     private static MachineProjectRuntimeCompilationResult Failure(
         params MachineProjectRuntimeCompilationError[] errors) =>

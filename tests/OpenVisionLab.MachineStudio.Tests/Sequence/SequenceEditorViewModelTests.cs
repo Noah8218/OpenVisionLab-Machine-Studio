@@ -1,3 +1,4 @@
+using System.Windows.Input;
 using OpenVisionLab.Machine.Core.Axes;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Core.Sequences;
@@ -122,6 +123,140 @@ public sealed class SequenceEditorViewModelTests
 
         Assert.Empty(editor.Steps);
         Assert.Equal(0, definitionChangedCount);
+    }
+
+    [Fact]
+    public void EditabilityChangeNotifiesStructuralCommands()
+    {
+        var project = new MachineProjectDocument
+        {
+            Id = "editability-command-project",
+            Name = "Editability command project",
+            Axes =
+            [
+                new VirtualAxisDefinition
+                {
+                    Id = "axis-1",
+                    Name = "Axis 1"
+                }
+            ],
+            Sequences =
+            [
+                CompleteSequence("sequence-1")
+            ]
+        };
+
+        var editor = new SequenceEditorViewModel();
+        editor.Load(project);
+
+        Assert.True(editor.AddStepCommand.CanExecute(null));
+        var notifications = 0;
+        editor.AddStepCommand.CanExecuteChanged += (_, _) => notifications++;
+
+        editor.IsEditable = false;
+
+        Assert.False(editor.AddStepCommand.CanExecute(null));
+        Assert.Equal(1, notifications);
+    }
+
+    [Fact]
+    public void DisposeDisablesStructuralCommandsAndNotifiesFinalAdmission()
+    {
+        var project = new MachineProjectDocument
+        {
+            Id = "dispose-command-project",
+            Name = "Dispose command project",
+            Axes =
+            [
+                new VirtualAxisDefinition
+                {
+                    Id = "axis-1",
+                    Name = "Axis 1"
+                }
+            ],
+            Sequences =
+            [
+                CompleteSequence("sequence-1")
+            ]
+        };
+
+        var editor = new SequenceEditorViewModel();
+        editor.Load(project);
+        var commands = new ICommand[]
+        {
+            editor.AddStepCommand,
+            editor.DeleteStepCommand,
+            editor.MoveStepUpCommand,
+            editor.MoveStepDownCommand
+        };
+        var notifications = new int[commands.Length];
+        for (var index = 0; index < commands.Length; index++)
+        {
+            var commandIndex = index;
+            commands[commandIndex].CanExecuteChanged += (_, _) => notifications[commandIndex]++;
+        }
+
+        editor.Dispose();
+
+        Assert.All(commands, command => Assert.False(command.CanExecute(null)));
+        Assert.All(notifications, count => Assert.Equal(1, count));
+    }
+
+    [Fact]
+    public void DisposedEditorRejectsDirectTargetStepAdmission()
+    {
+        var project = new MachineProjectDocument
+        {
+            Id = "disposed-target-step-project",
+            Name = "Disposed target step project",
+            Axes =
+            [
+                new VirtualAxisDefinition
+                {
+                    Id = "axis-1",
+                    Name = "Axis 1"
+                }
+            ],
+            Sequences =
+            [
+                CompleteSequence("sequence-1")
+            ]
+        };
+        var editor = new SequenceEditorViewModel();
+        editor.Load(project);
+        var originalStepCount = project.Sequences[0].Steps.Count;
+
+        editor.Dispose();
+
+        var stepId = editor.TryAddStepForTarget("axis-1");
+
+        Assert.Null(stepId);
+        Assert.Equal(originalStepCount, project.Sequences[0].Steps.Count);
+    }
+
+    [Fact]
+    public void DisposeRejectsDirectLocalizationRefresh()
+    {
+        var project = new MachineProjectDocument
+        {
+            Id = "disposed-localization-project",
+            Name = "Disposed localization project",
+            Sequences =
+            [
+                CompleteSequence("sequence-1")
+            ]
+        };
+        var editor = new SequenceEditorViewModel();
+        editor.Load(project);
+        var changedProperties = new List<string?>();
+        editor.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        editor.Dispose();
+        changedProperties.Clear();
+
+        editor.RefreshLocalization();
+
+        Assert.Empty(changedProperties);
     }
 
     private static SequenceDefinition SequenceWithCall(string id, string targetId) => new()

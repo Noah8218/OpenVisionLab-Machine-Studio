@@ -121,7 +121,9 @@ internal sealed class InspectionHandoffRuntimeState
                         _decision = result.Decision;
                         State = InspectionHandoffState.ResultAvailable;
                     }
-                    else if (camera.State is VirtualCameraState.Exposing or VirtualCameraState.Transferring)
+                    else if (camera.State is VirtualCameraState.Exposing
+                        or VirtualCameraState.Transferring
+                        or VirtualCameraState.AwaitingExternalResult)
                     {
                         State = InspectionHandoffState.Inspecting;
                     }
@@ -145,7 +147,10 @@ internal sealed class InspectionHandoffRuntimeState
                     _decision = result.Decision;
                     State = InspectionHandoffState.ResultAvailable;
                 }
-                else if (camera.State is not (VirtualCameraState.Exposing or VirtualCameraState.Transferring))
+                else if (camera.State is not (
+                    VirtualCameraState.Exposing
+                    or VirtualCameraState.Transferring
+                    or VirtualCameraState.AwaitingExternalResult))
                 {
                     EnterFault();
                 }

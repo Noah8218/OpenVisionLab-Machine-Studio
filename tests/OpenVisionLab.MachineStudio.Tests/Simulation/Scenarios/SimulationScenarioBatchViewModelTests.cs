@@ -50,6 +50,92 @@ public sealed class SimulationScenarioBatchViewModelTests
     }
 
     [Fact]
+    public void DisposeDisablesCommandsAndNotifiesFinalAdmission()
+    {
+        OpenVisionLanguageService.Load();
+        using var workspace = new SimulationWorkspaceViewModel();
+        var project = new MachineProjectDocument { Name = "Batch dispose test" };
+        using var viewModel = CreateViewModel(
+            workspace,
+            project,
+            () => true,
+            () => false,
+            _ => { });
+
+        var runNotifications = 0;
+        var cancelNotifications = 0;
+        var acceptNotifications = 0;
+        var clearNotifications = 0;
+        var navigateNotifications = 0;
+        viewModel.RunCommand.CanExecuteChanged += (_, _) => runNotifications++;
+        viewModel.CancelCommand.CanExecuteChanged += (_, _) => cancelNotifications++;
+        viewModel.AcceptBaselineCommand.CanExecuteChanged += (_, _) => acceptNotifications++;
+        viewModel.ClearBaselineCommand.CanExecuteChanged += (_, _) => clearNotifications++;
+        viewModel.NavigateToMismatchCommand.CanExecuteChanged += (_, _) => navigateNotifications++;
+
+        Assert.True(viewModel.RunCommand.CanExecute(null));
+
+        viewModel.Dispose();
+
+        Assert.False(viewModel.RunCommand.CanExecute(null));
+        Assert.False(viewModel.CancelCommand.CanExecute(null));
+        Assert.False(viewModel.AcceptBaselineCommand.CanExecute(null));
+        Assert.False(viewModel.ClearBaselineCommand.CanExecute(null));
+        Assert.False(viewModel.NavigateToMismatchCommand.CanExecute(null));
+        Assert.False(viewModel.CanExportEvidence);
+        Assert.False(viewModel.CanImportEvidence);
+        Assert.Equal(1, runNotifications);
+        Assert.Equal(1, cancelNotifications);
+        Assert.Equal(1, acceptNotifications);
+        Assert.Equal(1, clearNotifications);
+        Assert.Equal(1, navigateNotifications);
+    }
+
+    [Fact]
+    public void DisposeRejectsDirectResetAndRuntimeNotifications()
+    {
+        OpenVisionLanguageService.Load();
+        using var workspace = new SimulationWorkspaceViewModel();
+        var project = new MachineProjectDocument { Name = "Batch direct admission test" };
+        var parentNotifications = 0;
+        using var viewModel = CreateViewModel(
+            workspace,
+            project,
+            () => true,
+            () => false,
+            _ => parentNotifications++);
+        var propertyNotifications = 0;
+        viewModel.PropertyChanged += (_, _) => propertyNotifications++;
+
+        viewModel.Dispose();
+        var parentNotificationsAfterDispose = parentNotifications;
+        var propertyNotificationsAfterDispose = propertyNotifications;
+
+        viewModel.Reset();
+        viewModel.NotifyRuntimeChanged();
+
+        Assert.Equal(parentNotificationsAfterDispose, parentNotifications);
+        Assert.Equal(propertyNotificationsAfterDispose, propertyNotifications);
+    }
+
+    [Fact]
+    public void OtherValidationBlocksBatchAdmission()
+    {
+        OpenVisionLanguageService.Load();
+        using var workspace = new SimulationWorkspaceViewModel();
+        var project = new MachineProjectDocument { Name = "Batch admission test" };
+        using var viewModel = CreateViewModel(
+            workspace,
+            project,
+            () => true,
+            () => true,
+            _ => { });
+
+        Assert.False(viewModel.CanRunScenarioBatch);
+        Assert.False(viewModel.RunCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task BatchCompletionUsesTheUiDispatchBoundary()
     {
         OpenVisionLanguageService.Load();

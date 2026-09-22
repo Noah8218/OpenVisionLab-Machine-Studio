@@ -77,17 +77,61 @@ public sealed class SimulationCommandPresentationDispatcherTests
         Assert.Equal(3, engine.Commands.Count);
     }
 
+    [Fact]
+    public async Task LateResultSkipsPresentationWhenRuntimeAdmissionCloses()
+    {
+        OpenVisionLanguageService.Load();
+        var completion = new TaskCompletionSource<SimulationCommandResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var engine = new TestSimulationEngine(
+            acceptCommands: true,
+            completion: completion);
+        var canPresent = true;
+        var statuses = new List<string>();
+        var logs = new List<(string Category, string Message)>();
+        var dispatcher = new SimulationCommandPresentationDispatcher(
+            engine,
+            statuses.Add,
+            (category, message) => logs.Add((category, message)),
+            () => canPresent);
+
+        Task<SimulationCommandResult> dispatch = dispatcher.DispatchFaultAsync(
+            new InjectSimulationFaultCommand(
+                SimulationFaultKind.AxisMotionBlocked,
+                "axis-1"));
+        await engine.CommandSeen.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        canPresent = false;
+        completion.SetResult(new(
+            engine.Commands[0].CommandId,
+            true,
+            0,
+            TimeSpan.Zero,
+            SimulationCommandErrorCode.None,
+            null));
+
+        var result = await dispatch;
+
+        Assert.True(result.IsAccepted);
+        Assert.Empty(statuses);
+        Assert.Empty(logs);
+    }
+
     private sealed class TestSimulationEngine : ISimulationEngine
     {
         private readonly bool _acceptCommands;
+        private readonly TaskCompletionSource<SimulationCommandResult>? _completion;
         private readonly Channel<SimulationSnapshot> _snapshotChannel =
             Channel.CreateUnbounded<SimulationSnapshot>();
         private readonly Channel<SimulationEvent> _eventChannel =
             Channel.CreateUnbounded<SimulationEvent>();
 
-        internal TestSimulationEngine(bool acceptCommands)
+        internal TestSimulationEngine(
+            bool acceptCommands,
+            TaskCompletionSource<SimulationCommandResult>? completion = null)
         {
             _acceptCommands = acceptCommands;
+            _completion = completion;
             CurrentSnapshot = new SimulationSnapshot(
                 TimeSpan.Zero,
                 0,
@@ -101,6 +145,9 @@ public sealed class SimulationCommandPresentationDispatcherTests
         }
 
         internal List<SimulationCommand> Commands { get; } = [];
+
+        internal TaskCompletionSource<bool> CommandSeen { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public SimulationSnapshot CurrentSnapshot { get; }
 
@@ -123,6 +170,12 @@ public sealed class SimulationCommandPresentationDispatcherTests
             CancellationToken cancellationToken = default)
         {
             Commands.Add(command);
+            CommandSeen.TrySetResult(true);
+            if (_completion is not null)
+            {
+                return _completion.Task;
+            }
+
             return Task.FromResult(
                 new SimulationCommandResult(
                     command.CommandId,

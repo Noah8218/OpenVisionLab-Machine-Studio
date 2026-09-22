@@ -329,6 +329,28 @@ internal sealed class SimulationScenarioBatchArtifactStore
         }
     }
 
+    internal bool TryExportReport(string path, out string? errorDetail)
+    {
+        errorDetail = null;
+        if (_latestBatchResult is null || !_latestBatchResult.HasValidEvidenceHash())
+        {
+            errorDetail = "No complete batch evidence is available.";
+            return false;
+        }
+
+        try
+        {
+            DeterministicSimulationBatchResultReport.SaveToMarkdown(_latestBatchResult, path);
+            return true;
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            errorDetail = exception.Message;
+            return false;
+        }
+    }
+
     internal bool TryImportEvidence(
         string path,
         string? projectPath,

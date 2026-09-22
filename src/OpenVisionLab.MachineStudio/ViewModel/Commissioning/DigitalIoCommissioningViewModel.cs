@@ -376,6 +376,10 @@ public sealed class DigitalIoCommissioningViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         Interlocked.Exchange(ref _disposed, 1);
+        (_startManualControlCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        (_forceOnCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        (_forceOffCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        (_clearForceCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
     }
 
     private bool IsDisposed => Volatile.Read(ref _disposed) != 0;

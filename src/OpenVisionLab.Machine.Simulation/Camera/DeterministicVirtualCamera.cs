@@ -17,6 +17,8 @@ public sealed class DeterministicVirtualCamera
     private VirtualCameraAcquisitionResult? _result;
     private VirtualCameraFrameEvidence? _frameEvidence;
     private VirtualCameraInspectionEvidence? _inspectionEvidence;
+    private VirtualCameraExternalResultEvidence? _externalResultEvidence;
+    private bool _waitForExternalResult;
 
     public DeterministicVirtualCamera(VirtualCameraConfiguration configuration)
     {
@@ -27,6 +29,11 @@ public sealed class DeterministicVirtualCamera
     public string Name => _configuration.Name;
     public VirtualCameraState State => _state;
 
+    internal string CreateNextAcquisitionId() => string.Concat(
+        Id,
+        "/frame/",
+        (_acquisitionOrdinal + 1).ToString("D8", CultureInfo.InvariantCulture));
+
     /// <summary>
     /// Starts an acquisition from Idle or FrameReady. Busy and faulted cameras
     /// reject the request without changing their active acquisition.
@@ -34,7 +41,8 @@ public sealed class DeterministicVirtualCamera
     public VirtualCameraTriggerResult Trigger(
         string? recipeId,
         VirtualCameraFrameEvidence? frameEvidence = null,
-        VirtualCameraInspectionEvidence? inspectionEvidence = null)
+        VirtualCameraInspectionEvidence? inspectionEvidence = null,
+        bool waitForExternalResult = false)
     {
         if (string.IsNullOrWhiteSpace(recipeId))
         {
@@ -43,7 +51,9 @@ public sealed class DeterministicVirtualCamera
                 _acquisitionOrdinal);
         }
 
-        if (_state is VirtualCameraState.Exposing or VirtualCameraState.Transferring)
+        if (_state is VirtualCameraState.Exposing
+            or VirtualCameraState.Transferring
+            or VirtualCameraState.AwaitingExternalResult)
         {
             return VirtualCameraTriggerResult.Rejected(
                 VirtualCameraTriggerErrorCode.CameraBusy,
@@ -58,10 +68,7 @@ public sealed class DeterministicVirtualCamera
         }
 
         var nextOrdinal = _acquisitionOrdinal + 1;
-        var nextAcquisitionId = string.Concat(
-            Id,
-            "/frame/",
-            nextOrdinal.ToString("D8", CultureInfo.InvariantCulture));
+        var nextAcquisitionId = CreateNextAcquisitionId();
         if (frameEvidence is not null && !string.Equals(
                 frameEvidence.FrameId,
                 nextAcquisitionId,
@@ -82,6 +89,12 @@ public sealed class DeterministicVirtualCamera
                 VirtualCameraTriggerErrorCode.InspectionEvidenceInvalid,
                 _acquisitionOrdinal);
         }
+        if (waitForExternalResult && (frameEvidence is null || inspectionEvidence is not null))
+        {
+            return VirtualCameraTriggerResult.Rejected(
+                VirtualCameraTriggerErrorCode.InspectionEvidenceInvalid,
+                _acquisitionOrdinal);
+        }
 
         _acquisitionOrdinal = nextOrdinal;
         _currentAcquisitionId = nextAcquisitionId;
@@ -91,6 +104,8 @@ public sealed class DeterministicVirtualCamera
         _result = null;
         _frameEvidence = frameEvidence;
         _inspectionEvidence = inspectionEvidence;
+        _externalResultEvidence = null;
+        _waitForExternalResult = waitForExternalResult;
         _state = VirtualCameraState.Exposing;
 
         return VirtualCameraTriggerResult.Accepted(
@@ -124,17 +139,25 @@ public sealed class DeterministicVirtualCamera
 
             if (_transferTicksRemaining == 0)
             {
-                _result = new VirtualCameraAcquisitionResult(
-                    _currentAcquisitionId!,
-                    Id,
-                    _currentRecipeId!,
-                    _acquisitionOrdinal,
-                    _inspectionEvidence?.Decision ?? _configuration.PlaceholderDecision,
-                    _frameEvidence,
-                    _inspectionEvidence);
-                _state = VirtualCameraState.FrameReady;
-                transition = VirtualCameraTickTransition.FrameReady;
-                completedAcquisition = _result;
+                if (_waitForExternalResult)
+                {
+                    _state = VirtualCameraState.AwaitingExternalResult;
+                    transition = VirtualCameraTickTransition.ExternalResultPending;
+                }
+                else
+                {
+                    _result = new VirtualCameraAcquisitionResult(
+                        _currentAcquisitionId!,
+                        Id,
+                        _currentRecipeId!,
+                        _acquisitionOrdinal,
+                        _inspectionEvidence?.Decision ?? _configuration.PlaceholderDecision,
+                        _frameEvidence,
+                        _inspectionEvidence);
+                    _state = VirtualCameraState.FrameReady;
+                    transition = VirtualCameraTickTransition.FrameReady;
+                    completedAcquisition = _result;
+                }
             }
         }
 
@@ -142,6 +165,70 @@ public sealed class DeterministicVirtualCamera
             CaptureSnapshot(),
             transition,
             completedAcquisition);
+    }
+
+    public VirtualCameraExternalResultAdmissionResult ApplyExternalResult(
+        VirtualCameraExternalResultEvidence evidence)
+    {
+        ArgumentNullException.ThrowIfNull(evidence);
+
+        if (_externalResultEvidence is { } existing)
+        {
+            return existing.TransactionId == evidence.TransactionId
+                && existing.ResultMessageId == evidence.ResultMessageId
+                && string.Equals(
+                    existing.ResultDocumentSha256,
+                    evidence.ResultDocumentSha256,
+                    StringComparison.Ordinal)
+                ? VirtualCameraExternalResultAdmissionResult.Idempotent()
+                : VirtualCameraExternalResultAdmissionResult.Rejected(
+                    VirtualCameraExternalResultAdmissionErrorCode.ConflictingDuplicate);
+        }
+
+        if (_state != VirtualCameraState.AwaitingExternalResult)
+        {
+            return VirtualCameraExternalResultAdmissionResult.Rejected(
+                VirtualCameraExternalResultAdmissionErrorCode.NotAwaitingExternalResult);
+        }
+        if (!string.Equals(evidence.Correlation.CameraId, Id, StringComparison.Ordinal)
+            || !string.Equals(
+                evidence.Correlation.AcquisitionId,
+                _currentAcquisitionId,
+                StringComparison.Ordinal))
+        {
+            return VirtualCameraExternalResultAdmissionResult.Rejected(
+                VirtualCameraExternalResultAdmissionErrorCode.AcquisitionMismatch);
+        }
+        if (_frameEvidence is null
+            || !string.Equals(evidence.Correlation.FrameId, _frameEvidence.FrameId, StringComparison.Ordinal)
+            || !string.Equals(
+                evidence.Correlation.InputSha256,
+                _frameEvidence.ContentSha256,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return VirtualCameraExternalResultAdmissionResult.Rejected(
+                VirtualCameraExternalResultAdmissionErrorCode.FrameMismatch);
+        }
+
+        _externalResultEvidence = evidence;
+        _waitForExternalResult = false;
+        if (evidence.Decision is not { } decision)
+        {
+            _state = VirtualCameraState.Faulted;
+            _result = null;
+            return VirtualCameraExternalResultAdmissionResult.Applied(terminalFailure: true);
+        }
+
+        _result = new VirtualCameraAcquisitionResult(
+            _currentAcquisitionId!,
+            Id,
+            _currentRecipeId!,
+            _acquisitionOrdinal,
+            decision,
+            _frameEvidence,
+            ExternalResultEvidence: evidence);
+        _state = VirtualCameraState.FrameReady;
+        return VirtualCameraExternalResultAdmissionResult.Applied(terminalFailure: false);
     }
 
     /// <summary>
@@ -156,6 +243,8 @@ public sealed class DeterministicVirtualCamera
         _result = null;
         _frameEvidence = null;
         _inspectionEvidence = null;
+        _externalResultEvidence = null;
+        _waitForExternalResult = false;
         return CaptureSnapshot();
     }
 
@@ -170,6 +259,8 @@ public sealed class DeterministicVirtualCamera
         _result = null;
         _frameEvidence = null;
         _inspectionEvidence = null;
+        _externalResultEvidence = null;
+        _waitForExternalResult = false;
     }
 
     public VirtualCameraSnapshot CaptureSnapshot() =>
@@ -183,5 +274,6 @@ public sealed class DeterministicVirtualCamera
             _exposureTicksRemaining,
             _transferTicksRemaining,
             _result,
-            _frameEvidence);
+            _frameEvidence,
+            _externalResultEvidence);
 }

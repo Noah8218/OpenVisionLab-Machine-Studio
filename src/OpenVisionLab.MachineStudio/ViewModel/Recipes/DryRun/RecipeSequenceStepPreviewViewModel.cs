@@ -119,7 +119,15 @@ public sealed class RecipeSequenceStepPreviewViewModel : ViewModelBase, IDisposa
     private static string Format(string key, params object[] args) =>
         string.Format(CultureInfo.CurrentCulture, OpenVisionLanguageService.T(key), args);
 
-    public void Dispose() => Interlocked.Exchange(ref _disposed, 1);
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _previewSequenceStepCommand.RaiseCanExecuteChanged();
+    }
 
     private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

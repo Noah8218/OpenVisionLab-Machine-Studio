@@ -87,7 +87,7 @@ internal sealed class LayoutAuthoringHistoryViewModel : IDisposable
         _ => CanEdit && _clipboard.HasContent && _layout.Definition is not null,
         useCommandManagerRequery: false);
 
-    private bool CanEdit => _isEditable() && !_isApplyingProject();
+    private bool CanEdit => !_disposed && _isEditable() && !_isApplyingProject();
 
     public LayoutAuthoringState CaptureCurrentState() =>
         _currentState ??= CaptureState();
@@ -157,6 +157,11 @@ internal sealed class LayoutAuthoringHistoryViewModel : IDisposable
 
     private void Undo()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         if (_history.TryUndo(out var state) && state is not null)
         {
             Restore(state, "Undid layout edit");
@@ -165,6 +170,11 @@ internal sealed class LayoutAuthoringHistoryViewModel : IDisposable
 
     private void Redo()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         if (_history.TryRedo(out var state) && state is not null)
         {
             Restore(state, "Redid layout edit");
@@ -173,6 +183,11 @@ internal sealed class LayoutAuthoringHistoryViewModel : IDisposable
 
     private void CopySelection()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         var definition = _layout.Definition;
         var componentIds = _layout.SelectedItems
             .Where(item => item.Component is not null)
@@ -196,6 +211,11 @@ internal sealed class LayoutAuthoringHistoryViewModel : IDisposable
 
     private void PasteSelection()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         if (!_clipboard.HasContent || _layout.Definition is not { } targetLayout)
         {
             return;
@@ -273,5 +293,6 @@ internal sealed class LayoutAuthoringHistoryViewModel : IDisposable
         _disposed = true;
         _layout.PropertyChanged -= OnLayoutPropertyChanged;
         _layout.DefinitionChanged -= OnLayoutDefinitionChanged;
+        InvalidateCommands();
     }
 }

@@ -14,6 +14,7 @@ internal enum MachineIntegrationOperationKind
     None,
     PublishHandoff,
     RefreshResults,
+    ApplyResultToSimulation,
     Tcp
 }
 

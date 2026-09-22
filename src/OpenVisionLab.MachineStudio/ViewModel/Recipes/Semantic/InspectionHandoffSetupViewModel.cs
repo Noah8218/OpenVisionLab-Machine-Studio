@@ -8,7 +8,7 @@ using OpenVisionLab.Machine.Core.Projects;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
-public sealed class InspectionHandoffSetupViewModel : ViewModelBase
+public sealed class InspectionHandoffSetupViewModel : ViewModelBase, IDisposable
 {
     private readonly Func<InspectionHandoffDefinition, int> _applySetup;
     private readonly Action _clearWorkbenchPreviews;
@@ -25,15 +25,16 @@ public sealed class InspectionHandoffSetupViewModel : ViewModelBase
     private string? _acceptedChannelId;
     private string? _readyChannelId;
     private string? _completeChannelId;
+    private int _disposed;
 
     public InspectionHandoffSetupViewModel(Func<InspectionHandoffDefinition, int> applySetup, Action clearWorkbenchPreviews)
     {
         _applySetup = applySetup;
         _clearWorkbenchPreviews = clearWorkbenchPreviews;
-        _previewCommand = new RelayCommand(_ => Preview(), _ => IsEditable && _project is not null);
-        _applyCommand = new RelayCommand(_ => Apply(), ignored => IsEditable && IsVisible && TryCreate(out _));
-        _cancelCommand = new RelayCommand(_ => ClearPreviewForCompetingSetup(), _ => IsVisible);
-        _resetCommand = new RelayCommand(_ => Reset(), _ => IsEditable && IsVisible);
+        _previewCommand = new RelayCommand(_ => Preview(), _ => !IsDisposed && IsEditable && _project is not null);
+        _applyCommand = new RelayCommand(_ => Apply(), ignored => !IsDisposed && IsEditable && IsVisible && TryCreate(out _));
+        _cancelCommand = new RelayCommand(_ => ClearPreviewForCompetingSetup(), _ => !IsDisposed && IsVisible);
+        _resetCommand = new RelayCommand(_ => Reset(), _ => !IsDisposed && IsEditable && IsVisible);
     }
 
     public ObservableCollection<LoadLockSetupOption> CameraOptions { get; } = new();
@@ -50,7 +51,7 @@ public sealed class InspectionHandoffSetupViewModel : ViewModelBase
         get => _isEditable;
         set
         {
-            if (!SetProperty(ref _isEditable, value)) return;
+            if (IsDisposed || !SetProperty(ref _isEditable, value)) return;
             RaiseCommandStates();
         }
     }
@@ -75,6 +76,7 @@ public sealed class InspectionHandoffSetupViewModel : ViewModelBase
 
     public void Load(MachineProjectDocument project)
     {
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
         _project = project ?? throw new ArgumentNullException(nameof(project));
         ClearPreviewForCompetingSetup();
         RaiseCommandStates();
@@ -82,6 +84,7 @@ public sealed class InspectionHandoffSetupViewModel : ViewModelBase
 
     internal void ClearPreviewForCompetingSetup()
     {
+        if (IsDisposed) return;
         _isVisible = false;
         _savedSetup = null;
         CameraOptions.Clear(); InputOptions.Clear(); OutputOptions.Clear();
@@ -90,6 +93,7 @@ public sealed class InspectionHandoffSetupViewModel : ViewModelBase
 
     internal void RefreshLocalization(Action reloadWorkbench)
     {
+        if (IsDisposed) return;
         var draft = IsVisible ? CaptureDraft() : null;
         reloadWorkbench();
         if (draft is not null)
@@ -101,7 +105,7 @@ public sealed class InspectionHandoffSetupViewModel : ViewModelBase
 
     private void Preview()
     {
-        if (_project is null) return;
+        if (IsDisposed || _project is null) return;
         _clearWorkbenchPreviews();
         CameraOptions.Clear(); InputOptions.Clear(); OutputOptions.Clear();
         foreach (var camera in _project.Devices.Where(device => device is { Kind: DeviceKind.Camera, Camera: not null }).OrderBy(device => device.Name, StringComparer.CurrentCulture).ThenBy(device => device.Id, StringComparer.Ordinal))
@@ -125,11 +129,18 @@ public sealed class InspectionHandoffSetupViewModel : ViewModelBase
 
     private void Apply()
     {
+        if (IsDisposed) return;
         if (!TryCreate(out var setup)) return;
         if (_applySetup(setup) > 0 || IsEquivalentToSaved(setup)) ClearPreviewForCompetingSetup(); else Preview();
     }
 
-    private void Reset() => ApplyDraft(_savedSetup is null ? Suggest() : Clone(_savedSetup));
+    private void Reset()
+    {
+        if (!IsDisposed)
+        {
+            ApplyDraft(_savedSetup is null ? Suggest() : Clone(_savedSetup));
+        }
+    }
 
     private InspectionHandoffDefinition Suggest() => new()
     {
@@ -173,7 +184,7 @@ public sealed class InspectionHandoffSetupViewModel : ViewModelBase
         RaiseValidationChanged();
     }
 
-    private void SetSelection(ref string? field, string? value, string propertyName) { if (SetProperty(ref field, value, propertyName)) RaiseValidationChanged(); }
+    private void SetSelection(ref string? field, string? value, string propertyName) { if (!IsDisposed && SetProperty(ref field, value, propertyName)) RaiseValidationChanged(); }
     private bool IsCamera(string? id) => _project?.Devices.Any(device => device is { Kind: DeviceKind.Camera, Camera: not null } && Same(device.Id, id)) == true;
     private bool IsChannel(string? id, ChannelKind kind) => _project?.Channels.Any(channel => channel.Kind == kind && Same(channel.Id, id)) == true;
 
@@ -194,6 +205,24 @@ public sealed class InspectionHandoffSetupViewModel : ViewModelBase
     {
         _previewCommand.RaiseCanExecuteChanged(); _applyCommand.RaiseCanExecuteChanged(); _cancelCommand.RaiseCanExecuteChanged(); _resetCommand.RaiseCanExecuteChanged();
     }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _isVisible = false;
+        _savedSetup = null;
+        CameraOptions.Clear();
+        InputOptions.Clear();
+        OutputOptions.Clear();
+        RaiseChanged();
+        _previewCommand.RaiseCanExecuteChanged();
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     private static bool Distinct(string?[] values) => values.All(value => !string.IsNullOrWhiteSpace(value)) && values.Distinct(StringComparer.Ordinal).Count() == values.Length;
     private static bool Same(string? left, string? right) => string.Equals(left, right, StringComparison.Ordinal);

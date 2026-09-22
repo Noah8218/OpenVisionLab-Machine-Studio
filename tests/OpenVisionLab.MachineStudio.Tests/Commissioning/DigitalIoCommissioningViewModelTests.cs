@@ -45,6 +45,33 @@ public sealed class DigitalIoCommissioningViewModelTests
         Assert.False(viewModel.ClearForceCommand.CanExecute(null));
     }
 
+    [Fact]
+    public void DisposeNotifiesCommandsOfFinalAdmission()
+    {
+        var viewModel = new DigitalIoCommissioningViewModel(command =>
+            Task.FromResult(Accepted(command)));
+        viewModel.ApplySnapshot(CreateSnapshot());
+        viewModel.SetEnabled(true, invalidateCommands: true);
+        var commands = new[]
+        {
+            viewModel.StartManualControlCommand,
+            viewModel.ForceOnCommand,
+            viewModel.ForceOffCommand,
+            viewModel.ClearForceCommand
+        };
+        var notifications = new int[commands.Length];
+        for (var index = 0; index < commands.Length; index++)
+        {
+            var commandIndex = index;
+            commands[commandIndex].CanExecuteChanged += (_, _) => notifications[commandIndex]++;
+        }
+
+        viewModel.Dispose();
+
+        Assert.All(commands, command => Assert.False(command.CanExecute(null)));
+        Assert.All(notifications, count => Assert.Equal(1, count));
+    }
+
     private static SimulationSnapshot CreateSnapshot() => new(
         TimeSpan.Zero,
         0,

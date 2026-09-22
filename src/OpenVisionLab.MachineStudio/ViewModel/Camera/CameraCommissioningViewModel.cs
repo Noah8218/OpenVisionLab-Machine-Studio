@@ -6,6 +6,7 @@ using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Scenarios;
 using OpenVisionLab.Machine.Simulation.Snapshots;
+using OpenVisionLab.Machine.Vision.Models;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
@@ -24,12 +25,21 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
         nameof(CurrentCameraResultText), nameof(CurrentCameraFrameText),
         nameof(CurrentCameraExposureTicksText), nameof(CurrentCameraTransferTicksText),
         nameof(CurrentCameraSourceText), nameof(CurrentCameraSourceModeText),
+        nameof(CurrentCameraImagePath), nameof(HasCurrentCameraImage),
+        nameof(CurrentCameraResultSourceText), nameof(CurrentCameraVerificationLevelText),
+        nameof(CurrentCameraInputHashText), nameof(CurrentCameraModelKindText),
+        nameof(CurrentCameraClockModeText),
         nameof(CurrentCameraFrameHashText), nameof(CurrentCameraInspectionIdText),
         nameof(CurrentCameraInspectionMessageText), nameof(CurrentCameraInspectionMetricsText),
         nameof(CurrentVisionEvidenceHashText), nameof(VisionEvidenceStatusText),
         nameof(VisionEvidenceComparisonText), nameof(CurrentCameraEvidenceDetailsText),
         nameof(CameraCommissioningHintText), nameof(CanStartManualCameraControl),
         nameof(CanTriggerCamera)
+    ];
+
+    private static readonly string[] ModePresentationPropertyNames =
+    [
+        nameof(CanStartManualCameraControl), nameof(CanTriggerCamera)
     ];
 
     private readonly Func<MachineProjectDocument> _projectAccessor;
@@ -48,6 +58,7 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
     private readonly VisionExecutionEvidenceViewModel _visionExecutionEvidence;
     private readonly ManualCameraTriggerWorkflow _manualCameraTriggerWorkflow;
     private readonly CameraImageSourceApplicationWorkflow _imageSourceApplicationWorkflow;
+    private CameraCommissioningProjection? _lastProjection;
     private bool _sessionCloseRequested;
     private bool _disposed;
 
@@ -152,7 +163,15 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
     public string? SelectedCameraId
     {
         get => Selection.SelectedCameraId;
-        set => Selection.SelectVirtualCamera(value);
+        set
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            Selection.SelectVirtualCamera(value);
+        }
     }
 
     public IReadOnlyList<string> CurrentCameraRecipes => Selection.CurrentCameraRecipes;
@@ -160,7 +179,15 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
     public string? SelectedCameraRecipe
     {
         get => Selection.SelectedCameraRecipe;
-        set => Selection.SelectCameraRecipe(value);
+        set
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            Selection.SelectCameraRecipe(value);
+        }
     }
 
     public string CurrentCameraName => _presentation.CurrentCameraName;
@@ -171,6 +198,13 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
     public string CurrentCameraTransferTicksText => _presentation.CurrentCameraTransferTicksText;
     public string CurrentCameraSourceText => _presentation.CurrentCameraSourceText;
     public string CurrentCameraSourceModeText => _presentation.CurrentCameraSourceModeText;
+    public string? CurrentCameraImagePath => _presentation.CurrentCameraImagePath;
+    public bool HasCurrentCameraImage => _presentation.HasCurrentCameraImage;
+    public string CurrentCameraResultSourceText => _presentation.CurrentCameraResultSourceText;
+    public string CurrentCameraVerificationLevelText => _presentation.CurrentCameraVerificationLevelText;
+    public string CurrentCameraInputHashText => _presentation.CurrentCameraInputHashText;
+    public string CurrentCameraModelKindText => _presentation.CurrentCameraModelKindText;
+    public string CurrentCameraClockModeText => _presentation.CurrentCameraClockModeText;
     public string CurrentCameraFrameHashText => _presentation.CurrentCameraFrameHashText;
     public string CurrentCameraInspectionIdText => _presentation.CurrentCameraInspectionIdText;
     public string CurrentCameraInspectionMessageText => _presentation.CurrentCameraInspectionMessageText;
@@ -180,6 +214,11 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
     public string VisionEvidenceComparisonText => _visionExecutionEvidence.ComparisonText;
     public string CurrentCameraEvidenceDetailsText => string.Join(
         Environment.NewLine,
+        $"{OpenVisionLanguageService.T("Camera.ResultSource")}: {CurrentCameraResultSourceText}",
+        $"{OpenVisionLanguageService.T("Camera.VerificationLevel")}: {CurrentCameraVerificationLevelText}",
+        $"{OpenVisionLanguageService.T("Camera.ClockMode")}: {CurrentCameraClockModeText}",
+        $"{OpenVisionLanguageService.T("Camera.InputHash")}: {CurrentCameraInputHashText}",
+        $"{OpenVisionLanguageService.T("Camera.ModelKind")}: {CurrentCameraModelKindText}",
         $"{OpenVisionLanguageService.T("Camera.InspectionId")}: {CurrentCameraInspectionIdText}",
         $"{OpenVisionLanguageService.T("Camera.InspectionMessage")}: {CurrentCameraInspectionMessageText}",
         $"{OpenVisionLanguageService.T("Camera.InspectionMetrics")}: {CurrentCameraInspectionMetricsText}",
@@ -230,6 +269,11 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
 
     internal void RefreshLocalization()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         ImageSourceEditor.RefreshLocalization();
         _visionExecutionEvidence.RefreshLocalization();
         foreach (var propertyName in PresentationPropertyNames)
@@ -241,14 +285,29 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
     internal DeterministicVisionExecutionEvidencePackage? GetCurrentEvidence() =>
         _visionExecutionEvidence.GetCurrentEvidence();
 
+    internal ValueTask<VirtualFrameDescriptor> AcquireFrameAsync(
+        VirtualCameraInspectionRequest request,
+        CancellationToken cancellationToken = default) =>
+        _manualCameraTriggerWorkflow.AcquireFrameAsync(request, cancellationToken);
+
     internal void PersistEvidenceForProjectPath(string projectPath) =>
         _visionExecutionEvidence.PersistForProjectPath(projectPath);
 
     internal void RefreshProjection(bool invalidateCommands = true)
     {
-        _presentation.ApplyProjection(_projectionAccessor());
-        RaisePresentationChanged();
-        _notifyIntegrationContext();
+        var projection = _projectionAccessor();
+        var isModeOnlyChange = IsModeOnlyChange(_lastProjection, projection);
+        _lastProjection = projection;
+        _presentation.ApplyProjection(projection);
+        if (isModeOnlyChange)
+        {
+            RaiseModePresentationChanged();
+        }
+        else
+        {
+            RaisePresentationChanged();
+            _notifyIntegrationContext();
+        }
         if (invalidateCommands)
         {
             InvalidateCommands();
@@ -311,6 +370,7 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
         }
 
         _disposed = true;
+        ImageSourceEditor.Dispose();
         CancelPreparation();
         _acquisitionParticipant.Dispose();
         _visionExecutionEvidence.Dispose();
@@ -366,6 +426,26 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
         {
             OnPropertyChanged(propertyName);
         }
+    }
+
+    private void RaiseModePresentationChanged()
+    {
+        foreach (var propertyName in ModePresentationPropertyNames)
+        {
+            OnPropertyChanged(propertyName);
+        }
+    }
+
+    private static bool IsModeOnlyChange(
+        CameraCommissioningProjection? previous,
+        CameraCommissioningProjection current)
+    {
+        if (previous is null || previous.IsRunMode == current.IsRunMode)
+        {
+            return false;
+        }
+
+        return (previous with { IsRunMode = current.IsRunMode }) == current;
     }
 
 }

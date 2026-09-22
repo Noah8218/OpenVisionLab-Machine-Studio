@@ -29,6 +29,9 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase, IDisposable
         FixedStepSimulationEngine,
         DeterministicSimulationCommandTracePackage,
         Task<DeterministicSimulationCommandTraceReplayResult>> _replay;
+    private readonly Func<
+        FixedStepSimulationEngine,
+        DeterministicSimulationCommandTracePackage> _createStatusPackage;
     private readonly RelayCommand _startCaptureCommand;
     private readonly RelayCommand _exportCommand;
     private readonly AsyncRelayCommand _replayCommand;
@@ -36,6 +39,10 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase, IDisposable
     private int? _lastReplayEntryCount;
     private string? _lastReplayHash;
     private bool _lastReplaySucceeded;
+    private FixedStepSimulationEngine? _statusPackageEngine;
+    private int _statusPackageEntryCount = -1;
+    private DeterministicSimulationCommandTracePackage? _statusPackage;
+    private int _replayGeneration;
     private int _disposed;
 
     public SimulationCommandTraceViewModel(
@@ -78,7 +85,10 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase, IDisposable
         Func<
             FixedStepSimulationEngine,
             DeterministicSimulationCommandTracePackage,
-            Task<DeterministicSimulationCommandTraceReplayResult>> replay)
+            Task<DeterministicSimulationCommandTraceReplayResult>> replay,
+        Func<
+            FixedStepSimulationEngine,
+            DeterministicSimulationCommandTracePackage>? createStatusPackage = null)
     {
         _canStartCapture = canStartCapture ?? throw new ArgumentNullException(nameof(canStartCapture));
         _getEngine = getEngine ?? throw new ArgumentNullException(nameof(getEngine));
@@ -94,6 +104,7 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase, IDisposable
         _handleCommandException = handleCommandException
             ?? throw new ArgumentNullException(nameof(handleCommandException));
         _replay = replay ?? throw new ArgumentNullException(nameof(replay));
+        _createStatusPackage = createStatusPackage ?? (engine => engine.CreateCommandTracePackage());
         _startCaptureCommand = new RelayCommand(
             _ => StartCapture(),
             _ => CanStartCapture,
@@ -113,9 +124,10 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase, IDisposable
     public bool CanStartCapture => !IsDisposed && _canStartCapture() && _getEngine() is not null;
     public bool CanExportTrace => !IsDisposed && CanStartCapture
         && _captureStarted
-        && _getEngine()?.CommandTrace.Length > 0;
+        && _getEngine() is { CommandTraceCount: > 0, CommandTraceIsComplete: true };
     public bool CanReplayTrace => !IsDisposed && CanStartCapture;
-    public int EntryCount => IsDisposed ? 0 : _getEngine()?.CommandTrace.Length ?? 0;
+    public int EntryCount => IsDisposed ? 0 : _getEngine()?.CommandTraceCount ?? 0;
+    public long DroppedEntryCount => IsDisposed ? 0 : _getEngine()?.CommandTraceDroppedEntryCount ?? 0;
     public bool LastReplaySucceeded => !IsDisposed && _lastReplaySucceeded;
     public string StatusText
     {
@@ -132,7 +144,7 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase, IDisposable
                 return OpenVisionLanguageService.T("Simulation.CommandTraceUnavailable");
             }
 
-            var package = traceEngine.CreateCommandTracePackage();
+            var entryCount = traceEngine.CommandTraceCount;
             if (!_captureStarted)
             {
                 if (_lastReplayEntryCount is { } replayEntryCount
@@ -145,16 +157,28 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase, IDisposable
                         ShortHash(replayHash));
                 }
 
-                return traceEngine.CommandTrace.Length == 0
+                return entryCount == 0
                     ? OpenVisionLanguageService.T("Simulation.CommandTraceIdle")
                     : OpenVisionLanguageService.T("Simulation.CommandTraceSetupOnly");
             }
 
-            if (traceEngine.CommandTrace.Length == 0)
+            if (entryCount == 0)
             {
                 return OpenVisionLanguageService.T("Simulation.CommandTraceCaptureStarted");
             }
 
+            if (!traceEngine.CommandTraceIsComplete)
+            {
+                return string.Format(
+                    CultureInfo.CurrentCulture,
+                    OpenVisionLanguageService.T(
+                        "Simulation.CommandTraceIncomplete",
+                        "명령 trace가 불완전합니다. {0}개 경계를 보관하지 못했습니다.",
+                        "Command trace is incomplete. {0} command boundaries were not retained."),
+                    traceEngine.CommandTraceDroppedEntryCount);
+            }
+
+            var package = GetStatusPackage(traceEngine, entryCount);
             return string.Format(
                 CultureInfo.CurrentCulture,
                 OpenVisionLanguageService.T(package.CanReplay
@@ -210,6 +234,7 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase, IDisposable
         _lastReplaySucceeded = false;
         _lastReplayEntryCount = null;
         _lastReplayHash = null;
+        var replayGeneration = Volatile.Read(ref _replayGeneration);
         if (!CanReplayTrace
             || string.IsNullOrWhiteSpace(path)
             || _getEngine() is not { } traceEngine)
@@ -229,7 +254,9 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase, IDisposable
         {
             var result = await _replay(traceEngine, package)
                 .ConfigureAwait(true);
-            if (IsDisposed)
+            if (IsDisposed
+                || replayGeneration != Volatile.Read(ref _replayGeneration)
+                || !ReferenceEquals(traceEngine, _getEngine()))
             {
                 return false;
             }
@@ -286,10 +313,12 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        Interlocked.Increment(ref _replayGeneration);
         _captureStarted = false;
         _lastReplayEntryCount = null;
         _lastReplayHash = null;
         _lastReplaySucceeded = false;
+        InvalidateStatusPackage();
         RaiseTraceChanged();
     }
 
@@ -320,7 +349,9 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        Interlocked.Increment(ref _replayGeneration);
         traceEngine.ClearCommandTrace();
+        InvalidateStatusPackage();
         _captureStarted = true;
         _clearUnifiedCommissioningEvidence();
         _lastReplayEntryCount = null;
@@ -378,9 +409,33 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(CanExportTrace));
         OnPropertyChanged(nameof(CanReplayTrace));
         OnPropertyChanged(nameof(EntryCount));
+        OnPropertyChanged(nameof(DroppedEntryCount));
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(LastReplaySucceeded));
         InvalidateCommands();
+    }
+
+    private DeterministicSimulationCommandTracePackage GetStatusPackage(
+        FixedStepSimulationEngine traceEngine,
+        int entryCount)
+    {
+        if (_statusPackage is not null
+            && ReferenceEquals(_statusPackageEngine, traceEngine)
+            && _statusPackageEntryCount == entryCount)
+        {
+            return _statusPackage;
+        }
+
+        _statusPackageEngine = traceEngine;
+        _statusPackageEntryCount = entryCount;
+        return _statusPackage = _createStatusPackage(traceEngine);
+    }
+
+    private void InvalidateStatusPackage()
+    {
+        _statusPackageEngine = null;
+        _statusPackageEntryCount = -1;
+        _statusPackage = null;
     }
 
     public void Dispose()
@@ -394,6 +449,11 @@ public sealed class SimulationCommandTraceViewModel : ViewModelBase, IDisposable
         _lastReplayEntryCount = null;
         _lastReplayHash = null;
         _lastReplaySucceeded = false;
+        Interlocked.Increment(ref _replayGeneration);
+        InvalidateStatusPackage();
+        _startCaptureCommand.RaiseCanExecuteChanged();
+        _exportCommand.RaiseCanExecuteChanged();
+        _replayCommand.RaiseCanExecuteChanged();
     }
 
     private static Task<DeterministicSimulationCommandTraceReplayResult> ReplayWithDefaultRunner(

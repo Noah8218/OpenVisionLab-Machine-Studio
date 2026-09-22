@@ -4,7 +4,8 @@ using OpenVisionLab;
 namespace OpenVisionLab.MachineStudio.View.Dialogs;
 
 /// <summary>
-/// Owns native file-dialog creation for simulation evidence and command traces.
+/// Owns native file-dialog creation for simulation evidence, result reports,
+/// and command traces.
 /// It returns a selected path and does not perform application I/O.
 /// </summary>
 internal sealed class SimulationEvidenceFileDialogHost
@@ -37,6 +38,23 @@ internal sealed class SimulationEvidenceFileDialogHost
                 "Simulation.ImportEvidence",
                 "증거 가져오기",
                 "Import evidence")
+        };
+        return Show(dialog);
+    }
+
+    internal string? SelectSimulationReportExport(string projectDisplayName)
+    {
+        var dialog = new SaveFileDialog
+        {
+            AddExtension = true,
+            DefaultExt = ".ovsim-report.md",
+            Filter = "Machine Studio simulation report (*.ovsim-report.md)|*.ovsim-report.md|Markdown (*.md)|*.md|All files (*.*)|*.*",
+            FileName = $"{projectDisplayName}-simulation-report.ovsim-report.md",
+            OverwritePrompt = true,
+            Title = OpenVisionLanguageService.T(
+                "Simulation.ExportReport",
+                "결과 보고서 내보내기",
+                "Export result report")
         };
         return Show(dialog);
     }
@@ -101,6 +119,23 @@ internal sealed class SimulationEvidenceFileDialogHost
                 "Simulation.ImportUnifiedCommissioningEvidence",
                 "커미셔닝 증거 가져오기",
                 "Import commissioning evidence")
+        };
+        return Show(dialog);
+    }
+
+    internal string? SelectSupportDiagnosticExport(string projectDisplayName)
+    {
+        var dialog = new SaveFileDialog
+        {
+            AddExtension = true,
+            DefaultExt = ".ovsupport.json",
+            Filter = "Machine Studio support diagnostics (*.ovsupport.json)|*.ovsupport.json|JSON (*.json)|*.json",
+            FileName = $"{projectDisplayName}-support-diagnostics.ovsupport.json",
+            OverwritePrompt = true,
+            Title = OpenVisionLanguageService.T(
+                "SupportDiagnostics.Export",
+                "지원 진단 사본 내보내기",
+                "Export support diagnostics")
         };
         return Show(dialog);
     }

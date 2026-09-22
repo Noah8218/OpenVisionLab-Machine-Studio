@@ -42,6 +42,103 @@ public sealed class SemiconductorRecipeGalleryViewModelTests
     }
 
     [Fact]
+    public void DisposeNotifiesCommandsOfFinalAdmission()
+    {
+        var viewModel = new SemiconductorRecipeGalleryViewModel(
+            (_, _) => Task.FromResult(false),
+            () => null,
+            () => null,
+            () => null);
+        var commands = new[]
+        {
+            viewModel.OpenCommand,
+            viewModel.CloseCommand,
+            viewModel.CreateCopyCommand,
+            viewModel.ValidateAllCommand,
+            viewModel.SaveCompatibilityReportCommand,
+            viewModel.CompareCompatibilityReportsCommand,
+            viewModel.CloseCompatibilityComparisonCommand
+        };
+        var notifications = new int[commands.Length];
+        for (var index = 0; index < commands.Length; index++)
+        {
+            var commandIndex = index;
+            commands[commandIndex].CanExecuteChanged += (_, _) => notifications[commandIndex]++;
+        }
+
+        viewModel.Dispose();
+
+        Assert.All(commands, command => Assert.False(command.CanExecute(null)));
+        Assert.All(notifications, count => Assert.Equal(1, count));
+    }
+
+    [Fact]
+    public async Task BusyGalleryRejectsOpenUntilCurrentOperationCompletes()
+    {
+        var copyStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCopy = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var viewModel = new SemiconductorRecipeGalleryViewModel(
+            (_, _) =>
+            {
+                copyStarted.SetResult(true);
+                return releaseCopy.Task;
+            },
+            () => null,
+            () => null,
+            () => null);
+        var canExecuteChangedCount = 0;
+        viewModel.OpenCommand.CanExecuteChanged += (_, _) => canExecuteChangedCount++;
+
+        Task<bool> copyTask = viewModel.CreateCopyToAsync("ignored.ovmachine");
+        await copyStarted.Task;
+
+        Assert.True(viewModel.IsBusy);
+        Assert.False(viewModel.OpenCommand.CanExecute(null));
+        viewModel.OpenCommand.Execute(null);
+        viewModel.Open();
+        Assert.False(viewModel.IsOpen);
+        Assert.True(canExecuteChangedCount > 0);
+
+        releaseCopy.SetResult(false);
+        Assert.False(await copyTask);
+        Assert.False(viewModel.IsBusy);
+        Assert.True(viewModel.OpenCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task BusyGalleryDefersLocalizationReloadUntilCurrentOperationCompletes()
+    {
+        var copyStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCopy = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var viewModel = new SemiconductorRecipeGalleryViewModel(
+            (_, _) =>
+            {
+                copyStarted.SetResult(true);
+                return releaseCopy.Task;
+            },
+            () => null,
+            () => null,
+            () => null);
+
+        viewModel.Open();
+        var selectedItemBeforeRefresh = viewModel.SelectedItem;
+        Assert.NotNull(selectedItemBeforeRefresh);
+
+        Task<bool> copyTask = viewModel.CreateCopyToAsync("ignored.ovmachine");
+        await copyStarted.Task;
+
+        viewModel.RefreshLocalization();
+
+        Assert.Same(selectedItemBeforeRefresh, viewModel.SelectedItem);
+        Assert.Same(selectedItemBeforeRefresh, viewModel.Items[0]);
+
+        releaseCopy.SetResult(false);
+        Assert.False(await copyTask);
+        Assert.False(viewModel.IsBusy);
+        Assert.NotSame(selectedItemBeforeRefresh, viewModel.SelectedItem);
+    }
+
+    [Fact]
     public async Task CompatibilityCommandsUseInjectedSelectorsAndPreserveCancellation()
     {
         var root = Path.Combine(

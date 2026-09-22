@@ -1,7 +1,13 @@
 using OpenVisionLab.Machine.Core.Devices;
+using OpenVisionLab.Machine.Sequence.Runtime;
 using OpenVisionLab.Machine.Simulation.Camera;
 using OpenVisionLab.Machine.Simulation.Engine;
+using OpenVisionLab.MachineStudio.Converter;
 using OpenVisionLab.MachineStudio.ViewModel;
+using OpenVisionLab.TestSupport;
+using System.Globalization;
+using System.Windows;
+using System.Windows.Media.Imaging;
 using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
@@ -27,6 +33,25 @@ public sealed class CameraCommissioningPresentationTests
             OpenVisionLanguageService.T("Camera.SourceModeManual"),
             presentation.CurrentCameraSourceModeText);
         Assert.Equal(new string('A', 64), presentation.CurrentCameraFrameHashText);
+        Assert.Equal(
+            OpenVisionLanguageService.T("Camera.ResultSourceMock"),
+            presentation.CurrentCameraResultSourceText);
+        Assert.Equal(
+            OpenVisionLanguageService.T("Camera.VerificationModelOnly"),
+            presentation.CurrentCameraVerificationLevelText);
+        Assert.Equal(new string('A', 64), presentation.CurrentCameraInputHashText);
+        Assert.Equal(
+            OpenVisionLanguageService.T("Camera.ModelDeterministicMock"),
+            presentation.CurrentCameraModelKindText);
+        Assert.Equal(
+            string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                OpenVisionLanguageService.T(
+                    "Camera.ClockFixedStep",
+                    "고정 스텝 시뮬레이션 ({0} ms/tick)",
+                    "Fixed-step simulation ({0} ms/tick)"),
+                "5"),
+            presentation.CurrentCameraClockModeText);
         Assert.Equal("inspection-3", presentation.CurrentCameraInspectionIdText);
         Assert.Equal("Pass", presentation.CurrentCameraInspectionMessageText);
         Assert.Contains("score=0.75", presentation.CurrentCameraInspectionMetricsText);
@@ -85,13 +110,232 @@ public sealed class CameraCommissioningPresentationTests
             presentation.CurrentCameraSourceModeText);
     }
 
+    [Fact]
+    public void ExternalResultProjectionDistinguishesVerifiedAndUnverifiedEvidence()
+    {
+        var presentation = new CameraCommissioningPresentation();
+        var verified = CreateExternalEvidence(
+            ExternalInspectionResultStatus.Completed,
+            ExternalInspectionOutcome.Pass);
+        presentation.ApplyProjection(CreateProjection(
+            VirtualCameraState.FrameReady,
+            hasCameraDefinition: true,
+            isRunning: false,
+            controlOwner: SimulationControlOwner.Manual,
+            externalResultEvidence: verified));
+
+        Assert.Equal(
+            OpenVisionLanguageService.T("Camera.ResultSourceExternalVerified"),
+            presentation.CurrentCameraResultSourceText);
+        Assert.Equal(
+            OpenVisionLanguageService.T("Camera.VerificationExternal"),
+            presentation.CurrentCameraVerificationLevelText);
+        Assert.Equal(new string('B', 64), presentation.CurrentCameraInputHashText);
+        Assert.Contains("VisionConsumer", presentation.CurrentCameraModelKindText, StringComparison.Ordinal);
+
+        presentation.ApplyProjection(CreateProjection(
+            VirtualCameraState.Faulted,
+            hasCameraDefinition: true,
+            isRunning: false,
+            controlOwner: SimulationControlOwner.Manual,
+            externalResultEvidence: verified with
+            {
+                Status = ExternalInspectionResultStatus.Failed,
+                Outcome = ExternalInspectionOutcome.ExecutionError,
+                Decision = null
+            }));
+        Assert.Equal(
+            OpenVisionLanguageService.T("Camera.ResultSourceExternalUnverified"),
+            presentation.CurrentCameraResultSourceText);
+        Assert.Equal(
+            OpenVisionLanguageService.T("Camera.VerificationNotVerified"),
+            presentation.CurrentCameraVerificationLevelText);
+    }
+
+    [Fact]
+    public void PendingProjectionDoesNotClaimAResultOrInspectionModel()
+    {
+        var presentation = new CameraCommissioningPresentation();
+        presentation.ApplyProjection(CreateProjection(
+            VirtualCameraState.AwaitingExternalResult,
+            hasCameraDefinition: true,
+            isRunning: true,
+            controlOwner: SimulationControlOwner.Manual,
+            hasResult: false));
+
+        Assert.Equal(
+            OpenVisionLanguageService.T("Camera.ResultSourcePending"),
+            presentation.CurrentCameraResultSourceText);
+        Assert.Equal(
+            OpenVisionLanguageService.T("Camera.VerificationNotVerified"),
+            presentation.CurrentCameraVerificationLevelText);
+        Assert.Equal(new string('A', 64), presentation.CurrentCameraInputHashText);
+        Assert.Equal("—", presentation.CurrentCameraModelKindText);
+    }
+
+    [Fact]
+    public void FrameReadyProjectionExposesCapturedProjectImagePath()
+    {
+        var root = Path.Combine(TestStorage.RootPath, "camera-preview", Guid.NewGuid().ToString("N"));
+        var imageDirectory = Path.Combine(root, "assets");
+        var projectPath = Path.Combine(root, "cell.ovmachine");
+        var imagePath = Path.Combine(imageDirectory, "part.pgm");
+        Directory.CreateDirectory(imageDirectory);
+        File.WriteAllText(projectPath, "{}", System.Text.Encoding.UTF8);
+        File.WriteAllBytes(imagePath, "P5\n2 2\n255\n"u8.ToArray().Concat(new byte[] { 0, 64, 128, 255 }).ToArray());
+
+        try
+        {
+            var presentation = new CameraCommissioningPresentation();
+            presentation.ApplyProjection(CreateProjection(
+                VirtualCameraState.FrameReady,
+                hasCameraDefinition: true,
+                isRunning: false,
+                controlOwner: SimulationControlOwner.Manual,
+                projectPath: projectPath,
+                sourceRelativePath: "assets/part.pgm"));
+
+            Assert.Equal(Path.GetFullPath(imagePath), presentation.CurrentCameraImagePath);
+            Assert.True(presentation.HasCurrentCameraImage);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ProjectImageSourceConverterLoadsMono8Pgm()
+    {
+        var root = Path.Combine(TestStorage.RootPath, "camera-preview", Guid.NewGuid().ToString("N"));
+        var imagePath = Path.Combine(root, "part.pgm");
+        Directory.CreateDirectory(root);
+        File.WriteAllBytes(imagePath, "P5\n2 2\n255\n"u8.ToArray().Concat(new byte[] { 0, 64, 128, 255 }).ToArray());
+
+        try
+        {
+            var result = new ProjectImageSourceConverter().Convert(
+                imagePath,
+                typeof(BitmapSource),
+                parameter: null!,
+                CultureInfo.InvariantCulture);
+
+            var bitmap = Assert.IsAssignableFrom<BitmapSource>(result);
+            Assert.Equal(2, bitmap.PixelWidth);
+            Assert.Equal(2, bitmap.PixelHeight);
+            var pixels = new byte[4];
+            bitmap.CopyPixels(pixels, 2, 0);
+            Assert.Equal(new byte[] { 0, 64, 128, 255 }, pixels);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void AutomaticAcquisitionUsesConfiguredProjectImageWhenFrameEvidenceIsUnavailable()
+    {
+        var root = Path.Combine(TestStorage.RootPath, "camera-preview", Guid.NewGuid().ToString("N"));
+        var imageDirectory = Path.Combine(root, "assets");
+        var projectPath = Path.Combine(root, "cell.ovmachine");
+        var imagePath = Path.Combine(imageDirectory, "part.pgm");
+        Directory.CreateDirectory(imageDirectory);
+        File.WriteAllText(projectPath, "{}", System.Text.Encoding.UTF8);
+        File.WriteAllBytes(imagePath, "P2\n2 1\n255\n0 255\n"u8.ToArray());
+
+        try
+        {
+            var presentation = new CameraCommissioningPresentation();
+            presentation.ApplyProjection(new CameraCommissioningProjection(
+                new VirtualCameraSnapshot(
+                    "camera-1",
+                    "Camera",
+                    VirtualCameraState.FrameReady,
+                    1,
+                    "camera-1/frame/00000001",
+                    "recipe-1",
+                    0,
+                    0,
+                    new VirtualCameraAcquisitionResult(
+                        "camera-1/frame/00000001",
+                        "camera-1",
+                        "recipe-1",
+                        1,
+                        PlaceholderInspectionDecision.Pass)),
+                HasCameraDefinition: true,
+                FallbackCameraName: "Camera",
+                ImageSource: new VirtualSingleImageSourceDefinition
+                {
+                    SourceRelativePath = "assets/part.pgm",
+                    Width = 2,
+                    Height = 1,
+                    PixelFormat = "Mono8"
+                },
+                ProjectPath: projectPath,
+                SelectedCameraRecipe: "recipe-1",
+                SimulationFixedStep: TimeSpan.FromMilliseconds(5),
+                RuntimeRunMode: SimulationRunMode.Paused,
+                IsRunMode: true,
+                IsApplyingProject: false,
+                IsValidationBusy: false,
+                IsRuntimeDefinitionDirty: false,
+                IsRunning: false,
+                ControlOwner: SimulationControlOwner.EmbeddedSequence,
+                IsAutomaticRunActive: false,
+                ActiveSequenceStatus: SequenceExecutionStatus.Completed));
+
+            Assert.Equal(Path.GetFullPath(imagePath), presentation.CurrentCameraImagePath);
+            Assert.True(presentation.HasCurrentCameraImage);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static VirtualCameraExternalResultEvidence CreateExternalEvidence(
+        ExternalInspectionResultStatus status,
+        ExternalInspectionOutcome outcome) => new(
+        Guid.Empty,
+        Guid.Empty,
+        Guid.Empty,
+        Guid.Empty,
+        new string('D', 64),
+        new ExternalInspectionCorrelationIdentity(
+            "project-1",
+            "1.0",
+            "sequence-1",
+            "camera-trigger",
+            "camera-1",
+            "acquisition-3",
+            "frame-3",
+            "unit-1",
+            "Mono8",
+            "image",
+            new string('B', 64),
+            new string('C', 64),
+            new ExternalInspectionConsumerIdentity(
+                "VisionConsumer",
+                "2.1.0",
+                "commit",
+                "clean")),
+        status,
+        outcome,
+        "run-1",
+        PlaceholderInspectionDecision.Pass);
+
     private static CameraCommissioningProjection CreateProjection(
         VirtualCameraState state,
         bool hasCameraDefinition,
         bool isRunning,
         SimulationControlOwner controlOwner,
         bool hasUsableSource = true,
-        bool isAutomaticRunActive = false) => new(
+        bool isAutomaticRunActive = false,
+        bool hasResult = true,
+        VirtualCameraExternalResultEvidence? externalResultEvidence = null,
+        string? projectPath = null,
+        string sourceRelativePath = "images/part.png") => new(
         new VirtualCameraSnapshot(
             "camera-1",
             "Camera",
@@ -101,7 +345,8 @@ public sealed class CameraCommissioningPresentationTests
             "recipe-1",
             2,
             3,
-            new VirtualCameraAcquisitionResult(
+            hasResult
+                ? new VirtualCameraAcquisitionResult(
                 "acquisition-3",
                 "camera-1",
                 "recipe-1",
@@ -109,7 +354,7 @@ public sealed class CameraCommissioningPresentationTests
                 PlaceholderInspectionDecision.Pass,
                 new VirtualCameraFrameEvidence(
                     "frame-3",
-                    "images/part.png",
+                    sourceRelativePath,
                     new string('A', 64),
                     10,
                     10,
@@ -123,28 +368,32 @@ public sealed class CameraCommissioningPresentationTests
                     "frame-3",
                     PlaceholderInspectionDecision.Pass,
                     "Pass",
-                    new Dictionary<string, double> { ["score"] = 0.75 })),
+                    new Dictionary<string, double> { ["score"] = 0.75 }),
+                externalResultEvidence)
+                : null,
             new VirtualCameraFrameEvidence(
                 "frame-3",
-                "images/part.png",
+                sourceRelativePath,
                 new string('A', 64),
                 10,
                 10,
                 10,
-                "Mono8")),
+                "Mono8"),
+            externalResultEvidence),
         hasCameraDefinition,
         "Camera",
         hasUsableSource
             ? new VirtualSingleImageSourceDefinition
             {
-                SourceRelativePath = "images/part.png",
+                SourceRelativePath = sourceRelativePath,
                 Width = 10,
                 Height = 10,
                 PixelFormat = "Mono8"
             }
             : null,
-        hasUsableSource ? "C:\\Project" : null,
+        hasUsableSource ? projectPath ?? "C:\\Project" : null,
         hasUsableSource ? "recipe-1" : null,
+        TimeSpan.FromMilliseconds(5),
         SimulationRunMode.Paused,
         IsRunMode: true,
         IsApplyingProject: false,

@@ -1,4 +1,3 @@
-using System.Windows;
 using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.MachineStudio.ViewModel;
@@ -73,7 +72,7 @@ public sealed class LayoutAuthoringWorkspaceTests
         using var fixture = new Fixture();
         var workspace = fixture.Workspace;
         workspace.SceneLibraryComponentDropRequestedCommand.Execute(new SceneLibraryComponentDropRequest(
-            LayoutComponentKind.LinearStage, new Point(45, 185)));
+            LayoutComponentKind.LinearStage, (45, 185)));
         var firstId = Assert.Single(fixture.Layout.Items).Id;
         Assert.True(workspace.TryAddComponent(LayoutComponentKind.LinearStage, 200, 200));
         var first = fixture.Layout.Items.Single(item => item.Id == firstId);
@@ -89,7 +88,7 @@ public sealed class LayoutAuthoringWorkspaceTests
         Assert.True(workspace.AlignLayoutSelectionCommand.CanExecute("Left"));
 
         workspace.SceneMoveRequestedCommand.Execute(new SceneMoveRequest(SceneViewportMoveAction.Begin, default));
-        workspace.SceneMoveRequestedCommand.Execute(new SceneMoveRequest(SceneViewportMoveAction.Update, new Vector(20, 10)));
+        workspace.SceneMoveRequestedCommand.Execute(new SceneMoveRequest(SceneViewportMoveAction.Update, (20, 10)));
         workspace.SceneMoveRequestedCommand.Execute(new SceneMoveRequest(SceneViewportMoveAction.Commit, default));
 
         Assert.Equal(70, first.CurrentX);
@@ -105,7 +104,7 @@ public sealed class LayoutAuthoringWorkspaceTests
         workspace.SceneTransformRequestedCommand.Execute(new SceneTransformRequest(
             SceneViewportMoveAction.Begin, LayoutTransformHandle.BottomRight, default, false));
         workspace.SceneTransformRequestedCommand.Execute(new SceneTransformRequest(
-            SceneViewportMoveAction.Update, LayoutTransformHandle.BottomRight, new Point(350, 350), false));
+            SceneViewportMoveAction.Update, LayoutTransformHandle.BottomRight, (350, 350), false));
         workspace.SceneTransformRequestedCommand.Execute(new SceneTransformRequest(
             SceneViewportMoveAction.Cancel, LayoutTransformHandle.BottomRight, default, false));
         Assert.Equal(originalSize, (selected.CurrentWidth, selected.CurrentHeight));
@@ -143,6 +142,22 @@ public sealed class LayoutAuthoringWorkspaceTests
         Assert.Equal(originalId, fixture.Layout.SelectedItem?.Id);
         Assert.False(workspace.UndoLayoutEditCommand.CanExecute(null));
         Assert.False(workspace.PasteLayoutSelectionCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ResetNotifiesHistoryCommandStateAfterClearingHistory()
+    {
+        using var fixture = new Fixture();
+        var workspace = fixture.Workspace;
+        Assert.True(workspace.TryAddComponent(LayoutComponentKind.LinearStage));
+        var invalidations = 0;
+        workspace.UndoLayoutEditCommand.CanExecuteChanged += (_, _) => invalidations++;
+
+        Assert.True(workspace.UndoLayoutEditCommand.CanExecute(null));
+        workspace.Reset();
+
+        Assert.False(workspace.UndoLayoutEditCommand.CanExecute(null));
+        Assert.True(invalidations > 0);
     }
 
     [Fact]
@@ -236,6 +251,32 @@ public sealed class LayoutAuthoringWorkspaceTests
         Assert.Equal(marks, fixture.MarkCount);
         Assert.Equal(invalidations, fixture.CommandInvalidationCount);
         Assert.Equal(0, fixture.DefinitionChangedCount);
+    }
+
+    [Fact]
+    public void DisposalDisablesHistoryCommandsAndIgnoresDirectExecution()
+    {
+        using var fixture = new Fixture();
+        Assert.True(fixture.Workspace.TryAddComponent(LayoutComponentKind.LinearStage));
+        var before = new ProjectDocumentStore().SerializeForEvidence(fixture.Project);
+        var undoCommand = fixture.Workspace.UndoLayoutEditCommand;
+        var copyCommand = fixture.Workspace.CopyLayoutSelectionCommand;
+        var pasteCommand = fixture.Workspace.PasteLayoutSelectionCommand;
+        var invalidations = 0;
+        undoCommand.CanExecuteChanged += (_, _) => invalidations++;
+
+        fixture.Workspace.Dispose();
+
+        Assert.False(undoCommand.CanExecute(null));
+        Assert.False(copyCommand.CanExecute(null));
+        Assert.False(pasteCommand.CanExecute(null));
+        Assert.True(invalidations > 0);
+
+        undoCommand.Execute(null);
+        copyCommand.Execute(null);
+        pasteCommand.Execute(null);
+
+        Assert.Equal(before, new ProjectDocumentStore().SerializeForEvidence(fixture.Project));
     }
 
     private sealed class Fixture : IDisposable

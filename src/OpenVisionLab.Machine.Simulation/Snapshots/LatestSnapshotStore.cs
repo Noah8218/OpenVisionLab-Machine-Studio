@@ -4,9 +4,11 @@ namespace OpenVisionLab.Machine.Simulation.Snapshots;
 
 public sealed class LatestSnapshotStore
 {
+    private readonly object _gate = new();
     private readonly Channel<SimulationSnapshot> _channel = Channel.CreateBounded<SimulationSnapshot>(
         new BoundedChannelOptions(3) { FullMode = BoundedChannelFullMode.DropOldest });
     private SimulationSnapshot? _latest;
+    private bool _completed;
 
     public LatestSnapshotStore()
     {
@@ -32,12 +34,30 @@ public sealed class LatestSnapshotStore
 
     internal void Publish(SimulationSnapshot snapshot)
     {
-        SetCurrent(snapshot);
-        _channel.Writer.TryWrite(snapshot);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        lock (_gate)
+        {
+            if (_completed)
+            {
+                return;
+            }
+
+            SetCurrent(snapshot);
+            _channel.Writer.TryWrite(snapshot);
+        }
     }
 
     public void Complete()
     {
-        _channel.Writer.TryComplete();
+        lock (_gate)
+        {
+            if (_completed)
+            {
+                return;
+            }
+
+            _completed = true;
+            _channel.Writer.TryComplete();
+        }
     }
 }

@@ -10,6 +10,7 @@ public sealed class DeterministicSimulationCommandTraceStoreTests
     public void Capture_IsThreadSafeAndClearRemovesOnlyOwnedEntries()
     {
         var store = new DeterministicSimulationCommandTraceStore();
+        Assert.Equal(0, store.Count);
 
         Parallel.For(0, 64, _ =>
         {
@@ -27,6 +28,7 @@ public sealed class DeterministicSimulationCommandTraceStoreTests
 
         var entries = store.Snapshot();
         Assert.Equal(64, entries.Length);
+        Assert.Equal(entries.Length, store.Count);
         Assert.Equal(Enumerable.Range(1, 64), entries.Select(entry => entry.Sequence));
 
         var package = store.CreatePackage(TimeSpan.FromMilliseconds(5));
@@ -38,6 +40,7 @@ public sealed class DeterministicSimulationCommandTraceStoreTests
 
         store.Clear();
 
+        Assert.Equal(0, store.Count);
         Assert.Empty(store.Snapshot());
     }
 }

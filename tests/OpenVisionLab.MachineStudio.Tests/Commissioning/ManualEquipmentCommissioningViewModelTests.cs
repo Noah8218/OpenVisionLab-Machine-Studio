@@ -62,6 +62,30 @@ public sealed class ManualEquipmentCommissioningViewModelTests
     }
 
     [Fact]
+    public void DisposeRejectsDirectLocalizationRefreshNotifications()
+    {
+        var projection = CreateProjection(LayoutComponentKind.Conveyor, "conveyor-1");
+        using var engine = new RecordingSimulationEngine();
+        using var workspace = new ManualEquipmentCommissioningViewModel(
+            new EquipmentCommandDispatcher(engine, _ => { }, (_, _) => { }),
+            _ => projection,
+            () => LayoutComponentKind.Conveyor,
+            () => { },
+            _ => { });
+
+        workspace.ApplyProjection(projection, invalidateCommands: false);
+        var changedProperties = new List<string?>();
+        workspace.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        workspace.Dispose();
+        var notificationCountAfterDispose = changedProperties.Count;
+
+        workspace.RefreshLocalization();
+
+        Assert.Equal(notificationCountAfterDispose, changedProperties.Count);
+    }
+
+    [Fact]
     public void AxisProjectionUsesTheCurrentRuntimeInterlockForSharedStart()
     {
         var projection = CreateProjection(LayoutComponentKind.LinearStage, "axis-1") with
@@ -82,6 +106,72 @@ public sealed class ManualEquipmentCommissioningViewModelTests
 
         workspace.ApplyProjection(projection with { IsCurrentAxisInterlocked = true }, invalidateCommands: false);
         Assert.False(workspace.CanStartManualEquipmentControl);
+    }
+
+    [Fact]
+    public async Task DisposedWorkspaceSuppressesLateManualControlStartCallback()
+    {
+        var projection = CreateProjection(LayoutComponentKind.Conveyor, "conveyor-1");
+        var completion = new TaskCompletionSource<SimulationCommandResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var engine = new RecordingSimulationEngine(completion);
+        var callbackCount = 0;
+        using var workspace = new ManualEquipmentCommissioningViewModel(
+            new EquipmentCommandDispatcher(engine, _ => { }, (_, _) => { }),
+            _ => projection,
+            () => LayoutComponentKind.Conveyor,
+            () => callbackCount++,
+            _ => { });
+
+        workspace.ApplyProjection(projection, invalidateCommands: false);
+        workspace.StartManualEquipmentControlCommand.Execute(null);
+        await engine.CommandStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        workspace.Dispose();
+        completion.SetResult(new SimulationCommandResult(
+            "late-start",
+            true,
+            0,
+            TimeSpan.Zero,
+            SimulationCommandErrorCode.None,
+            null));
+        await engine.CommandFinished.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        await Task.Delay(20);
+
+        Assert.Equal(0, callbackCount);
+    }
+
+    [Fact]
+    public async Task ClosingWorkspaceSuppressesLateManualControlStartCallback()
+    {
+        var projection = CreateProjection(LayoutComponentKind.Conveyor, "conveyor-1");
+        var completion = new TaskCompletionSource<SimulationCommandResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var engine = new RecordingSimulationEngine(completion);
+        var callbackCount = 0;
+        using var workspace = new ManualEquipmentCommissioningViewModel(
+            new EquipmentCommandDispatcher(engine, _ => { }, (_, _) => { }),
+            _ => projection,
+            () => LayoutComponentKind.Conveyor,
+            () => callbackCount++,
+            _ => { });
+
+        workspace.ApplyProjection(projection, invalidateCommands: false);
+        workspace.StartManualEquipmentControlCommand.Execute(null);
+        await engine.CommandStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        workspace.SetSessionCloseAdmission(true);
+        completion.SetResult(new SimulationCommandResult(
+            "late-start",
+            true,
+            0,
+            TimeSpan.Zero,
+            SimulationCommandErrorCode.None,
+            null));
+        await engine.CommandFinished.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        await Task.Delay(20);
+
+        Assert.Equal(0, callbackCount);
     }
 
     private static ManualEquipmentProjection CreateProjection(
@@ -138,6 +228,19 @@ public sealed class ManualEquipmentCommissioningViewModelTests
     {
         private readonly Channel<SimulationSnapshot> _snapshotChannel = Channel.CreateUnbounded<SimulationSnapshot>();
         private readonly Channel<SimulationEvent> _eventChannel = Channel.CreateUnbounded<SimulationEvent>();
+        private readonly TaskCompletionSource<SimulationCommandResult>? _commandCompletion;
+
+        public RecordingSimulationEngine(
+            TaskCompletionSource<SimulationCommandResult>? commandCompletion = null)
+        {
+            _commandCompletion = commandCompletion;
+        }
+
+        public TaskCompletionSource<bool> CommandStarted { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource<bool> CommandFinished { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
 
         public SimulationSnapshot CurrentSnapshot => new(
             TimeSpan.Zero,
@@ -163,14 +266,17 @@ public sealed class ManualEquipmentCommissioningViewModelTests
 
         public Task<SimulationCommandResult> EnqueueCommandAsync(
             SimulationCommand command,
-            CancellationToken cancellationToken = default) => Task.FromResult(
-            new SimulationCommandResult(
-                command.CommandId,
-                true,
-                0,
-                TimeSpan.Zero,
-                SimulationCommandErrorCode.None,
-                null));
+            CancellationToken cancellationToken = default) => EnqueueCommandCoreAsync(command);
+
+        private async Task<SimulationCommandResult> EnqueueCommandCoreAsync(SimulationCommand command)
+        {
+            CommandStarted.TrySetResult(true);
+            var result = _commandCompletion is null
+                ? Accepted(command.CommandId)
+                : await _commandCompletion.Task;
+            CommandFinished.TrySetResult(true);
+            return result;
+        }
 
         public void AddAxis(OpenVisionLab.Machine.Simulation.Axis.ServoAxisComponent axis)
         {
@@ -181,5 +287,13 @@ public sealed class ManualEquipmentCommissioningViewModelTests
             _snapshotChannel.Writer.TryComplete();
             _eventChannel.Writer.TryComplete();
         }
+
+        private static SimulationCommandResult Accepted(string commandId) => new(
+            commandId,
+            true,
+            0,
+            TimeSpan.Zero,
+            SimulationCommandErrorCode.None,
+            null);
     }
 }

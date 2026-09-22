@@ -15,6 +15,24 @@ public sealed record SequenceExpectedStateTarget(
     string Name,
     IReadOnlyList<string> States);
 
+public sealed record SequenceValidationIssue(
+    SequenceCompilationErrorCode Code,
+    string SequenceId,
+    string? StepId,
+    string? TargetId,
+    string PropertyName,
+    string Message)
+{
+    public string DisplayText => $"{Code} [{StepId ?? "sequence"}]: {Message}";
+    public string LocationText => string.Format(
+        System.Globalization.CultureInfo.CurrentCulture,
+        OpenVisionLanguageService.T("Sequence.ValidationIssueLocationFormat"),
+        SequenceId,
+        StepId ?? "sequence",
+        TargetId ?? "—",
+        PropertyName);
+}
+
 public sealed class SequenceEditorViewModel : ViewModelBase
 {
     private readonly SequenceDefinitionEditor _editor = new();
@@ -34,8 +52,20 @@ public sealed class SequenceEditorViewModel : ViewModelBase
     private SequenceStepEditorItem? _selectedStep;
     private SequenceStepTemplateDefinition? _selectedTemplate;
     private bool _isEditable = true;
-    private string _validationSummary = "No sequence selected";
-    private string _structuralEditStatus = "Select a sequence to edit steps.";
+    private bool _disposed;
+    private string _validationSummary = OpenVisionLanguageService.T(
+        "Sequence.NoSequenceSelected",
+        "선택한 시퀀스 없음",
+        "No sequence selected");
+    private string _structuralEditStatus = OpenVisionLanguageService.T(
+        "Sequence.SelectSequenceHint",
+        "시퀀스를 선택해 단계를 편집하세요.",
+        "Select a sequence to edit steps.");
+    private SequenceValidationIssue? _selectedValidationIssue;
+    private string _validationComparisonText = string.Empty;
+    private string _lastValidationSignature = string.Empty;
+    private int _lastValidationErrorCount;
+    private bool _hasValidationSnapshot;
 
     public SequenceEditorViewModel()
     {
@@ -53,6 +83,7 @@ public sealed class SequenceEditorViewModel : ViewModelBase
     public ObservableCollection<SequenceStepEditorItem> Steps => _stepEditors.Items;
     public ObservableCollection<SequenceStepTemplateDefinition> Templates { get; } = new();
     public ObservableCollection<string> ValidationMessages { get; } = new();
+    public ObservableCollection<SequenceValidationIssue> ValidationIssues { get; } = new();
     public bool HasSequences => Sequences.Count != 0;
     public bool HasTemplates => Templates.Count != 0;
 
@@ -75,6 +106,7 @@ public sealed class SequenceEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedSequence, value))
             {
+                ResetValidationComparison();
                 LoadAuthoringTargets();
                 LoadSteps();
             }
@@ -101,7 +133,12 @@ public sealed class SequenceEditorViewModel : ViewModelBase
         get => _isEditable;
         set
         {
-            SetProperty(ref _isEditable, value);
+            if (!SetProperty(ref _isEditable, value))
+            {
+                return;
+            }
+
+            InvalidateCommands();
         }
     }
 
@@ -116,6 +153,28 @@ public sealed class SequenceEditorViewModel : ViewModelBase
         get => _structuralEditStatus;
         private set => SetProperty(ref _structuralEditStatus, value);
     }
+
+    public SequenceValidationIssue? SelectedValidationIssue
+    {
+        get => _selectedValidationIssue;
+        set
+        {
+            if (_disposed || !SetProperty(ref _selectedValidationIssue, value) || value is null)
+            {
+                return;
+            }
+
+            if (!string.Equals(SelectedSequence?.Id, value.SequenceId, StringComparison.Ordinal))
+            {
+                SelectSequence(value.SequenceId);
+            }
+
+            SelectedStep = Steps.FirstOrDefault(step =>
+                string.Equals(step.Id, value.StepId, StringComparison.Ordinal));
+        }
+    }
+
+    public string ValidationComparisonText => _validationComparisonText;
 
     public ICommand AddStepCommand => _addStepCommand;
     public ICommand DeleteStepCommand => _deleteStepCommand;
@@ -136,6 +195,7 @@ public sealed class SequenceEditorViewModel : ViewModelBase
     {
         ArgumentNullException.ThrowIfNull(project);
         _project = project;
+        ResetValidationComparison();
         string? preferredId = project.Simulation.AutomaticRun?.SequenceId
             ?? SelectedSequence?.Id
             ?? project.Sequences.FirstOrDefault()?.Id;
@@ -184,9 +244,20 @@ public sealed class SequenceEditorViewModel : ViewModelBase
 
     public void RefreshLocalization()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         OnPropertyChanged(nameof(Sequences));
         OnPropertyChanged(nameof(SelectedSequence));
+        OnPropertyChanged(nameof(Templates));
+        OnPropertyChanged(nameof(SelectedTemplate));
+        OnPropertyChanged(nameof(ValidationSummary));
+        OnPropertyChanged(nameof(StructuralEditStatus));
+        OnPropertyChanged(nameof(ValidationComparisonText));
         _stepEditors.RefreshLocalization();
+        Validate();
     }
 
     public void SelectSequence(string sequenceId)
@@ -219,9 +290,12 @@ public sealed class SequenceEditorViewModel : ViewModelBase
     {
         SequenceAuthoringTarget? target = _targetCatalog.GetTargetsForSequence(_authoringTargets, SelectedSequence).FirstOrDefault(candidate =>
             string.Equals(candidate.Id, targetId, StringComparison.Ordinal));
-        if (!IsEditable || SelectedSequence is null || target is null)
+        if (_disposed || !IsEditable || SelectedSequence is null || target is null)
         {
-            StructuralEditStatus = "Select an editable sequence and a compatible target.";
+            StructuralEditStatus = OpenVisionLanguageService.T(
+                "Sequence.SelectEditableHint",
+                "편집 가능한 시퀀스와 호환되는 대상을 선택하세요.",
+                "Select an editable sequence and a compatible target.");
             return null;
         }
 
@@ -324,7 +398,8 @@ public sealed class SequenceEditorViewModel : ViewModelBase
     }
 
     private bool CanChangeStructure() =>
-        IsEditable
+        !_disposed
+        && IsEditable
         && SelectedSequence is not null
         && SequenceDefinitionEditor.IsStrictLinear(SelectedSequence);
 
@@ -351,11 +426,22 @@ public sealed class SequenceEditorViewModel : ViewModelBase
 
     private void Validate()
     {
+        var previousIssueKey = SelectedValidationIssue is null
+            ? null
+            : GetIssueKey(SelectedValidationIssue);
         ValidationMessages.Clear();
+        ValidationIssues.Clear();
         if (SelectedSequence is null)
         {
-            ValidationSummary = "No sequence selected";
-            StructuralEditStatus = "Select a sequence to edit steps.";
+            ValidationSummary = OpenVisionLanguageService.T(
+                "Sequence.NoSequenceSelected",
+                "선택한 시퀀스 없음",
+                "No sequence selected");
+            StructuralEditStatus = OpenVisionLanguageService.T(
+                "Sequence.SelectSequenceHint",
+                "시퀀스를 선택해 단계를 편집하세요.",
+                "Select a sequence to edit steps.");
+            UpdateValidationComparison(0, string.Empty);
             return;
         }
 
@@ -365,18 +451,115 @@ public sealed class SequenceEditorViewModel : ViewModelBase
         foreach (SequenceCompilationError error in result.Errors)
         {
             ValidationMessages.Add($"{error.Code} [{error.StepId ?? "sequence"}]: {error.Message}");
+            var step = SelectedSequence.Steps.FirstOrDefault(candidate =>
+                string.Equals(candidate.Id, error.StepId, StringComparison.Ordinal));
+            ValidationIssues.Add(new SequenceValidationIssue(
+                error.Code,
+                SelectedSequence.Id,
+                error.StepId,
+                step?.TargetId,
+                ResolveValidationProperty(error.Code),
+                error.Message));
         }
+
+        SelectedValidationIssue = ValidationIssues.FirstOrDefault(issue =>
+            string.Equals(GetIssueKey(issue), previousIssueKey, StringComparison.Ordinal))
+            ?? ValidationIssues.FirstOrDefault();
 
         _stepEditors.SetValidation(result.Errors);
 
         ValidationSummary = result.IsSuccess
-            ? $"VALID · {Steps.Count} steps"
-            : $"INVALID · {result.Errors.Count} issue(s)";
+            ? Format("Sequence.ValidSummary", Steps.Count)
+            : Format("Sequence.InvalidSummary", result.Errors.Count);
         StructuralEditStatus = SequenceDefinitionEditor.IsStrictLinear(SelectedSequence)
-            ? "Linear path · add, remove, and reorder are available in Design mode."
-            : "Branched path · edit fields only; structural commands are locked.";
+            ? OpenVisionLanguageService.T(
+                "Sequence.StructuralLinear",
+                "선형 경로: 설계 모드에서 추가·삭제·순서 변경을 사용할 수 있습니다.",
+                "Linear path: add, remove, and reorder are available in Design mode.")
+            : OpenVisionLanguageService.T(
+                "Sequence.StructuralBranched",
+                "분기 경로: 필드만 편집할 수 있으며 구조 명령은 잠겨 있습니다.",
+                "Branched path: edit fields only; structural commands are locked.");
+        UpdateValidationComparison(
+            result.Errors.Count,
+            string.Join("|", ValidationIssues.Select(GetIssueKey)));
         CommandManager.InvalidateRequerySuggested();
     }
+
+    private void ResetValidationComparison()
+    {
+        _hasValidationSnapshot = false;
+        _lastValidationSignature = string.Empty;
+        _lastValidationErrorCount = 0;
+        _validationComparisonText = string.Empty;
+        _selectedValidationIssue = null;
+        OnPropertyChanged(nameof(SelectedValidationIssue));
+        OnPropertyChanged(nameof(ValidationComparisonText));
+    }
+
+    private void UpdateValidationComparison(int errorCount, string signature)
+    {
+        var key = !_hasValidationSnapshot
+            ? "Sequence.ValidationInitial"
+            : string.Equals(signature, _lastValidationSignature, StringComparison.Ordinal)
+                ? "Sequence.ValidationUnchanged"
+                : errorCount < _lastValidationErrorCount
+                    ? "Sequence.ValidationImproved"
+                    : errorCount > _lastValidationErrorCount
+                        ? "Sequence.ValidationRegressed"
+                        : "Sequence.ValidationChanged";
+        var previousCount = _lastValidationErrorCount;
+        _validationComparisonText = key switch
+        {
+            "Sequence.ValidationInitial" => Format(key, errorCount),
+            "Sequence.ValidationUnchanged" => Format(key, errorCount),
+            _ => Format(key, previousCount, errorCount)
+        };
+        _lastValidationErrorCount = errorCount;
+        _lastValidationSignature = signature;
+        _hasValidationSnapshot = true;
+        OnPropertyChanged(nameof(ValidationComparisonText));
+    }
+
+    private static string GetIssueKey(SequenceValidationIssue issue) =>
+        $"{issue.Code}|{issue.StepId}|{issue.TargetId}|{issue.PropertyName}|{issue.Message}";
+
+    private static string ResolveValidationProperty(SequenceCompilationErrorCode code) => code switch
+    {
+        SequenceCompilationErrorCode.DefinitionRequired
+            or SequenceCompilationErrorCode.SequenceIdRequired => "Sequence.Id",
+        SequenceCompilationErrorCode.NoSteps => "Sequence.Steps",
+        SequenceCompilationErrorCode.InvalidWatchdogTimeout => "Sequence.WatchdogTimeoutMs",
+        SequenceCompilationErrorCode.StepIdRequired
+            or SequenceCompilationErrorCode.DuplicateStepId => "Step.Id",
+        SequenceCompilationErrorCode.UnsupportedAction => "Step.Action",
+        SequenceCompilationErrorCode.TargetIdRequired
+            or SequenceCompilationErrorCode.UnexpectedTargetId
+            or SequenceCompilationErrorCode.UnknownSignal
+            or SequenceCompilationErrorCode.UnknownAxis
+            or SequenceCompilationErrorCode.UnknownCamera => "Step.TargetId",
+        SequenceCompilationErrorCode.InvalidBooleanParameter
+            or SequenceCompilationErrorCode.InvalidNumericParameter
+            or SequenceCompilationErrorCode.UnexpectedParameter
+            or SequenceCompilationErrorCode.InvalidSignalKind => "Step.Parameter",
+        SequenceCompilationErrorCode.InvalidTimeout => "Step.TimeoutMs",
+        SequenceCompilationErrorCode.UnknownSubsequence
+            or SequenceCompilationErrorCode.SubsequenceCycle => "Step.TargetId",
+        SequenceCompilationErrorCode.NextStepNotFound
+            or SequenceCompilationErrorCode.MissingSuccessor
+            or SequenceCompilationErrorCode.CompleteStepHasTransition => "Step.NextStepId",
+        SequenceCompilationErrorCode.ErrorStepNotFound
+            or SequenceCompilationErrorCode.FailureStepRequired
+            or SequenceCompilationErrorCode.FailureStepNotFound
+            or SequenceCompilationErrorCode.FailureStepNotAllowed => "Step.ErrorStepId",
+        SequenceCompilationErrorCode.RecipeIdRequired => "Step.Parameter",
+        SequenceCompilationErrorCode.ExpectedTargetIdRequired => "Step.ExpectedTargetId",
+        SequenceCompilationErrorCode.ExpectedStateRequired => "Step.ExpectedState",
+        _ => "Step"
+    };
+
+    private static string Format(string key, params object[] args) =>
+        string.Format(System.Globalization.CultureInfo.CurrentCulture, OpenVisionLanguageService.T(key), args);
 
     private static int NextStepOrdinal(SequenceDefinition sequence)
     {
@@ -392,7 +575,14 @@ public sealed class SequenceEditorViewModel : ViewModelBase
 
     internal void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
         _stepEditors.DefinitionChanged -= OnStepDefinitionChanged;
         _stepEditors.Dispose();
+        InvalidateCommands();
     }
 }

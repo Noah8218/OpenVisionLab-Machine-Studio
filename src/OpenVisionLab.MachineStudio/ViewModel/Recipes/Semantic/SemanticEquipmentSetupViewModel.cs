@@ -7,9 +7,10 @@ namespace OpenVisionLab.MachineStudio.ViewModel;
 /// Composes the semantic setup cards and coordinates their shared preview lifetime.
 /// Each child owns one equipment definition and its editable draft.
 /// </summary>
-public sealed class SemanticEquipmentSetupViewModel : ViewModelBase
+public sealed class SemanticEquipmentSetupViewModel : ViewModelBase, IDisposable
 {
     private bool _isEditable = true;
+    private int _disposed;
 
     public SemanticEquipmentSetupViewModel(
         Func<WaferHandlerDefinition, int> applyWaferHandlerSetup,
@@ -37,7 +38,7 @@ public sealed class SemanticEquipmentSetupViewModel : ViewModelBase
         get => _isEditable;
         set
         {
-            if (!SetProperty(ref _isEditable, value)) return;
+            if (IsDisposed || !SetProperty(ref _isEditable, value)) return;
             WaferHandler.IsEditable = value;
             Prealigner.IsEditable = value;
             InspectionHandoff.IsEditable = value;
@@ -48,6 +49,7 @@ public sealed class SemanticEquipmentSetupViewModel : ViewModelBase
 
     public void Load(MachineProjectDocument project)
     {
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
         WaferHandler.Load(project);
         Prealigner.Load(project);
         InspectionHandoff.Load(project);
@@ -57,6 +59,7 @@ public sealed class SemanticEquipmentSetupViewModel : ViewModelBase
 
     public void ClearPreviewForCompetingSetup()
     {
+        if (IsDisposed) return;
         WaferHandler.ClearPreviewForCompetingSetup();
         Prealigner.ClearPreviewForCompetingSetup();
         InspectionHandoff.ClearPreviewForCompetingSetup();
@@ -66,6 +69,7 @@ public sealed class SemanticEquipmentSetupViewModel : ViewModelBase
 
     internal void RefreshLocalization(Action reloadWorkbench)
     {
+        if (IsDisposed) return;
         if (WaferHandler.IsVisible)
         {
             WaferHandler.RefreshLocalization(reloadWorkbench);
@@ -91,4 +95,20 @@ public sealed class SemanticEquipmentSetupViewModel : ViewModelBase
             reloadWorkbench();
         }
     }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        WaferHandler.Dispose();
+        Prealigner.Dispose();
+        InspectionHandoff.Dispose();
+        InspectionSortRouter.Dispose();
+        OhtHandoff.Dispose();
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

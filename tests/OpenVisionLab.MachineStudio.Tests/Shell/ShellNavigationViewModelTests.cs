@@ -140,4 +140,27 @@ public sealed class ShellNavigationViewModelTests
             OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
         }
     }
+
+    [Fact]
+    public void DisposalNotifiesStartupCommandsOfFinalAdmission()
+    {
+        using var viewModel = new ShellNavigationViewModel(
+            isStartupChoiceVisible: true,
+            canStartBlankLayout: () => true,
+            canOpenBundledSample: () => true,
+            openBundledSampleAsync: () => Task.CompletedTask,
+            onBlankLayoutStarted: () => { },
+            onCommandException: exception => throw exception);
+        var startNotifications = 0;
+        var openNotifications = 0;
+        viewModel.StartBlankLayoutCommand.CanExecuteChanged += (_, _) => startNotifications++;
+        viewModel.OpenBundledSampleCommand.CanExecuteChanged += (_, _) => openNotifications++;
+
+        viewModel.Dispose();
+
+        Assert.False(viewModel.StartBlankLayoutCommand.CanExecute(null));
+        Assert.False(viewModel.OpenBundledSampleCommand.CanExecute(null));
+        Assert.Equal(1, startNotifications);
+        Assert.Equal(1, openNotifications);
+    }
 }

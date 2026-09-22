@@ -31,6 +31,7 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
     private DeterministicCommissioningBaselineComparison? _baselineComparison;
     private bool _isValidationRunning;
     private int _completedRuns;
+    private long _validationGeneration;
     private bool _disposed;
 
     public MultiAxisCommissioningViewModel(
@@ -92,7 +93,7 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
 
     public bool IsValidationRunning => _isValidationRunning;
     public bool IsValidationConfigurationEnabled => !_isValidationRunning;
-    public bool CanValidate => !_isValidationRunning && _canValidateFromParent();
+    public bool CanValidate => !_disposed && !_isValidationRunning && _canValidateFromParent();
     public string ValidationStatusText => _isValidationRunning
         ? string.Format(
             CultureInfo.CurrentCulture,
@@ -157,13 +158,13 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
             }
         }
     }
-    public bool CanAcceptBaseline => !_isValidationRunning
+    public bool CanAcceptBaseline => !_disposed && !_isValidationRunning
         && !_isOtherValidationRunning()
         && SelectedHistoryEntry?.Reference is not null;
-    public bool CanClearBaseline => !_isValidationRunning
+    public bool CanClearBaseline => !_disposed && !_isValidationRunning
         && !_isOtherValidationRunning()
         && AcceptedBaseline is not null;
-    public bool CanNavigateToMismatch => !_isValidationRunning
+    public bool CanNavigateToMismatch => !_disposed && !_isValidationRunning
         && !_isOtherValidationRunning()
         && !string.IsNullOrWhiteSpace(_baselineComparison?.FirstMismatch?.TargetId);
     public string HistoryStatusText => ResultHistory.Entries.IsDefaultOrEmpty
@@ -224,6 +225,12 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
 
     public void Reset()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        InvalidateValidationContext();
         _artifactStore.Reset(_getProject().Id);
         _selectedHistoryEntry = null;
         _baselineComparison = null;
@@ -234,6 +241,12 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
 
     public void Restore()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        InvalidateValidationContext();
         var project = _getProject();
         _selectedHistoryEntry = null;
         _baselineComparison = null;
@@ -257,11 +270,21 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
 
     public void RelinkProjectPath(string projectPath)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         _artifactStore.RelinkProjectPath(projectPath);
     }
 
     public void PersistResult()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         var errorDetail = _artifactStore.Persist(_getProjectPath(), CreateArtifactContext);
         if (errorDetail is not null)
         {
@@ -272,14 +295,33 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
 
     public void PersistForProjectPath(string projectPath)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         RelinkProjectPath(projectPath);
         PersistResult();
     }
 
-    internal void NotifyRuntimeChanged(bool invalidateCommands = true) => RaiseChanged(invalidateCommands);
+    internal void NotifyRuntimeChanged(bool invalidateCommands = true)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        RaiseChanged(invalidateCommands);
+    }
 
     internal void NotifyRecipeChanged(bool invalidateCommands = true)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        InvalidateValidationContext();
         _artifactStore.InvalidateContextIfResult();
         _baselineComparison = null;
         RaiseChanged(invalidateCommands);
@@ -287,8 +329,20 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
 
     internal void InvalidateContextIfResult()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (LatestResult is null && !_isValidationRunning)
+        {
+            return;
+        }
+
+        InvalidateValidationContext();
         if (LatestResult is null)
         {
+            RaiseChanged();
             return;
         }
 
@@ -297,9 +351,25 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
         RaiseChanged();
     }
 
-    internal void RefreshLocalization() => RaiseChanged(invalidateCommands: false);
+    internal void RefreshLocalization()
+    {
+        if (_disposed)
+        {
+            return;
+        }
 
-    internal void CancelValidation() => _validationParticipant.Cancel();
+        RaiseChanged(invalidateCommands: false);
+    }
+
+    internal void CancelValidation()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        InvalidateValidationContext();
+    }
 
     internal void InvalidateCommands()
     {
@@ -315,6 +385,7 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
     private async Task<MultiAxisCommissioningParticipantResult> ValidateAsync(
         CancellationToken cancellationToken)
     {
+        var validationGeneration = Volatile.Read(ref _validationGeneration);
         var project = _getProject();
         if (!CanValidate || project.MultiAxisCommissioningRecipe is not { } recipe)
         {
@@ -328,7 +399,7 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
         }
         catch (Exception exception) when (exception is InvalidDataException or ArgumentException)
         {
-            await DispatchPresentationAsync(() =>
+            await DispatchPresentationAsync(validationGeneration, () =>
             {
                 _setStatus(OpenVisionLanguageService.T("Axis.RecipeValidationRejected"));
                 _log($"Commissioning validation rejected · {exception.Message}");
@@ -339,7 +410,7 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
         var projectJson = _serializeProject();
         var projectPath = _getProjectPath()
             ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, $"unsaved-{project.Id}.ovmachine"));
-        await DispatchPresentationAsync(() =>
+        await DispatchPresentationAsync(validationGeneration, () =>
         {
             _artifactStore.SetLatestResult(null);
             _completedRuns = 0;
@@ -357,9 +428,9 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
                 projectJson,
                 recipe,
                 _fixedStep,
-                UpdateProgressAsync,
+                runIndex => UpdateProgressAsync(validationGeneration, runIndex),
                 cancellationToken);
-            await DispatchPresentationAsync(() =>
+            await DispatchPresentationAsync(validationGeneration, () =>
             {
                 _artifactStore.SetLatestResult(result);
                 _artifactStore.AppendHistory(result, DateTimeOffset.UtcNow);
@@ -378,7 +449,7 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
         }
         catch (Exception exception) when (exception is InvalidOperationException or ArgumentException)
         {
-            await DispatchPresentationAsync(() =>
+            await DispatchPresentationAsync(validationGeneration, () =>
             {
                 _setStatus(OpenVisionLanguageService.T("Axis.RecipeValidationRejected"));
                 _log($"Commissioning repeat validation rejected · {exception.Message}");
@@ -387,23 +458,32 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
         }
         finally
         {
-            await DispatchPresentationAsync(() => SetValidationRunning(false));
+            await DispatchPresentationAsync(validationGeneration, () => SetValidationRunning(false));
         }
     }
 
-    private Task DispatchPresentationAsync(Action action) => _dispatchToUi(() =>
+    private Task DispatchPresentationAsync(long validationGeneration, Action action) => _dispatchToUi(() =>
     {
-        if (!_disposed)
+        if (!_disposed && Volatile.Read(ref _validationGeneration) == validationGeneration)
         {
             action();
         }
     });
 
-    private Task UpdateProgressAsync(int completedRuns) => _dispatchToUi(() =>
+    private Task UpdateProgressAsync(long validationGeneration, int completedRuns) =>
+        DispatchPresentationAsync(validationGeneration, () =>
+        {
+            _completedRuns = completedRuns;
+            RaiseChanged();
+        });
+
+    private void InvalidateValidationContext()
     {
-        _completedRuns = completedRuns;
-        RaiseChanged();
-    });
+        Interlocked.Increment(ref _validationGeneration);
+        _validationParticipant.Cancel();
+        _isValidationRunning = false;
+        _completedRuns = 0;
+    }
 
     private void AcceptBaseline()
     {
@@ -508,5 +588,7 @@ public sealed class MultiAxisCommissioningViewModel : ViewModelBase, IDisposable
 
         _disposed = true;
         _validationParticipant.Dispose();
+        _recipe.Dispose();
+        InvalidateCommands();
     }
 }

@@ -1089,7 +1089,8 @@ evidence and canonical journal export use the same owner. Packages still prepare
 paths/directories and retain serializer timing, encoding and journal space/size
 checks. Baseline/history keep their existing internal forwarding entry point.
 Core project save/backup and retention deletion have separate contracts and are
-unchanged. See [PL-0265](../.proofline/evidence-file-persistence-refactor-report.md).
+unchanged; the public source and focused tests are the executable contract for
+those boundaries.
 `MainViewModel` retains the public binding facade and supplies project/runtime,
 status/logging, UI-progress, layout-selection, and presentation callbacks. The
 recipe editor remains the authoring owner, while manual coordinated Run/Stop,
@@ -1121,8 +1122,8 @@ rolled back, and PL-0263's host lifetime checks remain necessary and unchanged.
 Portable command traces preserve bound commands' arguments and actual outcomes,
 but mark them non-replayable. Replay must not drop the admission condition or
 invent a mapping to a new session's generation. Existing unbound trace schema,
-argument codec and hash rules are unchanged. See the
-[PL-0264 report](../.proofline/runtime-command-admission-refactor-report.md).
+argument codec and hash rules are unchanged. The runtime command admission
+boundary is covered by the simulation engine and its focused tests.
 
 Deterministic Test Scenario batch execution follows the same boundary.
 `SimulationScenarioBatchViewModel` owns the sequential batch command/state

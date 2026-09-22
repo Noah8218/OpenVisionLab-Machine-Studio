@@ -57,6 +57,38 @@ public sealed class SimulationRunControlWorkflowTests
     }
 
     [Fact]
+    public async Task ProjectInvalidationSuppressesLateRunPresentation()
+    {
+        using var engine = new RecordingSimulationEngine();
+        var state = CreateState();
+        var statuses = new List<string>();
+        var logs = new List<(string Category, string Message)>();
+        var workflow = new SimulationRunControlWorkflow(
+            engine,
+            TimeSpan.FromMilliseconds(5),
+            () => state,
+            () => Task.FromResult(true),
+            _ => { },
+            value => state = state with { IsRunning = value },
+            _ => { },
+            () => { },
+            statuses.Add,
+            (category, message) => logs.Add((category, message)),
+            () => { });
+
+        var run = workflow.RunAsync();
+        await engine.FirstCommandSeen.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        workflow.InvalidatePendingExecution();
+        engine.ReleaseFirstCommand();
+        await run;
+
+        Assert.False(state.IsRunning);
+        Assert.Empty(statuses);
+        Assert.Empty(logs);
+    }
+
+    [Fact]
     public async Task DisposePreventsQueuedCommandFromExecuting()
     {
         using var engine = new RecordingSimulationEngine();
@@ -76,6 +108,29 @@ public sealed class SimulationRunControlWorkflowTests
 
         var command = Assert.Single(engine.Commands);
         Assert.IsType<PlayCommand>(command);
+    }
+
+    [Fact]
+    public async Task WaitForOperationsCompletesOnlyAfterAnActiveCommandFinishes()
+    {
+        using var engine = new RecordingSimulationEngine();
+        var state = CreateState();
+        using var workflow = CreateWorkflow(engine, () => state, value => state = state with
+        {
+            IsRunning = value
+        });
+
+        var run = workflow.RunAsync();
+        await engine.FirstCommandSeen.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        workflow.Dispose();
+        var operationsIdle = workflow.WaitForOperationsAsync();
+
+        Assert.False(operationsIdle.IsCompleted);
+
+        engine.ReleaseFirstCommand();
+        await run;
+        await operationsIdle;
     }
 
     private static SimulationRunControlWorkflow CreateWorkflow(

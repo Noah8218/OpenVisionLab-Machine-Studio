@@ -15,6 +15,7 @@ public sealed class SequenceStepEditorItem : ViewModelBase
     private readonly IReadOnlyList<SequenceAuthoringTarget> _authoringTargets;
     private readonly IReadOnlyList<SequenceExpectedStateTarget> _expectedStateTargets;
     private readonly bool _isTerminal;
+    private IReadOnlyList<SequenceCompilationError> _validationErrors = Array.Empty<SequenceCompilationError>();
     private string _validationText = "Valid";
 
     public SequenceStepEditorItem(
@@ -250,15 +251,34 @@ public sealed class SequenceStepEditorItem : ViewModelBase
 
     public event EventHandler? DefinitionChanged;
 
-    public void RefreshLocalization() => OnPropertyChanged(nameof(DisplayName));
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(nameof(DisplayName));
+        OnPropertyChanged(nameof(Action));
+        OnPropertyChanged(nameof(AvailableActions));
+        RefreshValidationText();
+    }
 
     public void SetValidation(IEnumerable<SequenceCompilationError> errors)
     {
-        string[] messages = errors.Select(error => error.Message).ToArray();
+        _validationErrors = errors.ToArray();
+        RefreshValidationText();
+    }
+
+    private void RefreshValidationText()
+    {
+        string[] messages = _validationErrors.Select(error => error.Message).ToArray();
         ValidationText = messages.Length == 0
             ? HasExpectedState
-                ? $"Expected · {ExpectedTargetId} = {ExpectedState}"
-                : "Valid"
+                ? string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    OpenVisionLanguageService.T(
+                        "Sequence.ExpectedStateFormat",
+                        "기대 상태: {0} = {1}",
+                        "Expected: {0} = {1}"),
+                    ExpectedTargetId,
+                    ExpectedState)
+                : OpenVisionLanguageService.T("Sequence.StepValid", "유효", "Valid")
             : string.Join(" ", messages);
     }
 

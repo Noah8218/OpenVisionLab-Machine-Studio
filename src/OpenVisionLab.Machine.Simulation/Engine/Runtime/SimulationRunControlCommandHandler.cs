@@ -41,6 +41,7 @@ internal sealed class SimulationRunControlCommandHandler
         return command switch
         {
             PlayCommand => ApplyPlay(command, context),
+            FastForwardCommand fastForward => ApplyFastForward(command, fastForward, context),
             PauseCommand => ApplyPause(command, context),
             StepCommand => ApplyStep(command, context),
             StepSequenceCommand stepSequence => ApplyStepSequence(command, stepSequence, context),
@@ -84,6 +85,33 @@ internal sealed class SimulationRunControlCommandHandler
             "Simulation paused.",
             runMode: SimulationRunMode.Paused,
             pendingSteps: 0);
+    }
+
+    private static SimulationRunControlOutcome ApplyFastForward(
+        SimulationCommand command,
+        FastForwardCommand fastForward,
+        SimulationRunControlContext context)
+    {
+        if (context.RunMode != SimulationRunMode.Paused)
+        {
+            return Reject(
+                command,
+                context,
+                SimulationCommandErrorCode.InvalidRunMode,
+                "FastForward is available only while paused.");
+        }
+
+        context.SequenceDebugState.ClearPendingSemanticStep();
+        context.SequenceDebugState.SetPause(SequenceDebugPauseReason.None, null);
+        return Accept(
+            command,
+            context,
+            $"Simulation will run {fastForward.TickBudget} deterministic fixed ticks without wall-clock pacing.",
+            runMode: SimulationRunMode.FastForward,
+            controlOwner: context.SequenceExecutors.Count > 0
+                ? SimulationControlOwner.EmbeddedSequence
+                : SimulationControlOwner.Manual,
+            pendingSteps: fastForward.TickBudget);
     }
 
     private static SimulationRunControlOutcome ApplyStep(

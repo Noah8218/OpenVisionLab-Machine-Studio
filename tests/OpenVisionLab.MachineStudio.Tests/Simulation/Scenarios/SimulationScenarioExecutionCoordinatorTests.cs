@@ -197,6 +197,143 @@ public sealed class SimulationScenarioExecutionCoordinatorTests
         Assert.Empty(runningValues);
     }
 
+    [Fact]
+    public async Task InvalidatePendingExecutionSuppressesLateStartCompletion()
+    {
+        OpenVisionLanguageService.Load();
+        using var workspace = new SimulationWorkspaceViewModel
+        {
+            ScenarioTargetId = "axis-1"
+        };
+        var commands = new List<SimulationCommand>();
+        var completion = new TaskCompletionSource<SimulationCommandResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var workflow = new SimulationScenarioWorkflow(command =>
+        {
+            commands.Add(command);
+            return completion.Task;
+        });
+        var statuses = new List<string>();
+        var logs = new List<(string Category, string Message)>();
+        var designModeValues = new List<bool>();
+        var runningValues = new List<bool>();
+        var coordinator = CreateCoordinator(
+            workflow,
+            workspace,
+            statuses,
+            logs,
+            designModeValues,
+            runningValues);
+
+        var startTask = coordinator.StartAsync();
+        await WaitForAsync(() => commands.Count == 1);
+
+        coordinator.InvalidatePendingExecution();
+        completion.SetResult(CreateAcceptedResult(commands[0]));
+        await startTask;
+
+        Assert.False(coordinator.OwnsRun);
+        Assert.Empty(statuses);
+        Assert.Empty(logs);
+        Assert.Empty(runningValues);
+    }
+
+    [Fact]
+    public async Task ConcurrentScenarioOperationsDoNotInterleave()
+    {
+        OpenVisionLanguageService.Load();
+        using var workspace = new SimulationWorkspaceViewModel
+        {
+            ScenarioTargetId = "axis-1"
+        };
+        var commands = new List<SimulationCommand>();
+        var completions = new Dictionary<string, TaskCompletionSource<SimulationCommandResult>>(
+            StringComparer.Ordinal);
+        var secondCommandObserved = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var workflow = new SimulationScenarioWorkflow(command =>
+        {
+            var completion = new TaskCompletionSource<SimulationCommandResult>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (commands)
+            {
+                commands.Add(command);
+                completions[command.CommandId] = completion;
+                if (commands.Count == 2)
+                {
+                    secondCommandObserved.TrySetResult(true);
+                }
+            }
+
+            return completion.Task;
+        });
+        var statuses = new List<string>();
+        var logs = new List<(string Category, string Message)>();
+        var designModeValues = new List<bool>();
+        var runningValues = new List<bool>();
+        var coordinator = CreateCoordinator(
+            workflow,
+            workspace,
+            statuses,
+            logs,
+            designModeValues,
+            runningValues);
+
+        var startTask = coordinator.StartAsync();
+        await WaitForAsync(() => Count(commands) == 1);
+        var replayTask = coordinator.ReplayAsync();
+
+        var observed = await Task.WhenAny(
+            secondCommandObserved.Task,
+            Task.Delay(TimeSpan.FromSeconds(1)));
+        Assert.NotSame(secondCommandObserved.Task, observed);
+        await replayTask;
+
+        var firstCommand = First(commands);
+        Complete(firstCommand, completions);
+        await startTask;
+
+        Assert.Equal(1, Count(commands));
+        Assert.False(coordinator.OwnsRun);
+        Assert.Single(statuses);
+        Assert.Contains(
+            logs,
+            log => log.Message.Contains("operation ignored", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(
+            logs,
+            log => log.Message.Contains("replayed", StringComparison.OrdinalIgnoreCase));
+        coordinator.Dispose();
+
+        static int Count(List<SimulationCommand> values)
+        {
+            lock (values)
+            {
+                return values.Count;
+            }
+        }
+
+        static SimulationCommand First(List<SimulationCommand> values)
+        {
+            lock (values)
+            {
+                return Assert.Single(values);
+            }
+        }
+
+        static void Complete(
+            SimulationCommand command,
+            Dictionary<string, TaskCompletionSource<SimulationCommandResult>> pending)
+        {
+            pending[command.CommandId].SetResult(new(
+                command.CommandId,
+                true,
+                0,
+                TimeSpan.Zero,
+                SimulationCommandErrorCode.None,
+                null));
+        }
+    }
+
     private static SimulationScenarioExecutionCoordinator CreateCoordinator(
         SimulationScenarioWorkflow workflow,
         SimulationWorkspaceViewModel workspace,

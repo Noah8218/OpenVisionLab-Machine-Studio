@@ -17,6 +17,8 @@ public sealed class SimulationSnapshot
     public string? ProjectId { get; }
     [JsonIgnore]
     public long RuntimeGeneration { get; }
+    [JsonIgnore]
+    public string? ResetRetrySequenceId { get; }
     public TimeSpan SimulationTime { get; }
     public long TickIndex { get; }
     public SimulationRunMode RunMode { get; }
@@ -147,10 +149,12 @@ public sealed class SimulationSnapshot
         SequenceDebugSnapshot? sequenceDebug = null,
         IEnumerable<AnalogSignalSnapshot>? analogSignals = null,
         string? projectId = null,
-        long runtimeGeneration = 0)
+        long runtimeGeneration = 0,
+        string? resetRetrySequenceId = null)
     {
         ProjectId = projectId;
         RuntimeGeneration = runtimeGeneration;
+        ResetRetrySequenceId = resetRetrySequenceId;
         SimulationTime = simulationTime;
         TickIndex = tickIndex;
         RunMode = runMode;

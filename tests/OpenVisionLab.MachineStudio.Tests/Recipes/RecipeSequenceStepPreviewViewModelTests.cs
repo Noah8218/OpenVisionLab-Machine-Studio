@@ -137,6 +137,8 @@ public sealed class RecipeSequenceStepPreviewViewModelTests
             () => true,
             () => true,
             (_, _, _) => resultSource.Task);
+        var notifications = 0;
+        viewModel.PreviewSequenceStepCommand.CanExecuteChanged += (_, _) => notifications++;
 
         viewModel.PreviewSequenceStepCommand.Execute(row);
         Assert.False(viewModel.PreviewSequenceStepCommand.CanExecute(row));
@@ -149,6 +151,7 @@ public sealed class RecipeSequenceStepPreviewViewModelTests
 
         Assert.False(row.HasPreviewResult);
         Assert.False(viewModel.PreviewSequenceStepCommand.CanExecute(row));
+        Assert.Equal(1, notifications);
     }
 
     private static RecipeSequenceStepPreviewViewModel CreateViewModel(

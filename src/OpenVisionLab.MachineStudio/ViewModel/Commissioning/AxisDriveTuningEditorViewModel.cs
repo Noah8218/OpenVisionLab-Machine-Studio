@@ -8,13 +8,14 @@ namespace OpenVisionLab.MachineStudio.ViewModel;
 /// Edits one project-owned axis definition. Runtime motion remains owned by the
 /// simulation axis compiled from that definition.
 /// </summary>
-public sealed class AxisDriveTuningEditorViewModel : ViewModelBase
+public sealed class AxisDriveTuningEditorViewModel : ViewModelBase, IDisposable
 {
     private readonly VirtualAxisDefinition _axis;
     private readonly Action _definitionChanged;
     private bool _hasValidationErrors;
     private string _validationMessage = string.Empty;
     private ICommand? _resetDriveDefaultsCommand;
+    private int _disposed;
 
     public AxisDriveTuningEditorViewModel(
         VirtualAxisDefinition axis,
@@ -83,6 +84,11 @@ public sealed class AxisDriveTuningEditorViewModel : ViewModelBase
         get => _axis.MaxAcceleration;
         set
         {
+            if (IsDisposed)
+            {
+                return;
+            }
+
             var previous = _axis.MaxAcceleration;
             Update(
                 () => _axis.MaxAcceleration = value,
@@ -135,6 +141,11 @@ public sealed class AxisDriveTuningEditorViewModel : ViewModelBase
 
     public ICommand ResetDriveDefaultsCommand => _resetDriveDefaultsCommand ??= new RelayCommand(_ =>
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _axis.MaxVelocity = VirtualAxisDefinition.DefaultMaxVelocity;
         _axis.MaxAcceleration = VirtualAxisDefinition.DefaultMaxAcceleration;
         _axis.MaxDeceleration = null;
@@ -145,9 +156,25 @@ public sealed class AxisDriveTuningEditorViewModel : ViewModelBase
         OnPropertyChanged(nameof(FollowingErrorLimit));
         Validate();
         _definitionChanged();
-    });
+    }, _ => !IsDisposed);
 
-    public void RefreshLocalization() => Validate();
+    public void RefreshLocalization()
+    {
+        if (!IsDisposed)
+        {
+            Validate();
+        }
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        (_resetDriveDefaultsCommand as RelayCommand)?.RaiseCanExecuteChanged();
+    }
 
     private void UpdateValue(
         double previous,
@@ -158,6 +185,11 @@ public sealed class AxisDriveTuningEditorViewModel : ViewModelBase
 
     private void Update(Action update, Action revert, string propertyName)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         update();
         if (!TryValidate(out var message))
         {
@@ -204,4 +236,6 @@ public sealed class AxisDriveTuningEditorViewModel : ViewModelBase
         message = OpenVisionLanguageService.T("Axis.TuningValid");
         return true;
     }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

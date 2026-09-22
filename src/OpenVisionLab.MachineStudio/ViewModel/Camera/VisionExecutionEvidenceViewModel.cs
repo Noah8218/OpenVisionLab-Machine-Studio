@@ -13,7 +13,8 @@ internal readonly record struct VisionEvidenceContext(
     string BuildIdentity,
     string? ProjectPath,
     string? CameraId,
-    string? RecipeId);
+    string? RecipeId,
+    Func<string, bool>? ValidateFrameSource = null);
 
 /// <summary>
 /// Owns the lifecycle of one project-linked deterministic Vision execution
@@ -184,12 +185,7 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase, IDisposa
         else
         {
             _latestEvidence = package;
-            _artifactState = package.IsForContext(
-                context.ProjectId,
-                context.ProjectJson,
-                context.BuildIdentity,
-                context.CameraId,
-                context.RecipeId)
+            _artifactState = IsForContext(package, context)
                 ? ArtifactState.Restored
                 : ArtifactState.StaleRejected;
         }
@@ -198,7 +194,7 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase, IDisposa
             _artifactState == ArtifactState.Restored
                 ? "Saved execution evidence restored"
                 : _artifactState == ArtifactState.StaleRejected
-                    ? "Saved execution evidence rejected because project, build, camera, or recipe context changed"
+                    ? "Saved execution evidence rejected because project, build, camera, recipe, or frame source context changed"
                     : "No saved execution evidence found");
         RaiseChanged(invalidateCommands: false);
     }
@@ -243,11 +239,7 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase, IDisposa
             return;
         }
 
-        if (_activeRecorder is not null)
-        {
-            RaiseChanged(invalidateCommands: false);
-            return;
-        }
+        _activeRecorder = null;
 
         var context = _getContext();
         _artifactState = _latestEvidence switch
@@ -255,12 +247,7 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase, IDisposa
             null when _artifactState == ArtifactState.StaleRejected =>
                 ArtifactState.StaleRejected,
             null => ArtifactState.None,
-            { } package when package.IsForContext(
-                context.ProjectId,
-                context.ProjectJson,
-                context.BuildIdentity,
-                context.CameraId,
-                context.RecipeId) => _artifactState switch
+            { } package when IsForContext(package, context) => _artifactState switch
                 {
                     ArtifactState.Restored => ArtifactState.Restored,
                     ArtifactState.SaveFailed => ArtifactState.SaveFailed,
@@ -295,9 +282,12 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase, IDisposa
 
         _latestEvidence = evidence;
         _comparison = null;
-        _artifactState = evidence is null
-            ? ArtifactState.None
-            : ArtifactState.Imported;
+        _artifactState = evidence switch
+        {
+            null => ArtifactState.None,
+            { } package when IsForContext(package, _getContext()) => ArtifactState.Imported,
+            _ => ArtifactState.StaleRejected
+        };
         RaiseChanged(invalidateCommands: false);
     }
 
@@ -335,12 +325,7 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase, IDisposa
         }
 
         var context = _getContext();
-        return evidence.IsForContext(
-            context.ProjectId,
-            context.ProjectJson,
-            context.BuildIdentity,
-            context.CameraId,
-            context.RecipeId)
+        return IsForContext(evidence, context)
             ? evidence
             : null;
     }
@@ -362,12 +347,7 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase, IDisposa
             return;
         }
 
-        if (!_latestEvidence.IsForContext(
-                context.ProjectId,
-                context.ProjectJson,
-                context.BuildIdentity,
-                context.CameraId,
-                context.RecipeId))
+        if (!IsForContext(_latestEvidence, context))
         {
             _artifactState = ArtifactState.StaleRejected;
             return;
@@ -422,6 +402,34 @@ internal sealed class VisionExecutionEvidenceViewModel : ViewModelBase, IDisposa
 
     private static string ArtifactPath(string projectPath) =>
         $"{Path.GetFullPath(projectPath)}.vision-result.json";
+
+    private static bool IsForContext(
+        DeterministicVisionExecutionEvidencePackage package,
+        VisionEvidenceContext context)
+    {
+        if (!package.IsForContext(
+                context.ProjectId,
+                context.ProjectJson,
+                context.BuildIdentity,
+                context.CameraId,
+                context.RecipeId))
+        {
+            return false;
+        }
+
+        try
+        {
+            return context.ValidateFrameSource?.Invoke(package.FrameHash) ?? true;
+        }
+        catch (Exception exception) when (
+            exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or InvalidOperationException)
+        {
+            return false;
+        }
+    }
 
     private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

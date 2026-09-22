@@ -10,6 +10,18 @@ using OpenVisionLab.Machine.Simulation.Snapshots;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
+public enum RuntimeAlarmHistoryFilterState
+{
+    Active,
+    Cleared,
+    Acknowledged,
+    Unacknowledged
+}
+
+public sealed record RuntimeAlarmHistoryFilterItem(
+    RuntimeAlarmHistoryFilterState? State,
+    string DisplayText);
+
 public sealed class RuntimeAlarmItem : ViewModelBase
 {
     private string _source;
@@ -176,6 +188,8 @@ internal sealed class RuntimeAlarmCollectionViewModel : ViewModelBase
     private readonly Action<string> _setOperationStatus;
     private readonly Dictionary<string, RuntimeAlarmItem> _activeAlarms = new(StringComparer.Ordinal);
     private SimulationSnapshot? _latestSnapshot;
+    private IReadOnlyList<RuntimeAlarmHistoryFilterItem> _historyFilters = [];
+    private RuntimeAlarmHistoryFilterState? _selectedHistoryFilterState;
     private ICommand? _acknowledgeAlarmCommand;
     private ICommand? _acknowledgeAllAlarmsCommand;
 
@@ -187,13 +201,27 @@ internal sealed class RuntimeAlarmCollectionViewModel : ViewModelBase
         _isEnabled = isEnabled ?? throw new ArgumentNullException(nameof(isEnabled));
         _sequenceName = sequenceName ?? throw new ArgumentNullException(nameof(sequenceName));
         _setOperationStatus = setOperationStatus ?? throw new ArgumentNullException(nameof(setOperationStatus));
+        RebuildHistoryFilters();
     }
 
     internal ObservableCollection<RuntimeAlarmItem> Alarms { get; } = new();
     internal ObservableCollection<RuntimeAlarmItem> AlarmHistory { get; } = new();
+    internal ObservableCollection<RuntimeAlarmItem> VisibleAlarmHistory { get; } = new();
+    internal IReadOnlyList<RuntimeAlarmHistoryFilterItem> AlarmHistoryFilters => _historyFilters;
+    internal RuntimeAlarmHistoryFilterItem? SelectedAlarmHistoryFilter => _historyFilters.FirstOrDefault(item =>
+        item.State == _selectedHistoryFilterState);
     internal bool HasAlarms => Alarms.Count > 0;
     internal bool HasAlarmHistory => AlarmHistory.Count > 0;
+    internal bool HasVisibleAlarmHistory => VisibleAlarmHistory.Count > 0;
+    internal bool HasAlarmHistoryEmptyState => !HasVisibleAlarmHistory;
     internal int UnacknowledgedAlarmCount => Alarms.Count(item => item.CanAcknowledge);
+
+    internal string AlarmHistoryEmptyText => AlarmHistory.Count == 0
+        ? T("Debugger.NoAlarmHistory", "알람 기록 없음", "No alarm history")
+        : T(
+            "Debugger.NoMatchingAlarmHistory",
+            "선택한 상태의 알람 이력이 없습니다.",
+            "No alarm history matches the selected state.");
 
     internal string AlarmSummaryText => Alarms.Count switch
     {
@@ -219,10 +247,28 @@ internal sealed class RuntimeAlarmCollectionViewModel : ViewModelBase
             T("Debugger.AlarmHistoryCount", "알람 기록 {0}/200건", "Alarm history {0}/200"),
             AlarmHistory.Count);
 
+    internal bool SetHistoryFilter(RuntimeAlarmHistoryFilterState? state)
+    {
+        if (state is not null && !_historyFilters.Any(item => item.State == state))
+        {
+            return false;
+        }
+
+        if (_selectedHistoryFilterState == state)
+        {
+            return false;
+        }
+
+        _selectedHistoryFilterState = state;
+        RebuildVisibleAlarmHistory();
+        return true;
+    }
+
     internal ICommand AcknowledgeAlarmCommand => _acknowledgeAlarmCommand ??= new RelayCommand(
         parameter => AcknowledgeAlarm(parameter as RuntimeAlarmItem),
         parameter => _isEnabled()
             && parameter is RuntimeAlarmItem item
+            && Alarms.Contains(item)
             && item.CanAcknowledge,
         useCommandManagerRequery: false);
 
@@ -233,11 +279,16 @@ internal sealed class RuntimeAlarmCollectionViewModel : ViewModelBase
 
     internal void Reset()
     {
+        _latestSnapshot = null;
         Alarms.Clear();
         _activeAlarms.Clear();
         AlarmHistory.Clear();
+        VisibleAlarmHistory.Clear();
+        _selectedHistoryFilterState = null;
         OnPropertyChanged(nameof(HasAlarms));
         OnPropertyChanged(nameof(HasAlarmHistory));
+        OnPropertyChanged(nameof(SelectedAlarmHistoryFilter));
+        NotifyVisibleHistoryChanged();
         OnPropertyChanged(nameof(AlarmAcknowledgementSummaryText));
         OnPropertyChanged(nameof(AlarmHistorySummaryText));
         InvalidateCommands();
@@ -252,6 +303,9 @@ internal sealed class RuntimeAlarmCollectionViewModel : ViewModelBase
 
     internal void RefreshLocalization()
     {
+        RebuildHistoryFilters();
+        OnPropertyChanged(nameof(AlarmHistoryFilters));
+        OnPropertyChanged(nameof(SelectedAlarmHistoryFilter));
         if (_latestSnapshot is not null)
         {
             RebuildAlarms(_latestSnapshot);
@@ -259,6 +313,7 @@ internal sealed class RuntimeAlarmCollectionViewModel : ViewModelBase
         else
         {
             RefreshAlarmPresentation();
+            RebuildVisibleAlarmHistory();
         }
     }
 
@@ -270,13 +325,14 @@ internal sealed class RuntimeAlarmCollectionViewModel : ViewModelBase
 
     private void AcknowledgeAlarm(RuntimeAlarmItem? alarm)
     {
-        if (!_isEnabled() || alarm is null || !alarm.CanAcknowledge)
+        if (!_isEnabled() || alarm is null || !Alarms.Contains(alarm) || !alarm.CanAcknowledge)
         {
             return;
         }
 
         alarm.Acknowledge();
         RefreshAlarmPresentation(alarm);
+        RebuildVisibleAlarmHistory();
         _setOperationStatus(T(
             "Debugger.AlarmAcknowledgedStatus",
             "알람을 확인 처리했습니다.",
@@ -298,6 +354,8 @@ internal sealed class RuntimeAlarmCollectionViewModel : ViewModelBase
             alarm.Acknowledge();
             RefreshAlarmPresentation(alarm);
         }
+
+        RebuildVisibleAlarmHistory();
 
         if (alarms.Length > 0)
         {
@@ -356,6 +414,7 @@ internal sealed class RuntimeAlarmCollectionViewModel : ViewModelBase
 
         TrimAlarmHistory();
         RefreshAlarmPresentation();
+        RebuildVisibleAlarmHistory();
         OnPropertyChanged(nameof(HasAlarms));
         OnPropertyChanged(nameof(HasAlarmHistory));
         OnPropertyChanged(nameof(AlarmSummaryText));
@@ -506,6 +565,45 @@ internal sealed class RuntimeAlarmCollectionViewModel : ViewModelBase
                 ?? AlarmHistory[^1];
             AlarmHistory.Remove(candidate);
         }
+    }
+
+    private void RebuildHistoryFilters()
+    {
+        _historyFilters =
+        [
+            new(null, T("Debugger.AlarmHistoryFilterAll", "전체 기록", "All history")),
+            new(RuntimeAlarmHistoryFilterState.Active, T("Debugger.AlarmActive")),
+            new(RuntimeAlarmHistoryFilterState.Cleared, T("Debugger.AlarmCleared")),
+            new(RuntimeAlarmHistoryFilterState.Acknowledged, T("Debugger.AlarmAcknowledged")),
+            new(RuntimeAlarmHistoryFilterState.Unacknowledged, T("Debugger.AlarmUnacknowledged"))
+        ];
+    }
+
+    private void RebuildVisibleAlarmHistory()
+    {
+        VisibleAlarmHistory.Clear();
+        foreach (var alarm in AlarmHistory.Where(MatchesSelectedHistoryFilter))
+        {
+            VisibleAlarmHistory.Add(alarm);
+        }
+
+        NotifyVisibleHistoryChanged();
+    }
+
+    private bool MatchesSelectedHistoryFilter(RuntimeAlarmItem alarm) => _selectedHistoryFilterState switch
+    {
+        RuntimeAlarmHistoryFilterState.Active => alarm.IsActive,
+        RuntimeAlarmHistoryFilterState.Cleared => !alarm.IsActive,
+        RuntimeAlarmHistoryFilterState.Acknowledged => alarm.IsAcknowledged,
+        RuntimeAlarmHistoryFilterState.Unacknowledged => !alarm.IsAcknowledged,
+        _ => true
+    };
+
+    private void NotifyVisibleHistoryChanged()
+    {
+        OnPropertyChanged(nameof(HasVisibleAlarmHistory));
+        OnPropertyChanged(nameof(HasAlarmHistoryEmptyState));
+        OnPropertyChanged(nameof(AlarmHistoryEmptyText));
     }
 
     private static string FormatAlarmTime(TimeSpan time) =>

@@ -7,6 +7,7 @@ public enum VirtualCameraState
     Idle,
     Exposing,
     Transferring,
+    AwaitingExternalResult,
     FrameReady,
     Faulted
 }
@@ -72,6 +73,77 @@ public sealed record VirtualCameraConfiguration
     public int ExposureTicks { get; }
     public int TransferTicks { get; }
     public PlaceholderInspectionDecision PlaceholderDecision { get; }
+}
+
+/// <summary>
+/// Immutable, preflighted source metadata for an automatic external
+/// inspection. File access and hashing happen before a run starts; the
+/// fixed-step runtime only uses this value to attach deterministic evidence.
+/// </summary>
+public sealed record VirtualCameraExternalSource
+{
+    public VirtualCameraExternalSource(
+        string sourceRelativePath,
+        string contentSha256,
+        long contentLength,
+        int width,
+        int height,
+        string pixelFormat)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceRelativePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(pixelFormat);
+        if (Path.IsPathRooted(sourceRelativePath)
+            || sourceRelativePath.Split(['/', '\\']).Any(segment => segment == ".."))
+        {
+            throw new ArgumentException(
+                "The external source must be a project-relative path without parent traversal.",
+                nameof(sourceRelativePath));
+        }
+        if (string.IsNullOrWhiteSpace(contentSha256)
+            || contentSha256.Length != 64
+            || contentSha256.Any(character => !Uri.IsHexDigit(character)))
+        {
+            throw new ArgumentException(
+                "Content SHA-256 must contain exactly 64 hexadecimal characters.",
+                nameof(contentSha256));
+        }
+        if (contentLength <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(contentLength));
+        }
+        if (width <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(width));
+        }
+        if (height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(height));
+        }
+
+        SourceRelativePath = sourceRelativePath;
+        ContentSha256 = contentSha256.ToUpperInvariant();
+        ContentLength = contentLength;
+        Width = width;
+        Height = height;
+        PixelFormat = pixelFormat;
+    }
+
+    public string SourceRelativePath { get; }
+    public string ContentSha256 { get; }
+    public long ContentLength { get; }
+    public int Width { get; }
+    public int Height { get; }
+    public string PixelFormat { get; }
+
+    public VirtualCameraFrameEvidence CreateEvidence(string frameId) =>
+        new(
+            frameId,
+            SourceRelativePath,
+            ContentSha256,
+            ContentLength,
+            Width,
+            Height,
+            PixelFormat);
 }
 
 public sealed record VirtualCameraFrameEvidence
@@ -237,7 +309,8 @@ public sealed record VirtualCameraAcquisitionResult(
     long AcquisitionOrdinal,
     PlaceholderInspectionDecision Decision,
     VirtualCameraFrameEvidence? FrameEvidence = null,
-    VirtualCameraInspectionEvidence? InspectionEvidence = null);
+    VirtualCameraInspectionEvidence? InspectionEvidence = null,
+    VirtualCameraExternalResultEvidence? ExternalResultEvidence = null);
 
 public sealed record VirtualCameraSnapshot(
     string Id,
@@ -249,7 +322,8 @@ public sealed record VirtualCameraSnapshot(
     int ExposureTicksRemaining,
     int TransferTicksRemaining,
     VirtualCameraAcquisitionResult? Result,
-    VirtualCameraFrameEvidence? FrameEvidence = null);
+    VirtualCameraFrameEvidence? FrameEvidence = null,
+    VirtualCameraExternalResultEvidence? ExternalResultEvidence = null);
 
 public sealed record VirtualCameraTriggerResult(
     bool IsAccepted,
@@ -276,6 +350,7 @@ public enum VirtualCameraTickTransition
 {
     None,
     ExposureCompleted,
+    ExternalResultPending,
     FrameReady
 }
 

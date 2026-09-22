@@ -233,6 +233,7 @@ internal sealed class UnifiedCommissioningEvidenceViewModel : ViewModelBase
     {
         _latestEvidence = null;
         _artifactState = ArtifactState.None;
+        RaiseChanged();
     }
 
     private bool IsForCurrentContext(DeterministicUnifiedCommissioningEvidencePackage package)

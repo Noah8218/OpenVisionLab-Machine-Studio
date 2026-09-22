@@ -21,6 +21,8 @@ internal sealed class SimulationScenarioExecutionCoordinator : IDisposable
     private readonly Action<bool> _setRunning;
     private readonly Action<string> _setStatus;
     private readonly Action<string, string> _log;
+    private int _operationGeneration;
+    private int _operationActive;
     private int _disposed;
     private bool _ownsRun;
 
@@ -47,7 +49,9 @@ internal sealed class SimulationScenarioExecutionCoordinator : IDisposable
 
     internal bool OwnsRun => !IsDisposed && _ownsRun;
 
-    internal async Task StartAsync()
+    internal Task StartAsync() => ExecuteExclusiveAsync(StartCoreAsync);
+
+    private async Task StartCoreAsync()
     {
         if (IsDisposed)
         {
@@ -60,10 +64,12 @@ internal sealed class SimulationScenarioExecutionCoordinator : IDisposable
             return;
         }
 
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
         var result = await _workflow.StartAsync(
             profile,
             _getProject().Simulation.AutomaticRun is not null);
-        if (IsDisposed)
+        if (IsDisposed
+            || operationGeneration != Volatile.Read(ref _operationGeneration))
         {
             return;
         }
@@ -77,7 +83,9 @@ internal sealed class SimulationScenarioExecutionCoordinator : IDisposable
         ApplySuccess(result, replay: false);
     }
 
-    internal async Task StopAsync()
+    internal Task StopAsync() => ExecuteExclusiveAsync(StopCoreAsync);
+
+    private async Task StopCoreAsync()
     {
         if (IsDisposed)
         {
@@ -85,8 +93,10 @@ internal sealed class SimulationScenarioExecutionCoordinator : IDisposable
         }
 
         var wasOwned = _ownsRun;
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
         var result = await _workflow.StopAsync(wasOwned);
-        if (IsDisposed)
+        if (IsDisposed
+            || operationGeneration != Volatile.Read(ref _operationGeneration))
         {
             return;
         }
@@ -111,7 +121,9 @@ internal sealed class SimulationScenarioExecutionCoordinator : IDisposable
         _log("Scenario", $"Test scenario stopped · {ShortCommandId(result.StopResult.CommandId)}");
     }
 
-    internal async Task ReplayAsync()
+    internal Task ReplayAsync() => ExecuteExclusiveAsync(ReplayCoreAsync);
+
+    private async Task ReplayCoreAsync()
     {
         if (IsDisposed)
         {
@@ -124,10 +136,12 @@ internal sealed class SimulationScenarioExecutionCoordinator : IDisposable
             return;
         }
 
+        var operationGeneration = Volatile.Read(ref _operationGeneration);
         var result = await _workflow.ReplayAsync(
             profile,
             _getProject().Simulation.AutomaticRun is not null);
-        if (IsDisposed)
+        if (IsDisposed
+            || operationGeneration != Volatile.Read(ref _operationGeneration))
         {
             return;
         }
@@ -162,6 +176,37 @@ internal sealed class SimulationScenarioExecutionCoordinator : IDisposable
         }
 
         return _workspace.BuildEngineProfile(targetId);
+    }
+
+    internal void InvalidatePendingExecution()
+    {
+        if (!IsDisposed)
+        {
+            Interlocked.Increment(ref _operationGeneration);
+        }
+    }
+
+    private async Task ExecuteExclusiveAsync(Func<Task> operation)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        if (Interlocked.CompareExchange(ref _operationActive, 1, 0) != 0)
+        {
+            _log("Scenario", "Scenario operation ignored because another operation is already in progress.");
+            return;
+        }
+
+        try
+        {
+            await operation();
+        }
+        finally
+        {
+            Volatile.Write(ref _operationActive, 0);
+        }
     }
 
     private void ApplySuccess(SimulationScenarioResult result, bool replay)
@@ -263,6 +308,7 @@ internal sealed class SimulationScenarioExecutionCoordinator : IDisposable
             return;
         }
 
+        Interlocked.Increment(ref _operationGeneration);
         _ownsRun = false;
     }
 

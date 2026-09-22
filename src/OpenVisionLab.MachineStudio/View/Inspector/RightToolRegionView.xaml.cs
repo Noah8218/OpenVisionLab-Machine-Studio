@@ -1,6 +1,4 @@
-using System.Windows;
 using System.Windows.Controls;
-using OpenVisionLab.MachineStudio.ViewModel;
 
 namespace OpenVisionLab.MachineStudio.View.Inspector;
 
@@ -10,18 +8,6 @@ public partial class RightToolRegionView : UserControl
     {
         InitializeComponent();
     }
-
-    private void OnIntegrationTcpSharedKeyPasswordChanged(object sender, RoutedEventArgs e)
-    {
-        if (sender is PasswordBox passwordBox
-            && DataContext is MainViewModel viewModel)
-        {
-            viewModel.Integration.SetSessionSharedKey(passwordBox.Password);
-        }
-    }
-
-    private void OnResetIntegrationSetupClicked(object sender, RoutedEventArgs e) =>
-        IntegrationTcpSharedKeyBox.Clear();
 
     public StackPanel AxisCommissioningPanel =>
         AxisCommissioningContent.AxisCommissioningPanelControl;
@@ -45,6 +31,8 @@ public partial class RightToolRegionView : UserControl
     public Button JogPositiveButton => AxisCommissioningContent.JogPositiveButtonControl;
 
     public TextBox IntegrationTcpListenAddressTextBoxControl => IntegrationTcpListenAddressTextBox;
+
+    public TextBlock IntegrationSetupWorkflowStatusTextBlockControl => IntegrationSetupWorkflowStatusTextBlock;
     public TextBox IntegrationTcpListenPortTextBoxControl => IntegrationTcpListenPortTextBox;
     public TextBox IntegrationTcpPeerHostTextBoxControl => IntegrationTcpPeerHostTextBox;
     public TextBox IntegrationTcpPeerPortTextBoxControl => IntegrationTcpPeerPortTextBox;
@@ -56,4 +44,18 @@ public partial class RightToolRegionView : UserControl
     public Button PullIntegrationTcpTransactionButtonControl => PullIntegrationTcpTransactionButton;
     public TextBlock IntegrationTcpListenerStatusTextBlockControl => IntegrationTcpListenerStatusTextBlock;
     public TextBlock IntegrationTcpTransferStatusTextBlockControl => IntegrationTcpTransferStatusTextBlock;
+    public CheckBox IntegrationWaitForExternalResultCheckBoxControl => IntegrationWaitForExternalResultCheckBox;
+    public Expander MmiRecipeManagerExpanderControl => MmiRecipeManagerExpander;
+    public ListBox MmiRecipeListControl => MmiRecipeList;
+    public Button AddMmiRecipeButtonControl => AddMmiRecipeButton;
+    public Button RemoveMmiRecipeButtonControl => RemoveMmiRecipeButton;
+    public Button ApplyIntegrationResultToSimulationButtonControl => ApplyIntegrationResultToSimulationButton;
+    public Expander MachineIntegrationTransactionHistoryExpanderControl => MachineIntegrationTransactionHistoryExpander;
+    public ComboBox MachineIntegrationTransactionHistoryFilterControl => MachineIntegrationTransactionHistoryFilter;
+    public TextBlock MachineIntegrationTransactionHistoryEmptyTextBlockControl => MachineIntegrationTransactionHistoryEmptyText;
+    public ListBox MachineIntegrationTransactionHistoryListControl => MachineIntegrationTransactionHistoryList;
+    public Expander MachineIntegrationTransactionDiagnosticsExpanderControl => MachineIntegrationTransactionDiagnosticsExpander;
+    public ComboBox MachineIntegrationTransactionDiagnosticsFilterControl => MachineIntegrationTransactionDiagnosticsFilter;
+    public TextBlock MachineIntegrationTransactionDiagnosticsEmptyTextBlockControl => MachineIntegrationTransactionDiagnosticsEmptyText;
+    public ListBox MachineIntegrationTransactionDiagnosticsListControl => MachineIntegrationTransactionDiagnosticsList;
 }

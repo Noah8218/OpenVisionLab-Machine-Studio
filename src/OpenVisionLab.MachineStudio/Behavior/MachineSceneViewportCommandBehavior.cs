@@ -93,7 +93,7 @@ public sealed class MachineSceneViewportCommandBehavior : Behavior<MachineSceneV
 
         Execute(
             MoveRequestedCommand,
-            new SceneMoveRequest(action, args.Delta));
+            new SceneMoveRequest(action, (args.Delta.X, args.Delta.Y)));
     }
 
     private void OnMarqueeSelectionRequested(
@@ -124,7 +124,7 @@ public sealed class MachineSceneViewportCommandBehavior : Behavior<MachineSceneV
             new SceneTransformRequest(
                 action,
                 args.Handle,
-                args.WorldPoint,
+                (args.WorldPoint.X, args.WorldPoint.Y),
                 args.Modifiers.HasFlag(ModifierKeys.Shift)));
     }
 
@@ -133,7 +133,7 @@ public sealed class MachineSceneViewportCommandBehavior : Behavior<MachineSceneV
         MachineSceneLibraryComponentDropRequestedEventArgs args) =>
         Execute(
             LibraryComponentDropRequestedCommand,
-            new SceneLibraryComponentDropRequest(args.Kind, args.WorldPoint));
+            new SceneLibraryComponentDropRequest(args.Kind, (args.WorldPoint.X, args.WorldPoint.Y)));
 
     private static DependencyProperty RegisterCommand(string name) =>
         DependencyProperty.Register(

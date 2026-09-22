@@ -36,6 +36,11 @@ public sealed record SimulationEventJournalExportPackage(
 
     public bool HasValidJournalHash()
     {
+        if (SchemaVersion != CurrentSchemaVersion)
+        {
+            return false;
+        }
+
         var events = Events.IsDefault
             ? ImmutableArray<SimulationEvent>.Empty
             : Events;
@@ -181,6 +186,7 @@ public sealed record SimulationEventJournalExportPackage(
             return false;
         }
 
+        long lastStoredEventIndex = 0;
         if (journal.StoredEventCount == 0)
         {
             if (journal.FirstEventIndex != 0 || journal.LastEventIndex != 0)
@@ -190,12 +196,20 @@ public sealed record SimulationEventJournalExportPackage(
             }
         }
         else if (journal.FirstEventIndex <= 0
-            || journal.LastEventIndex < journal.FirstEventIndex
-            || journal.LastEventIndex - journal.FirstEventIndex + 1
-                != journal.StoredEventCount)
+            || journal.FirstEventIndex > long.MaxValue - journal.StoredEventCount + 1)
         {
-            error = "Journal first, last, and stored indexes are inconsistent.";
+            error = "Journal first and stored indexes are inconsistent.";
             return false;
+        }
+        else
+        {
+            lastStoredEventIndex = journal.FirstEventIndex + journal.StoredEventCount - 1;
+            if (journal.LastEventIndex < lastStoredEventIndex
+                || journal.LastEventIndex != journal.TotalEventCount)
+            {
+                error = "Journal last and total indexes are inconsistent.";
+                return false;
+            }
         }
 
         if (journal.IsComplete != (journal.IsCompleted && journal.FirstMissingEventIndex is null))
@@ -208,7 +222,8 @@ public sealed record SimulationEventJournalExportPackage(
         {
             if (journal.StoredEventCount != journal.Capacity
                 || journal.StoredEventCount == 0
-                || firstMissingEventIndex != journal.LastEventIndex + 1
+                || lastStoredEventIndex == long.MaxValue
+                || firstMissingEventIndex != lastStoredEventIndex + 1
                 || firstMissingEventIndex > journal.TotalEventCount)
             {
                 error = "Journal overflow watermark is inconsistent.";

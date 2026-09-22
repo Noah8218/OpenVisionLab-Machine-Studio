@@ -4,6 +4,7 @@ namespace OpenVisionLab.Machine.Simulation.Events;
 
 internal sealed class SimulationEventPublisher : IDisposable
 {
+    private readonly object _gate = new();
     private readonly Channel<SimulationEvent> _channel;
     private readonly SimulationEventJournal _journal;
 
@@ -42,21 +43,31 @@ internal sealed class SimulationEventPublisher : IDisposable
         string message,
         string? commandId = null)
     {
-        var runtimeEvent = _journal.TryAppend(
-            tickIndex,
-            simulationTime,
-            category,
-            code,
-            message,
-            commandId);
-        return runtimeEvent is not null && _channel.Writer.TryWrite(runtimeEvent);
+        lock (_gate)
+        {
+            var runtimeEvent = _journal.TryAppend(
+                tickIndex,
+                simulationTime,
+                category,
+                code,
+                message,
+                commandId);
+            return runtimeEvent is not null && _channel.Writer.TryWrite(runtimeEvent);
+        }
     }
 
     internal void Complete()
     {
-        _journal.Complete();
-        _channel.Writer.TryComplete();
+        lock (_gate)
+        {
+            _journal.Complete();
+            _channel.Writer.TryComplete();
+        }
     }
 
-    public void Dispose() => _journal.Dispose();
+    public void Dispose()
+    {
+        Complete();
+        _journal.Dispose();
+    }
 }

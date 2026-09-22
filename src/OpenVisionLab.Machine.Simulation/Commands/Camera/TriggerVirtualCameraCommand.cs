@@ -10,7 +10,8 @@ public sealed class TriggerVirtualCameraCommand : SimulationCommand
         VirtualCameraFrameEvidence frameEvidence,
         VirtualCameraInspectionEvidence? inspectionEvidence = null,
         string? projectId = null,
-        long? runtimeGeneration = null)
+        long? runtimeGeneration = null,
+        bool waitForExternalResult = false)
     {
         if ((string.IsNullOrWhiteSpace(projectId)) != !runtimeGeneration.HasValue)
         {
@@ -25,6 +26,7 @@ public sealed class TriggerVirtualCameraCommand : SimulationCommand
         InspectionEvidence = inspectionEvidence;
         ProjectId = string.IsNullOrWhiteSpace(projectId) ? null : projectId;
         RuntimeGeneration = runtimeGeneration;
+        WaitForExternalResult = waitForExternalResult;
     }
 
     public string CameraId { get; }
@@ -33,5 +35,6 @@ public sealed class TriggerVirtualCameraCommand : SimulationCommand
     public VirtualCameraInspectionEvidence? InspectionEvidence { get; }
     public string? ProjectId { get; }
     public long? RuntimeGeneration { get; }
+    public bool WaitForExternalResult { get; }
     public bool HasRuntimeIdentity => ProjectId is not null && RuntimeGeneration.HasValue;
 }

@@ -190,6 +190,15 @@ public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
                 token),
             cancellationToken);
 
+    public Task<TcpIntegrationCancellationReceipt> CancelTransactionAsync(
+        TcpIntegrationEndpoint peer,
+        IntegrationCancelRequestV2 request,
+        CancellationToken cancellationToken = default) =>
+        ExecuteCancellationClientAsync(
+            peer,
+            request,
+            cancellationToken);
+
     public IReadOnlyList<MachineIntegrationTransactionSummary> DiscoverTransactions()
     {
         ThrowIfDisposed();
@@ -279,6 +288,23 @@ public sealed class MachineIntegrationTcpExchange : IAsyncDisposable
             _sharedKey,
             _options);
         return await operation(client, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<TcpIntegrationCancellationReceipt> ExecuteCancellationClientAsync(
+        TcpIntegrationEndpoint peer,
+        IntegrationCancelRequestV2 request,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(peer);
+        ArgumentNullException.ThrowIfNull(request);
+        using var client = new TcpIntegrationClient(
+            IntegrationApplicationIds.MachineStudio,
+            peer,
+            _sharedKey,
+            _options);
+        return await client.CancelTransactionAsync(request, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private void OnRequestCompleted(TcpIntegrationTransferReceipt receipt)

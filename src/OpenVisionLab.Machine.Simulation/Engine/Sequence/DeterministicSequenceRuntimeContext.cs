@@ -17,6 +17,8 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
     private readonly Action<string, string, string, long, TimeSpan> _emit;
     private readonly long _eventTick;
     private readonly TimeSpan _eventTime;
+    private readonly bool _waitForExternalResult;
+    private readonly IReadOnlyDictionary<string, VirtualCameraExternalSource> _externalSources;
 
     public DeterministicSequenceRuntimeContext(
         DeterministicSignalHub signalHub,
@@ -24,7 +26,9 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
         IReadOnlyList<DeterministicVirtualCamera> cameras,
         long eventTick,
         TimeSpan eventTime,
-        Action<string, string, string, long, TimeSpan> emit)
+        Action<string, string, string, long, TimeSpan> emit,
+        bool waitForExternalResult = false,
+        IReadOnlyDictionary<string, VirtualCameraExternalSource>? externalSources = null)
     {
         _signalHub = signalHub;
         _axes = axes;
@@ -32,6 +36,9 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
         _eventTick = eventTick;
         _eventTime = eventTime;
         _emit = emit;
+        _waitForExternalResult = waitForExternalResult;
+        _externalSources = externalSources
+            ?? new Dictionary<string, VirtualCameraExternalSource>(StringComparer.Ordinal);
     }
 
     public SequenceSignalReadResult ReadSignal(string signalId)
@@ -131,7 +138,24 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
                 $"Virtual camera '{cameraId}' was not found.");
         }
 
-        var trigger = camera.Trigger(recipeId);
+        VirtualCameraFrameEvidence? frameEvidence = null;
+        if (_waitForExternalResult)
+        {
+            if (!_externalSources.TryGetValue(cameraId, out var source))
+            {
+                return SequenceCameraTriggerResult.Failure(
+                    SequenceContextErrorCode.Unavailable,
+                    $"No preflighted external source is armed for virtual camera '{cameraId}'.");
+            }
+
+            frameEvidence = source.CreateEvidence(camera.CreateNextAcquisitionId());
+        }
+
+        var trigger = camera.Trigger(
+            recipeId,
+            frameEvidence,
+            inspectionEvidence: null,
+            waitForExternalResult: _waitForExternalResult);
         if (!trigger.IsAccepted || string.IsNullOrWhiteSpace(trigger.AcquisitionId))
         {
             var contextCode = trigger.ErrorCode switch
@@ -184,6 +208,8 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
             VirtualCameraState.Idle =>
                 SequenceVisionResultReadResult.Success(SequenceVisionResultState.NotTriggered),
             VirtualCameraState.Exposing or VirtualCameraState.Transferring =>
+                SequenceVisionResultReadResult.Success(SequenceVisionResultState.Pending),
+            VirtualCameraState.AwaitingExternalResult =>
                 SequenceVisionResultReadResult.Success(SequenceVisionResultState.Pending),
             VirtualCameraState.Faulted =>
                 SequenceVisionResultReadResult.Success(SequenceVisionResultState.Faulted),

@@ -30,6 +30,7 @@ public sealed class ManualEquipmentCommissioningViewModel : ViewModelBase, IDisp
     private readonly Func<SimulationSnapshot?, ManualEquipmentProjection> _projectionFactory;
     private readonly ManualEquipmentPresentation _presentation = new();
     private readonly ManualControlCommandWorkflow _commandWorkflow;
+    private ManualEquipmentProjection? _lastProjection;
     private bool _sessionCloseRequested;
     private bool _disposed;
 
@@ -41,13 +42,15 @@ public sealed class ManualEquipmentCommissioningViewModel : ViewModelBase, IDisp
         Action<Exception> handleCommandException)
     {
         ArgumentNullException.ThrowIfNull(handleCommandException);
+        var controlStartedCallback = markManualControlStarted
+            ?? throw new ArgumentNullException(nameof(markManualControlStarted));
         _projectionFactory = projectionFactory
             ?? throw new ArgumentNullException(nameof(projectionFactory));
         _commandWorkflow = new(
             dispatcher ?? throw new ArgumentNullException(nameof(dispatcher)),
             _presentation,
             selectedComponentKind ?? throw new ArgumentNullException(nameof(selectedComponentKind)),
-            markManualControlStarted ?? throw new ArgumentNullException(nameof(markManualControlStarted)));
+            () => MarkManualControlStarted(controlStartedCallback));
 
         StartManualEquipmentControlCommand = CreateCommand(
             _commandWorkflow.StartEquipmentControlAsync,
@@ -137,8 +140,17 @@ public sealed class ManualEquipmentCommissioningViewModel : ViewModelBase, IDisp
             return;
         }
 
+        var isModeOnlyChange = IsModeOnlyChange(_lastProjection, projection);
+        _lastProjection = projection;
         _presentation.ApplyProjection(projection);
-        RaisePresentationChanged();
+        if (isModeOnlyChange)
+        {
+            RaiseModePresentationChanged();
+        }
+        else
+        {
+            RaisePresentationChanged();
+        }
         if (invalidateCommands)
         {
             InvalidateCommands();
@@ -150,7 +162,15 @@ public sealed class ManualEquipmentCommissioningViewModel : ViewModelBase, IDisp
         bool invalidateCommands = true) =>
         ApplyProjection(_projectionFactory(snapshot), invalidateCommands);
 
-    internal void RefreshLocalization() => RaisePresentationChanged();
+    internal void RefreshLocalization()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        RaisePresentationChanged();
+    }
 
     internal void SetSessionCloseAdmission(bool isRequested)
     {
@@ -192,12 +212,56 @@ public sealed class ManualEquipmentCommissioningViewModel : ViewModelBase, IDisp
     private bool CanExecute(bool presentationGate) =>
         IsReady && !_sessionCloseRequested && presentationGate;
 
+    private void MarkManualControlStarted(Action callback)
+    {
+        if (_disposed || _sessionCloseRequested)
+        {
+            return;
+        }
+
+        callback();
+    }
+
     private void RaisePresentationChanged()
     {
         foreach (var propertyName in PresentationPropertyNames)
         {
             OnPropertyChanged(propertyName);
         }
+    }
+
+    private void RaiseModePresentationChanged()
+    {
+        OnPropertyChanged(nameof(CanStartManualEquipmentControl));
+        switch (_lastProjection?.SelectedComponentKind)
+        {
+            case LayoutComponentKind.DigitalSensor:
+                OnPropertyChanged(nameof(CanForceSensorOn));
+                OnPropertyChanged(nameof(CanForceSensorOff));
+                OnPropertyChanged(nameof(CanClearSensorForce));
+                break;
+            case LayoutComponentKind.PneumaticCylinder:
+                OnPropertyChanged(nameof(CanExtendCylinder));
+                OnPropertyChanged(nameof(CanRetractCylinder));
+                break;
+            case LayoutComponentKind.Conveyor:
+                OnPropertyChanged(nameof(CanRunConveyorForward));
+                OnPropertyChanged(nameof(CanRunConveyorReverse));
+                OnPropertyChanged(nameof(CanStopConveyor));
+                break;
+        }
+    }
+
+    private static bool IsModeOnlyChange(
+        ManualEquipmentProjection? previous,
+        ManualEquipmentProjection current)
+    {
+        if (previous is null || previous.IsRunMode == current.IsRunMode)
+        {
+            return false;
+        }
+
+        return (previous with { IsRunMode = current.IsRunMode }) == current;
     }
 
     private static AsyncRelayCommand CreateCommand(

@@ -61,14 +61,110 @@ public sealed class CameraCommissioningViewModelTests
         Assert.False(viewModel.CanTriggerCamera);
     }
 
+    [Fact]
+    public void ModeOnlyProjectionRefreshRaisesOnlyCameraCommandGates()
+    {
+        OpenVisionLanguageService.Load();
+        var project = CreateProject();
+        var projection = CreateProjection();
+        using var viewModel = CreateViewModel(project, projection, () => projection);
+        viewModel.LoadProject(project, null);
+        var changedProperties = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        projection = projection with { IsRunMode = false };
+        viewModel.RefreshProjection(invalidateCommands: false);
+
+        Assert.Contains(nameof(CameraCommissioningViewModel.CanStartManualCameraControl), changedProperties);
+        Assert.Contains(nameof(CameraCommissioningViewModel.CanTriggerCamera), changedProperties);
+        Assert.DoesNotContain(nameof(CameraCommissioningViewModel.CurrentCameraName), changedProperties);
+        Assert.DoesNotContain(nameof(CameraCommissioningViewModel.CurrentCameraSourceText), changedProperties);
+    }
+
+    [Fact]
+    public void DisposeClosesImageSourceEditorAdmission()
+    {
+        var root = Path.Combine(
+            @"D:\OpenVisionLab-TestData\Machine\p2-camera-source-editor-disposal-admission-20260911",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "images"));
+        var projectPath = Path.Combine(root, "machine.ovmachine");
+        var imagePath = Path.Combine(root, "images", "inspection.png");
+        File.WriteAllText(projectPath, string.Empty);
+        File.WriteAllBytes(imagePath, [1, 2, 3]);
+
+        try
+        {
+            var project = CreateProject();
+            using var viewModel = CreateViewModel(project, CreateProjection());
+            viewModel.LoadProject(project, projectPath);
+            var editor = viewModel.ImageSourceEditor;
+            editor.PathText = "images/inspection.png";
+            editor.PixelFormatText = "Mono8";
+
+            Assert.True(editor.ApplyCommand.CanExecute(null));
+
+            viewModel.Dispose();
+
+            Assert.False(editor.ApplyCommand.CanExecute(null));
+            editor.ApplyCommand.Execute(null);
+            Assert.Null(project.Devices.Single(device => device.Id == "camera-1").Camera?.SingleImageSource);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void DisposeRejectsCameraSelectionChanges()
+    {
+        OpenVisionLanguageService.Load();
+        var project = CreateProject();
+        using var viewModel = CreateViewModel(project, CreateProjection());
+        viewModel.LoadProject(project, null);
+
+        Assert.Equal("camera-1", viewModel.SelectedCameraId);
+        Assert.Equal("alpha", viewModel.SelectedCameraRecipe);
+
+        viewModel.Dispose();
+
+        viewModel.SelectedCameraId = "camera-2";
+        viewModel.SelectedCameraRecipe = "zeta";
+
+        Assert.Equal("camera-1", viewModel.SelectedCameraId);
+        Assert.Equal("alpha", viewModel.SelectedCameraRecipe);
+    }
+
+    [Fact]
+    public void DisposeRejectsDirectLocalizationRefresh()
+    {
+        OpenVisionLanguageService.Load();
+        var project = CreateProject();
+        using var viewModel = CreateViewModel(project, CreateProjection());
+        var changedProperties = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        viewModel.Dispose();
+        changedProperties.Clear();
+
+        viewModel.RefreshLocalization();
+
+        Assert.Empty(changedProperties);
+    }
+
     private static CameraCommissioningViewModel CreateViewModel(
         MachineProjectDocument project,
-        CameraCommissioningProjection projection)
+        CameraCommissioningProjection projection,
+        Func<CameraCommissioningProjection>? projectionAccessor = null)
     {
         var snapshot = CreateSnapshot();
         return new(
             () => project,
-            () => projection,
+            projectionAccessor ?? (() => projection),
             () => new VisionEvidenceContext(
                 project.Id,
                 "{}",
@@ -136,6 +232,7 @@ public sealed class CameraCommissioningViewModelTests
         },
         ProjectPath: @"D:\OpenVisionLab-TestData\Machine\camera-commissioning-workspace\machine.ovmachine",
         SelectedCameraRecipe: "alpha",
+        SimulationFixedStep: TimeSpan.FromMilliseconds(5),
         RuntimeRunMode: SimulationRunMode.Paused,
         IsRunMode: true,
         IsApplyingProject: false,

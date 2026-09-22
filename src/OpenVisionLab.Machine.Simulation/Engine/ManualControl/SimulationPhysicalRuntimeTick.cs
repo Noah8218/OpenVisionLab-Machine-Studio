@@ -141,6 +141,14 @@ internal sealed class SimulationPhysicalRuntimeTick
                           $"{acquisition.Decision.ToString().ToUpperInvariant()}.",
                     context);
             }
+            else if (cameraTick.Transition == VirtualCameraTickTransition.ExternalResultPending)
+            {
+                Emit(
+                    "Camera",
+                    "CameraExternalResultPending",
+                    $"{camera.Id} frame {cameraTick.Snapshot.CurrentAcquisitionId} transferred and is waiting for an external Result.",
+                    context);
+            }
         }
     }
 

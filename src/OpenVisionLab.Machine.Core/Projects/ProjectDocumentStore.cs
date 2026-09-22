@@ -37,8 +37,23 @@ public sealed class ProjectDocumentStore
         return root.ToJsonString(Options);
     }
 
+    /// <summary>
+    /// Creates the saved-evidence payload from the same normalized projection
+    /// that is written to disk, without mutating the live document.
+    /// </summary>
+    public string SerializeForSaveEvidence(MachineProjectDocument document)
+    {
+        var root = JsonNode.Parse(
+                SerializeForSave(document, DateTimeOffset.UnixEpoch))?.AsObject()
+            ?? throw new InvalidOperationException("Failed to serialize saved project evidence.");
+        root.Remove("modifiedAt");
+        return root.ToJsonString(Options);
+    }
+
     public MachineProjectDocument Load(string json)
     {
+        ArgumentNullException.ThrowIfNull(json);
+        json = json.TrimStart('\uFEFF');
         var doc = JsonSerializer.Deserialize<MachineProjectDocument>(json, Options)
                   ?? throw new ProjectDocumentLoadException(
                       ProjectDocumentLoadErrorCode.EmptyDocument,

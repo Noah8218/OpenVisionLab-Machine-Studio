@@ -49,4 +49,29 @@ public sealed class MachineLayoutViewModelTests
         Assert.Throws<ObjectDisposedException>(() => layout.Load(project));
         layout.Dispose();
     }
+
+    [Fact]
+    public void DisposeRejectsDirectLocalizationRefresh()
+    {
+        var definition = new MachineLayoutDefinition
+        {
+            Id = "main-cell",
+            Name = "Main Cell"
+        };
+        var project = new MachineProjectDocument();
+        project.Layouts.Add(definition);
+        project.Simulation.ActiveLayoutId = definition.Id;
+
+        using var layout = new MachineLayoutViewModel();
+        layout.Load(project);
+        var changedProperties = new List<string?>();
+        layout.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        layout.Dispose();
+        changedProperties.Clear();
+
+        layout.RefreshLocalization();
+
+        Assert.Empty(changedProperties);
+    }
 }

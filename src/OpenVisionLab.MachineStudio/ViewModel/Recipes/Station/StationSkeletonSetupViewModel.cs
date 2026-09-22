@@ -33,6 +33,7 @@ public sealed class StationSkeletonSetupViewModel : ViewModelBase
     private string _processSensorPositionText = string.Empty;
     private string _cylinderTravelTimeText = string.Empty;
     private bool _stationSetupWasInvalid;
+    private int _disposed;
 
     public StationSkeletonSetupViewModel(
         Func<SemiconductorStationSetupDefinition, int> applyStationSkeleton,
@@ -40,16 +41,19 @@ public sealed class StationSkeletonSetupViewModel : ViewModelBase
     {
         _applyStationSkeleton = applyStationSkeleton;
         _clearCompetingPreviews = clearCompetingPreviews;
-        _previewCommand = new RelayCommand(_ => Preview(), _ => IsEditable);
+        _previewCommand = new RelayCommand(_ => Preview(), _ => !IsDisposed && IsEditable);
         _applyCommand = new RelayCommand(
             _ => Apply(),
-            ignored => IsEditable
+            ignored => !IsDisposed
+                       && IsEditable
                        && _stationSkeletonPreview is { UnavailableCount: 0 }
                        && TryCreateStationSetup(out _));
-        _cancelCommand = new RelayCommand(_ => ClearPreview(), _ => IsStationSkeletonPreviewVisible);
+        _cancelCommand = new RelayCommand(
+            _ => ClearPreview(),
+            _ => !IsDisposed && IsStationSkeletonPreviewVisible);
         _resetCommand = new RelayCommand(
             _ => Reset(),
-            _ => IsEditable && IsStationSkeletonPreviewVisible);
+            _ => !IsDisposed && IsEditable && IsStationSkeletonPreviewVisible);
     }
 
     public ObservableCollection<SemiconductorStationSkeletonItemPresentation> StationSkeletonItems { get; } = new();
@@ -150,15 +154,27 @@ public sealed class StationSkeletonSetupViewModel : ViewModelBase
 
     public void Load(MachineProjectDocument project)
     {
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
         _project = project ?? throw new ArgumentNullException(nameof(project));
         ClearPreview();
         RaiseCommandStates();
     }
 
-    public void ClearPreviewForCompetingSetup() => ClearPreview();
+    public void ClearPreviewForCompetingSetup()
+    {
+        if (!IsDisposed)
+        {
+            ClearPreview();
+        }
+    }
 
     internal void RefreshLocalization(Action reloadWorkbench)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var draft = IsStationSkeletonPreviewVisible
             ? new[]
             {
@@ -221,7 +237,7 @@ public sealed class StationSkeletonSetupViewModel : ViewModelBase
 
     private void Preview()
     {
-        if (_project is null)
+        if (IsDisposed || _project is null)
         {
             return;
         }
@@ -242,7 +258,8 @@ public sealed class StationSkeletonSetupViewModel : ViewModelBase
 
     private void Apply()
     {
-        if (_project is null
+        if (IsDisposed
+            || _project is null
             || _stationSkeletonPreview is not { UnavailableCount: 0 }
             || !TryCreateStationSetup(out var setup))
         {
@@ -257,6 +274,11 @@ public sealed class StationSkeletonSetupViewModel : ViewModelBase
 
     private void Reset()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _stationSetupWasInvalid = false;
         ApplyStationSetupText(new SemiconductorStationSetupDefinition());
     }
@@ -317,6 +339,11 @@ public sealed class StationSkeletonSetupViewModel : ViewModelBase
 
     private void ClearPreview()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _stationSkeletonPreview = null;
         StationSkeletonItems.Clear();
         RaiseStationSkeletonChanged();
@@ -366,6 +393,21 @@ public sealed class StationSkeletonSetupViewModel : ViewModelBase
         _cancelCommand.RaiseCanExecuteChanged();
         _resetCommand.RaiseCanExecuteChanged();
     }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _stationSkeletonPreview = null;
+        StationSkeletonItems.Clear();
+        RaiseStationSkeletonChanged();
+        RaiseCommandStates();
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     private static bool TryPositiveDouble(string text, out double value) =>
         TryFiniteDouble(text, out value) && value > 0;

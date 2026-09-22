@@ -13,6 +13,7 @@ public sealed record ScenarioAssertionOutcomePresentation(
 internal sealed record SimulationScenarioBatchPresentationState(
     bool IsBatchRunning,
     bool BatchWasCanceled,
+    bool BatchCancellationRequested,
     int BatchCompletedRuns,
     int BatchRepetitionCount,
     DeterministicSimulationBatchResultPackage? LatestBatchResult,
@@ -26,7 +27,13 @@ internal sealed record SimulationScenarioBatchPresentationState(
 internal sealed class SimulationScenarioBatchPresentation
 {
     internal string GetBatchStatusText(SimulationScenarioBatchPresentationState state) =>
-        state.IsBatchRunning
+        state.IsBatchRunning && state.BatchCancellationRequested
+            ? string.Format(
+                CultureInfo.CurrentCulture,
+                OpenVisionLanguageService.T("Simulation.BatchCancelRequested"),
+                state.BatchCompletedRuns,
+                state.BatchRepetitionCount)
+            : state.IsBatchRunning
             ? string.Format(
                 CultureInfo.CurrentCulture,
                 OpenVisionLanguageService.T("Simulation.BatchRunning"),

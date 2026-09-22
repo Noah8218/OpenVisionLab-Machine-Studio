@@ -220,6 +220,7 @@ internal static class SmokeLayoutValidator
 
             double requiredWidth;
             double requiredHeight;
+            var availableHeight = textBlock.ActualHeight;
             var widthClipped = false;
             var heightClipped = false;
             if (textBlock.TextWrapping == TextWrapping.NoWrap)
@@ -233,17 +234,16 @@ internal static class SmokeLayoutValidator
             }
             else
             {
-                formatted.MaxTextWidth = Math.Max(1.0, textBlock.ActualWidth);
-                if (!double.IsNaN(textBlock.LineHeight))
-                {
-                    formatted.LineHeight = textBlock.LineHeight;
-                }
-
                 requiredWidth = Math.Min(
                     formatted.WidthIncludingTrailingWhitespace,
                     textBlock.ActualWidth);
-                requiredHeight = formatted.Height;
-                heightClipped = false;
+                requiredHeight = MeasureNaturalWrappedHeight(textBlock);
+                // Measure a detached TextBlock with the same text and typography.
+                // FormattedText can report an extra line for a wrapped control
+                // because its fallback metrics differ from the arranged WPF
+                // element; the detached control uses the same layout engine.
+                availableHeight = Math.Min(textBlock.ActualHeight, textBlock.DesiredSize.Height);
+                heightClipped = requiredHeight > availableHeight + TextTolerance;
             }
 
             if (!widthClipped && !heightClipped)
@@ -255,12 +255,33 @@ internal static class SmokeLayoutValidator
                 Describe(textBlock),
                 text,
                 textBlock.ActualWidth,
-                textBlock.ActualHeight,
+                availableHeight,
                 requiredWidth,
                 requiredHeight));
         }
 
         return issues;
+    }
+
+    private static double MeasureNaturalWrappedHeight(TextBlock source)
+    {
+        var measured = new TextBlock
+        {
+            Text = source.Text,
+            FontFamily = source.FontFamily,
+            FontSize = source.FontSize,
+            FontStretch = source.FontStretch,
+            FontStyle = source.FontStyle,
+            FontWeight = source.FontWeight,
+            FlowDirection = source.FlowDirection,
+            TextAlignment = source.TextAlignment,
+            TextDecorations = source.TextDecorations,
+            TextWrapping = source.TextWrapping,
+            LineHeight = source.LineHeight,
+            Width = Math.Max(1.0, source.ActualWidth)
+        };
+        measured.Measure(new Size(measured.Width, double.PositiveInfinity));
+        return measured.DesiredSize.Height;
     }
 
     private static IReadOnlyList<string> FindVisibleHorizontalScrollBars(DependencyObject root) =>

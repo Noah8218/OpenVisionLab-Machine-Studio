@@ -54,7 +54,7 @@ internal sealed class ProjectSaveWorkflow
             ?? throw new InvalidOperationException("The current project is not available.");
         _prepareProject(project);
         var contentHash = ProjectDocumentSession.ComputeContentHash(
-            _documentStore.SerializeForEvidence(project));
+            _documentStore.SerializeForSaveEvidence(project));
         await _projectStore.SaveAsync(project, path);
 
         var fullPath = Path.GetFullPath(path);

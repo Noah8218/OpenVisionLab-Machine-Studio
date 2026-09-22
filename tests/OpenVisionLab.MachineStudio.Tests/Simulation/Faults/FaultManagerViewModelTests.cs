@@ -47,7 +47,123 @@ public sealed class FaultManagerViewModelTests
         Assert.False(viewModel.ClearAllCommand.CanExecute(null));
     }
 
-    private static SimulationSnapshot CreateSnapshot() => new(
+    [Fact]
+    public void Dispose_NotifiesFaultCommandsOfFinalAdmission()
+    {
+        OpenVisionLanguageService.Load();
+        var viewModel = new FaultManagerViewModel(command => Task.FromResult(Accepted(command)));
+        viewModel.SelectedKind = viewModel.AvailableKinds.Single(option =>
+            option.Kind == SimulationFaultKind.AxisFollowingError);
+        viewModel.ApplySnapshot(CreateSnapshot(
+        [
+            new SimulationFaultSnapshot(
+                SimulationFaultKind.AxisMotionBlocked,
+                "axis-x",
+                null,
+                5,
+                TimeSpan.FromMilliseconds(25))
+        ]));
+        viewModel.SetEnabled(true, invalidateCommands: true);
+
+        var injectNotifications = 0;
+        var clearSelectedNotifications = 0;
+        var clearAllNotifications = 0;
+        viewModel.InjectCommand.CanExecuteChanged += (_, _) => injectNotifications++;
+        viewModel.ClearSelectedCommand.CanExecuteChanged += (_, _) => clearSelectedNotifications++;
+        viewModel.ClearAllCommand.CanExecuteChanged += (_, _) => clearAllNotifications++;
+
+        Assert.True(viewModel.InjectCommand.CanExecute(null));
+        Assert.True(viewModel.ClearSelectedCommand.CanExecute(null));
+        Assert.True(viewModel.ClearAllCommand.CanExecute(null));
+
+        viewModel.Dispose();
+        viewModel.Dispose();
+
+        Assert.False(viewModel.InjectCommand.CanExecute(null));
+        Assert.False(viewModel.ClearSelectedCommand.CanExecute(null));
+        Assert.False(viewModel.ClearAllCommand.CanExecute(null));
+        Assert.Equal(1, injectNotifications);
+        Assert.Equal(1, clearSelectedNotifications);
+        Assert.Equal(1, clearAllNotifications);
+    }
+
+    [Fact]
+    public async Task DisableRuntime_StopsClearAllDispatchAndSuppressesLatePublication()
+    {
+        OpenVisionLanguageService.Load();
+        var dispatched = new List<SimulationCommand>();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var viewModel = new FaultManagerViewModel(async command =>
+        {
+            dispatched.Add(command);
+            await gate.Task;
+            return Accepted(command);
+        });
+        viewModel.ApplySnapshot(CreateSnapshot(
+        [
+            new SimulationFaultSnapshot(
+                SimulationFaultKind.AxisMotionBlocked,
+                "axis-x",
+                null,
+                5,
+                TimeSpan.FromMilliseconds(25)),
+            new SimulationFaultSnapshot(
+                SimulationFaultKind.AxisFollowingError,
+                "axis-x",
+                null,
+                5,
+                TimeSpan.FromMilliseconds(25))
+        ]));
+        viewModel.SetEnabled(true, invalidateCommands: true);
+        var initialStatus = viewModel.OperationStatusText;
+        var changedProperties = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        viewModel.ClearAllCommand.Execute(null);
+        await WaitUntilAsync(() => dispatched.Count == 1);
+
+        viewModel.SetEnabled(false, invalidateCommands: true);
+        gate.SetResult();
+        await WaitUntilAsync(() => !viewModel.IsOperationPending);
+
+        Assert.Single(dispatched);
+        Assert.Equal(initialStatus, viewModel.OperationStatusText);
+        Assert.DoesNotContain(nameof(viewModel.OperationStatusText), changedProperties);
+        Assert.False(viewModel.ClearAllCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task DisableRuntime_SuppressesLateSingleFaultPublication()
+    {
+        OpenVisionLanguageService.Load();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var viewModel = new FaultManagerViewModel(async command =>
+        {
+            await gate.Task;
+            return Accepted(command);
+        });
+        viewModel.SelectedKind = viewModel.AvailableKinds.Single(option =>
+            option.Kind == SimulationFaultKind.AxisMotionBlocked);
+        viewModel.ApplySnapshot(CreateSnapshot());
+        viewModel.SetEnabled(true, invalidateCommands: true);
+        var initialStatus = viewModel.OperationStatusText;
+        var changedProperties = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        viewModel.InjectCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.IsOperationPending);
+
+        viewModel.SetEnabled(false, invalidateCommands: true);
+        gate.SetResult();
+        await WaitUntilAsync(() => !viewModel.IsOperationPending);
+
+        Assert.Equal(initialStatus, viewModel.OperationStatusText);
+        Assert.DoesNotContain(nameof(viewModel.OperationStatusText), changedProperties);
+        Assert.False(viewModel.InjectCommand.CanExecute(null));
+    }
+
+    private static SimulationSnapshot CreateSnapshot(
+        IEnumerable<SimulationFaultSnapshot>? faults = null) => new(
         TimeSpan.FromMilliseconds(25),
         5,
         SimulationRunMode.Paused,
@@ -74,7 +190,7 @@ public sealed class FaultManagerViewModelTests
         [],
         AutomaticRunSnapshot.NotConfigured,
         [],
-        faults: [],
+        faults: faults,
         sequenceDebug: null);
 
     private static SimulationCommandResult Accepted(SimulationCommand command) => new(

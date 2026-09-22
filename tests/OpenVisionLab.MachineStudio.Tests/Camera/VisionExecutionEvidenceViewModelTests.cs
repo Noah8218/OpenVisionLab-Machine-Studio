@@ -93,6 +93,78 @@ public sealed class VisionExecutionEvidenceViewModelTests
     }
 
     [Fact]
+    public void RefreshContext_CancelsCaptureBeforeLateContextEventCanCompleteEvidence()
+    {
+        OpenVisionLanguageService.Load();
+        var projectPath = CreateProjectPath();
+        var cameraId = CameraId;
+        var recipeId = RecipeId;
+        using var viewModel = new VisionExecutionEvidenceViewModel(
+            () => new VisionEvidenceContext(
+                ProjectId,
+                ProjectJson,
+                BuildIdentity,
+                projectPath,
+                cameraId,
+                recipeId),
+            _ => { },
+            _ => { });
+        var recorder = new DeterministicVisionExecutionRecorder(
+            ProjectId,
+            "Vision Project",
+            projectPath,
+            ProjectJson,
+            BuildIdentity,
+            FixedStep,
+            20,
+            "command-001",
+            CameraId,
+            RecipeId,
+            "acquisition-001",
+            "frame-001",
+            "inspection-001");
+        var snapshot = new SimulationSnapshot(
+            TimeSpan.Zero,
+            0,
+            SimulationRunMode.Paused,
+            SimulationControlOwner.Manual,
+            1,
+            [],
+            0,
+            [],
+            []);
+
+        try
+        {
+            viewModel.BeginCapture(recorder);
+            cameraId = "camera.changed";
+            viewModel.RefreshContext();
+
+            Assert.False(viewModel.IsCapturing);
+            Assert.Null(viewModel.LatestEvidence);
+
+            viewModel.RecordEvent(
+                new SimulationEvent(
+                    1,
+                    20,
+                    TimeSpan.FromTicks(FixedStep.Ticks * 20),
+                    "Vision",
+                    "CameraTriggered",
+                    "late event",
+                    "command-001"),
+                snapshot);
+
+            Assert.False(viewModel.TryComplete(snapshot));
+            Assert.Null(viewModel.GetCurrentEvidence());
+            Assert.False(File.Exists($"{projectPath}.vision-result.json"));
+        }
+        finally
+        {
+            File.Delete($"{projectPath}.vision-result.json");
+        }
+    }
+
+    [Fact]
     public void Dispose_SuppressesLateRuntimeEvidenceAndParentNotification()
     {
         OpenVisionLanguageService.Load();

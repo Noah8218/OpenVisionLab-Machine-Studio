@@ -17,6 +17,7 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
     private readonly MachineIntegrationResultFileWatcher _resultFileWatcher;
     private readonly object _lifetimeGate = new();
     private string? _lastProjectId;
+    private long _observationGeneration;
     private int _refreshInProgress;
     private bool _disposed;
 
@@ -53,9 +54,32 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
 
     public MachineIntegrationTransactionSummary? LatestResultTransaction { get; private set; }
 
+    /// <summary>
+    /// Current-project transactions ordered by newest handoff first.
+    /// The collection is a read-only snapshot; refresh and project changes replace it.
+    /// </summary>
+    public IReadOnlyList<MachineIntegrationTransactionSummary> CurrentTransactions { get; private set; } = [];
+
+    /// <summary>
+    /// Read-only diagnostics for transaction directories under the configured exchange root.
+    /// Staging and quarantine entries are correlated by TransactionId when available;
+    /// this owner does not infer a project identity that the storage contract does not contain.
+    /// </summary>
+    public IReadOnlyList<MachineIntegrationTransactionDiagnostic> TransactionDiagnostics { get; private set; } = [];
+
     public IntegrationAcknowledgementV2? LatestAcknowledgement { get; private set; }
 
     public IntegrationResultV2? LatestResult { get; private set; }
+
+    public MachineIntegrationValidatedResult? LatestValidatedResult { get; private set; }
+
+    /// <summary>
+    /// Validated results keyed by transaction so modality-specific projections
+    /// do not lose a 2D result when a newer 3D transaction is observed (or the
+    /// other way around).
+    /// </summary>
+    public IReadOnlyDictionary<Guid, MachineIntegrationValidatedResult> ValidatedResultsByTransaction { get; private set; } =
+        new Dictionary<Guid, MachineIntegrationValidatedResult>();
 
     public string? AcknowledgementReadError { get; private set; }
 
@@ -64,6 +88,8 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
     public MachineCoordinateProjectionResult? LatestProjectionResult { get; private set; }
 
     public string? ProjectionReadError { get; private set; }
+
+    public string? DiagnosticReadError { get; private set; }
 
     public int TransactionCount { get; private set; }
 
@@ -83,19 +109,33 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
         }
 
         var projectId = _projectIdProvider();
-        if (string.Equals(_lastProjectId, projectId, StringComparison.Ordinal))
+        lock (_lifetimeGate)
         {
-            return false;
+            if (_disposed || string.Equals(_lastProjectId, projectId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            _lastProjectId = projectId;
+            _observationGeneration++;
+            ClearStateUnsafe();
         }
 
-        _lastProjectId = projectId;
-        ClearState();
         return true;
     }
 
     public void Reset()
     {
-        ClearState();
+        lock (_lifetimeGate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _observationGeneration++;
+            ClearStateUnsafe();
+        }
     }
 
     public void RecordPublishedHandoff(IntegrationHandoffV2 handoff)
@@ -104,16 +144,27 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
         lock (_lifetimeGate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
+            _observationGeneration++;
             LatestTransaction = new MachineIntegrationTransactionSummary(handoff, false, false);
+            var updatedTransactions = new List<MachineIntegrationTransactionSummary>(CurrentTransactions.Count + 1)
+            {
+                LatestTransaction
+            };
+            updatedTransactions.AddRange(CurrentTransactions);
+            CurrentTransactions = updatedTransactions;
+            TransactionDiagnostics = [];
             LatestAcknowledgementTransaction = null;
             LatestResultTransaction = null;
             LatestAcknowledgement = null;
             LatestResult = null;
+            LatestValidatedResult = null;
+            ValidatedResultsByTransaction = new Dictionary<Guid, MachineIntegrationValidatedResult>();
             AcknowledgementReadError = null;
             ResultReadError = null;
             LatestProjectionResult = null;
             ProjectionReadError = null;
-            TransactionCount = Math.Max(1, TransactionCount + 1);
+            DiagnosticReadError = null;
+            TransactionCount = CurrentTransactions.Count;
         }
     }
 
@@ -126,8 +177,21 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
 
         try
         {
+            RefreshContext();
+            string? projectId;
+            long observationGeneration;
+            lock (_lifetimeGate)
+            {
+                if (_disposed)
+                {
+                    return null;
+                }
+
+                projectId = _lastProjectId;
+                observationGeneration = _observationGeneration;
+            }
+
             var root = _pathReadiness.NormalizeFullPath(_exchangeRootProvider());
-            var projectId = _projectIdProvider();
             var transactions = await Task.Run(() =>
                     MachineIntegrationExchange.DiscoverTransactions(root)
                         .Where(transaction => string.Equals(
@@ -136,16 +200,12 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
                             StringComparison.Ordinal))
                         .ToArray())
                 .ConfigureAwait(true);
-            MachineIntegrationTransactionSummary? acknowledgementTransaction;
-            MachineIntegrationTransactionSummary? resultTransaction;
-            lock (_lifetimeGate)
+            MachineIntegrationTransactionSummary? acknowledgementTransaction = null;
+            MachineIntegrationTransactionSummary? resultTransaction = null;
+            if (!TryPublishForGeneration(observationGeneration, () =>
             {
-                if (_disposed)
-                {
-                    return null;
-                }
-
                 TransactionCount = transactions.Length;
+                CurrentTransactions = transactions;
                 LatestTransaction = transactions.FirstOrDefault();
                 LatestAcknowledgementTransaction = transactions.FirstOrDefault(transaction => transaction.HasAcknowledgement);
                 LatestResultTransaction = transactions.FirstOrDefault(transaction => transaction.HasResult);
@@ -153,13 +213,124 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
                 resultTransaction = LatestResultTransaction;
                 LatestAcknowledgement = null;
                 LatestResult = null;
+                LatestValidatedResult = null;
+                ValidatedResultsByTransaction = new Dictionary<Guid, MachineIntegrationValidatedResult>();
                 AcknowledgementReadError = null;
                 ResultReadError = null;
                 LatestProjectionResult = null;
                 ProjectionReadError = null;
+            }))
+            {
+                return null;
             }
 
-            if (acknowledgementTransaction is { })
+            try
+            {
+                var diagnostics = await Task.Run(() => MachineIntegrationExchange.DiagnoseTransactions(root))
+                    .ConfigureAwait(true);
+                if (!TryPublishForGeneration(observationGeneration, () =>
+                    {
+                        TransactionDiagnostics = diagnostics;
+                        DiagnosticReadError = null;
+                    }))
+                {
+                    return null;
+                }
+            }
+            catch (Exception exception) when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or InvalidOperationException
+                or NotSupportedException
+                or IntegrationContractException)
+            {
+                if (!TryPublishForGeneration(observationGeneration, () =>
+                    {
+                        TransactionDiagnostics = [];
+                        DiagnosticReadError = exception.Message;
+                    }))
+                {
+                    return null;
+                }
+            }
+
+            MachineIntegrationValidatedResult? validatedResult = null;
+            var validatedResults = new Dictionary<Guid, MachineIntegrationValidatedResult>();
+            if (resultTransaction is { })
+            {
+                try
+                {
+                    validatedResult = await Task.Run(() =>
+                            MachineIntegrationExchange.ReadValidatedResult(
+                                root,
+                                resultTransaction.Handoff.TransactionId))
+                        .ConfigureAwait(true);
+                    if (!TryPublishForGeneration(observationGeneration, () =>
+                        {
+                            LatestValidatedResult = validatedResult;
+                            LatestResult = validatedResult.Result;
+                            validatedResults[validatedResult.Handoff.TransactionId] = validatedResult;
+                            if (acknowledgementTransaction?.Handoff.TransactionId
+                                == validatedResult.Handoff.TransactionId)
+                            {
+                                LatestAcknowledgement = validatedResult.Acknowledgement;
+                            }
+                        }))
+                    {
+                        return null;
+                    }
+                }
+                catch (Exception exception) when (exception is IOException
+                    or UnauthorizedAccessException
+                    or ArgumentException
+                    or InvalidOperationException
+                    or InvalidDataException
+                    or JsonException
+                    or IntegrationContractException)
+                {
+                    if (!TryPublishForGeneration(observationGeneration, () => ResultReadError = exception.Message))
+                    {
+                        return null;
+                    }
+                }
+            }
+
+            foreach (var transaction in transactions.Where(transaction =>
+                transaction.HasResult
+                && resultTransaction?.Handoff.TransactionId != transaction.Handoff.TransactionId))
+            {
+                try
+                {
+                    var result = await Task.Run(() =>
+                            MachineIntegrationExchange.ReadValidatedResult(
+                                root,
+                                transaction.Handoff.TransactionId))
+                        .ConfigureAwait(true);
+                    validatedResults[result.Handoff.TransactionId] = result;
+                }
+                catch (Exception exception) when (exception is IOException
+                    or UnauthorizedAccessException
+                    or ArgumentException
+                    or InvalidOperationException
+                    or InvalidDataException
+                    or JsonException
+                    or IntegrationContractException)
+                {
+                    // The latest result's failure remains visible through
+                    // ResultReadError above. Older malformed transactions do
+                    // not erase valid modality-specific results.
+                }
+            }
+
+            if (!TryPublishForGeneration(observationGeneration, () =>
+                ValidatedResultsByTransaction = new Dictionary<Guid, MachineIntegrationValidatedResult>(validatedResults)))
+            {
+                return null;
+            }
+
+            if (acknowledgementTransaction is { }
+                && validatedResult?.Handoff.TransactionId
+                    != acknowledgementTransaction.Handoff.TransactionId)
             {
                 try
                 {
@@ -168,7 +339,7 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
                                 root,
                                 acknowledgementTransaction.Handoff.TransactionId))
                         .ConfigureAwait(true);
-                    if (!TryPublish(() => LatestAcknowledgement = acknowledgement))
+                    if (!TryPublishForGeneration(observationGeneration, () => LatestAcknowledgement = acknowledgement))
                     {
                         return null;
                     }
@@ -177,34 +348,11 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
                     or UnauthorizedAccessException
                     or ArgumentException
                     or InvalidOperationException
+                    or InvalidDataException
+                    or JsonException
                     or IntegrationContractException)
                 {
-                    if (!TryPublish(() => AcknowledgementReadError = exception.Message))
-                    {
-                        return null;
-                    }
-                }
-            }
-
-            if (resultTransaction is { })
-            {
-                try
-                {
-                    var result = await Task.Run(() =>
-                            MachineIntegrationExchange.ReadResult(root, resultTransaction.Handoff.TransactionId))
-                        .ConfigureAwait(true);
-                    if (!TryPublish(() => LatestResult = result))
-                    {
-                        return null;
-                    }
-                }
-                catch (Exception exception) when (exception is IOException
-                    or UnauthorizedAccessException
-                    or ArgumentException
-                    or InvalidOperationException
-                    or IntegrationContractException)
-                {
-                    if (!TryPublish(() => ResultReadError = exception.Message))
+                    if (!TryPublishForGeneration(observationGeneration, () => AcknowledgementReadError = exception.Message))
                     {
                         return null;
                     }
@@ -214,7 +362,7 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
             IntegrationResultV2? latestResult;
             lock (_lifetimeGate)
             {
-                if (_disposed)
+                if (_disposed || _observationGeneration != observationGeneration)
                 {
                     return null;
                 }
@@ -233,7 +381,7 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
                                 projectionTransaction.Handoff.TransactionId,
                                 latestResult))
                         .ConfigureAwait(true);
-                    if (!TryPublish(() => LatestProjectionResult = projection))
+                    if (!TryPublishForGeneration(observationGeneration, () => LatestProjectionResult = projection))
                     {
                         return null;
                     }
@@ -246,7 +394,7 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
                     or JsonException
                     or IntegrationContractException)
                 {
-                    if (!TryPublish(() => ProjectionReadError = exception.Message))
+                    if (!TryPublishForGeneration(observationGeneration, () => ProjectionReadError = exception.Message))
                     {
                         return null;
                     }
@@ -255,7 +403,9 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
 
             lock (_lifetimeGate)
             {
-                return _disposed ? null : TransactionCount;
+                return _disposed || _observationGeneration != observationGeneration
+                    ? null
+                    : TransactionCount;
             }
         }
         finally
@@ -264,26 +414,23 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
         }
     }
 
-    private void ClearState()
+    private void ClearStateUnsafe()
     {
-        lock (_lifetimeGate)
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            LatestTransaction = null;
-            LatestAcknowledgementTransaction = null;
-            LatestResultTransaction = null;
-            LatestAcknowledgement = null;
-            LatestResult = null;
-            AcknowledgementReadError = null;
-            ResultReadError = null;
-            LatestProjectionResult = null;
-            ProjectionReadError = null;
-            TransactionCount = 0;
-        }
+        LatestTransaction = null;
+        CurrentTransactions = [];
+        TransactionDiagnostics = [];
+        LatestAcknowledgementTransaction = null;
+        LatestResultTransaction = null;
+        LatestAcknowledgement = null;
+        LatestResult = null;
+        LatestValidatedResult = null;
+        ValidatedResultsByTransaction = new Dictionary<Guid, MachineIntegrationValidatedResult>();
+        AcknowledgementReadError = null;
+        ResultReadError = null;
+        LatestProjectionResult = null;
+        ProjectionReadError = null;
+        DiagnosticReadError = null;
+        TransactionCount = 0;
     }
 
     private bool IsDisposed
@@ -297,11 +444,11 @@ public sealed class MachineIntegrationResultObservationWorkflow : IDisposable
         }
     }
 
-    private bool TryPublish(Action action)
+    private bool TryPublishForGeneration(long observationGeneration, Action action)
     {
         lock (_lifetimeGate)
         {
-            if (_disposed)
+            if (_disposed || _observationGeneration != observationGeneration)
             {
                 return false;
             }

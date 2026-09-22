@@ -45,6 +45,36 @@ public sealed class RuntimeAlarmCollectionViewModelTests
         Assert.Single(viewModel.AlarmHistory);
     }
 
+    [Fact]
+    public void ResetRejectsAcknowledgementOfRetainedAlarm()
+    {
+        OpenVisionLanguageService.Load();
+        var status = string.Empty;
+        var viewModel = new RuntimeAlarmCollectionViewModel(
+            () => true,
+            sequenceId => sequenceId,
+            value => status = value);
+
+        viewModel.ApplySnapshot(CreateSnapshot(
+        [
+            new SimulationFaultSnapshot(
+                SimulationFaultKind.AxisMotionBlocked,
+                "axis-x",
+                null,
+                5,
+                TimeSpan.FromMilliseconds(25))
+        ]));
+        var retainedAlarm = Assert.Single(viewModel.Alarms);
+
+        viewModel.Reset();
+
+        Assert.False(viewModel.AcknowledgeAlarmCommand.CanExecute(retainedAlarm));
+        viewModel.AcknowledgeAlarmCommand.Execute(retainedAlarm);
+
+        Assert.False(retainedAlarm.IsAcknowledged);
+        Assert.Equal(string.Empty, status);
+    }
+
     private static SimulationSnapshot CreateSnapshot(IEnumerable<SimulationFaultSnapshot>? faults = null) => new(
         TimeSpan.FromMilliseconds(25),
         5,

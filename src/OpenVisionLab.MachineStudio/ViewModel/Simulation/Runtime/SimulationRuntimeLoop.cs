@@ -25,6 +25,7 @@ internal sealed class SimulationRuntimeLoop : IDisposable
     private readonly Func<Action, Task> _dispatch;
     private readonly Action<SimulationSnapshot> _publishSnapshot;
     private readonly Action<SimulationSnapshot> _applySnapshot;
+    private readonly Func<SimulationSnapshot, bool>? _canApplySnapshot;
     private readonly Action _onInitialRuntimeApplied;
     private readonly Action<string> _onInitialConfigurationRejected;
     private readonly Action<SimulationEvent> _onEvent;
@@ -53,12 +54,14 @@ internal sealed class SimulationRuntimeLoop : IDisposable
         Action<SimulationEngineTerminationResult> onTerminated,
         Action<Exception> onUnhandledException,
         Action<SimulationEvent>? onCanonicalEvent = null,
-        Action<SimulationEventJournalSnapshot>? onCanonicalJournalCompleted = null)
+        Action<SimulationEventJournalSnapshot>? onCanonicalJournalCompleted = null,
+        Func<SimulationSnapshot, bool>? canApplySnapshot = null)
     {
         _engine = engine ?? throw new ArgumentNullException(nameof(engine));
         _dispatch = dispatch ?? throw new ArgumentNullException(nameof(dispatch));
         _publishSnapshot = publishSnapshot ?? throw new ArgumentNullException(nameof(publishSnapshot));
         _applySnapshot = applySnapshot ?? throw new ArgumentNullException(nameof(applySnapshot));
+        _canApplySnapshot = canApplySnapshot;
         _onInitialRuntimeApplied = onInitialRuntimeApplied
             ?? throw new ArgumentNullException(nameof(onInitialRuntimeApplied));
         _onInitialConfigurationRejected = onInitialConfigurationRejected
@@ -185,7 +188,10 @@ internal sealed class SimulationRuntimeLoop : IDisposable
         var monitorStopwatch = Stopwatch.StartNew();
         await foreach (var snapshot in _engine.SnapshotReader.ReadAllAsync(_cancellation.Token))
         {
-            _publishSnapshot(snapshot);
+            if (IsSnapshotAdmitted(snapshot))
+            {
+                _publishSnapshot(snapshot);
+            }
             if (snapshot.RunMode == SimulationRunMode.RealTime
                 && monitorStopwatch.Elapsed < MonitorRefreshInterval)
             {
@@ -193,9 +199,18 @@ internal sealed class SimulationRuntimeLoop : IDisposable
             }
 
             monitorStopwatch.Restart();
-            await _dispatch(() => _applySnapshot(snapshot)).ConfigureAwait(false);
+            await _dispatch(() =>
+            {
+                if (IsSnapshotAdmitted(snapshot))
+                {
+                    _applySnapshot(snapshot);
+                }
+            }).ConfigureAwait(false);
         }
     }
+
+    private bool IsSnapshotAdmitted(SimulationSnapshot snapshot) =>
+        _canApplySnapshot is null || _canApplySnapshot(snapshot);
 
     private async Task ConsumeEventsAsync()
     {

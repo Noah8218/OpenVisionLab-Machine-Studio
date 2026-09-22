@@ -14,15 +14,18 @@ internal sealed class SimulationCommandPresentationDispatcher
     private readonly ISimulationEngine _engine;
     private readonly Action<string> _setStatus;
     private readonly Action<string, string> _log;
+    private readonly Func<bool> _canPresentResult;
 
     internal SimulationCommandPresentationDispatcher(
         ISimulationEngine engine,
         Action<string> setStatus,
-        Action<string, string> log)
+        Action<string, string> log,
+        Func<bool>? canPresentResult = null)
     {
         _engine = engine ?? throw new ArgumentNullException(nameof(engine));
         _setStatus = setStatus ?? throw new ArgumentNullException(nameof(setStatus));
         _log = log ?? throw new ArgumentNullException(nameof(log));
+        _canPresentResult = canPresentResult ?? (() => true);
     }
 
     internal async Task<SimulationCommandResult> DispatchRuntimeDebuggerAsync(
@@ -33,6 +36,11 @@ internal sealed class SimulationCommandPresentationDispatcher
         ArgumentNullException.ThrowIfNull(applySnapshot);
 
         var result = await _engine.EnqueueCommandAsync(command);
+        if (!_canPresentResult())
+        {
+            return result;
+        }
+
         applySnapshot();
         _setStatus(OpenVisionLanguageService.T(
             result.IsAccepted ? "Debugger.CommandAcceptedStatus" : "Debugger.CommandRejectedStatus",
@@ -49,6 +57,11 @@ internal sealed class SimulationCommandPresentationDispatcher
     {
         ArgumentNullException.ThrowIfNull(command);
         var result = await _engine.EnqueueCommandAsync(command);
+        if (!_canPresentResult())
+        {
+            return result;
+        }
+
         var actionKey = command switch
         {
             StartManualControlCommand => "Io.ActionStartManual",
@@ -83,6 +96,11 @@ internal sealed class SimulationCommandPresentationDispatcher
     {
         ArgumentNullException.ThrowIfNull(command);
         var result = await _engine.EnqueueCommandAsync(command);
+        if (!_canPresentResult())
+        {
+            return result;
+        }
+
         var isInject = command is InjectSimulationFaultCommand;
         var action = OpenVisionLanguageService.T(isInject ? "Fault.ActionInject" : "Fault.ActionClear");
         if (!result.IsAccepted)

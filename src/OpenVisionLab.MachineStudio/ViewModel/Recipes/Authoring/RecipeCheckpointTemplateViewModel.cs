@@ -29,6 +29,7 @@ public sealed class RecipeCheckpointTemplateViewModel : ViewModelBase
     private MachineProjectDocument? _project;
     private bool _isEditable = true;
     private RepresentativeRecipeCheckpointTemplatePreview? _preview;
+    private int _disposed;
 
     public RecipeCheckpointTemplateViewModel(
         Func<RepresentativeRecipeCheckpointTemplatePreview, int> applyCheckpointTemplate,
@@ -38,13 +39,13 @@ public sealed class RecipeCheckpointTemplateViewModel : ViewModelBase
         _clearCompetingPreviews = clearCompetingPreviews;
         _previewCommand = new RelayCommand(
             _ => Preview(),
-            _ => IsEditable && ResolveRecipeSequenceId() is not null);
+            _ => !IsDisposed && IsEditable && ResolveRecipeSequenceId() is not null);
         _applyCommand = new RelayCommand(
             _ => Apply(),
-            _ => IsEditable && _preview?.ProposedCount > 0);
+            _ => !IsDisposed && IsEditable && _preview?.ProposedCount > 0);
         _cancelCommand = new RelayCommand(
             _ => ClearPreview(),
-            _ => IsPreviewVisible);
+            _ => !IsDisposed && IsPreviewVisible);
     }
 
     public ObservableCollection<RecipeCheckpointTemplateItemPresentation> Items { get; } = new();
@@ -58,7 +59,7 @@ public sealed class RecipeCheckpointTemplateViewModel : ViewModelBase
         get => _isEditable;
         set
         {
-            if (!SetProperty(ref _isEditable, value))
+            if (IsDisposed || !SetProperty(ref _isEditable, value))
             {
                 return;
             }
@@ -81,15 +82,27 @@ public sealed class RecipeCheckpointTemplateViewModel : ViewModelBase
 
     public void Load(MachineProjectDocument project)
     {
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
         _project = project ?? throw new ArgumentNullException(nameof(project));
         ClearPreview();
         RaiseCommandStates();
     }
 
-    public void ClearPreviewForCompetingSetup() => ClearPreview();
+    public void ClearPreviewForCompetingSetup()
+    {
+        if (!IsDisposed)
+        {
+            ClearPreview();
+        }
+    }
 
     internal void RefreshLocalization(Action reloadWorkbench)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         var hadPreview = IsPreviewVisible;
         reloadWorkbench();
         if (hadPreview)
@@ -101,7 +114,7 @@ public sealed class RecipeCheckpointTemplateViewModel : ViewModelBase
     private void Preview()
     {
         var sequenceId = ResolveRecipeSequenceId();
-        if (_project is null || sequenceId is null)
+        if (IsDisposed || _project is null || sequenceId is null)
         {
             return;
         }
@@ -119,7 +132,7 @@ public sealed class RecipeCheckpointTemplateViewModel : ViewModelBase
 
     private void Apply()
     {
-        if (_preview is not null)
+        if (!IsDisposed && _preview is not null)
         {
             _applyCheckpointTemplate(_preview);
         }
@@ -127,6 +140,11 @@ public sealed class RecipeCheckpointTemplateViewModel : ViewModelBase
 
     private void ClearPreview()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _preview = null;
         Items.Clear();
         RaisePreviewChanged();
@@ -148,6 +166,21 @@ public sealed class RecipeCheckpointTemplateViewModel : ViewModelBase
         _applyCommand.RaiseCanExecuteChanged();
         _cancelCommand.RaiseCanExecuteChanged();
     }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _preview = null;
+        Items.Clear();
+        RaisePreviewChanged();
+        _previewCommand.RaiseCanExecuteChanged();
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     private string? ResolveRecipeSequenceId() =>
         _project?.Simulation.AutomaticRun?.SequenceId

@@ -34,6 +34,8 @@ public sealed class RuntimeObservabilityPresenterTests
 
         var timelineItem = Assert.Single(debugger.Timeline);
         Assert.Equal(runtimeEvent.Code, timelineItem.Code);
+        Assert.Equal(runtimeEvent.CommandId, timelineItem.CommandId);
+        Assert.Contains(runtimeEvent.CommandId!, timelineItem.CommandIdText, StringComparison.Ordinal);
         Assert.Contains(
             presenter.LogMessages,
             line => line.Contains(runtimeEvent.Message, StringComparison.Ordinal));
@@ -50,7 +52,7 @@ public sealed class RuntimeObservabilityPresenterTests
     {
         OpenVisionLanguageService.Load();
         var presenter = CreatePresenter();
-        var exception = new InvalidOperationException("engine failure");
+        var exception = CreateNestedException("engine failure", "inner engine failure");
         var termination = new SimulationEngineTerminationResult(
             SimulationEngineTerminationOutcome.Faulted,
             TickIndex: 42,
@@ -71,6 +73,11 @@ public sealed class RuntimeObservabilityPresenterTests
         Assert.Equal(termination.Outcome, diagnostic.TerminationOutcome);
         Assert.Equal(exception.GetType().FullName, diagnostic.ExceptionType);
         Assert.Equal(exception.Message, diagnostic.ExceptionMessage);
+        Assert.Contains("ApplicationException", diagnostic.ExceptionDetail, StringComparison.Ordinal);
+        Assert.Contains("engine failure", diagnostic.ExceptionDetail, StringComparison.Ordinal);
+        Assert.Contains("InvalidOperationException", diagnostic.ExceptionDetail, StringComparison.Ordinal);
+        Assert.Contains("inner engine failure", diagnostic.ExceptionDetail, StringComparison.Ordinal);
+        Assert.Contains("at ", diagnostic.ExceptionDetail, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -126,6 +133,35 @@ public sealed class RuntimeObservabilityPresenterTests
         Assert.Equal(termination.TickIndex, diagnostic.TickIndex);
         Assert.Equal(termination.SimulationTime, diagnostic.SimulationTime);
         Assert.Equal(termination.Outcome, diagnostic.TerminationOutcome);
+        Assert.Null(diagnostic.ExceptionDetail);
+    }
+
+    [Fact]
+    public void RecordShutdownDiagnostic_PreservesExceptionDetails()
+    {
+        OpenVisionLanguageService.Load();
+        var presenter = CreatePresenter();
+        var exception = CreateNestedException("shutdown failure", "inner shutdown failure");
+
+        presenter.RecordShutdownDiagnostic(
+            SimulationOperationalDiagnosticKind.ShutdownFaulted,
+            SimulationLogSeverity.Alarm,
+            "shutdown failed",
+            "EngineStop",
+            currentTickIndex: 42,
+            currentSimulationTime: TimeSpan.FromMilliseconds(210),
+            exception: exception);
+
+        var diagnostic = Assert.Single(presenter.OperationalDiagnostics);
+        Assert.Equal(SimulationOperationalDiagnosticKind.ShutdownFaulted, diagnostic.Kind);
+        Assert.Equal("EngineStop", diagnostic.ShutdownStage);
+        Assert.Equal(exception.GetType().FullName, diagnostic.ExceptionType);
+        Assert.Equal(exception.Message, diagnostic.ExceptionMessage);
+        Assert.Contains("ApplicationException", diagnostic.ExceptionDetail, StringComparison.Ordinal);
+        Assert.Contains("shutdown failure", diagnostic.ExceptionDetail, StringComparison.Ordinal);
+        Assert.Contains("InvalidOperationException", diagnostic.ExceptionDetail, StringComparison.Ordinal);
+        Assert.Contains("inner shutdown failure", diagnostic.ExceptionDetail, StringComparison.Ordinal);
+        Assert.Contains("at ", diagnostic.ExceptionDetail, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -178,6 +214,25 @@ public sealed class RuntimeObservabilityPresenterTests
                 TimeSpan.Zero,
                 SimulationCommandErrorCode.None,
                 null)));
+
+    private static Exception CreateNestedException(string outerMessage, string innerMessage)
+    {
+        try
+        {
+            try
+            {
+                throw new InvalidOperationException(innerMessage);
+            }
+            catch (Exception inner)
+            {
+                throw new ApplicationException(outerMessage, inner);
+            }
+        }
+        catch (Exception exception)
+        {
+            return exception;
+        }
+    }
 
     private static SimulationSnapshot CreateSnapshot() =>
         new(

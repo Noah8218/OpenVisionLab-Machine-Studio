@@ -45,7 +45,11 @@ public enum SimulationCommandErrorCode
     EngineNotStarted,
     EngineFaulted,
     EngineStopped,
-    RuntimeIdentityMismatch
+    RuntimeIdentityMismatch,
+    ExternalInspectionCorrelationMismatch,
+    ExternalInspectionNotPending,
+    ExternalInspectionAcquisitionMismatch,
+    ExternalInspectionConflictingDuplicate
 }
 
 public sealed record SimulationCommandResult(

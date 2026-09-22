@@ -5,6 +5,7 @@
              xmlns:behavior="clr-namespace:OpenVisionLab.MachineStudio.Behavior"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:scene="clr-namespace:OpenVisionLab.MachineStudio.View.Scene"
+             xmlns:mmi="clr-namespace:OpenVisionLab.MachineStudio.View.Mmi"
              xmlns:project="clr-namespace:OpenVisionLab.MachineStudio.View.Project"
              xmlns:sequence="clr-namespace:OpenVisionLab.MachineStudio.View.Sequence"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
@@ -14,7 +15,8 @@
                 <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="220" />
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0" Style="{StaticResource PanelHeaderStyle}">
@@ -22,7 +24,28 @@
                            Text="{Binding Layout.LayoutTitleText}" />
             </Border>
 
-            <Grid Grid.Row="1" ClipToBounds="True">
+            <ScrollViewer Grid.Row="1"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto"
+                          CanContentScroll="False">
+                <ScrollViewer.Style>
+                    <Style TargetType="ScrollViewer">
+                        <Setter Property="MaxHeight" Value="420" />
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsRunMode}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsCompactLayout}" Value="True">
+                                <Setter Property="MaxHeight" Value="300" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ScrollViewer.Style>
+                <mmi:MmiOperatorLayoutView />
+            </ScrollViewer>
+
+            <Grid Grid.Row="2" ClipToBounds="True">
                 <Border Background="{DynamicResource Scene.Background}">
                     <scene:MachineSceneViewport x:Name="SceneViewport"
                                                 IsDesignMode="{Binding IsSceneEditable}"
@@ -96,6 +119,7 @@
                                 <MultiDataTrigger>
                                     <MultiDataTrigger.Conditions>
                                         <Condition Binding="{Binding HasAuthoredLayout}" Value="False" />
+                                        <Condition Binding="{Binding IsRunMode}" Value="False" />
                                         <Condition Binding="{Binding Navigation.IsStartupChoiceVisible}" Value="False" />
                                     </MultiDataTrigger.Conditions>
                                     <Setter Property="Visibility" Value="Visible" />
@@ -297,7 +321,8 @@
                     </DockPanel>
                 </Border>
 
-                <Border Margin="10"
+                <Border x:Name="SceneIdentityCard"
+                        Margin="10"
                         Padding="8,5"
                         HorizontalAlignment="Left"
                         VerticalAlignment="Top"
@@ -306,6 +331,16 @@
                         BorderThickness="1"
                         CornerRadius="4"
                         IsHitTestVisible="False">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsDryRunPlaybackActive}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <StackPanel>
                         <TextBlock FontSize="10.5"
                                    FontWeight="SemiBold"

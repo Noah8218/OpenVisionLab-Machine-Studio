@@ -1,13 +1,19 @@
 using System.ComponentModel;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Input;
 
 namespace OpenVisionLab.MachineStudio.View.Shell;
 
 public partial class ShellWindow : MachineFluentWindow
 {
+    public static readonly DependencyProperty IsCompactLayoutProperty =
+        DependencyProperty.RegisterAttached(
+            "IsCompactLayout",
+            typeof(bool),
+            typeof(ShellWindow),
+            new FrameworkPropertyMetadata(
+                false,
+                FrameworkPropertyMetadataOptions.BindsTwoWayByDefault));
+
     private bool _closeApproved;
     private bool _closeResolutionRunning;
 
@@ -18,16 +24,19 @@ public partial class ShellWindow : MachineFluentWindow
         SizeChanged += (_, args) => UpdateAdaptiveLayout(args.NewSize.Width);
     }
 
+    public static bool GetIsCompactLayout(DependencyObject element) =>
+        (bool)element.GetValue(IsCompactLayoutProperty);
+
+    public static void SetIsCompactLayout(DependencyObject element, bool value) =>
+        element.SetValue(IsCompactLayoutProperty, value);
+
     private void UpdateAdaptiveLayout(double width)
     {
         var compact = width < 1500;
-        LeftWorkspaceColumn.Width = new GridLength(compact ? 220 : 280);
+        LeftWorkspaceColumn.Width = new GridLength(compact ? 350 : 360);
         RightWorkspaceColumn.Width = new GridLength(compact ? 300 : 360);
 
-        if (DataContext is global::OpenVisionLab.MachineStudio.ViewModel.MainViewModel viewModel)
-        {
-            viewModel.Navigation.IsCompactLayout = compact;
-        }
+        SetIsCompactLayout(this, compact);
     }
 
     internal ShellLayoutMetrics CaptureLayoutMetrics() =>
@@ -45,40 +54,9 @@ public partial class ShellWindow : MachineFluentWindow
             WorkspaceColumnsGrid.ActualWidth,
             WorkspaceRowsGrid.ActualHeight);
 
-    protected override void OnPreviewKeyDown(KeyEventArgs e)
-    {
-        base.OnPreviewKeyDown(e);
-
-        if (e.Handled || IsTextEditingFocus() ||
-            DataContext is not global::OpenVisionLab.MachineStudio.ViewModel.MainViewModel viewModel)
-        {
-            return;
-        }
-
-        var command = (e.Key, Keyboard.Modifiers) switch
-        {
-            (Key.Delete, ModifierKeys.None) => viewModel.DeleteLayoutComponentCommand,
-            (Key.D, ModifierKeys.Control) => viewModel.DuplicateLayoutSelectionCommand,
-            _ => null
-        };
-
-        if (command?.CanExecute(null) != true)
-        {
-            return;
-        }
-
-        command.Execute(null);
-        e.Handled = true;
-    }
-
-    private static bool IsTextEditingFocus() => Keyboard.FocusedElement is
-        TextBoxBase or
-        PasswordBox or
-        ComboBox { IsEditable: true };
-
     protected override async void OnClosing(CancelEventArgs e)
     {
-        if (_closeApproved || DataContext is not global::OpenVisionLab.MachineStudio.ViewModel.MainViewModel viewModel)
+        if (_closeApproved || DataContext is not IShellCloseHost closeHost)
         {
             base.OnClosing(e);
             return;
@@ -93,20 +71,15 @@ public partial class ShellWindow : MachineFluentWindow
         _closeResolutionRunning = true;
         try
         {
-            var result = await viewModel.RequestCloseAsync();
-            if (result.IsApproved)
+            if (await closeHost.RequestCloseAsync())
             {
                 _closeApproved = true;
                 Close();
             }
-            else
-            {
-                viewModel.PresentCloseResult(result);
-            }
         }
         catch (Exception exception)
         {
-            viewModel.PresentCloseFailure(exception);
+            closeHost.PresentCloseFailure(exception);
         }
         finally
         {

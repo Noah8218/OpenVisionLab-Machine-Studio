@@ -39,6 +39,79 @@ public sealed class SimulationOutputStoreTests
     }
 
     [Fact]
+    public void EventPublisher_RejectsPublicationAfterCompletion()
+    {
+        var publisher = new SimulationEventPublisher(2);
+
+        Assert.True(publisher.TryPublish(1, TimeSpan.Zero, "Test", "First", "first"));
+        publisher.Complete();
+
+        Assert.False(publisher.TryPublish(2, TimeSpan.FromMilliseconds(5), "Test", "Late", "late"));
+        Assert.True(publisher.Reader.TryRead(out var first));
+        Assert.Equal(1, first.EventIndex);
+        Assert.False(publisher.Reader.TryRead(out _));
+
+        var journal = publisher.JournalSnapshot;
+        Assert.Equal(1, journal.StoredEventCount);
+        Assert.Equal(1, journal.TotalEventCount);
+        Assert.Equal(1, journal.FirstEventIndex);
+        Assert.Equal(1, journal.LastEventIndex);
+        Assert.True(journal.IsCompleted);
+        Assert.True(journal.IsComplete);
+        Assert.Null(journal.FirstMissingEventIndex);
+    }
+
+    [Fact]
+    public void EventPublisher_DisposeCompletesPresentationReader()
+    {
+        var publisher = new SimulationEventPublisher(2);
+
+        Assert.True(publisher.TryPublish(1, TimeSpan.Zero, "Test", "First", "first"));
+        publisher.Dispose();
+
+        Assert.True(publisher.Reader.TryRead(out var first));
+        Assert.Equal(1, first.EventIndex);
+        Assert.False(publisher.Reader.TryRead(out _));
+        Assert.True(publisher.Reader.Completion.IsCompleted);
+        Assert.True(publisher.JournalSnapshot.IsCompleted);
+    }
+
+    [Fact]
+    public async Task EventPublisher_CompletionRaceKeepsCanonicalAndPresentationEventsAligned()
+    {
+        for (var attempt = 0; attempt < 10_000; attempt++)
+        {
+            using var start = new Barrier(3);
+            var publisher = new SimulationEventPublisher(1);
+            var publishTask = Task.Run(() =>
+            {
+                start.SignalAndWait();
+                return publisher.TryPublish(attempt, TimeSpan.Zero, "Test", "Race", "race");
+            });
+            var completeTask = Task.Run(() =>
+            {
+                start.SignalAndWait();
+                publisher.Complete();
+            });
+
+            start.SignalAndWait();
+            await Task.WhenAll(publishTask, completeTask);
+
+            var presentationCount = 0;
+            while (publisher.Reader.TryRead(out _))
+            {
+                presentationCount++;
+            }
+
+            var journal = publisher.JournalSnapshot;
+            publisher.Dispose();
+            Assert.Equal(
+                journal.TotalEventCount,
+                presentationCount);
+        }
+    }
+
+    [Fact]
     public async Task EventJournal_PreservesCanonicalRecordsAndMarksBudgetOverflow()
     {
         var publisher = new SimulationEventPublisher(2);
@@ -208,6 +281,21 @@ public sealed class SimulationOutputStoreTests
         Assert.False(store.Reader.TryRead(out _));
 
         store.Complete();
+        Assert.True(store.Reader.Completion.IsCompleted);
+    }
+
+    [Fact]
+    public void LatestSnapshotStore_RejectsPublicationAfterCompletion()
+    {
+        var first = CreateSnapshot(0);
+        var late = CreateSnapshot(1);
+        var store = new LatestSnapshotStore(first);
+
+        store.Complete();
+        store.Publish(late);
+
+        Assert.Same(first, store.Current);
+        Assert.False(store.Reader.TryRead(out _));
         Assert.True(store.Reader.Completion.IsCompleted);
     }
 

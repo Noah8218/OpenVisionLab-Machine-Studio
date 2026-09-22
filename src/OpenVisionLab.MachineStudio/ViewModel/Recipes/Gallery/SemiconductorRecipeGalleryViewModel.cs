@@ -18,6 +18,7 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase, IDispos
     private readonly Func<string?> _selectCompatibilityReportSavePath;
     private readonly Func<string?> _selectBaselineCompatibilityReportPath;
     private readonly Func<string?> _selectCurrentCompatibilityReportPath;
+    private readonly RelayCommand _openCommand;
     private readonly RelayCommand _closeCommand;
     private readonly AsyncRelayCommand _createCopyCommand;
     private readonly AsyncRelayCommand _validateAllCommand;
@@ -28,6 +29,7 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase, IDispos
     private RecipePackCompatibilityComparison? _compatibilityComparison;
     private bool _isOpen;
     private bool _isBusy;
+    private bool _localizationRefreshPending;
     private bool _isComparisonOpen;
     private int _disposed;
     private string _errorMessage = string.Empty;
@@ -64,7 +66,11 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase, IDispos
         _selectCompatibilityReportSavePath = selectCompatibilityReportSavePath ?? throw new ArgumentNullException(nameof(selectCompatibilityReportSavePath));
         _selectBaselineCompatibilityReportPath = selectBaselineCompatibilityReportPath ?? throw new ArgumentNullException(nameof(selectBaselineCompatibilityReportPath));
         _selectCurrentCompatibilityReportPath = selectCurrentCompatibilityReportPath ?? throw new ArgumentNullException(nameof(selectCurrentCompatibilityReportPath));
-        OpenCommand = new RelayCommand(_ => Open(), _ => !IsDisposed);
+        _openCommand = new RelayCommand(
+            _ => Open(),
+            _ => !IsDisposed && !IsBusy,
+            useCommandManagerRequery: false);
+        OpenCommand = _openCommand;
         _closeCommand = new RelayCommand(
             _ => Close(),
             _ => !IsDisposed && !IsBusy,
@@ -141,12 +147,21 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase, IDispos
 
             if (SetProperty(ref _isBusy, value))
             {
+                _openCommand.RaiseCanExecuteChanged();
                 _createCopyCommand.RaiseCanExecuteChanged();
                 _validateAllCommand.RaiseCanExecuteChanged();
                 _closeCommand.RaiseCanExecuteChanged();
                 _saveCompatibilityReportCommand.RaiseCanExecuteChanged();
                 _compareCompatibilityReportsCommand.RaiseCanExecuteChanged();
                 _closeCompatibilityComparisonCommand.RaiseCanExecuteChanged();
+                if (!value && _localizationRefreshPending)
+                {
+                    _localizationRefreshPending = false;
+                    if (IsOpen)
+                    {
+                        Reload();
+                    }
+                }
             }
         }
     }
@@ -273,7 +288,7 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase, IDispos
 
     public void Open()
     {
-        if (IsDisposed)
+        if (IsDisposed || IsBusy)
         {
             return;
         }
@@ -303,6 +318,12 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase, IDispos
 
         if (IsOpen)
         {
+            if (IsBusy)
+            {
+                _localizationRefreshPending = true;
+                return;
+            }
+
             Reload();
             foreach (var item in ComparisonItems)
             {
@@ -773,6 +794,13 @@ public sealed class SemiconductorRecipeGalleryViewModel : ViewModelBase, IDispos
         _isBusy = false;
         _isOpen = false;
         _isComparisonOpen = false;
+        _openCommand.RaiseCanExecuteChanged();
+        _closeCommand.RaiseCanExecuteChanged();
+        _createCopyCommand.RaiseCanExecuteChanged();
+        _validateAllCommand.RaiseCanExecuteChanged();
+        _saveCompatibilityReportCommand.RaiseCanExecuteChanged();
+        _compareCompatibilityReportsCommand.RaiseCanExecuteChanged();
+        _closeCompatibilityComparisonCommand.RaiseCanExecuteChanged();
     }
 
     private bool IsDisposed => Volatile.Read(ref _disposed) != 0;

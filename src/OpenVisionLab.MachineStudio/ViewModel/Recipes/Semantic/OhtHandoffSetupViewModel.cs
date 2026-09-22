@@ -8,7 +8,7 @@ using OpenVisionLab.Machine.Core.Projects;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
-public sealed class OhtHandoffSetupViewModel : ViewModelBase
+public sealed class OhtHandoffSetupViewModel : ViewModelBase, IDisposable
 {
     private readonly Func<OhtHandoffDefinition, int> _applySetup;
     private readonly Action _clearWorkbenchPreviews;
@@ -27,15 +27,16 @@ public sealed class OhtHandoffSetupViewModel : ViewModelBase
     private string? _carrierReceivedChannelId;
     private string? _handoffReadyChannelId;
     private string? _carrierTransferredChannelId;
+    private int _disposed;
 
     public OhtHandoffSetupViewModel(Func<OhtHandoffDefinition, int> applySetup, Action clearWorkbenchPreviews)
     {
         _applySetup = applySetup;
         _clearWorkbenchPreviews = clearWorkbenchPreviews;
-        _previewCommand = new RelayCommand(_ => Preview(), _ => IsEditable && _project is not null);
-        _applyCommand = new RelayCommand(_ => Apply(), ignored => IsEditable && IsVisible && TryCreate(out _));
-        _cancelCommand = new RelayCommand(_ => ClearPreviewForCompetingSetup(), _ => IsVisible);
-        _resetCommand = new RelayCommand(_ => Reset(), _ => IsEditable && IsVisible);
+        _previewCommand = new RelayCommand(_ => Preview(), _ => !IsDisposed && IsEditable && _project is not null);
+        _applyCommand = new RelayCommand(_ => Apply(), ignored => !IsDisposed && IsEditable && IsVisible && TryCreate(out _));
+        _cancelCommand = new RelayCommand(_ => ClearPreviewForCompetingSetup(), _ => !IsDisposed && IsVisible);
+        _resetCommand = new RelayCommand(_ => Reset(), _ => !IsDisposed && IsEditable && IsVisible);
     }
 
     public ObservableCollection<LoadLockSetupOption> ConveyorOptions { get; } = new();
@@ -51,7 +52,7 @@ public sealed class OhtHandoffSetupViewModel : ViewModelBase
         get => _isEditable;
         set
         {
-            if (!SetProperty(ref _isEditable, value)) return;
+            if (IsDisposed || !SetProperty(ref _isEditable, value)) return;
             RaiseCommandStates();
         }
     }
@@ -80,6 +81,7 @@ public sealed class OhtHandoffSetupViewModel : ViewModelBase
 
     public void Load(MachineProjectDocument project)
     {
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
         _project = project ?? throw new ArgumentNullException(nameof(project));
         ClearPreviewForCompetingSetup();
         RaiseCommandStates();
@@ -87,6 +89,7 @@ public sealed class OhtHandoffSetupViewModel : ViewModelBase
 
     internal void ClearPreviewForCompetingSetup()
     {
+        if (IsDisposed) return;
         _isVisible = false;
         _savedSetup = null;
         ConveyorOptions.Clear(); InputOptions.Clear();
@@ -95,6 +98,7 @@ public sealed class OhtHandoffSetupViewModel : ViewModelBase
 
     internal void RefreshLocalization(Action reloadWorkbench)
     {
+        if (IsDisposed) return;
         var draft = IsVisible ? CaptureDraft() : null;
         reloadWorkbench();
         if (draft is not null)
@@ -106,7 +110,7 @@ public sealed class OhtHandoffSetupViewModel : ViewModelBase
 
     private void Preview()
     {
-        if (_project is null) return;
+        if (IsDisposed || _project is null) return;
         _clearWorkbenchPreviews();
         ConveyorOptions.Clear(); InputOptions.Clear();
         var layout = ResolveActiveLayout(_project);
@@ -124,11 +128,18 @@ public sealed class OhtHandoffSetupViewModel : ViewModelBase
 
     private void Apply()
     {
+        if (IsDisposed) return;
         if (!TryCreate(out var setup)) return;
         if (_applySetup(setup) > 0 || IsEquivalentToSaved(setup)) ClearPreviewForCompetingSetup(); else Preview();
     }
 
-    private void Reset() => ApplyDraft(_savedSetup is null ? Suggest() : Clone(_savedSetup));
+    private void Reset()
+    {
+        if (!IsDisposed)
+        {
+            ApplyDraft(_savedSetup is null ? Suggest() : Clone(_savedSetup));
+        }
+    }
 
     private OhtHandoffDefinition Suggest() => new()
     {
@@ -177,7 +188,7 @@ public sealed class OhtHandoffSetupViewModel : ViewModelBase
         RaiseValidationChanged();
     }
 
-    private void SetSelection(ref string? field, string? value, string propertyName) { if (SetProperty(ref field, value, propertyName)) RaiseValidationChanged(); }
+    private void SetSelection(ref string? field, string? value, string propertyName) { if (!IsDisposed && SetProperty(ref field, value, propertyName)) RaiseValidationChanged(); }
     private MachineLayoutDefinition? ActiveLayout() => _project is null ? null : ResolveActiveLayout(_project);
     private bool IsLayoutComponent(string? id, LayoutComponentKind kind) => ActiveLayout()?.Components.Any(component => component.Kind == kind && Same(component.Id, id)) == true;
     private bool IsChannel(string? id, ChannelKind kind) => _project?.Channels.Any(channel => channel.Kind == kind && Same(channel.Id, id)) == true;
@@ -199,6 +210,23 @@ public sealed class OhtHandoffSetupViewModel : ViewModelBase
     {
         _previewCommand.RaiseCanExecuteChanged(); _applyCommand.RaiseCanExecuteChanged(); _cancelCommand.RaiseCanExecuteChanged(); _resetCommand.RaiseCanExecuteChanged();
     }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _isVisible = false;
+        _savedSetup = null;
+        ConveyorOptions.Clear();
+        InputOptions.Clear();
+        RaiseChanged();
+        _previewCommand.RaiseCanExecuteChanged();
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     private static bool Distinct(string?[] values) => values.All(value => !string.IsNullOrWhiteSpace(value)) && values.Distinct(StringComparer.Ordinal).Count() == values.Length;
     private static bool Same(string? left, string? right) => string.Equals(left, right, StringComparison.Ordinal);

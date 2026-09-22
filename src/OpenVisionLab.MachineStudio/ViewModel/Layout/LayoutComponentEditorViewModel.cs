@@ -363,9 +363,25 @@ public sealed class LayoutComponentEditorViewModel : ViewModelBase, IDisposable
             : OpenVisionLanguageService.T(
                 "Inspector.PropertiesInvalid",
                 "속성을 확인하세요.",
-                "Check the authored properties.") + $" {errors[0].Message}" +
+                "Check the authored properties.") + $" {LocalizeValidationMessage(errors[0])}" +
               (errors.Length > 1 ? $" (+{errors.Length - 1})" : string.Empty);
     }
+
+    private static string LocalizeValidationMessage(MachineProjectLayoutValidationError error) =>
+        error.Code switch
+        {
+            MachineProjectLayoutValidationErrorCode.LayoutNameRequired =>
+                OpenVisionLanguageService.T(
+                    "LayoutValidation.LayoutNameRequired",
+                    "레이아웃 이름이 필요합니다.",
+                    "Every layout requires a name."),
+            MachineProjectLayoutValidationErrorCode.ComponentNameRequired =>
+                OpenVisionLanguageService.T(
+                    "LayoutValidation.ComponentNameRequired",
+                    "모든 레이아웃 구성요소에 이름이 필요합니다.",
+                    "Every layout component requires a name."),
+            _ => error.Message
+        };
 
     private static int ConvertToInt(double value) => checked((int)Math.Round(value));
 

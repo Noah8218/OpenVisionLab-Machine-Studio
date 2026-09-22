@@ -1,9 +1,12 @@
+using OpenVisionLab.Machine.Core.Axes;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Core.Layouts;
+using OpenVisionLab.Machine.Persistence.Projects;
 using OpenVisionLab.MachineStudio.Model;
 using OpenVisionLab.MachineStudio.View.Dialogs;
 using OpenVisionLab.MachineStudio.ViewModel;
 using OpenVisionLab.Wpf.MessageDialogs;
+using System.Windows.Threading;
 using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
@@ -30,6 +33,116 @@ public sealed class LayoutStartupViewModelTests
 
         Assert.False(viewModel.HasUnsavedChanges);
         Assert.DoesNotContain("*", viewModel.Title, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DisposeClearsSelectedAxisTuningEditorBeforeRuntimeShutdown()
+    {
+        var project = new MachineProjectDocument { Name = "Dispose axis editor" };
+        project.Axes.Add(new VirtualAxisDefinition
+        {
+            Id = "axis-x",
+            Name = "X Axis",
+            Unit = "mm",
+            SoftLimitMin = 0,
+            SoftLimitMax = 100,
+            MaxVelocity = 50
+        });
+        using var viewModel = new MainViewModel(project);
+        var axesNode = viewModel.ProjectTree.Roots
+            .Single()
+            .Children
+            .Single(node => node.Kind == TreeNodeKind.Axes);
+        viewModel.ProjectTree.SelectedNode = Assert.Single(axesNode.Children);
+
+        Assert.NotNull(viewModel.AxisDriveTuningEditor);
+
+        viewModel.Dispose();
+
+        Assert.Null(viewModel.AxisDriveTuningEditor);
+    }
+
+    [Fact]
+    public void ReplacedAxisTuningEditorCannotMutatePreviousAxis()
+    {
+        var firstAxis = new VirtualAxisDefinition
+        {
+            Id = "axis-first",
+            Name = "First Axis",
+            Unit = "mm",
+            SoftLimitMin = 0,
+            SoftLimitMax = 100,
+            MaxVelocity = 50
+        };
+        var secondAxis = new VirtualAxisDefinition
+        {
+            Id = "axis-second",
+            Name = "Second Axis",
+            Unit = "mm",
+            SoftLimitMin = 0,
+            SoftLimitMax = 100,
+            MaxVelocity = 60
+        };
+        var project = new MachineProjectDocument { Name = "Axis selection lifetime" };
+        project.Axes.Add(firstAxis);
+        project.Axes.Add(secondAxis);
+        using var viewModel = new MainViewModel(project);
+
+        var axesNode = viewModel.ProjectTree.Roots
+            .Single()
+            .Children
+            .Single(node => node.Kind == TreeNodeKind.Axes);
+        var firstNode = axesNode.Children.Single(node => node.Id == firstAxis.Id);
+        var secondNode = axesNode.Children.Single(node => node.Id == secondAxis.Id);
+
+        viewModel.ProjectTree.SelectedNode = firstNode;
+        var replacedEditor = Assert.IsType<AxisDriveTuningEditorViewModel>(viewModel.AxisDriveTuningEditor);
+        viewModel.ProjectTree.SelectedNode = secondNode;
+
+        replacedEditor.MaxVelocity = 77;
+        Assert.False(replacedEditor.ResetDriveDefaultsCommand.CanExecute(null));
+        replacedEditor.ResetDriveDefaultsCommand.Execute(null);
+
+        Assert.Equal(50, firstAxis.MaxVelocity);
+        Assert.Equal(60, secondAxis.MaxVelocity);
+        Assert.Equal(60, viewModel.AxisDriveTuningEditor?.MaxVelocity);
+    }
+
+    [Fact]
+    public async Task ReplacingProjectPublishesTheAppliedRuntimeSnapshotWhilePaused()
+    {
+        await RunOnStaAsync(async () =>
+        {
+            var initialProject = new ProjectDocumentStore().Load(File.ReadAllText(SamplePath));
+            var replacement = new MachineProjectDocument { Name = "Replacement" };
+            var root = Path.Combine(
+                "D:\\OpenVisionLab-TestData\\Machine",
+                "pl-0370-project-runtime-snapshot",
+                Guid.NewGuid().ToString("N"));
+            var replacementPath = Path.Combine(root, "replacement.ovmachine");
+            Directory.CreateDirectory(root);
+
+            try
+            {
+                await new ProjectDocumentFileStore().SaveAsync(replacement, replacementPath);
+                using var viewModel = new MainViewModel(initialProject, SamplePath);
+                await WaitForAsync(() => viewModel.SceneSnapshots.Latest?.ProjectId == initialProject.Id);
+
+                Assert.False(viewModel.IsRunning);
+                Assert.True(await viewModel.OpenProjectAsync(replacementPath));
+
+                Assert.Equal(replacement.Id, viewModel.SceneSnapshots.Latest?.ProjectId);
+                Assert.Empty(viewModel.ConditionScenarioTargets);
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+            return true;
+        });
     }
 
     [Fact]
@@ -126,6 +239,29 @@ public sealed class LayoutStartupViewModelTests
 
         Assert.Equal(originalCount, viewModel.Layout.Items.Count);
         Assert.Equal(source.Id, viewModel.Layout.SelectedItem?.Id);
+    }
+
+    [Fact]
+    public async Task LayoutDefinitionChangeNotifiesSelectedEquipmentStatus()
+    {
+        var project = new ProjectDocumentStore().Load(File.ReadAllText(SamplePath));
+        using var viewModel = new MainViewModel(project);
+        var selected = viewModel.Layout.Items.First(item => item.Component is not null);
+        viewModel.Layout.Select(selected.Id);
+        await Task.Delay(200);
+        var notifications = 0;
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(MainViewModel.SelectedEquipmentStatus))
+            {
+                notifications++;
+            }
+        };
+
+        selected.CurrentName = $"{selected.Name} Renamed";
+
+        Assert.Equal(selected.Name, viewModel.SelectedEquipmentStatus?.Name);
+        Assert.Equal(1, notifications);
     }
 
     [Fact]
@@ -347,6 +483,37 @@ public sealed class LayoutStartupViewModelTests
         }
 
         Assert.True(condition(), "The initial runtime configuration did not become observable.");
+    }
+
+    private static Task<T> RunOnStaAsync<T>(Func<Task<T>> action)
+    {
+        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
+            _ = RunAsync();
+            Dispatcher.Run();
+
+            async Task RunAsync()
+            {
+                try
+                {
+                    completion.SetResult(await action());
+                }
+                catch (Exception exception)
+                {
+                    completion.SetException(exception);
+                }
+                finally
+                {
+                    dispatcher.BeginInvokeShutdown(DispatcherPriority.Normal);
+                }
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        return completion.Task;
     }
 
     private static bool Overlaps(

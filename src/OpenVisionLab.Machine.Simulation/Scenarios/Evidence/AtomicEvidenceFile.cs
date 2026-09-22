@@ -1,7 +1,7 @@
 namespace OpenVisionLab.Machine.Simulation.Scenarios;
 
 /// <summary>
-/// Owns temporary-file lifetime and replacement for Simulation JSON artifacts.
+/// Owns temporary-file lifetime and replacement for Simulation artifacts.
 /// Callers retain validation, path preparation, serialization, and encoding.
 /// </summary>
 internal static class AtomicEvidenceFile

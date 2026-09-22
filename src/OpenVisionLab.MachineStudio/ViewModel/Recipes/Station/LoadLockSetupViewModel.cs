@@ -29,6 +29,7 @@ public sealed class LoadLockSetupViewModel : ViewModelBase
     private string? _atmosphereReadySensorChannelId;
     private string _pumpDownDurationText = string.Empty;
     private string _ventDurationText = string.Empty;
+    private int _disposed;
 
     public LoadLockSetupViewModel(
         Func<LoadLockDefinition, int> applyLoadLockSetup,
@@ -36,10 +37,10 @@ public sealed class LoadLockSetupViewModel : ViewModelBase
     {
         _applyLoadLockSetup = applyLoadLockSetup;
         _clearWorkbenchPreviews = clearWorkbenchPreviews;
-        _previewCommand = new RelayCommand(_ => Preview(), _ => IsEditable && _project is not null);
-        _applyCommand = new RelayCommand(_ => Apply(), _ => IsEditable && IsVisible && TryCreate(out LoadLockDefinition _));
-        _cancelCommand = new RelayCommand(_ => ClearAll(), _ => IsVisible);
-        _resetCommand = new RelayCommand(_ => Reset(), _ => IsEditable && IsVisible);
+        _previewCommand = new RelayCommand(_ => Preview(), _ => !IsDisposed && IsEditable && _project is not null);
+        _applyCommand = new RelayCommand(_ => Apply(), _ => !IsDisposed && IsEditable && IsVisible && TryCreate(out LoadLockDefinition _));
+        _cancelCommand = new RelayCommand(_ => ClearAll(), _ => !IsDisposed && IsVisible);
+        _resetCommand = new RelayCommand(_ => Reset(), _ => !IsDisposed && IsEditable && IsVisible);
     }
 
     public ObservableCollection<LoadLockSetupOption> DoorOptions { get; } = new();
@@ -56,7 +57,7 @@ public sealed class LoadLockSetupViewModel : ViewModelBase
         get => _isEditable;
         set
         {
-            if (!SetProperty(ref _isEditable, value)) return;
+            if (IsDisposed || !SetProperty(ref _isEditable, value)) return;
             RaiseCommandStates();
         }
     }
@@ -90,15 +91,27 @@ public sealed class LoadLockSetupViewModel : ViewModelBase
 
     public void Load(MachineProjectDocument project)
     {
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
         _project = project ?? throw new ArgumentNullException(nameof(project));
         ClearAll();
         RaiseCommandStates();
     }
 
-    public void ClearPreviewForCompetingSetup() => ClearAll();
+    public void ClearPreviewForCompetingSetup()
+    {
+        if (!IsDisposed)
+        {
+            ClearAll();
+        }
+    }
 
     internal void RefreshLocalization(Action reloadWorkbench)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         (string? OuterDoor, string? InnerDoor, string? Evacuate, string? Vent, string? VacuumReady, string? AtmosphereReady, string PumpDown, string VentDuration)? draft = IsVisible ? CaptureDraft() : null;
         reloadWorkbench();
         if (draft is not null)
@@ -110,7 +123,7 @@ public sealed class LoadLockSetupViewModel : ViewModelBase
 
     private void Preview()
     {
-        if (_project is null) return;
+        if (IsDisposed || _project is null) return;
         _clearWorkbenchPreviews();
         DoorOptions.Clear(); OutputOptions.Clear(); InputOptions.Clear();
         var layout = ResolveActiveLayout(_project);
@@ -141,15 +154,31 @@ public sealed class LoadLockSetupViewModel : ViewModelBase
 
     private void Apply()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         if (!TryCreate(out var setup)) return;
         if (_applyLoadLockSetup(setup) > 0 || IsEquivalentToSaved(setup)) ClearAll();
         else Preview();
     }
 
-    private void Reset() => ApplyDraft(_savedSetup is null ? Suggest() : Clone(_savedSetup));
+    private void Reset()
+    {
+        if (!IsDisposed)
+        {
+            ApplyDraft(_savedSetup is null ? Suggest() : Clone(_savedSetup));
+        }
+    }
 
     private void ClearAll()
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         _isVisible = false;
         _savedSetup = null;
         DoorOptions.Clear(); OutputOptions.Clear(); InputOptions.Clear();
@@ -192,11 +221,13 @@ public sealed class LoadLockSetupViewModel : ViewModelBase
 
     private void SetSelection(ref string? field, string? value, string propertyName)
     {
+        if (IsDisposed) return;
         if (SetProperty(ref field, value, propertyName)) RaiseValidationChanged();
     }
 
     private void SetText(ref string field, string value, string propertyName)
     {
+        if (IsDisposed) return;
         if (SetProperty(ref field, value, propertyName)) RaiseValidationChanged();
     }
 
@@ -307,6 +338,24 @@ public sealed class LoadLockSetupViewModel : ViewModelBase
         _cancelCommand.RaiseCanExecuteChanged();
         _resetCommand.RaiseCanExecuteChanged();
     }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _isVisible = false;
+        _savedSetup = null;
+        DoorOptions.Clear();
+        OutputOptions.Clear();
+        InputOptions.Clear();
+        RaiseChanged();
+        _previewCommand.RaiseCanExecuteChanged();
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     private static bool Same(string? left, string? right) => string.Equals(left, right, StringComparison.Ordinal);
 

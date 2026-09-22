@@ -13,6 +13,8 @@ internal sealed class SimulationEngineLifecycle : IDisposable
     private readonly Func<SimulationEngineTerminationOutcome, Exception?, SimulationEngineTerminationResult>
         _terminationFactory;
     private readonly Func<SimulationSnapshot> _currentSnapshotFactory;
+    // Internal measurement seam; normal engine construction leaves it null.
+    private readonly Action<SimulationCommand>? _commandAdmissionObserver;
     private readonly CancellationTokenSource _stopCts = new();
     private readonly TaskCompletionSource<SimulationEngineTerminationResult> _termination =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -30,13 +32,15 @@ internal sealed class SimulationEngineLifecycle : IDisposable
         SimulationEventPublisher eventPublisher,
         LatestSnapshotStore snapshotStore,
         Func<SimulationEngineTerminationOutcome, Exception?, SimulationEngineTerminationResult> terminationFactory,
-        Func<SimulationSnapshot> currentSnapshotFactory)
+        Func<SimulationSnapshot> currentSnapshotFactory,
+        Action<SimulationCommand>? commandAdmissionObserver = null)
     {
         _commandChannel = commandChannel ?? throw new ArgumentNullException(nameof(commandChannel));
         _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
         _snapshotStore = snapshotStore ?? throw new ArgumentNullException(nameof(snapshotStore));
         _terminationFactory = terminationFactory ?? throw new ArgumentNullException(nameof(terminationFactory));
         _currentSnapshotFactory = currentSnapshotFactory ?? throw new ArgumentNullException(nameof(currentSnapshotFactory));
+        _commandAdmissionObserver = commandAdmissionObserver;
     }
 
     internal bool HasStarted => _runTask is not null;
@@ -136,7 +140,14 @@ internal sealed class SimulationEngineLifecycle : IDisposable
             return CompleteLifecycleRejection(command, GetClosedChannelError());
         }
 
-        return await command.Completion.WaitAsync(cancellationToken).ConfigureAwait(false);
+        // WriteAsync success is the channel admission boundary. The optional
+        // observer records that boundary without changing the public contract.
+        _commandAdmissionObserver?.Invoke(command);
+
+        // Once WriteAsync succeeds, the command cannot be retracted. Return the
+        // authoritative applied/rejected result instead of making cancellation
+        // look like the command was never executed.
+        return await command.Completion.ConfigureAwait(false);
     }
 
     internal void CompleteAppliedCommands(IEnumerable<PendingSimulationCommand> pendingCommands)
@@ -260,6 +271,9 @@ internal sealed class SimulationEngineLifecycle : IDisposable
     {
         foreach (var pendingCommand in pendingCommands)
         {
+            var detail = CreatePendingCommandTerminationDetail(
+                termination,
+                pendingCommand.Result);
             pendingCommand.Command.TryComplete(
                 SimulationCommandResult.Rejected(
                     pendingCommand.Command,
@@ -268,8 +282,29 @@ internal sealed class SimulationEngineLifecycle : IDisposable
                     termination.Outcome == SimulationEngineTerminationOutcome.Faulted
                         ? SimulationCommandErrorCode.EngineFaulted
                         : SimulationCommandErrorCode.EngineStopped,
-                    CreateTerminationDetail(termination)));
+                    detail));
         }
+    }
+
+    private static string CreatePendingCommandTerminationDetail(
+        SimulationEngineTerminationResult termination,
+        SimulationCommandResult? applicationResult)
+    {
+        var outcomeDetail = applicationResult switch
+        {
+            { IsAccepted: true } =>
+                "applicationOutcome=AppliedThenTerminated. The command was applied before termination; " +
+                "the resulting state may have changed. Do not retry automatically; reconcile the latest " +
+                "snapshot and diagnostic first.",
+            null =>
+                "applicationOutcome=OutcomeUnknown. The command may have changed state before termination. " +
+                "Do not retry automatically; reconcile the latest snapshot and diagnostic first.",
+            _ => null
+        };
+        var terminationDetail = CreateTerminationDetail(termination);
+        return outcomeDetail is null
+            ? terminationDetail
+            : $"{terminationDetail} {outcomeDetail}";
     }
 
     private static string CreateTerminationDetail(SimulationEngineTerminationResult termination)
