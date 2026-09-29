@@ -28,8 +28,11 @@ that stay within the supported local desktop scope.
    dotnet test OpenVisionLab.MachineStudio.sln -c Release --no-build
    ```
 
-6. For UI changes, include current-build evidence at `1280x760` and
-   `1920x1040` and follow the repository UI/performance requirements.
+6. For UI changes, include before/after evidence from the actual application
+   on a 1920x1080 display, excluding the taskbar. Record the actual work-area
+   size, language, data state and DPI. Check compact layouts and supported
+   100%/125% scaling where available; state untested cases explicitly.
+   In-process rendering and ViewModel tests do not replace desktop interaction.
 7. Update user documentation only for behavior included in the same pull
    request.
 

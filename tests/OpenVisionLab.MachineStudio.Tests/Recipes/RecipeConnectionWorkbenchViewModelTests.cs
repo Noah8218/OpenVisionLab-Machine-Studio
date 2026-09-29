@@ -473,6 +473,196 @@ public sealed class RecipeConnectionWorkbenchViewModelTests
     }
 
     [Fact]
+    public void SelectingValidationIssueNavigatesToRowWithoutRunningWorkflow()
+    {
+        var project = new MachineProjectDocument { Name = "Validation issue navigation" };
+        var layout = new MachineLayoutDefinition { Id = "layout", Name = "Layout" };
+        layout.Components.Add(new LayoutComponentDefinition
+        {
+            Id = "stage",
+            Name = "Stage",
+            Kind = LayoutComponentKind.LinearStage
+        });
+        project.Layouts.Add(layout);
+        project.Simulation.ActiveLayoutId = layout.Id;
+
+        var selectionEvents = new List<string?>();
+        var applied = 0;
+        var dryRun = 0;
+        var playback = 0;
+        var viewModel = CreateViewModel(
+            () => applied++,
+            () => dryRun++,
+            () => playback++,
+            selectComponent: selectionEvents.Add);
+        viewModel.Load(project);
+
+        var issue = Assert.Single(viewModel.ValidationIssues);
+        Assert.Equal("stage", issue.ComponentId);
+        Assert.Equal("Component.BehaviorBindingId", issue.PropertyName);
+        viewModel.SelectedValidationIssue = issue;
+
+        Assert.Equal("stage", viewModel.SelectedRow?.ComponentId);
+        Assert.Equal(new[] { "stage" }, selectionEvents);
+        Assert.Equal(0, applied);
+        Assert.Equal(0, dryRun);
+        Assert.Equal(0, playback);
+    }
+
+    [Fact]
+    public void SelectingValidationIssueNavigatesToFirstSequenceStepAndPreservesAuthoredState()
+    {
+        var project = new MachineProjectDocument { Name = "Validation sequence navigation" };
+        var layout = new MachineLayoutDefinition { Id = "layout", Name = "Layout" };
+        layout.Components.Add(new LayoutComponentDefinition
+        {
+            Id = "stage",
+            Name = "Stage",
+            Kind = LayoutComponentKind.LinearStage
+        });
+        project.Layouts.Add(layout);
+        project.Simulation.ActiveLayoutId = layout.Id;
+        project.Sequences.Add(new SequenceDefinition
+        {
+            Id = "sequence",
+            Name = "Sequence",
+            Steps =
+            [
+                new SequenceStepDefinition
+                {
+                    Id = "stage-step",
+                    Name = "Move stage",
+                    Action = SequenceStepAction.MoveAxis,
+                    TargetId = "stage"
+                }
+            ]
+        });
+
+        var selectionEvents = new List<string?>();
+        var openedSteps = new List<(string SequenceId, string StepId)>();
+        var statuses = new List<string>();
+        var viewModel = CreateViewModel(
+            () => { },
+            () => { },
+            () => { },
+            selectComponent: selectionEvents.Add,
+            openSequenceStep: (sequenceId, stepId) => openedSteps.Add((sequenceId, stepId)),
+            setStatus: statuses.Add);
+        viewModel.Load(project);
+
+        var issue = Assert.Single(viewModel.ValidationIssues);
+        Assert.Equal(RecipeConnectionValidationTargetKind.SequenceStep, issue.TargetKind);
+        Assert.Equal("sequence", issue.SequenceId);
+        Assert.Equal("stage-step", issue.StepId);
+        Assert.Contains("sequence", issue.LocationText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("stage-step", issue.LocationText, StringComparison.Ordinal);
+        viewModel.SelectedValidationIssue = issue;
+
+        Assert.Equal("stage", viewModel.SelectedRow?.ComponentId);
+        Assert.Equal(new[] { "stage" }, selectionEvents);
+        Assert.Equal(new[] { ("sequence", "stage-step") }, openedSteps);
+        Assert.Empty(statuses);
+        Assert.Equal("stage", project.Layouts[0].Components[0].Id);
+
+        project.Axes.Add(new OpenVisionLab.Machine.Core.Axes.VirtualAxisDefinition { Id = "axis" });
+        project.Layouts[0].Components[0].BehaviorBindingId = "axis";
+        viewModel.Load(project, "stage");
+        Assert.Empty(viewModel.ValidationIssues);
+        Assert.Equal("stage", viewModel.SelectedRow?.ComponentId);
+    }
+
+    [Fact]
+    public void SelectingStaleValidationIssueClearsSelectionAndReportsUnavailableTarget()
+    {
+        var project = new MachineProjectDocument { Name = "Stale validation issue" };
+        var layout = new MachineLayoutDefinition { Id = "layout", Name = "Layout" };
+        layout.Components.Add(new LayoutComponentDefinition
+        {
+            Id = "stage",
+            Name = "Stage",
+            Kind = LayoutComponentKind.LinearStage
+        });
+        project.Layouts.Add(layout);
+        project.Simulation.ActiveLayoutId = layout.Id;
+
+        var statuses = new List<string>();
+        var openedSteps = new List<(string SequenceId, string StepId)>();
+        var viewModel = CreateViewModel(
+            () => { },
+            () => { },
+            () => { },
+            openSequenceStep: (sequenceId, stepId) => openedSteps.Add((sequenceId, stepId)),
+            setStatus: statuses.Add);
+        viewModel.Load(project);
+        var issue = Assert.Single(viewModel.ValidationIssues);
+
+        viewModel.Load(new MachineProjectDocument { Name = "Replacement" });
+        viewModel.SelectedValidationIssue = issue;
+
+        Assert.Null(viewModel.SelectedRow);
+        Assert.Empty(openedSteps);
+        Assert.Equal(
+            string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                OpenVisionLanguageService.T("Connections.ValidationTargetUnavailableStatus"),
+                "stage"),
+            Assert.Single(statuses));
+    }
+
+    [Fact]
+    public void SelectingStaleSequenceTargetKeepsOwningComponentAndReportsUnavailableTarget()
+    {
+        var project = new MachineProjectDocument { Name = "Stale sequence target" };
+        var layout = new MachineLayoutDefinition { Id = "layout", Name = "Layout" };
+        layout.Components.Add(new LayoutComponentDefinition
+        {
+            Id = "stage",
+            Name = "Stage",
+            Kind = LayoutComponentKind.LinearStage
+        });
+        project.Layouts.Add(layout);
+        project.Simulation.ActiveLayoutId = layout.Id;
+        var sequence = new SequenceDefinition
+        {
+            Id = "sequence",
+            Name = "Sequence",
+            Steps =
+            [
+                new SequenceStepDefinition
+                {
+                    Id = "stage-step",
+                    Name = "Move stage",
+                    Action = SequenceStepAction.MoveAxis,
+                    TargetId = "stage"
+                }
+            ]
+        };
+        project.Sequences.Add(sequence);
+
+        var statuses = new List<string>();
+        var openedSteps = new List<(string SequenceId, string StepId)>();
+        var viewModel = CreateViewModel(
+            () => { },
+            () => { },
+            () => { },
+            openSequenceStep: (sequenceId, stepId) => openedSteps.Add((sequenceId, stepId)),
+            setStatus: statuses.Add);
+        viewModel.Load(project);
+        var issue = Assert.Single(viewModel.ValidationIssues);
+        Assert.Equal(RecipeConnectionValidationTargetKind.SequenceStep, issue.TargetKind);
+
+        viewModel.SelectedValidationIssue = issue;
+        openedSteps.Clear();
+        sequence.Steps.Clear();
+        viewModel.SelectedValidationIssue = null;
+        viewModel.SelectedValidationIssue = issue;
+
+        Assert.Equal("stage", viewModel.SelectedRow?.ComponentId);
+        Assert.Empty(openedSteps);
+        Assert.Contains("sequence/stage-step", Assert.Single(statuses));
+    }
+
+    [Fact]
     public void DisposeNotifiesParentCommandsOfFinalAdmission()
     {
         var project = new ProjectDocumentStore().Load(File.ReadAllText(Path.Combine(
@@ -824,7 +1014,9 @@ public sealed class RecipeConnectionWorkbenchViewModelTests
         Action playback,
         Func<SemiconductorStationSetupDefinition, int>? applyStationSkeleton = null,
         Action<string?>? selectComponent = null,
-        Func<string, string?>? addSequenceStep = null)
+        Func<string, string?>? addSequenceStep = null,
+        Action<string, string>? openSequenceStep = null,
+        Action<string>? setStatus = null)
     {
         int Apply()
         {
@@ -834,7 +1026,7 @@ public sealed class RecipeConnectionWorkbenchViewModelTests
 
         return new RecipeConnectionWorkbenchViewModel(
             selectComponent: selectComponent ?? (_ => { }),
-            openSequenceStep: (_, _) => { },
+            openSequenceStep: openSequenceStep ?? ((_, _) => { }),
             addSequenceStep: addSequenceStep ?? (_ => null),
             validateSimulationReadiness: () => null,
             previewSequenceStep: (_, _, _) => throw new InvalidOperationException(),
@@ -854,6 +1046,7 @@ public sealed class RecipeConnectionWorkbenchViewModelTests
             applyOhtHandoffSetup: _ => Apply(),
             applyProcessBlock: _ => 0,
             applyProcessBlockTimeouts: _ => 0,
-            checkpointTemplateApplied: _ => { });
+            checkpointTemplateApplied: _ => { },
+            setStatus: setStatus ?? (_ => { }));
     }
 }

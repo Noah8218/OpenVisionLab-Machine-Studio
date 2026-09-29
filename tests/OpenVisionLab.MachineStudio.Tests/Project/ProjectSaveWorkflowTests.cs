@@ -106,6 +106,42 @@ public sealed class ProjectSaveWorkflowTests
         }
     }
 
+    [Fact]
+    public async Task SaveWithReceiptAppliesWhenLegacySchemaIsNormalizedByFileStore()
+    {
+        var directory = CreateTestDirectory();
+        try
+        {
+            var project = new MachineProjectDocument
+            {
+                Name = "Legacy receipt",
+                Schema = "1.5"
+            };
+            var workflow = CreateWorkflow(
+                project,
+                prepareProject: _ => { },
+                persistScenarioBatchArtifacts: _ => { },
+                persistMultiAxisResult: _ => { },
+                persistVisionEvidence: _ => { });
+            var session = new ProjectDocumentSession(
+                new ProjectDocumentStore(),
+                project,
+                currentPath: null);
+
+            var receipt = await workflow.SaveWithReceiptAsync(
+                Path.Combine(directory, "legacy-receipt.ovmachine"),
+                session.SessionId,
+                session.Revision);
+
+            Assert.True(session.TryApplySave(receipt));
+            Assert.Equal(receipt.SavedPath, session.CurrentPath);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static ProjectSaveWorkflow CreateWorkflow(
         MachineProjectDocument project,
         Action<MachineProjectDocument> prepareProject,

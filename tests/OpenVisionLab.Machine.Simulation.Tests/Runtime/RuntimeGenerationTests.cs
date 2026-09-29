@@ -149,6 +149,80 @@ public sealed class RuntimeGenerationTests
         Assert.Contains("project-b", rejection.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ResetRejectsQueuedOldIdentityBeforePublishingNewSnapshot()
+    {
+        var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var holdNextApplication = 0;
+        using var engine = new FixedStepSimulationEngine(new SimulationSettings(), point =>
+        {
+            if (point == SimulationEngineFaultPoint.AfterCommandApplication
+                && Interlocked.Exchange(ref holdNextApplication, 0) == 1)
+            {
+                applied.SetResult();
+                release.Task.GetAwaiter().GetResult();
+            }
+        });
+        await engine.StartAsync();
+        StepCommand? delayed = null;
+        try
+        {
+            Assert.True((await engine.EnqueueCommandAsync(
+                new ConfigureRuntimeCommand(CreateAxisRuntime(), "project-reset"))).IsAccepted);
+            var old = engine.CurrentSnapshot;
+            var oldIdentity = new SimulationRuntimeIdentity(old.ProjectId, old.RuntimeGeneration);
+            delayed = new StepCommand { ExpectedRuntime = oldIdentity };
+            Volatile.Write(ref holdNextApplication, 1);
+            var reset = engine.EnqueueCommandAsync(new ResetCommand());
+            await applied.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // Reset has changed owned state, but the old public snapshot is still visible.
+            Assert.Equal(old.RuntimeGeneration, engine.CurrentSnapshot.RuntimeGeneration);
+            var queued = engine.EnqueueCommandAsync(delayed);
+            Assert.False(queued.IsCompleted);
+            release.SetResult();
+
+            var resetResult = await reset.WaitAsync(TimeSpan.FromSeconds(5));
+            var staleResult = await queued.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.True(resetResult.IsAccepted, resetResult.Detail);
+            Assert.False(staleResult.IsAccepted);
+            Assert.Equal(SimulationCommandErrorCode.RuntimeIdentityMismatch, staleResult.ErrorCode);
+            Assert.Equal(delayed.CommandId, staleResult.CommandId);
+
+            var current = engine.CurrentSnapshot;
+            Assert.Equal("project-reset", current.ProjectId);
+            Assert.Equal(old.RuntimeGeneration + 1, current.RuntimeGeneration);
+            Assert.Equal(0, current.TickIndex);
+            Assert.Equal(TimeSpan.Zero, current.SimulationTime);
+            Assert.Equal(SimulationRunMode.Paused, current.RunMode);
+            Assert.Equal(SimulationControlOwner.Definition, current.ControlOwner);
+            Assert.Equal(AxisState.Idle, Assert.Single(current.Axes).State);
+            var trace = engine.CommandTrace.Last();
+            Assert.Equal(nameof(StepCommand), trace.CommandType);
+            Assert.False(trace.IsAccepted);
+            Assert.Equal(SimulationCommandErrorCode.RuntimeIdentityMismatch, trace.ErrorCode);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await engine.StopAsync();
+        }
+
+        var events = new List<SimulationEvent>();
+        await foreach (var item in engine.ReadCanonicalEventsAsync())
+        {
+            if (item.CommandId == delayed!.CommandId) events.Add(item);
+        }
+
+        var rejection = Assert.Single(events);
+        Assert.Equal("Command", rejection.Category);
+        Assert.Equal("CommandRejected", rejection.Code);
+        Assert.Contains("project-reset", rejection.Message, StringComparison.Ordinal);
+        Assert.Contains("generation 1", rejection.Message, StringComparison.Ordinal);
+        Assert.Contains("generation 2", rejection.Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("pause", "project")]
     [InlineData("manual", "project")]

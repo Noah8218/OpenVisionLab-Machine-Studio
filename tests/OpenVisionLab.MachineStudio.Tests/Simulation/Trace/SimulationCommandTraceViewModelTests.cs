@@ -217,6 +217,40 @@ public sealed class SimulationCommandTraceViewModelTests
     }
 
     [Fact]
+    public async Task IncompleteTraceDisablesExportAfterAnOverflowBoundary()
+    {
+        OpenVisionLanguageService.Load();
+        using var engine = new FixedStepSimulationEngine(new SimulationSettings
+        {
+            FixedStep = TimeSpan.FromMilliseconds(5),
+            CommandTraceEntryCapacity = 1
+        });
+        using var viewModel = new SimulationCommandTraceViewModel(
+            () => true,
+            () => engine,
+            _ => { },
+            () => { },
+            () => { },
+            _ => { },
+            _ => { },
+            () => { },
+            () => Task.CompletedTask,
+            _ => { });
+
+        await engine.StartAsync();
+        viewModel.StartCaptureCommand.Execute(null);
+        Assert.True((await engine.EnqueueCommandAsync(new StepCommand())).IsAccepted);
+        Assert.True((await engine.EnqueueCommandAsync(new PauseCommand())).IsAccepted);
+
+        Assert.Equal(1, viewModel.EntryCount);
+        Assert.Equal(1, viewModel.DroppedEntryCount);
+        Assert.False(engine.CommandTraceIsComplete);
+        Assert.False(viewModel.CanExportTrace);
+
+        await engine.StopAsync();
+    }
+
+    [Fact]
     public void RuntimePredicateAndEngineGuardDisableCommands()
     {
         OpenVisionLanguageService.Load();

@@ -215,6 +215,7 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
     public string CurrentCameraEvidenceDetailsText => string.Join(
         Environment.NewLine,
         $"{OpenVisionLanguageService.T("Camera.ResultSource")}: {CurrentCameraResultSourceText}",
+        $"{OpenVisionLanguageService.T("Camera.WorkpieceAssociation")}: {_presentation.CurrentCameraWorkpieceComponentIdText}",
         $"{OpenVisionLanguageService.T("Camera.VerificationLevel")}: {CurrentCameraVerificationLevelText}",
         $"{OpenVisionLanguageService.T("Camera.ClockMode")}: {CurrentCameraClockModeText}",
         $"{OpenVisionLanguageService.T("Camera.InputHash")}: {CurrentCameraInputHashText}",

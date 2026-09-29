@@ -121,6 +121,31 @@ public class DeterministicVirtualCameraTests
     }
 
     [Fact]
+    public void Trigger_RejectsBusyCameraWithoutReplacingWorkpieceAssociation()
+    {
+        var camera = CreateCamera(exposureTicks: 2, transferTicks: 2);
+        camera.Trigger(
+            "recipe.first",
+            workpieceComponentId: "workpiece.first",
+            workpieceInstanceId: "run-0001/WP-001");
+
+        var rejection = camera.Trigger(
+            "recipe.repeated",
+            workpieceComponentId: "workpiece.repeated",
+            workpieceInstanceId: "run-0001/WP-002");
+        Assert.False(rejection.IsAccepted);
+        Assert.Equal(VirtualCameraTriggerErrorCode.CameraBusy, rejection.ErrorCode);
+
+        camera.Tick();
+        camera.Tick();
+        camera.Tick();
+        var completed = camera.Tick().CompletedAcquisition;
+        Assert.NotNull(completed);
+        Assert.Equal("workpiece.first", completed.WorkpieceComponentId);
+        Assert.Equal("run-0001/WP-001", completed.WorkpieceInstanceId);
+    }
+
+    [Fact]
     public void FrameReady_AllowsRetriggerWithNextDeterministicAcquisitionId()
     {
         var camera = CreateCamera(exposureTicks: 1, transferTicks: 1);
@@ -163,6 +188,52 @@ public class DeterministicVirtualCameraTests
 
         var afterReset = camera.Trigger("recipe.pass");
         Assert.Equal("camera-top/frame/00000001", afterReset.AcquisitionId);
+    }
+
+    [Theory]
+    [InlineData(false, null)]
+    [InlineData(true, null)]
+    [InlineData(true, "workpiece.next")]
+    public void ResetAfterInterruptedAssociatedAcquisition_DoesNotLeakPreviousWorkpiece(
+        bool faultBeforeReset,
+        string? retryWorkpieceComponentId)
+    {
+        var camera = CreateCamera(exposureTicks: 2, transferTicks: 2);
+        var firstTrigger = camera.Trigger(
+            "recipe.first",
+            workpieceComponentId: "workpiece.previous",
+            workpieceInstanceId: "run-0001/WP-001");
+
+        Assert.True(firstTrigger.IsAccepted);
+        if (faultBeforeReset)
+        {
+            camera.Fault();
+        }
+
+        camera.Reset();
+        var reset = camera.CaptureSnapshot();
+        Assert.Equal(VirtualCameraState.Idle, reset.State);
+        Assert.Equal(0, reset.AcquisitionOrdinal);
+        Assert.Null(reset.CurrentAcquisitionId);
+        Assert.Null(reset.CurrentRecipeId);
+        Assert.Null(reset.Result);
+
+        var retry = camera.Trigger(
+            "recipe.retry",
+            workpieceComponentId: retryWorkpieceComponentId,
+            workpieceInstanceId: retryWorkpieceComponentId is null ? null : "run-0002/WP-001");
+        camera.Tick();
+        camera.Tick();
+        camera.Tick();
+        var completed = camera.Tick().CompletedAcquisition;
+
+        Assert.True(retry.IsAccepted);
+        Assert.Equal("camera-top/frame/00000001", retry.AcquisitionId);
+        Assert.NotNull(completed);
+        Assert.Equal(retryWorkpieceComponentId, completed.WorkpieceComponentId);
+        Assert.Equal(
+            retryWorkpieceComponentId is null ? null : "run-0002/WP-001",
+            completed.WorkpieceInstanceId);
     }
 
     [Fact]
@@ -283,6 +354,151 @@ public class DeterministicVirtualCameraTests
         Assert.Equal(VirtualCameraTriggerErrorCode.FrameEvidenceInvalid, result.ErrorCode);
         Assert.Equal(initial, camera.CaptureSnapshot());
     }
+
+    [Fact]
+    public void ExternalResultMode_StopsAfterTransferWithoutCreatingPlaceholderDecision()
+    {
+        var camera = CreateCamera(exposureTicks: 1, transferTicks: 1);
+        var frame = CreateFrameEvidence();
+
+        var trigger = camera.Trigger(
+            "recipe.pass",
+            frame,
+            inspectionEvidence: null,
+            waitForExternalResult: true);
+        camera.Tick();
+        var pending = camera.Tick();
+
+        Assert.True(trigger.IsAccepted);
+        Assert.Equal(VirtualCameraState.AwaitingExternalResult, pending.Snapshot.State);
+        Assert.Equal(VirtualCameraTickTransition.ExternalResultPending, pending.Transition);
+        Assert.Null(pending.CompletedAcquisition);
+        Assert.Null(pending.Snapshot.Result);
+        Assert.Equal(frame, pending.Snapshot.FrameEvidence);
+        Assert.Equal(
+            VirtualCameraTriggerErrorCode.CameraBusy,
+            camera.Trigger("recipe.pass").ErrorCode);
+    }
+
+    [Fact]
+    public void ApplyExternalResult_PreservesEvidenceAndHandlesReplayConflictAndReset()
+    {
+        var camera = CreatePendingExternalResultCamera("run-0001/WP-001");
+        var evidence = CreateExternalEvidence(PlaceholderInspectionDecision.Fail);
+
+        var applied = camera.ApplyExternalResult(evidence);
+        var snapshot = camera.CaptureSnapshot();
+        var acquisition = Assert.IsType<VirtualCameraAcquisitionResult>(snapshot.Result);
+
+        Assert.True(applied.IsAccepted);
+        Assert.False(applied.IsIdempotent);
+        Assert.Equal(VirtualCameraState.FrameReady, snapshot.State);
+        Assert.Equal(PlaceholderInspectionDecision.Fail, acquisition.Decision);
+        Assert.Equal("run-0001/WP-001", acquisition.WorkpieceInstanceId);
+        Assert.Equal(evidence, acquisition.ExternalResultEvidence);
+        Assert.Equal(evidence, snapshot.ExternalResultEvidence);
+
+        var replay = camera.ApplyExternalResult(evidence);
+        Assert.True(replay.IsAccepted);
+        Assert.True(replay.IsIdempotent);
+        Assert.Equal(snapshot, camera.CaptureSnapshot());
+
+        var conflict = camera.ApplyExternalResult(evidence with { ResultMessageId = Guid.NewGuid() });
+        Assert.False(conflict.IsAccepted);
+        Assert.Equal(
+            VirtualCameraExternalResultAdmissionErrorCode.ConflictingDuplicate,
+            conflict.ErrorCode);
+        Assert.Equal(snapshot, camera.CaptureSnapshot());
+
+        camera.Reset();
+        var reset = camera.CaptureSnapshot();
+        Assert.Equal(VirtualCameraState.Idle, reset.State);
+        Assert.Null(reset.ExternalResultEvidence);
+    }
+
+    [Fact]
+    public void ApplyExternalTerminalFailure_FailsClosedUntilReset()
+    {
+        var camera = CreatePendingExternalResultCamera();
+
+        var applied = camera.ApplyExternalResult(CreateExternalEvidence(decision: null));
+
+        Assert.True(applied.IsAccepted);
+        Assert.True(applied.IsTerminalFailure);
+        Assert.Equal(VirtualCameraState.Faulted, camera.CaptureSnapshot().State);
+        Assert.Null(camera.CaptureSnapshot().Result);
+        Assert.Equal(
+            VirtualCameraTriggerErrorCode.CameraFaulted,
+            camera.Trigger("recipe.pass").ErrorCode);
+
+        camera.Reset();
+        Assert.Equal(VirtualCameraState.Idle, camera.CaptureSnapshot().State);
+    }
+
+    private static DeterministicVirtualCamera CreatePendingExternalResultCamera(
+        string? workpieceInstanceId = null)
+    {
+        var camera = CreateCamera(exposureTicks: 1, transferTicks: 1);
+        Assert.True(camera.Trigger(
+            "recipe.pass",
+            CreateFrameEvidence(),
+            inspectionEvidence: null,
+            waitForExternalResult: true,
+            workpieceComponentId: workpieceInstanceId is null ? null : "workpiece.top",
+            workpieceInstanceId: workpieceInstanceId).IsAccepted);
+        camera.Tick();
+        camera.Tick();
+        Assert.Equal(VirtualCameraState.AwaitingExternalResult, camera.CaptureSnapshot().State);
+        return camera;
+    }
+
+    private static VirtualCameraFrameEvidence CreateFrameEvidence() =>
+        new(
+            "camera-top/frame/00000001",
+            "assets/presence-check.pgm",
+            new string('A', 64),
+            42,
+            16,
+            12,
+            "Mono8");
+
+    private static VirtualCameraExternalResultEvidence CreateExternalEvidence(
+        PlaceholderInspectionDecision? decision) =>
+        new(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            Guid.Parse("33333333-3333-3333-3333-333333333333"),
+            Guid.Parse("44444444-4444-4444-4444-444444444444"),
+            new string('C', 64),
+            new ExternalInspectionCorrelationIdentity(
+                "project",
+                "1.0",
+                "sequence",
+                "step",
+                "camera-top",
+                "camera-top/frame/00000001",
+                "camera-top/frame/00000001",
+                "mm",
+                "TwoD",
+                "Image",
+                new string('A', 64),
+                new string('B', 64),
+                new ExternalInspectionConsumerIdentity(
+                    "OpenVisionLab.TwoDStudio",
+                    "1.0.0",
+                    new string('1', 40),
+                    "Clean")),
+            decision is null
+                ? ExternalInspectionResultStatus.Failed
+                : ExternalInspectionResultStatus.Completed,
+            decision switch
+            {
+                PlaceholderInspectionDecision.Pass => ExternalInspectionOutcome.Pass,
+                PlaceholderInspectionDecision.Fail => ExternalInspectionOutcome.Ng,
+                _ => ExternalInspectionOutcome.ExecutionError
+            },
+            "run-1",
+            decision);
 
     private static DeterministicVirtualCamera CreateCamera(
         int exposureTicks,

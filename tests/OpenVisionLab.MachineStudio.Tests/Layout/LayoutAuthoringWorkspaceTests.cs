@@ -1,6 +1,11 @@
 using OpenVisionLab.Machine.Core.Layouts;
+using OpenVisionLab.Machine.Core.Devices;
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Core.Sequences;
+using OpenVisionLab.MachineStudio.Model;
+using OpenVisionLab.MachineStudio.View.Dialogs;
 using OpenVisionLab.MachineStudio.ViewModel;
+using OpenVisionLab.Wpf.MessageDialogs;
 using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
@@ -67,6 +72,83 @@ public sealed class LayoutAuthoringWorkspaceTests
     }
 
     [Fact]
+    public void RejectedPlacementDraftBlocksLayoutMutationsAndHistoryUntilRecovered()
+    {
+        using var fixture = new Fixture();
+        var workspace = fixture.Workspace;
+        Assert.True(workspace.TryAddComponent(LayoutComponentKind.LinearStage));
+        var before = new ProjectDocumentStore().SerializeForEvidence(fixture.Project);
+        var selectedId = fixture.Layout.SelectedItem?.Id;
+        fixture.ResolveDraft = false;
+
+        Assert.False(workspace.TryAddComponent(LayoutComponentKind.LinearStage));
+        Assert.False(workspace.TryMoveSelectionBy(10, 0));
+        workspace.AddLayoutComponentCommand.Execute(LayoutComponentKind.LinearStage);
+        workspace.DeleteLayoutComponentCommand.Execute(null);
+        workspace.UndoLayoutEditCommand.Execute(null);
+
+        Assert.Equal(before, new ProjectDocumentStore().SerializeForEvidence(fixture.Project));
+        Assert.Equal(selectedId, fixture.Layout.SelectedItem?.Id);
+        fixture.ResolveDraft = true;
+        workspace.UndoLayoutEditCommand.Execute(null);
+        Assert.Empty(fixture.Layout.Definition!.Components);
+    }
+
+    [Fact]
+    public void MultiSelectionRemovalShowsImpactsAndCancelPreservesOneUndoBoundary()
+    {
+        using var fixture = new Fixture();
+        Assert.True(fixture.Workspace.TryAddComponent(LayoutComponentKind.LinearStage));
+        var first = fixture.Layout.SelectedItem!.Component!;
+        Assert.True(fixture.Workspace.TryAddComponent(LayoutComponentKind.LinearStage));
+        var second = fixture.Layout.SelectedItem!.Component!;
+        fixture.Project.Sequences.Add(new SequenceDefinition
+        {
+            Id = "cycle",
+            Name = "Cycle",
+            Steps = [new SequenceStepDefinition
+            {
+                Id = "move",
+                Name = "Move stage",
+                Action = SequenceStepAction.MoveAxis,
+                TargetId = first.BehaviorBindingId!
+            }]
+        });
+        fixture.Layout.SelectMany([first.Id, second.Id], second.Id);
+        fixture.Workspace.Reset();
+        var before = new ProjectDocumentStore().SerializeForEvidence(fixture.Project);
+        var marks = fixture.MarkCount;
+        fixture.ConfirmRemoval = false;
+
+        Assert.True(fixture.Workspace.DeleteLayoutComponentCommand.CanExecute(null));
+        fixture.Workspace.DeleteLayoutComponentCommand.Execute(null);
+
+        Assert.Equal(before, new ProjectDocumentStore().SerializeForEvidence(fixture.Project));
+        Assert.Equal(marks, fixture.MarkCount);
+        Assert.Equal(2, fixture.Layout.SelectionCount);
+        Assert.False(fixture.Workspace.UndoLayoutEditCommand.CanExecute(null));
+        Assert.Equal([first.Id, second.Id], fixture.LastConfirmedIds);
+        Assert.Contains(fixture.LastImpacts, impact =>
+            impact.ComponentId == first.Id && impact.ReferenceKind == LayoutComponentRemovalReferenceKind.Target);
+
+        var options = MainMessageDialogHost.CreateLayoutRemovalDialogOptions([first, second], fixture.LastImpacts);
+        Assert.Equal(WpfMessageDialogResult.No, options.DefaultResult);
+        Assert.Contains("cycle", options.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(first.Id, options.Message, StringComparison.Ordinal);
+
+        fixture.ConfirmRemoval = true;
+        fixture.Workspace.DeleteLayoutComponentCommand.Execute(null);
+
+        Assert.Empty(fixture.Layout.Definition!.Components);
+        Assert.Equal(marks + 1, fixture.MarkCount);
+        Assert.Equal(2, fixture.ConfirmationCount);
+        Assert.Equal(first.BehaviorBindingId, fixture.Project.Sequences[0].Steps[0].TargetId);
+        fixture.Workspace.UndoLayoutEditCommand.Execute(null);
+        Assert.Equal(before, new ProjectDocumentStore().SerializeForEvidence(fixture.Project));
+        Assert.Equal(2, fixture.Layout.SelectionCount);
+    }
+
+    [Fact]
     public void SceneDropSelectionAndGestureCommandsShareTheAuthoringHistory()
     {
         using var fixture = new Fixture();
@@ -84,7 +166,7 @@ public sealed class LayoutAuthoringWorkspaceTests
 
         Assert.Equal(2, fixture.Layout.SelectionCount);
         Assert.Same(second, fixture.Layout.SelectedItem);
-        Assert.False(workspace.DeleteLayoutComponentCommand.CanExecute(null));
+        Assert.True(workspace.DeleteLayoutComponentCommand.CanExecute(null));
         Assert.True(workspace.AlignLayoutSelectionCommand.CanExecute("Left"));
 
         workspace.SceneMoveRequestedCommand.Execute(new SceneMoveRequest(SceneViewportMoveAction.Begin, default));
@@ -145,6 +227,34 @@ public sealed class LayoutAuthoringWorkspaceTests
     }
 
     [Fact]
+    public void CameraPlacementCanBeCopiedAndPastedWithAnIndependentDeviceBinding()
+    {
+        using var fixture = new Fixture();
+        fixture.Project.Devices.Add(new DeviceDefinition
+        {
+            Id = "device.camera-1",
+            Name = "Top camera",
+            Kind = DeviceKind.Camera,
+            Camera = new VirtualCameraDefinition()
+        });
+
+        Assert.True(fixture.Workspace.TryAddComponent(LayoutComponentKind.Camera));
+        var original = Assert.IsType<LayoutComponentDefinition>(fixture.Layout.SelectedItem!.Component);
+        fixture.Workspace.CopyLayoutSelectionCommand.Execute(null);
+        Assert.True(fixture.Workspace.PasteLayoutSelectionCommand.CanExecute(null));
+        fixture.Workspace.PasteLayoutSelectionCommand.Execute(null);
+
+        var components = fixture.Layout.Items
+            .Where(item => item.Kind == LayoutItemKind.Camera)
+            .Select(item => item.Component!)
+            .ToArray();
+        Assert.Equal(2, components.Length);
+        Assert.NotEqual(original.Id, components[1].Id);
+        Assert.NotEqual(original.BehaviorBindingId, components[1].BehaviorBindingId);
+        Assert.Equal(2, fixture.Project.Devices.Count(device => device.Kind == DeviceKind.Camera));
+    }
+
+    [Fact]
     public void ResetNotifiesHistoryCommandStateAfterClearingHistory()
     {
         using var fixture = new Fixture();
@@ -168,7 +278,7 @@ public sealed class LayoutAuthoringWorkspaceTests
         var before = new ProjectDocumentStore().SerializeForEvidence(fixture.Project);
 
         Assert.False(workspace.TryAddComponent(LayoutComponentKind.DigitalSensor));
-        Assert.Equal("Add a Workpiece or Stage before adding a Digital Sensor", fixture.StatusMessages[^1]);
+        Assert.Equal(OpenVisionLanguageService.T("Layout.Add.SensorTargetRequired"), fixture.StatusMessages[^1]);
         Assert.False(workspace.TryAddComponent(LayoutComponentKind.LinearStage, double.NaN, 10));
         Assert.False(workspace.TryAddComponent(LayoutComponentKind.LinearStage, 10, null));
         workspace.AddLayoutComponentCommand.Execute("LinearStage");
@@ -296,6 +406,7 @@ public sealed class LayoutAuthoringWorkspaceTests
             Workspace = new LayoutAuthoringWorkspace(
                 Layout,
                 () => Project,
+                () => null,
                 () => IsEditable,
                 () => IsApplyingProject,
                 () => CanExecuteSessionCommand,
@@ -305,7 +416,15 @@ public sealed class LayoutAuthoringWorkspaceTests
                 () => CommandInvalidationCount++,
                 StatusMessages.Add,
                 (category, message) => Logs.Add((category, message)),
-                () => DefinitionChangedCount++);
+                () => DefinitionChangedCount++,
+                (components, impacts) =>
+                {
+                    ConfirmationCount++;
+                    LastConfirmedIds = components.Select(component => component.Id).ToArray();
+                    LastImpacts = impacts.ToArray();
+                    return ConfirmRemoval;
+                },
+                () => ResolveDraft);
             Workspace.Reset();
         }
 
@@ -315,6 +434,11 @@ public sealed class LayoutAuthoringWorkspaceTests
         public bool IsEditable { get; set; } = true;
         public bool IsApplyingProject { get; set; }
         public bool CanExecuteSessionCommand { get; set; } = true;
+        public bool ConfirmRemoval { get; set; } = true;
+        public bool ResolveDraft { get; set; } = true;
+        public int ConfirmationCount { get; private set; }
+        public IReadOnlyList<string> LastConfirmedIds { get; private set; } = Array.Empty<string>();
+        public IReadOnlyList<LayoutComponentRemovalImpact> LastImpacts { get; private set; } = Array.Empty<LayoutComponentRemovalImpact>();
         public int MarkCount { get; private set; }
         public int RefreshCount { get; private set; }
         public int CommandInvalidationCount { get; private set; }

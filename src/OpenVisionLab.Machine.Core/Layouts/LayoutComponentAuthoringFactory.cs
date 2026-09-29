@@ -36,6 +36,7 @@ public sealed class LayoutComponentAuthoringFactory
             LayoutComponentKind.PneumaticCylinder => CreatePneumaticCylinder(project),
             LayoutComponentKind.Conveyor => CreateConveyor(project),
             LayoutComponentKind.Workpiece => CreateWorkpiece(project, layout, out failure),
+            LayoutComponentKind.Camera => CreateCamera(project, layout, out failure),
             _ => null
         } ?? SetUnsupportedFailure(ref failure);
     }
@@ -337,6 +338,42 @@ public sealed class LayoutComponentAuthoringFactory
             Size = new Size2D { Width = 96, Height = 36 },
             ZIndex = 25,
             BehaviorBindingId = deviceId
+        };
+    }
+
+    private static LayoutComponentDefinition? CreateCamera(
+        MachineProjectDocument project,
+        MachineLayoutDefinition layout,
+        out LayoutComponentAuthoringFailure? failure)
+    {
+        failure = null;
+        var placedCameraIds = layout.Components
+            .Where(component => component.Kind == LayoutComponentKind.Camera)
+            .Select(component => component.BehaviorBindingId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.Ordinal);
+        var camera = project.Devices.FirstOrDefault(device =>
+            device.Kind == DeviceKind.Camera && !placedCameraIds.Contains(device.Id));
+        if (camera is null)
+        {
+            failure = new(LayoutComponentAuthoringFailureKind.CameraDeviceRequired);
+            return null;
+        }
+
+        var componentIndex = NextOrdinal("camera", AllLayoutComponentIds(project));
+        return new LayoutComponentDefinition
+        {
+            Id = $"camera-{componentIndex}",
+            Name = camera.Name,
+            Kind = LayoutComponentKind.Camera,
+            Transform = new Transform2D
+            {
+                X = camera.MountPosition.X,
+                Y = camera.MountPosition.Y
+            },
+            Size = new Size2D { Width = 28, Height = 20 },
+            ZIndex = 35,
+            BehaviorBindingId = camera.Id
         };
     }
 

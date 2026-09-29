@@ -14,53 +14,244 @@
             BorderBrush="{DynamicResource Accent.Primary}"
             BorderThickness="1"
             CornerRadius="6">
-        <Grid>
+        <Grid x:Name="MmiInspectionLayoutGrid">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition x:Name="MmiInspectionPreviewColumn" MinWidth="300">
+                    <ColumnDefinition.Style>
+                        <Style TargetType="ColumnDefinition">
+                            <Setter Property="Width" Value="1.25*" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
+                                    <Setter Property="Width" Value="*" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
+                                    <Setter Property="MinWidth" Value="0" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ColumnDefinition.Style>
+                </ColumnDefinition>
+                <ColumnDefinition x:Name="MmiInspectionColumnGap">
+                    <ColumnDefinition.Style>
+                        <Style TargetType="ColumnDefinition">
+                            <Setter Property="Width" Value="18" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
+                                    <Setter Property="Width" Value="12" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Navigation.IsNarrowLayout}" Value="True">
+                                    <Setter Property="Width" Value="0" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
+                                    <Setter Property="Width" Value="0" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ColumnDefinition.Style>
+                </ColumnDefinition>
+                <ColumnDefinition x:Name="MmiInspectionSetupColumn">
+                    <ColumnDefinition.Style>
+                        <Style TargetType="ColumnDefinition">
+                            <Setter Property="Width" Value="0.75*" />
+                            <Setter Property="MinWidth" Value="310" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
+                                    <Setter Property="Width" Value="330" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Navigation.IsNarrowLayout}" Value="True">
+                                    <Setter Property="Width" Value="0" />
+                                    <Setter Property="MinWidth" Value="0" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
+                                    <Setter Property="Width" Value="0" />
+                                    <Setter Property="MinWidth" Value="0" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ColumnDefinition.Style>
+                </ColumnDefinition>
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Row="0">
+            <StackPanel Grid.Row="0" Grid.Column="0">
                 <TextBlock FontSize="13"
                            FontWeight="SemiBold"
-                           Text="{loc:Loc Key=Integration.MmiOperator}" />
+                           Text="{loc:Loc Key=Integration.InspectionWorkspaceTitle}" />
                 <TextBlock Margin="0,2,0,0"
                            Foreground="{DynamicResource Text.Secondary}"
-                           Text="{loc:Loc Key=Integration.MmiOperatorHint}"
+                           Text="{loc:Loc Key=Integration.InspectionWorkspaceHint}"
                            TextWrapping="Wrap" />
             </StackPanel>
-            <Border Grid.Row="0"
-                    Grid.Column="1"
-                    Margin="10,0,0,0"
-                    Padding="7,3"
-                    Style="{StaticResource StatusPillStyle}">
-                <TextBlock FontFamily="{StaticResource Typography.Telemetry}"
-                           Foreground="{DynamicResource State.Vision}"
-                           Text="{Binding ModeText}" />
-            </Border>
+            <StackPanel x:Name="MmiInspectionHeaderActions"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Grid.Row" Value="0" />
+                        <Setter Property="Grid.Column" Value="2" />
+                        <Setter Property="Margin" Value="10,0,0,0" />
+                        <Setter Property="HorizontalAlignment" Value="Right" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsNarrowLayout}" Value="True">
+                                <Setter Property="Grid.Row" Value="1" />
+                                <Setter Property="Grid.Column" Value="0" />
+                                <Setter Property="Margin" Value="0,4,0,0" />
+                                <Setter Property="HorizontalAlignment" Value="Left" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <Border x:Name="MmiInspectionStatusPill"
+                        Margin="0,0,6,0"
+                        Padding="7,3">
+                    <Border.Style>
+                        <Style TargetType="Border" BasedOn="{StaticResource StatusPillStyle}" />
+                    </Border.Style>
+                    <TextBlock FontFamily="{StaticResource Typography.Telemetry}"
+                               Foreground="{DynamicResource State.Vision}"
+                               Text="{Binding ModeText}" />
+                </Border>
+                <ToggleButton x:Name="MmiInspectionSettingsToggle"
+                              IsChecked="{Binding Navigation.IsInspectionSettingsExpanded, Mode=TwoWay}"
+                              AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}">
+                    <ToggleButton.Style>
+                        <Style TargetType="ToggleButton">
+                            <Setter Property="Height" Value="{StaticResource Density.GlobalCommandButtonHeight}" />
+                            <Setter Property="MinWidth" Value="58" />
+                            <Setter Property="Margin" Value="3,0" />
+                            <Setter Property="Padding" Value="10,0" />
+                            <Setter Property="HorizontalContentAlignment" Value="Center" />
+                            <Setter Property="VerticalContentAlignment" Value="Center" />
+                            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+                            <Setter Property="Background" Value="{DynamicResource Surface.Raised}" />
+                            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+                            <Setter Property="BorderThickness" Value="1" />
+                            <Setter Property="Cursor" Value="Hand" />
+                            <Setter Property="Content" Value="{loc:Loc Key=Integration.MmiSettingsWide}" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="ToggleBorder"
+                                                Padding="{TemplateBinding Padding}"
+                                                Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="4">
+                                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="ToggleBorder" Property="Background" Value="{DynamicResource Accent.Soft}" />
+                                                <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                                            </Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ToggleBorder" Property="Background" Value="{DynamicResource Surface.Hover}" />
+                                                <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="{DynamicResource Accent.Hover}" />
+                                            </Trigger>
+                                            <Trigger Property="IsPressed" Value="True">
+                                                <Setter TargetName="ToggleBorder" Property="Background" Value="{DynamicResource Surface.Selected}" />
+                                            </Trigger>
+                                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                                <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" />
+                                                <Setter Property="Opacity" Value="0.55" />
+                                                <Setter TargetName="ToggleBorder" Property="Background" Value="{DynamicResource Surface.Panel}" />
+                                                <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+                                                <Setter Property="Cursor" Value="Arrow" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
+                                    <Setter Property="Content" Value="{loc:Loc Key=Integration.MmiShowInputWithSettings}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ToggleButton.Style>
+                </ToggleButton>
+            </StackPanel>
 
-            <Grid Grid.Row="1"
-                  Grid.ColumnSpan="2"
-                  Margin="0,8,0,0">
+            <Grid x:Name="MmiInspectionSetupPanel" Margin="0,8,0,0">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Grid.Row" Value="2" />
+                        <Setter Property="Grid.Column" Value="2" />
+                        <Setter Property="Grid.ColumnSpan" Value="1" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsNarrowLayout}" Value="True">
+                                <Setter Property="Grid.Row" Value="3" />
+                                <Setter Property="Grid.Column" Value="0" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
+                                <Setter Property="Grid.Row" Value="2" />
+                                <Setter Property="Grid.Column" Value="0" />
+                                <Setter Property="Grid.ColumnSpan" Value="3" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.05*" />
-                    <ColumnDefinition Width="1.25*" />
-                    <ColumnDefinition Width="1.25*" />
+                    <ColumnDefinition>
+                        <ColumnDefinition.Style>
+                            <Style TargetType="ColumnDefinition">
+                                <Setter Property="Width" Value="*" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
+                                        <Setter Property="Width" Value="2*" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ColumnDefinition.Style>
+                    </ColumnDefinition>
+                    <ColumnDefinition>
+                        <ColumnDefinition.Style>
+                            <Style TargetType="ColumnDefinition">
+                                <Setter Property="Width" Value="0" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
+                                        <Setter Property="Width" Value="*" />
+                                        <Setter Property="MinWidth" Value="220" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ColumnDefinition.Style>
+                    </ColumnDefinition>
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0"
-                        Margin="0,0,5,0"
+                <Border x:Name="MmiMachineStateCard"
+                        Margin="0,0,0,6"
                         Padding="8,7"
                         Background="{DynamicResource Surface.Raised}"
                         BorderBrush="{DynamicResource Border.Subtle}"
                         BorderThickness="1"
                         CornerRadius="5">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Grid.Row" Value="0" />
+                            <Setter Property="Grid.Column" Value="0" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
+                                    <Setter Property="Grid.Column" Value="1" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionCaptionStyle}"
                                    Text="{loc:Loc Key=Left.MachineState}" />
@@ -91,13 +282,25 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Column="1"
-                        Margin="5,0"
+                <Border x:Name="MmiInspectionRecipeCard"
+                        Margin="0,0,0,6"
                         Padding="8,7"
                         Background="{DynamicResource Surface.Raised}"
                         BorderBrush="{DynamicResource Border.Subtle}"
                         BorderThickness="1"
                         CornerRadius="5">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Grid.Row" Value="1" />
+                            <Setter Property="Grid.Column" Value="0" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
+                                    <Setter Property="Grid.Row" Value="0" />
+                                    <Setter Property="Grid.RowSpan" Value="2" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionCaptionStyle}"
                                    Text="{loc:Loc Key=Integration.MmiActiveRecipe}" />
@@ -107,19 +310,19 @@
                                   IsEnabled="{Binding Integration.Setup.HasRecipeCatalogItems}"
                                   ItemsSource="{Binding Integration.Setup.RecipeCatalogItems}"
                                   SelectedItem="{Binding Integration.Setup.SelectedRecipe, Mode=TwoWay}"
-                                  ToolTip="{loc:Loc Key=Integration.MmiActiveRecipeTooltip}">
+                                  ToolTip="{loc:Loc Key=Integration.InspectionActiveRecipeTooltip}">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
                                     <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
                                         <TextBlock Text="{Binding DisplayName}"
-                                                   TextTrimming="CharacterEllipsis"
+                                                   TextWrapping="Wrap"
                                                    ToolTip="{Binding Path}" />
-                                        <TextBlock Grid.Column="1"
-                                                   Margin="8,0,0,0"
+                                        <TextBlock Grid.Row="1"
+                                                   Margin="0,2,0,0"
                                                    Foreground="{DynamicResource Text.Secondary}"
                                                    Text="{Binding AvailabilityText}" />
                                     </Grid>
@@ -134,14 +337,14 @@
                         <TextBlock Margin="0,3,0,0"
                                    Foreground="{DynamicResource Text.Secondary}"
                                    Text="{Binding Integration.Setup.InspectionRecipeStatusText}"
-                                   TextTrimming="CharacterEllipsis"
+                                   TextWrapping="Wrap"
                                    ToolTip="{Binding Integration.Setup.InspectionRecipeStatusText}" />
                         <TextBlock Margin="0,2,0,0"
                                    FontFamily="{StaticResource Typography.Telemetry}"
                                    FontSize="9.5"
                                    Foreground="{DynamicResource Text.Secondary}"
                                    Text="{Binding Integration.Setup.SetupSaveStateText}"
-                                   TextTrimming="CharacterEllipsis"
+                                   TextWrapping="Wrap"
                                    ToolTip="{Binding Integration.Setup.SetupSaveStateText}" />
                         <WrapPanel Margin="0,5,0,0">
                             <Button x:Name="MmiAddRecipeButton"
@@ -149,14 +352,14 @@
                                     Command="{Binding Integration.Setup.AddRecipeCommand}"
                                     Content="{loc:Loc Key=Integration.MmiRecipeAdd}"
                                     Style="{StaticResource GlobalCommandButtonStyle}"
-                                    ToolTip="{loc:Loc Key=Integration.MmiRecipeAddTooltip}"
+                                    ToolTip="{loc:Loc Key=Integration.InspectionRecipeAddTooltip}"
                                     AutomationProperties.Name="{loc:Loc Key=Integration.MmiRecipeAdd}" />
                             <Button x:Name="MmiRemoveRecipeButton"
                                     Command="{Binding Integration.Setup.RemoveRecipeCommand}"
                                     CommandParameter="{Binding Integration.Setup.SelectedRecipe}"
                                     Content="{loc:Loc Key=Integration.MmiRecipeRemove}"
                                     Style="{StaticResource GlobalCommandButtonStyle}"
-                                    ToolTip="{loc:Loc Key=Integration.MmiRecipeRemoveTooltip}"
+                                    ToolTip="{loc:Loc Key=Integration.InspectionRecipeRemoveTooltip}"
                                     AutomationProperties.Name="{loc:Loc Key=Integration.MmiRecipeRemove}" />
                             <Button x:Name="MmiSaveSetupButton"
                                     Margin="0,5,5,0"
@@ -169,13 +372,24 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Column="2"
-                        Margin="5,0,0,0"
+                <Border x:Name="MmiInspectionResultCard"
                         Padding="8,7"
                         Background="{DynamicResource Surface.Raised}"
                         BorderBrush="{DynamicResource Border.Subtle}"
                         BorderThickness="1"
                         CornerRadius="5">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Grid.Row" Value="2" />
+                            <Setter Property="Grid.Column" Value="0" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
+                                    <Setter Property="Grid.Row" Value="1" />
+                                    <Setter Property="Grid.Column" Value="1" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionCaptionStyle}"
                                    Text="{loc:Loc Key=Integration.MmiInspectionStatus}" />
@@ -205,14 +419,24 @@
                 </Border>
             </Grid>
 
-            <Border Grid.Row="2"
-                    Grid.ColumnSpan="2"
+            <Border x:Name="MmiInspectionPreviewPanel"
+                    Grid.Row="2"
+                    Grid.Column="0"
                     Margin="0,8,0,0"
                     Padding="8,7"
                     Background="{DynamicResource Surface.Raised}"
                     BorderBrush="{DynamicResource Border.Subtle}"
                     BorderThickness="1"
                     CornerRadius="5">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -230,12 +454,25 @@
                     <StackPanel Grid.Row="2">
                         <TextBlock FontWeight="SemiBold"
                                    Text="{loc:Loc Key=Integration.MmiVirtualCameraImage}" />
-                        <Border Height="120"
+                        <Border x:Name="MmiVirtualCameraImageFrame"
                                 Margin="0,4,0,0"
                                 Background="{DynamicResource Surface.Panel}"
                                 BorderBrush="{DynamicResource Border.Subtle}"
                                 BorderThickness="1"
                                 CornerRadius="4">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="MinHeight" Value="260" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
+                                            <Setter Property="MinHeight" Value="180" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Navigation.IsNarrowLayout}" Value="True">
+                                            <Setter Property="MinHeight" Value="240" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
                             <Grid>
                                 <Image x:Name="MmiVirtualCameraImageViewer"
                                        Source="{Binding Camera.CurrentCameraImagePath, Converter={StaticResource ProjectImageSourceConverter}}"
@@ -243,7 +480,7 @@
                                        SnapsToDevicePixels="True"
                                        ToolTip="{Binding Camera.CurrentCameraSourceText}" />
                                 <TextBlock Margin="8"
-                                           HorizontalAlignment="Center"
+                                           HorizontalAlignment="Stretch"
                                            VerticalAlignment="Center"
                                            Foreground="{DynamicResource Text.Secondary}"
                                            Text="{loc:Loc Key=Integration.MmiVirtualCameraImageEmpty}"
@@ -283,7 +520,7 @@
                                            SnapsToDevicePixels="True"
                                            ToolTip="{Binding Integration.LatestTwoDImageSourceText}" />
                                     <TextBlock Margin="8"
-                                               HorizontalAlignment="Center"
+                                               HorizontalAlignment="Stretch"
                                                VerticalAlignment="Center"
                                                Foreground="{DynamicResource Text.Secondary}"
                                                Text="{Binding Integration.LatestTwoDImageStatusText}"
@@ -322,7 +559,7 @@
                                            SnapsToDevicePixels="True"
                                            ToolTip="{Binding Integration.LatestThreeDImageSourceText}" />
                                     <TextBlock Margin="8"
-                                               HorizontalAlignment="Center"
+                                               HorizontalAlignment="Stretch"
                                                VerticalAlignment="Center"
                                                Foreground="{DynamicResource Text.Secondary}"
                                                Text="{Binding Integration.LatestThreeDImageStatusText}"
@@ -349,8 +586,8 @@
                 </Grid>
             </Border>
 
-            <WrapPanel Grid.Row="3"
-                       Grid.ColumnSpan="2"
+            <WrapPanel Grid.Row="4"
+                       Grid.ColumnSpan="3"
                        Margin="0,8,0,0">
                 <Button x:Name="MmiRunButton"
                         Margin="0,0,5,4"

@@ -184,7 +184,8 @@ internal sealed class MachineProjectRuntimeComponentCompiler
                         workpiece.ConveyorComponentId,
                         workpiece.InspectionState,
                         transform,
-                        size));
+                        size,
+                        workpiece.InitiallyPresent ?? true));
                     break;
             }
         }

@@ -1,8 +1,12 @@
 using OpenVisionLab;
+using OpenVisionLab.Machine.Core.Devices;
+using OpenVisionLab.Machine.Infrastructure.Vision;
+using OpenVisionLab.Machine.Simulation.Camera;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Events;
 using OpenVisionLab.Machine.Simulation.Scenarios;
 using OpenVisionLab.Machine.Simulation.Snapshots;
+using System.Security.Cryptography;
 using OpenVisionLab.MachineStudio.ViewModel;
 using Xunit;
 
@@ -219,6 +223,76 @@ public sealed class VisionExecutionEvidenceViewModelTests
         Assert.False(File.Exists($"{projectPath}.vision-result.json"));
     }
 
+    [Fact]
+    public async Task Restore_WhenFrameSourceChanges_RejectsCurrentEvidence()
+    {
+        OpenVisionLanguageService.Load();
+        var projectPath = CreateProjectPath();
+        var sourcePath = Path.Combine(Path.GetDirectoryName(projectPath)!, "input.raw");
+        await File.WriteAllBytesAsync(sourcePath, [0x10, 0x20, 0x30, 0x40]);
+        var package = CreateEvidencePackage(
+            projectPath,
+            Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(sourcePath))));
+        DeterministicVisionExecutionEvidencePackage.SaveToJson(
+            package,
+            $"{projectPath}.vision-result.json");
+        await File.WriteAllBytesAsync(sourcePath, [0x10, 0x20, 0x30, 0x41]);
+        var logMessages = new List<string>();
+        using var viewModel = CreateSourceValidatedViewModel(projectPath, logMessages);
+
+        try
+        {
+            viewModel.Restore();
+
+            Assert.NotNull(viewModel.LatestEvidence);
+            Assert.Null(viewModel.GetCurrentEvidence());
+            Assert.Equal(
+                OpenVisionLanguageService.T("Camera.EvidenceStale"),
+                viewModel.StatusText);
+            Assert.Contains(logMessages, message =>
+                message.Contains("frame source context changed", StringComparison.Ordinal));
+        }
+        finally
+        {
+            File.Delete($"{projectPath}.vision-result.json");
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Fact]
+    public async Task RefreshContext_WhenFrameSourceChanges_MarksImportedEvidenceStale()
+    {
+        OpenVisionLanguageService.Load();
+        var projectPath = CreateProjectPath();
+        var sourcePath = Path.Combine(Path.GetDirectoryName(projectPath)!, "input.raw");
+        var original = new byte[] { 0x10, 0x20, 0x30, 0x40 };
+        await File.WriteAllBytesAsync(sourcePath, original);
+        using var viewModel = CreateSourceValidatedViewModel(projectPath, []);
+        var package = CreateEvidencePackage(
+            projectPath,
+            Convert.ToHexString(SHA256.HashData(original)));
+
+        try
+        {
+            viewModel.SetImportedEvidence(package);
+            Assert.Equal(
+                OpenVisionLanguageService.T("Camera.EvidenceImported"),
+                viewModel.StatusText);
+
+            await File.WriteAllBytesAsync(sourcePath, [0x10, 0x20, 0x30, 0x41]);
+            viewModel.RefreshContext();
+
+            Assert.Equal(
+                OpenVisionLanguageService.T("Camera.EvidenceStale"),
+                viewModel.StatusText);
+            Assert.Null(viewModel.GetCurrentEvidence());
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
     private static VisionExecutionEvidenceViewModel CreateViewModel(
         string projectPath,
         List<string> logMessages,
@@ -241,5 +315,97 @@ public sealed class VisionExecutionEvidenceViewModelTests
             : Path.Combine(Path.GetTempPath(), "OpenVisionLab-Machine-Studio", "vision-evidence-refactor-tests");
         Directory.CreateDirectory(root);
         return Path.Combine(root, $"project-{Guid.NewGuid():N}.ovmachine");
+    }
+
+    private static VisionExecutionEvidenceViewModel CreateSourceValidatedViewModel(
+        string projectPath,
+        List<string> logMessages) =>
+        new(
+            () => new VisionEvidenceContext(
+                ProjectId,
+                ProjectJson,
+                BuildIdentity,
+                projectPath,
+                CameraId,
+                RecipeId,
+                frameHash => new ProjectRelativeSingleImageSource(
+                    Path.GetDirectoryName(projectPath)!,
+                    "input.raw",
+                    2,
+                    2,
+                    "Mono8").MatchesContentHash(frameHash)),
+            logMessages.Add,
+            _ => { });
+
+    private static DeterministicVisionExecutionEvidencePackage CreateEvidencePackage(
+        string projectPath,
+        string frameHash)
+    {
+        var frameId = $"{CameraId}/frame/00000001";
+        var frame = new VirtualCameraFrameEvidence(
+            frameId,
+            "input.raw",
+            frameHash,
+            4,
+            2,
+            2,
+            "Mono8");
+        var inspection = new VirtualCameraInspectionEvidence(
+            "inspection-001",
+            frameId,
+            CameraId,
+            RecipeId,
+            frameId,
+            PlaceholderInspectionDecision.Pass,
+            "pass",
+            new Dictionary<string, double> { ["Score"] = 1 });
+        var camera = new VirtualCameraSnapshot(
+            CameraId,
+            "Top camera",
+            VirtualCameraState.FrameReady,
+            1,
+            frameId,
+            RecipeId,
+            0,
+            0,
+            new VirtualCameraAcquisitionResult(
+                frameId,
+                CameraId,
+                RecipeId,
+                1,
+                PlaceholderInspectionDecision.Pass,
+                frame,
+                inspection),
+            frame);
+        var snapshot = new SimulationSnapshot(
+            FixedStep,
+            1,
+            SimulationRunMode.Paused,
+            SimulationControlOwner.Manual,
+            1,
+            [],
+            0,
+            [],
+            [],
+            [camera],
+            AutomaticRunSnapshot.NotConfigured,
+            [],
+            projectId: ProjectId,
+            runtimeGeneration: 1);
+        return DeterministicVisionExecutionEvidencePackage.Create(
+            ProjectId,
+            "Vision Project",
+            projectPath,
+            ProjectJson,
+            BuildIdentity,
+            FixedStep,
+            0,
+            snapshot,
+            camera,
+            [
+                new SimulationEvent(0, 0, TimeSpan.Zero, "Camera", "CameraTriggered", "trigger"),
+                new SimulationEvent(1, 1, FixedStep, "Camera", "CameraFrameReady", "frame"),
+                new SimulationEvent(2, 1, FixedStep, "Vision", "VisionResultReady", "result")
+            ]);
     }
 }

@@ -287,6 +287,7 @@ public sealed record EquipmentStatusPresentation(
         LayoutItemKind.PneumaticCylinder => OpenVisionLanguageService.T("Equipment.PneumaticCylinder"),
         LayoutItemKind.Conveyor => OpenVisionLanguageService.T("Equipment.ConveyorMotor"),
         LayoutItemKind.Workpiece => OpenVisionLanguageService.T("Equipment.Workpiece"),
+        LayoutItemKind.Camera => OpenVisionLanguageService.T("Equipment.Camera"),
         _ => kind.ToString()
     };
 

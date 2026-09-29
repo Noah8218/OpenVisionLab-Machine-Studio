@@ -39,7 +39,7 @@ public sealed class LayoutAuthoringMutationWorkflowTests
         Assert.Equal(0, fixture.MarkCount);
         Assert.Equal(0, fixture.RunToolAvailabilityRefreshCount);
         Assert.Equal(0, fixture.DefinitionRefreshCount);
-        Assert.Equal("Add a Workpiece or Stage before adding a Digital Sensor", fixture.StatusMessages[^1]);
+        Assert.Equal(OpenVisionLanguageService.T("Layout.Add.SensorTargetRequired"), fixture.StatusMessages[^1]);
         Assert.Contains(fixture.Logs, log => log.Message.Contains("Digital Sensor requires", StringComparison.Ordinal));
     }
 
@@ -125,13 +125,15 @@ public sealed class LayoutAuthoringMutationWorkflowTests
             new LayoutComponentAuthoringService(),
             fixture.History,
             () => project,
+            () => null,
             () => isEditable,
             () => isApplyingProject,
             () => fixture.MarkCount++,
             () => fixture.RunToolAvailabilityRefreshCount++,
             fixture.RefreshDefinition,
             statusMessages.Add,
-            (category, message) => logs.Add((category, message)));
+            (category, message) => logs.Add((category, message)),
+            (_, _) => true);
         return fixture;
     }
 

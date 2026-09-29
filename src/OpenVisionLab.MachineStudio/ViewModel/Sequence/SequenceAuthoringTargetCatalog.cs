@@ -12,7 +12,8 @@ namespace OpenVisionLab.MachineStudio.ViewModel;
 
 internal sealed record SequenceAuthoringTargetCatalogSnapshot(
     IReadOnlyList<SequenceAuthoringTarget> AuthoringTargets,
-    IReadOnlyList<SequenceExpectedStateTarget> ExpectedStateTargets);
+    IReadOnlyList<SequenceExpectedStateTarget> ExpectedStateTargets,
+    IReadOnlyList<SequenceAuthoringTarget> WorkpieceTargets);
 
 /// <summary>
 /// Builds the project-backed target views used by the Sequence editor and
@@ -20,8 +21,14 @@ internal sealed record SequenceAuthoringTargetCatalogSnapshot(
 /// </summary>
 internal sealed class SequenceAuthoringTargetCatalog
 {
-    internal SequenceAuthoringTargetCatalogSnapshot Build(MachineProjectDocument project) =>
-        new(BuildAuthoringTargets(project), BuildExpectedStateTargets(project));
+    internal SequenceAuthoringTargetCatalogSnapshot Build(MachineProjectDocument project)
+    {
+        MachineLayoutDefinition? layout = GetActiveLayout(project);
+        return new(
+            BuildAuthoringTargets(project, layout),
+            BuildExpectedStateTargets(project, layout),
+            BuildWorkpieceTargets(layout));
+    }
 
     internal IReadOnlyList<SequenceAuthoringTarget> GetTargetsForSequence(
         IReadOnlyList<SequenceAuthoringTarget> targets,
@@ -41,11 +48,42 @@ internal sealed class SequenceAuthoringTargetCatalog
             channelKinds,
             project.Axes.Select(axis => axis.Id),
             project.Devices.Where(device => device.Kind == DeviceKind.Camera).Select(device => device.Id),
-            project.Sequences.Select(sequence => sequence.Id));
+            project.Sequences.Select(sequence => sequence.Id),
+            GetActiveLayout(project)?.Components
+                .Where(component => component.Kind == LayoutComponentKind.Workpiece)
+                .Select(component => component.Id)
+                ?? Enumerable.Empty<string>());
+    }
+
+    private static IReadOnlyList<SequenceAuthoringTarget> BuildWorkpieceTargets(
+        MachineLayoutDefinition? layout)
+    {
+        var targets = new List<SequenceAuthoringTarget>
+        {
+            new SequenceAuthoringTarget(
+                string.Empty,
+                OpenVisionLanguageService.T(
+                    "Sequence.NoWorkpieceAssociation",
+                    "작업물 연결 안 함",
+                    "No workpiece association"),
+                SequenceAuthoringTargetKind.Workpiece)
+        };
+        if (layout is not null)
+        {
+            targets.AddRange(layout.Components
+                .Where(component => component.Kind == LayoutComponentKind.Workpiece)
+                .Select(component => new SequenceAuthoringTarget(
+                    component.Id,
+                    TargetDisplayName(component.Name, component.Id),
+                    SequenceAuthoringTargetKind.Workpiece)));
+        }
+
+        return targets;
     }
 
     private static IReadOnlyList<SequenceAuthoringTarget> BuildAuthoringTargets(
-        MachineProjectDocument project)
+        MachineProjectDocument project,
+        MachineLayoutDefinition? layout)
     {
         var targets = new List<SequenceAuthoringTarget>();
         targets.AddRange(project.Channels
@@ -67,6 +105,15 @@ internal sealed class SequenceAuthoringTargetCatalog
                 device.Id,
                 TargetDisplayName(device.Name, device.Id),
                 SequenceAuthoringTargetKind.Camera)));
+        if (layout is not null)
+        {
+            targets.AddRange(layout.Components
+                .Where(component => component.Kind == LayoutComponentKind.Workpiece)
+                .Select(component => new SequenceAuthoringTarget(
+                    component.Id,
+                    TargetDisplayName(component.Name, component.Id),
+                    SequenceAuthoringTargetKind.Workpiece)));
+        }
         targets.AddRange(project.Sequences.Select(sequence => new SequenceAuthoringTarget(
             sequence.Id,
             SequenceTargetDisplayName(sequence.Name, sequence.Id),
@@ -75,7 +122,8 @@ internal sealed class SequenceAuthoringTargetCatalog
     }
 
     private static IReadOnlyList<SequenceExpectedStateTarget> BuildExpectedStateTargets(
-        MachineProjectDocument project)
+        MachineProjectDocument project,
+        MachineLayoutDefinition? layout)
     {
         var targets = project.Axes
             .Select(axis => new SequenceExpectedStateTarget(
@@ -83,12 +131,6 @@ internal sealed class SequenceAuthoringTargetCatalog
                 TargetDisplayName(axis.Name, axis.Id),
                 Enum.GetNames<AxisState>()))
             .ToList();
-        MachineLayoutDefinition? layout = project.Simulation.ActiveLayoutId is { Length: > 0 } activeLayoutId
-            ? project.Layouts.FirstOrDefault(candidate =>
-                string.Equals(candidate.Id, activeLayoutId, StringComparison.Ordinal))
-            : project.Layouts.Count == 1
-                ? project.Layouts[0]
-                : null;
         if (layout is null)
         {
             return targets;
@@ -115,6 +157,14 @@ internal sealed class SequenceAuthoringTargetCatalog
 
         return targets;
     }
+
+    private static MachineLayoutDefinition? GetActiveLayout(MachineProjectDocument project) =>
+        project.Simulation.ActiveLayoutId is { Length: > 0 } activeLayoutId
+            ? project.Layouts.FirstOrDefault(candidate =>
+                string.Equals(candidate.Id, activeLayoutId, StringComparison.Ordinal))
+            : project.Layouts.Count == 1
+                ? project.Layouts[0]
+                : null;
 
     private static string TargetDisplayName(string? name, string id) =>
         string.IsNullOrWhiteSpace(name) ? id : $"{name} · {id}";

@@ -59,6 +59,39 @@ public sealed class CameraCommissioningPresentationTests
         Assert.False(presentation.CanStartManualCameraControl);
     }
 
+    [Theory]
+    [InlineData(PlaceholderInspectionDecision.Pass)]
+    [InlineData(PlaceholderInspectionDecision.Fail)]
+    public void PlaceholderResultWithoutDetailedEvidenceStillIdentifiesMockSource(
+        PlaceholderInspectionDecision decision)
+    {
+        CameraCommissioningProjection projection = CreateProjection(
+            VirtualCameraState.FrameReady,
+            hasCameraDefinition: true,
+            isRunning: false,
+            controlOwner: SimulationControlOwner.Manual);
+        VirtualCameraSnapshot snapshot = Assert.IsType<VirtualCameraSnapshot>(projection.Snapshot);
+        VirtualCameraAcquisitionResult result = Assert.IsType<VirtualCameraAcquisitionResult>(snapshot.Result);
+        projection = projection with
+        {
+            Snapshot = snapshot with
+            {
+                Result = result with { Decision = decision, InspectionEvidence = null }
+            }
+        };
+        var presentation = new CameraCommissioningPresentation();
+        presentation.ApplyProjection(projection);
+
+        Assert.Equal(
+            decision == PlaceholderInspectionDecision.Pass
+                ? OpenVisionLanguageService.T("Shell.ResultPass")
+                : OpenVisionLanguageService.T("Shell.ResultFail"),
+            presentation.CurrentCameraResultText);
+        Assert.Equal(
+            OpenVisionLanguageService.T("Camera.ResultSourceMock"),
+            presentation.CurrentCameraResultSourceText);
+    }
+
     [Fact]
     public void CameraAvailabilityPreservesSourceAndModeGates()
     {

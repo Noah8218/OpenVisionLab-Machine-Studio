@@ -73,6 +73,23 @@ public sealed class LayoutSelectionEditingWorkflowTests
         Assert.Equal(3, items[1].ZIndex);
     }
 
+    [Fact]
+    public void MoveSelectionByAppliesExactSharedOffsetAndRejectsInvalidOrReadOnlyRequests()
+    {
+        var items = CreateItems();
+        var workflow = new LayoutSelectionEditingWorkflow();
+
+        Assert.True(workflow.MoveSelectionBy(items.Take(2), 12.5, -7.25, isEditable: true));
+        Assert.Equal(52.5, items[0].CurrentX);
+        Assert.Equal(12.75, items[0].CurrentY);
+        Assert.Equal(112.5, items[1].CurrentX);
+        Assert.Equal(42.75, items[1].CurrentY);
+
+        Assert.False(workflow.MoveSelectionBy(items, 0, 0, isEditable: true));
+        Assert.False(workflow.MoveSelectionBy(items, double.NaN, 1, isEditable: true));
+        Assert.False(workflow.MoveSelectionBy(items, 1, 1, isEditable: false));
+    }
+
     private static LayoutItem[] CreateItems() =>
         [
             CreateItem("stage-1", LayoutComponentKind.LinearStage, 40, 20, 84, 48, 10),

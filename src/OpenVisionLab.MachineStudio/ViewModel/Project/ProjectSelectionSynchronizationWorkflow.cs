@@ -34,6 +34,9 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
     private readonly Action<string> _setStatus;
     private AxisDriveTuningEditorViewModel? _axisDriveTuningEditor;
     private AnalogIoAuthoringViewModel? _analogIoAuthoring;
+    private bool _isApplyingProjectTreeGroupSelection;
+    private bool _isApplyingLayoutSelection;
+    private bool _isClearingProjectTreeGroupSelection;
     private int _disposed;
 
     internal ProjectSelectionSynchronizationWorkflow(
@@ -87,11 +90,23 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
         SetAnalogIoAuthoring(null);
     }
 
+    internal void ClearSelection()
+    {
+        if (_projectTree.SelectedNode is { } selectedNode)
+        {
+            selectedNode.IsSelected = false;
+        }
+
+        _projectTree.SelectedNode = null;
+        _layout.SelectedItem = null;
+    }
+
     internal void ClearAnalogEditor() => SetAnalogIoAuthoring(null);
 
     private void OnProjectTreePropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName != nameof(ProjectTreeViewModel.SelectedNode))
+        if (args.PropertyName != nameof(ProjectTreeViewModel.SelectedNode)
+            || _isClearingProjectTreeGroupSelection)
         {
             return;
         }
@@ -105,9 +120,47 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
             _cameraSelection.SelectVirtualCamera(node.Id);
         }
 
-        if (node?.Kind == TreeNodeKind.LayoutComponent)
+        if (TryGetSelectedUnitIds(node, out var unitIds))
         {
-            _layout.Select(node.Id);
+            var unitIdSet = unitIds.ToHashSet(StringComparer.Ordinal);
+            var componentIds = node is { Kind: TreeNodeKind.Unit, Model: MachineUnitDefinition unit }
+                ? Array.Empty<string>()
+                : _layout.Items
+                    .Where(item => item.Component?.UnitId is { } unitId && unitIdSet.Contains(unitId))
+                    .Select(item => item.Id)
+                    .ToArray();
+            if (node is { Kind: TreeNodeKind.Unit, Model: MachineUnitDefinition selectedUnit })
+            {
+                _layout.ShowUnit(selectedUnit.Id);
+            }
+            else
+            {
+                _layout.ShowOverview();
+            }
+            _isApplyingProjectTreeGroupSelection = true;
+            try
+            {
+                _layout.SelectMany(componentIds);
+            }
+            finally
+            {
+                _isApplyingProjectTreeGroupSelection = false;
+            }
+        }
+        else if (node?.Kind == TreeNodeKind.LayoutComponent)
+        {
+            if (node.Model is LayoutComponentDefinition { UnitId: { } unitId })
+            {
+                _layout.ShowUnit(unitId);
+            }
+            else
+            {
+                _layout.ShowOverview();
+            }
+            if (!_isApplyingLayoutSelection)
+            {
+                _layout.Select(node.Id);
+            }
         }
         else if (_layout.SelectedItem is not null)
         {
@@ -139,9 +192,45 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
     private void OnLayoutPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
         if (args.PropertyName is not nameof(MachineLayoutViewModel.SelectedItem) and
-            not nameof(MachineLayoutViewModel.SelectionCount))
+            not nameof(MachineLayoutViewModel.SelectionCount) and
+            not nameof(MachineLayoutViewModel.SelectedItems))
         {
             return;
+        }
+
+        if (!_isApplyingProjectTreeGroupSelection && IsProjectTreeGroupSelection(_projectTree.SelectedNode))
+        {
+            var selectedNode = _projectTree.SelectedNode!;
+            _isClearingProjectTreeGroupSelection = true;
+            try
+            {
+                selectedNode.IsSelected = false;
+                _projectTree.SelectedNode = null;
+            }
+            finally
+            {
+                _isClearingProjectTreeGroupSelection = false;
+            }
+            _notifyTreeSelectionChanged(false);
+        }
+
+        if (!_isApplyingProjectTreeGroupSelection)
+        {
+            var layoutComponentNode = _layout.SelectedItem is { } selectedItem
+                ? FindLayoutComponentNode(selectedItem.Id)
+                : null;
+            if (layoutComponentNode is not null || _projectTree.SelectedNode?.Kind == TreeNodeKind.LayoutComponent)
+            {
+                _isApplyingLayoutSelection = true;
+                try
+                {
+                    _projectTree.SelectedNode = layoutComponentNode;
+                }
+                finally
+                {
+                    _isApplyingLayoutSelection = false;
+                }
+            }
         }
 
         _properties.Show(_layout.SelectedItem?.Component);
@@ -165,6 +254,39 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
 
         _notifyLayoutSelectionChanged();
     }
+
+    private bool TryGetSelectedUnitIds(TreeNodeViewModel? node, out IEnumerable<string> unitIds)
+    {
+        unitIds = node switch
+        {
+            { Kind: TreeNodeKind.Stations } => _getProject().Stations.SelectMany(station => station.Units).Select(unit => unit.Id),
+            { Kind: TreeNodeKind.Station, Model: MachineStationDefinition station } => station.Units.Select(unit => unit.Id),
+            { Kind: TreeNodeKind.Unit, Model: MachineUnitDefinition unit } => [unit.Id],
+            _ => Array.Empty<string>()
+        };
+        return node?.Kind is TreeNodeKind.Stations or TreeNodeKind.Station or TreeNodeKind.Unit;
+    }
+
+    private TreeNodeViewModel? FindLayoutComponentNode(string componentId) =>
+        _projectTree.Roots
+            .SelectMany(EnumerateNodes)
+            .FirstOrDefault(node => node.Kind == TreeNodeKind.LayoutComponent
+                && string.Equals(node.Id, componentId, StringComparison.Ordinal));
+
+    private static IEnumerable<TreeNodeViewModel> EnumerateNodes(TreeNodeViewModel node)
+    {
+        yield return node;
+        foreach (var child in node.Children)
+        {
+            foreach (var descendant in EnumerateNodes(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
+    private static bool IsProjectTreeGroupSelection(TreeNodeViewModel? node) =>
+        node?.Kind is TreeNodeKind.Stations or TreeNodeKind.Station or TreeNodeKind.Unit;
 
     private void SetAxisDriveTuningEditor(AxisDriveTuningEditorViewModel? value)
     {

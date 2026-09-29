@@ -178,8 +178,8 @@ public sealed class MachineIntegrationSetupViewModel : ViewModelBase, IDisposabl
                     CultureInfo.CurrentCulture,
                     L(
                         "MmiRecipeSelected",
-                        "MMI 활성 레시피를 선택했습니다: {0}. 설정 저장 후 다음 Handoff부터 사용합니다.",
-                        "MMI active recipe selected: {0}. Save setup before the next Handoff."),
+                        "검사 레시피를 선택했습니다: {0}. 설정 저장 후 다음 검사 요청부터 사용합니다.",
+                        "Inspection recipe selected: {0}. Save setup before the next inspection request."),
                     value.DisplayName));
             }
         }
@@ -812,8 +812,8 @@ public sealed class MachineIntegrationSetupViewModel : ViewModelBase, IDisposabl
             EnsureRecipeCatalogPath(normalizedPath);
             _setStatus(L(
                 "RecipeSelected",
-                "2D 레시피를 선택했습니다. MMI 설정 저장 후 Publish를 실행하세요.",
-                "2D recipe selected. Save MMI setup before publishing."));
+                "2D 레시피를 선택했습니다. 설정 저장 후 검사 요청을 만드세요.",
+                "2D recipe selected. Save setup before creating an inspection request."));
         }
     }
 
@@ -853,8 +853,8 @@ public sealed class MachineIntegrationSetupViewModel : ViewModelBase, IDisposabl
             string.Equals(item.Path, InspectionRecipePath, StringComparison.OrdinalIgnoreCase));
         _setStatus(L(
             "MmiRecipeRemoved",
-            "MMI 레시피 목록에서 제거했습니다. 파일은 삭제하지 않았습니다.",
-            "Removed the recipe from the MMI list. The file was not deleted."));
+            "검사 레시피 목록에서 제거했습니다. 파일은 삭제하지 않았습니다.",
+            "Removed the recipe from the inspection list. The file was not deleted."));
     }
 
     private void SaveSetup()
@@ -927,8 +927,8 @@ public sealed class MachineIntegrationSetupViewModel : ViewModelBase, IDisposabl
             SetUnsavedChanges(false);
             _setStatus(L(
                 "SetupSaved",
-                "MMI 레시피 목록, 교환 폴더, 외부 Result 대기 옵션, TCP 주소를 저장했습니다. 공유 키는 저장하지 않으며 네트워크/Publish/Refresh/Apply는 실행하지 않았습니다.",
-                "MMI recipe list, exchange folder, external Result waiting option, and TCP endpoints saved. The shared key is not saved; network, Publish, Refresh, and Apply were not run."));
+                "검사 레시피 목록, 교환 폴더, 외부 결과 대기 옵션, TCP 주소를 저장했습니다. 공유 키는 저장하지 않으며 전송·결과 확인·적용은 실행하지 않았습니다.",
+                "Inspection recipes, exchange folder, external result waiting option, and TCP endpoints saved. The shared key is not saved; transfer, result refresh, and apply were not run."));
         }
         catch (Exception exception) when (exception is IOException
             or InvalidDataException

@@ -85,6 +85,80 @@ internal static class SmokeLayoutPropertyStateVerifier
             case "bottom":
                 cylinderSection?.BringIntoView();
                 break;
+            case "geometry":
+            case "geometry-bottom":
+            case "geometry-hint":
+            case "geometry-estimate":
+            {
+                var geometryFieldIds = new[]
+                {
+                    "EquipmentDraftRotation",
+                    "EquipmentDraftWidth",
+                    "EquipmentDraftDepth",
+                    "EquipmentDraftVerticalHeight"
+                };
+                var geometryFields = geometryFieldIds
+                    .Select(id => FindVisualDescendant<TextBox>(
+                        inspector,
+                        textBox => string.Equals(
+                            System.Windows.Automation.AutomationProperties.GetAutomationId(textBox),
+                            id,
+                            StringComparison.Ordinal)))
+                    .ToArray();
+                if (geometryFields.Any(field => field is null || !field.IsVisible))
+                {
+                    throw new InvalidOperationException("The Equipment geometry draft fields were not visible.");
+                }
+                var inspectorScrollViewer = FindVisualDescendant<ScrollViewer>(
+                    inspector,
+                    scrollViewer => string.Equals(scrollViewer.Name, "DesignInspectorScrollViewer", StringComparison.Ordinal))
+                    ?? throw new InvalidOperationException("The Design inspector scroll region was not available.");
+                var geometryTargetName = state.ToLowerInvariant() switch
+                {
+                    "geometry" => "EquipmentDraftRotationField",
+                    "geometry-bottom" => "EquipmentDraftVerticalHeightField",
+                    "geometry-hint" => "EquipmentDraftVerticalEnvelopeHint",
+                    "geometry-estimate" => "EquipmentDraftVerticalEnvelopeEstimated",
+                    _ => throw new InvalidOperationException("The Equipment geometry state was not supported.")
+                };
+                var geometryTarget = FindVisualDescendant<FrameworkElement>(
+                    inspector,
+                    element => string.Equals(element.Name, geometryTargetName, StringComparison.Ordinal))
+                    ?? throw new InvalidOperationException($"The Equipment geometry target '{geometryTargetName}' was not available.");
+                geometryTarget.BringIntoView();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
+                var targetBounds = geometryTarget.TransformToAncestor(inspectorScrollViewer)
+                    .TransformBounds(new Rect(new Point(), geometryTarget.RenderSize));
+                inspectorScrollViewer.ScrollToVerticalOffset(Math.Max(
+                    0,
+                    inspectorScrollViewer.VerticalOffset + targetBounds.Top - 4));
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
+                targetBounds = geometryTarget.TransformToAncestor(inspectorScrollViewer)
+                    .TransformBounds(new Rect(new Point(), geometryTarget.RenderSize));
+                if (targetBounds.Top < 0 || targetBounds.Bottom > inspectorScrollViewer.ViewportHeight)
+                {
+                    throw new InvalidOperationException(
+                        $"The Equipment geometry target '{geometryTargetName}' was outside the inspector viewport " +
+                        $"(top={targetBounds.Top:0.##}, bottom={targetBounds.Bottom:0.##}, height={inspectorScrollViewer.ViewportHeight:0.##}).");
+                }
+                break;
+            }
+            case "drive":
+                if (!viewModel.OpenEquipmentDriveTabCommand.CanExecute(null) ||
+                    viewModel.Layout.SelectedComponentEditor?.ShowAxisDriveProperties != true)
+                {
+                    throw new InvalidOperationException("A selected axis-backed stage is required for the drive draft capture.");
+                }
+                viewModel.OpenEquipmentDriveTabCommand.Execute(null);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var axisMin = FindVisualDescendant<TextBox>(inspector,
+                    textBox => string.Equals(textBox.Name, "ComponentAxisMinTextBox", StringComparison.Ordinal));
+                axisMin?.BringIntoView();
+                if (axisMin?.IsVisible != true)
+                {
+                    throw new InvalidOperationException("The selected stage drive draft was not visible.");
+                }
+                break;
             case "pressed":
                 nudgeRightButton?.BringIntoView();
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
@@ -141,7 +215,8 @@ internal static class SmokeLayoutPropertyStateVerifier
             default:
                 throw new ArgumentException(
                     $"Unsupported --smoke-layout-property-state '{state}'. " +
-                    "Expected focus, hover, popup, validation, bottom, pressed, " +
+                    "Expected focus, hover, popup, validation, bottom, geometry, geometry-bottom, geometry-hint, " +
+                    "geometry-estimate, drive, pressed, " +
                     "alignment-focus, alignment-hover, alignment-pressed, layer-focus, " +
                     "layer-hover, layer-pressed, or layer-disabled.");
         }

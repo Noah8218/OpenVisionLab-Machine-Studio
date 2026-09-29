@@ -1,6 +1,6 @@
-﻿<Project>
+<Project>
   <PropertyGroup>
-    <Version>0.2.0-dev.23</Version>
+    <Version>0.2.0-dev.62</Version>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <LangVersion>12.0</LangVersion>
     <Nullable>enable</Nullable>

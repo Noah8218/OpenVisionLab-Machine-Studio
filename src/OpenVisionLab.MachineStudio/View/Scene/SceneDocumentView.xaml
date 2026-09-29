@@ -5,51 +5,327 @@
              xmlns:behavior="clr-namespace:OpenVisionLab.MachineStudio.Behavior"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:scene="clr-namespace:OpenVisionLab.MachineStudio.View.Scene"
-             xmlns:mmi="clr-namespace:OpenVisionLab.MachineStudio.View.Mmi"
              xmlns:project="clr-namespace:OpenVisionLab.MachineStudio.View.Project"
              xmlns:sequence="clr-namespace:OpenVisionLab.MachineStudio.View.Sequence"
+             xmlns:simulation="clr-namespace:OpenVisionLab.MachineStudio.View.Simulation"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
-    <TabControl SelectedIndex="{Binding Navigation.SelectedDocumentTabIndex, Mode=TwoWay}">
-        <TabItem Header="{loc:Loc Key=Shell.MachineLayout}">
+    <TabControl SelectedIndex="{Binding Navigation.SelectedDocumentContentIndex, Mode=OneWay}">
+        <TabControl.Template>
+            <ControlTemplate TargetType="TabControl">
+                <Grid KeyboardNavigation.TabNavigation="Local">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TabPanel IsItemsHost="True" Visibility="Collapsed" />
+                    <ContentPresenter Grid.Row="1" x:Name="PART_SelectedContentHost"
+                                      ContentSource="SelectedContent" />
+                </Grid>
+            </ControlTemplate>
+        </TabControl.Template>
+        <TabItem Header="{loc:Loc Key=Shell.MachineLayout}" Visibility="Collapsed">
+            <TabControl x:Name="ExecutionWorkspaceTabs"
+                        SelectedIndex="{Binding Navigation.SelectedExecutionTabIndex, Mode=TwoWay}">
+                <TabControl.ItemContainerStyle>
+                    <Style TargetType="TabItem">
+                        <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+                        <Setter Property="Background" Value="{DynamicResource Surface.Root}" />
+                        <Setter Property="BorderBrush" Value="Transparent" />
+                        <Setter Property="Padding" Value="12,9" />
+                        <Setter Property="Cursor" Value="Hand" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="TabItem">
+                                    <Border Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="0,0,0,2"
+                                            Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource Surface.Hover}" />
+                                <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource Accent.Soft}" />
+                                <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource Accent.Hover}" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </TabControl.ItemContainerStyle>
+                <TabControl.Template>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid KeyboardNavigation.TabNavigation="Local">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TabPanel IsItemsHost="True"
+                                      Visibility="{Binding Navigation.IsSimulationWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <ContentPresenter Grid.Row="1" x:Name="PART_SelectedContentHost"
+                                              ContentSource="SelectedContent" />
+                        </Grid>
+                    </ControlTemplate>
+                </TabControl.Template>
+                <TabItem Header="{loc:Loc Key=Scene.EquipmentView}">
             <Border Style="{StaticResource PanelSurfaceStyle}">
                 <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" MinHeight="220" />
                 <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" MinHeight="220" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Style="{StaticResource PanelHeaderStyle}">
-                <TextBlock Style="{StaticResource PanelHeaderTextStyle}"
-                           Text="{Binding Layout.LayoutTitleText}" />
+            <Border Grid.Row="0" MinHeight="55" Style="{StaticResource PanelHeaderStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <WrapPanel Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"
+                               Visibility="{Binding Navigation.IsEquipmentWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Button Margin="0,0,6,4"
+                                Command="{Binding ShowEquipmentOverviewCommand}"
+                                Content="{loc:Loc Key=Equipment.OverviewButton}"
+                                AutomationProperties.Name="{loc:Loc Key=Equipment.OverviewButton}"
+                                Style="{StaticResource GlobalCommandButtonStyle}" />
+                        <Button Margin="0,0,6,4"
+                                Command="{Binding OpenStationUnitEditorCommand}"
+                                Content="{loc:Loc Key=Equipment.StationUnitAddButton}"
+                                AutomationProperties.Name="{loc:Loc Key=Equipment.StationUnitAddButton}"
+                                Style="{StaticResource PrimaryCommandButtonStyle}" />
+                        <Button Margin="0,0,14,4"
+                                Command="{Binding OpenEquipmentComponentLibraryDialogCommand}"
+                                Content="{loc:Loc Key=Equipment.AddPartButton}"
+                                AutomationProperties.Name="{loc:Loc Key=Equipment.AddPartButton}"
+                                Style="{StaticResource GlobalCommandButtonStyle}" />
+                        <RadioButton Height="34" MinWidth="88" Margin="0,0,4,4"
+                                     AutomationProperties.Name="{loc:Loc Key=Scene.ViewOblique}"
+                                     Command="{Binding Layout.ShowObliqueViewCommand}"
+                                     Content="{loc:Loc Key=Scene.ViewOblique}"
+                                     GroupName="EquipmentSceneView"
+                                     IsChecked="{Binding Layout.IsObliqueView, Mode=OneWay}"
+                                     Style="{StaticResource WorkspaceModeRadioStyle}"
+                                     ToolTip="{loc:Loc Key=Scene.ToggleViewTooltip}" />
+                        <RadioButton Height="34" MinWidth="72" Margin="0,0,6,4"
+                                     AutomationProperties.Name="{loc:Loc Key=Scene.ViewPlan}"
+                                     Command="{Binding Layout.ShowTopViewCommand}"
+                                     Content="{loc:Loc Key=Scene.ViewPlan}"
+                                     GroupName="EquipmentSceneView"
+                                     IsChecked="{Binding Layout.IsTopView, Mode=OneWay}"
+                                     Style="{StaticResource WorkspaceModeRadioStyle}"
+                                     ToolTip="{loc:Loc Key=Scene.ToggleViewTooltip}" />
+                        <Button MinWidth="38"
+                                Margin="0,0,4,4"
+                                AutomationProperties.Name="{loc:Loc Key=Scene.ZoomOut}"
+                                Content="−"
+                                Style="{StaticResource GlobalCommandButtonStyle}"
+                                ToolTip="{loc:Loc Key=Scene.ZoomOutTooltip}">
+                            <b:Interaction.Behaviors>
+                                <behavior:ZoomSceneViewportBehavior SceneViewport="{Binding ElementName=SceneViewport}" WheelDelta="-120" />
+                            </b:Interaction.Behaviors>
+                        </Button>
+                        <Button Margin="0,0,4,4"
+                                Padding="8,0"
+                                AutomationProperties.Name="{loc:Loc Key=Scene.FitLayout}"
+                                Content="{loc:Loc Key=Scene.FitLayout}"
+                                Style="{StaticResource GlobalCommandButtonStyle}"
+                                ToolTip="{loc:Loc Key=Scene.FitLayoutTooltip}">
+                            <b:Interaction.Behaviors>
+                                <behavior:FitSceneViewportBehavior SceneViewport="{Binding ElementName=SceneViewport}" />
+                            </b:Interaction.Behaviors>
+                        </Button>
+                        <Button MinWidth="38"
+                                Margin="0,0,0,4"
+                                AutomationProperties.Name="{loc:Loc Key=Scene.ZoomIn}"
+                                Content="+"
+                                Style="{StaticResource GlobalCommandButtonStyle}"
+                                ToolTip="{loc:Loc Key=Scene.ZoomInTooltip}">
+                            <b:Interaction.Behaviors>
+                                <behavior:ZoomSceneViewportBehavior SceneViewport="{Binding ElementName=SceneViewport}" WheelDelta="120" />
+                            </b:Interaction.Behaviors>
+                        </Button>
+                    </WrapPanel>
+
+                    <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
+                                Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Margin="8,4">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding Navigation.IsSimulationWorkspace}" Value="True" />
+                                            <Condition Binding="{Binding Navigation.SelectedExecutionTabIndex}" Value="0" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Margin="0,0,8,0" VerticalAlignment="Center"
+                                   Text="{loc:Loc Key=Properties.Unit}" />
+                        <Grid Width="252" MinHeight="34" Margin="0,0,8,0">
+                            <ComboBox x:Name="SimulationUnitSelector"
+                                      AutomationProperties.Name="{loc:Loc Key=Equipment.SimulationUnitsTitle}"
+                                      ItemsSource="{Binding Layout.UnitOverviewItems}"
+                                      SelectedValue="{Binding Layout.ActiveUnitId, Mode=OneWay}"
+                                      SelectedValuePath="UnitId"
+                                      Style="{StaticResource {x:Type ComboBox}}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock TextTrimming="CharacterEllipsis">
+                                            <Run Text="{Binding UnitName}" />
+                                            <Run Text=" / " />
+                                            <Run Text="{Binding UnitId}" />
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                                <b:Interaction.Behaviors>
+                                    <behavior:ComboBoxSelectionCommandBehavior Command="{Binding ShowEquipmentUnitCommand}" />
+                                </b:Interaction.Behaviors>
+                            </ComboBox>
+                            <TextBlock x:Name="SimulationUnitScopePlaceholder"
+                                       Margin="12,0,30,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       IsHitTestVisible="False"
+                                       Focusable="False"
+                                       Text="{loc:Loc Key=Equipment.SimulationUnitSelectPlaceholder}"
+                                       TextTrimming="CharacterEllipsis">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Layout.ActiveUnitId}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                        <Button x:Name="SimulationWholeMachineButton"
+                                Command="{Binding ShowEquipmentOverviewCommand}"
+                                Content="{loc:Loc Key=Equipment.OverviewButton}"
+                                AutomationProperties.Name="{loc:Loc Key=Equipment.OverviewButton}"
+                                Style="{StaticResource GlobalCommandButtonStyle}" />
+                        <Button x:Name="SimulationInspectorToggleButton"
+                                Margin="8,0,0,0"
+                                Command="{Binding Navigation.ToggleInspectorCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
+                                    <Setter Property="Content" Value="{loc:Loc Key=Shell.Properties}" />
+                                    <Setter Property="AutomationProperties.Name" Value="{loc:Loc Key=Shell.Properties}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Navigation.IsInspectorOpen}" Value="True">
+                                            <Setter Property="Content" Value="×" />
+                                            <Setter Property="AutomationProperties.Name" Value="{loc:Loc Key=Shell.CloseProperties}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="0">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Style="{StaticResource PanelHeaderTextStyle}"
+                                   Text="{Binding Layout.SceneTitleText}" TextWrapping="Wrap" />
+                        <WrapPanel x:Name="MachineExecutionSummary" Margin="0,6,0,0"
+                                   Visibility="{Binding Navigation.IsSimulationWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Border Margin="0,0,8,3" Padding="8,3" CornerRadius="4">
+                                <Border.Style>
+                                    <Style TargetType="Border" BasedOn="{StaticResource StatusPillStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource State.RunningSurface}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource State.Running}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{loc:Loc Key=Scene.SimulationState}"
+                                               Margin="0,0,6,0" />
+                                    <TextBlock Text="{Binding StateText}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Border>
+                            <Border Margin="0,0,8,3" Padding="8,3" CornerRadius="4" Style="{StaticResource StatusPillStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{loc:Loc Key=Scene.SequenceState}"
+                                               Margin="0,0,6,0" />
+                                    <TextBlock Text="{Binding CurrentSequenceStateText}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Border>
+                        </WrapPanel>
+                    </StackPanel>
+                </Grid>
             </Border>
 
-            <ScrollViewer Grid.Row="1"
-                          HorizontalScrollBarVisibility="Disabled"
-                          VerticalScrollBarVisibility="Auto"
-                          CanContentScroll="False">
-                <ScrollViewer.Style>
-                    <Style TargetType="ScrollViewer">
-                        <Setter Property="MaxHeight" Value="420" />
-                        <Setter Property="Visibility" Value="Collapsed" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsRunMode}" Value="True">
-                                <Setter Property="Visibility" Value="Visible" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding IsCompactLayout}" Value="True">
-                                <Setter Property="MaxHeight" Value="300" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </ScrollViewer.Style>
-                <mmi:MmiOperatorLayoutView />
-            </ScrollViewer>
-
-            <Grid Grid.Row="2" ClipToBounds="True">
-                <Border Background="{DynamicResource Scene.Background}">
+            <Grid Grid.Row="1" ClipToBounds="True">
+                <Grid>
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Background" Value="{DynamicResource Scene.Background}" />
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Layout.IsObliqueView}" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource Scene.ObliqueBackground}" />
+                                </DataTrigger>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" />
+                                        <Condition Binding="{Binding Layout.IsLargeOverview}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                <Border>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Margin" Value="0" />
+                            <Setter Property="Background" Value="{DynamicResource Scene.Background}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                                    <Setter Property="Margin" Value="0,90,0,0" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Layout.IsObliqueView}" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource Scene.ObliqueBackground}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <scene:MachineSceneViewport x:Name="SceneViewport"
                                                 IsDesignMode="{Binding IsSceneEditable}"
-                                                ItemsSource="{Binding Layout.Items}"
+                                                IsObliqueView="{Binding Layout.IsObliqueView}"
+                                                ItemsSource="{Binding Layout.SceneItems}"
                                                 SelectedItem="{Binding Layout.SelectedItem, Mode=TwoWay}"
                                                 SnapshotSource="{Binding SceneSnapshotSource}">
                         <b:Interaction.Behaviors>
@@ -63,44 +339,41 @@
                     </scene:MachineSceneViewport>
                 </Border>
 
-                <Border Width="460"
-                        MaxWidth="460"
-                        Margin="24"
-                        Padding="24"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Background="{DynamicResource Surface.Raised}"
-                        BorderBrush="{DynamicResource Border.Default}"
+                <Border BorderBrush="{DynamicResource Accent.Primary}"
                         BorderThickness="1"
-                        CornerRadius="8"
-                        Visibility="{Binding Navigation.IsStartupChoiceVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <StackPanel>
-                        <TextBlock HorizontalAlignment="Center"
-                                   FontSize="20"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource Text.Primary}"
-                                   Text="{loc:Loc Key=Scene.StartTitle}" />
-                        <TextBlock Margin="0,8,0,18"
-                                   Foreground="{DynamicResource Text.Secondary}"
-                                   Text="{loc:Loc Key=Scene.StartHint}"
-                                   TextAlignment="Center"
-                                   TextWrapping="Wrap" />
-                        <Button x:Name="StartBlankLayoutButton"
-                                Height="42"
-                                AutomationProperties.Name="{loc:Loc Key=Scene.StartBlank}"
-                                Command="{Binding Navigation.StartBlankLayoutCommand}"
-                                Content="{loc:Loc Key=Scene.StartBlank}"
-                                Style="{StaticResource GlobalCommandButtonStyle}" />
-                        <Button x:Name="StartSampleButton"
-                                Height="42"
-                                Margin="0,10,0,0"
-                                AutomationProperties.Name="{loc:Loc Key=Scene.StartSample}"
-                                Command="{Binding Navigation.OpenBundledSampleCommand}"
-                                Content="{loc:Loc Key=Scene.StartSample}"
-                                Style="{StaticResource QuietCommandButtonStyle}"
-                                ToolTip="{loc:Loc Key=Scene.StartSampleTooltip}" />
-                    </StackPanel>
+                        CornerRadius="6"
+                        IsHitTestVisible="False"
+                        Visibility="{Binding Layout.IsUnitView, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Margin" Value="34" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                                    <Setter Property="Margin" Value="34,124,34,34" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                 </Border>
+
+                <Button x:Name="SceneViewModeButton"
+                        Margin="10"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        AutomationProperties.Name="{Binding Layout.SceneViewToggleText}"
+                        Command="{Binding Layout.ToggleSceneViewCommand}"
+                        Content="{Binding Layout.SceneViewToggleText}"
+                        ToolTip="{loc:Loc Key=Scene.ToggleViewTooltip}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
 
                 <Border Width="430"
                         MaxWidth="430"
@@ -322,14 +595,12 @@
                 </Border>
 
                 <Border x:Name="SceneIdentityCard"
-                        Margin="10"
-                        Padding="8,5"
+                        Margin="18,15"
+                        Padding="0"
+                        MaxWidth="320"
                         HorizontalAlignment="Left"
                         VerticalAlignment="Top"
-                        Background="#CC171D24"
-                        BorderBrush="{DynamicResource Border.Default}"
-                        BorderThickness="1"
-                        CornerRadius="4"
+                        Background="Transparent"
                         IsHitTestVisible="False">
                     <Border.Style>
                         <Style TargetType="Border">
@@ -341,107 +612,752 @@
                             </Style.Triggers>
                         </Style>
                     </Border.Style>
-                    <StackPanel>
-                        <TextBlock FontSize="10.5"
+                    <Grid>
+                    <StackPanel Visibility="{Binding Navigation.IsEquipmentWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock FontSize="18"
                                    FontWeight="SemiBold"
-                                   Foreground="{DynamicResource State.Vision}"
-                                   Text="{Binding SceneTitleText}" />
+                                   Foreground="{DynamicResource Text.Primary}"
+                                   Text="{Binding Layout.SceneTitleText}"
+                                   TextWrapping="Wrap" />
                         <TextBlock Margin="0,3,0,0"
-                                   FontSize="10"
+                                   FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
+                                   TextWrapping="Wrap">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="{loc:Loc Key=Scene.EquipmentEditHint}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSceneEditable}" Value="False">
+                                            <Setter Property="Text" Value="{loc:Loc Key=Scene.EquipmentRunHint}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                    <StackPanel>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource State.Vision}"
+                                   Text="{Binding SceneTitleText}" />
+                        <TextBlock Margin="0,3,0,0" FontSize="10" Foreground="{DynamicResource Text.Secondary}"
                                    Text="{Binding SceneControlText}" />
                     </StackPanel>
+                    </Grid>
                 </Border>
 
-                <Button x:Name="FitLayoutButton"
-                        Margin="10"
-                        Padding="8,0"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Bottom"
-                        AutomationProperties.Name="{loc:Loc Key=Scene.FitLayout}"
-                        Content="{loc:Loc Key=Scene.FitLayout}"
-                        Style="{StaticResource GlobalCommandButtonStyle}"
-                        ToolTip="{loc:Loc Key=Scene.FitLayoutTooltip}">
-                    <b:Interaction.Behaviors>
-                        <behavior:FitSceneViewportBehavior SceneViewport="{Binding ElementName=SceneViewport}" />
-                    </b:Interaction.Behaviors>
-                </Button>
+                <WrapPanel Margin="18,0,18,14"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Bottom"
+                           IsHitTestVisible="False"
+                           Visibility="{Binding Navigation.IsEquipmentWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Margin="0,0,14,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Scene.LegendAxis}" />
+                    <TextBlock Margin="0,0,14,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Scene.LegendCylinder}" />
+                    <TextBlock Margin="0,0,14,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Scene.LegendSensor}" />
+                    <TextBlock Margin="0,0,14,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Scene.LegendCamera}" />
+                    <TextBlock Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Scene.LegendUnit}" />
+                </WrapPanel>
+
+                <StackPanel Margin="10"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Bottom"
+                            Orientation="Horizontal">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <Button x:Name="SceneZoomOutButton"
+                            Margin="0,0,4,0"
+                            MinWidth="38"
+                            AutomationProperties.Name="{loc:Loc Key=Scene.ZoomOut}"
+                            Content="−"
+                            Style="{StaticResource GlobalCommandButtonStyle}"
+                            ToolTip="{loc:Loc Key=Scene.ZoomOutTooltip}">
+                        <b:Interaction.Behaviors>
+                            <behavior:ZoomSceneViewportBehavior SceneViewport="{Binding ElementName=SceneViewport}" WheelDelta="-120" />
+                        </b:Interaction.Behaviors>
+                    </Button>
+                    <Button x:Name="FitLayoutButton"
+                            Margin="0,0,4,0"
+                            Padding="8,0"
+                            AutomationProperties.Name="{loc:Loc Key=Scene.FitLayout}"
+                            Content="{loc:Loc Key=Scene.FitLayout}"
+                            Style="{StaticResource GlobalCommandButtonStyle}"
+                            ToolTip="{loc:Loc Key=Scene.FitLayoutTooltip}">
+                        <b:Interaction.Behaviors>
+                            <behavior:FitSceneViewportBehavior SceneViewport="{Binding ElementName=SceneViewport}" />
+                        </b:Interaction.Behaviors>
+                    </Button>
+                    <Button x:Name="SceneZoomInButton"
+                            MinWidth="38"
+                            AutomationProperties.Name="{loc:Loc Key=Scene.ZoomIn}"
+                            Content="+"
+                            Style="{StaticResource GlobalCommandButtonStyle}"
+                            ToolTip="{loc:Loc Key=Scene.ZoomInTooltip}">
+                        <b:Interaction.Behaviors>
+                            <behavior:ZoomSceneViewportBehavior SceneViewport="{Binding ElementName=SceneViewport}" WheelDelta="120" />
+                        </b:Interaction.Behaviors>
+                    </Button>
+                </StackPanel>
+                </Grid>
+
+                <Border Panel.ZIndex="10"
+                        Background="{DynamicResource Scene.Background}">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" />
+                                        <Condition Binding="{Binding Layout.IsLargeOverview}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <ScrollViewer x:Name="LargeOverviewScrollViewer"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  IsVisibleChanged="LargeOverviewScrollViewer_OnIsVisibleChanged"
+                                  VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="24">
+                            <TextBlock FontSize="22"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Text.Primary}"
+                                       Text="{Binding Layout.LargeOverviewTitleText}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,6,0,18"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Equipment.LargeOverviewHint}"
+                                       TextWrapping="Wrap" />
+                            <ItemsControl ItemsSource="{Binding Layout.UnitOverviewItems}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemContainerStyle>
+                                    <Style TargetType="ContentPresenter">
+                                        <Setter Property="Margin" Value="0,0,12,12" />
+                                    </Style>
+                                </ItemsControl.ItemContainerStyle>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Width="230"
+                                                Height="Auto"
+                                                MinHeight="130"
+                                                Padding="18"
+                                                HorizontalContentAlignment="Stretch"
+                                                VerticalContentAlignment="Stretch"
+                                                AutomationProperties.Name="{Binding UnitName}"
+                                                Command="{Binding DataContext.ShowEquipmentUnitCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding UnitId}">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
+                                                    <Setter Property="Background" Value="{DynamicResource Equipment.OverviewCardBackground}" />
+                                                </Style>
+                                            </Button.Style>
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="*" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+                                                <TextBlock FontSize="15"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource Text.Primary}"
+                                                           TextWrapping="Wrap">
+                                                    <Run Text="▦ " /><Run Text="{Binding UnitName}" />
+                                                </TextBlock>
+                                                <TextBlock Grid.Row="1"
+                                                           Margin="0,3,0,0"
+                                                           Foreground="{DynamicResource Text.Secondary}"
+                                                           Text="{Binding StationName}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Grid.Row="2"
+                                                           Margin="0,12,0,8"
+                                                           Foreground="{DynamicResource Text.Primary}"
+                                                           Text="{Binding CountText}"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Grid.Row="3"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource State.Success}"
+                                                           Text="{loc:Loc Key=Equipment.LargeOverviewOpen}" />
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+
+                <Grid Panel.ZIndex="20"
+                      Visibility="{Binding IsStationUnitEditorOpen, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      AutomationProperties.Name="{loc:Loc Key=Equipment.StationUnitDialogTitle}"
+                      FocusManager.IsFocusScope="True"
+                      FocusManager.FocusedElement="{Binding ElementName=StationUnitNameTextBox}">
+                    <Border Background="{DynamicResource Surface.Root}" Opacity="0.82" />
+                    <Border Width="500"
+                            MaxWidth="500"
+                            Margin="20"
+                            Padding="22"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Background="{DynamicResource Surface.Raised}"
+                            BorderBrush="{DynamicResource Border.Default}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <StackPanel KeyboardNavigation.TabNavigation="Cycle">
+                            <TextBlock FontSize="19"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Text.Primary}"
+                                       Text="{loc:Loc Key=Equipment.StationUnitDialogTitle}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,7,0,18"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Equipment.StationUnitDialogHint}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,0,0,5"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Equipment.StationUnitUnitName}" />
+                            <TextBox x:Name="StationUnitNameTextBox"
+                                     MinHeight="36"
+                                     MaxLength="80"
+                                     AutomationProperties.Name="{loc:Loc Key=Equipment.StationUnitUnitName}"
+                                     Text="{Binding UnitNameDraft, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Margin="0,14,0,5"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Equipment.StationUnitStation}" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox Grid.Column="0" MinHeight="36"
+                                          ItemsSource="{Binding ProjectStations}"
+                                          DisplayMemberPath="Name"
+                                          SelectedValuePath="Id"
+                                          SelectedValue="{Binding SelectedStationId, Mode=TwoWay}"
+                                          AutomationProperties.Name="{loc:Loc Key=Equipment.StationUnitStation}">
+                                    <ComboBox.Style>
+                                        <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCreatingNewStation}" Value="True">
+                                                    <Setter Property="IsEnabled" Value="False" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ComboBox.Style>
+                                </ComboBox>
+                                <Button Grid.Column="1" Margin="8,0,0,0" MinHeight="36"
+                                        Command="{Binding RemoveSelectedStationCommand}"
+                                        Content="{loc:Loc Key=Equipment.StationRemove}"
+                                        AutomationProperties.Name="{loc:Loc Key=Equipment.StationRemove}"
+                                        ToolTip="{loc:Loc Key=Equipment.StationRemoveTooltip}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource QuietCommandButtonStyle}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCreatingNewStation}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </Grid>
+                            <TextBlock Margin="0,7,0,0"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding StationUnitRemovalHintText}"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding HasSelectedStationChildren, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <CheckBox Margin="0,12,0,0"
+                                      Content="{loc:Loc Key=Equipment.StationUnitNewStationOption}"
+                                      IsChecked="{Binding IsCreatingNewStation, Mode=TwoWay}" />
+                            <StackPanel Margin="0,10,0,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsCreatingNewStation}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Margin="0,0,0,5"
+                                           Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{loc:Loc Key=Equipment.StationUnitStationName}" />
+                                <TextBox MinHeight="36"
+                                         MaxLength="80"
+                                         AutomationProperties.Name="{loc:Loc Key=Equipment.StationUnitStationName}"
+                                         Text="{Binding StationNameDraft, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <TextBlock Margin="0,10,0,0"
+                                       Foreground="{DynamicResource State.Fault}"
+                                       Text="{Binding StationUnitValidationText}"
+                                       TextWrapping="Wrap">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding StationUnitValidationText}" Value="">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <WrapPanel Margin="0,18,0,0" HorizontalAlignment="Right">
+                                <Button Margin="0,0,8,0"
+                                        Command="{Binding CancelStationUnitEditorCommand}"
+                                        Content="{loc:Loc Key=Equipment.StationUnitCancel}"
+                                        Style="{StaticResource QuietCommandButtonStyle}" />
+                                <Button IsDefault="True"
+                                        Command="{Binding AddStationUnitCommand}"
+                                        Content="{loc:Loc Key=Equipment.StationUnitAdd}"
+                                        Style="{StaticResource PrimaryCommandButtonStyle}" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Grid Panel.ZIndex="21"
+                      Visibility="{Binding IsBulkMoveEditorOpen, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      AutomationProperties.Name="{Binding BulkMoveTitleText}"
+                      FocusManager.IsFocusScope="True"
+                      FocusManager.FocusedElement="{Binding ElementName=BulkMoveXNumberBox}">
+                    <Border Background="{DynamicResource Surface.Root}" Opacity="0.82" />
+                    <Border Width="620"
+                            MaxWidth="620"
+                            Margin="20"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Background="{DynamicResource Surface.Raised}"
+                            BorderBrush="{DynamicResource Border.Default}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Border Padding="22,18"
+                                    BorderBrush="{DynamicResource Border.Default}"
+                                    BorderThickness="0,0,0,1">
+                                <TextBlock FontSize="19"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Text.Primary}"
+                                           Text="{Binding BulkMoveTitleText}"
+                                           TextWrapping="Wrap" />
+                            </Border>
+                            <StackPanel Grid.Row="1" Margin="22,18">
+                                <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{loc:Loc Key=Equipment.BulkMoveHint}"
+                                           TextWrapping="Wrap" />
+                                <Grid Margin="0,16,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Margin="0,0,0,5"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{loc:Loc Key=Equipment.BulkMoveX}" />
+                                        <TextBox x:Name="BulkMoveXNumberBox"
+                                                 MinHeight="36"
+                                                 AutomationProperties.Name="{loc:Loc Key=Equipment.BulkMoveX}"
+                                                 Text="{Binding BulkMoveXText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Margin="0,0,0,5"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{loc:Loc Key=Equipment.BulkMoveZ}" />
+                                        <TextBox MinHeight="36"
+                                                 AutomationProperties.Name="{loc:Loc Key=Equipment.BulkMoveZ}"
+                                                 Text="{Binding BulkMoveZText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Margin="0,10,0,0"
+                                           Foreground="{DynamicResource State.Fault}"
+                                           Text="{Binding BulkMoveValidationText}"
+                                           TextWrapping="Wrap">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding BulkMoveValidationText}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                            <Border Grid.Row="2"
+                                    Padding="22,16"
+                                    BorderBrush="{DynamicResource Border.Default}"
+                                    BorderThickness="0,1,0,0">
+                                <WrapPanel HorizontalAlignment="Right">
+                                    <Button Margin="0,0,8,0"
+                                            Command="{Binding CancelBulkMoveCommand}"
+                                            Content="{loc:Loc Key=Equipment.BulkMoveCancel}"
+                                            Style="{StaticResource QuietCommandButtonStyle}" />
+                                    <Button IsDefault="True"
+                                            Command="{Binding ApplyBulkMoveCommand}"
+                                            Content="{loc:Loc Key=Equipment.BulkMoveApply}"
+                                            Style="{StaticResource PrimaryCommandButtonStyle}" />
+                                </WrapPanel>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
             </Grid>
+
+                <Grid Grid.Row="2">
+                <Border
+                        MinHeight="54"
+                        Padding="10,8"
+                        Background="{DynamicResource Surface.Raised}"
+                        BorderBrush="{DynamicResource Border.Default}"
+                        BorderThickness="0,1,0,0"
+                        Visibility="{Binding Navigation.IsEquipmentWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock FontWeight="SemiBold"
+                                       Text="{Binding Layout.SelectionSummaryText}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Margin="0,2,0,0"
+                                       FontFamily="{StaticResource Typography.Telemetry}"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding Layout.SelectedItem.Id}"
+                                       TextTrimming="CharacterEllipsis"
+                                       Visibility="{Binding Layout.HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </StackPanel>
+                        <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                            <Button Margin="6,0,0,0"
+                                    MinHeight="34"
+                                    Command="{Binding OpenEquipmentPropertiesCommand}"
+                                    Content="{loc:Loc Key=Shell.Properties}"
+                                    AutomationProperties.Name="{loc:Loc Key=Shell.Properties}"
+                                    Style="{StaticResource PrimaryCommandButtonStyle}" />
+                            <Button Margin="6,0,0,0"
+                                    MinHeight="34"
+                                    Command="{Binding OpenEquipmentSinglePartCheckCommand}"
+                                    Content="{loc:Loc Key=Equipment.SinglePartCheck}"
+                                    AutomationProperties.Name="{loc:Loc Key=Equipment.SinglePartCheck}"
+                                    Style="{StaticResource GlobalCommandButtonStyle}" />
+                            <Button Margin="6,0,0,0"
+                                    MinHeight="34"
+                                    Command="{Binding DuplicateLayoutSelectionCommand}"
+                                    Content="{loc:Loc Key=Shell.Duplicate}"
+                                    AutomationProperties.Name="{loc:Loc Key=Shell.Duplicate}"
+                                    Style="{StaticResource GlobalCommandButtonStyle}" />
+                            <Button Margin="6,0,0,0"
+                                    MinHeight="34"
+                                    Command="{Binding OpenBulkMoveEditorCommand}"
+                                    Content="{loc:Loc Key=Equipment.BulkMoveButton}"
+                                    AutomationProperties.Name="{loc:Loc Key=Equipment.BulkMoveButton}"
+                                    Style="{StaticResource GlobalCommandButtonStyle}" />
+                            <Button Margin="6,0,0,0"
+                                    MinHeight="34"
+                                    Command="{Binding DeleteLayoutComponentCommand}"
+                                    Content="{loc:Loc Key=Shell.Delete}"
+                                    AutomationProperties.Name="{loc:Loc Key=Shell.Delete}"
+                                    Style="{StaticResource GlobalCommandButtonStyle}" />
+                            <Button Margin="6,0,0,0"
+                                    MinHeight="34"
+                                    Command="{Binding Navigation.OpenSequenceEditorCommand}"
+                                    IsEnabled="{Binding Layout.HasSelection}"
+                                    AutomationProperties.Name="{loc:Loc Key=Shell.Sequence}"
+                                    Style="{StaticResource GlobalCommandButtonStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{loc:Loc Key=Shell.Sequence}" />
+                                    <TextBlock Margin="5,0,0,0" Text="→" />
+                                </StackPanel>
+                            </Button>
+                        </WrapPanel>
+                    </Grid>
+                </Border>
+                <Border MinHeight="96"
+                        Padding="8"
+                        Background="{DynamicResource Surface.Raised}"
+                        BorderBrush="{DynamicResource Border.Default}"
+                        BorderThickness="0,1,0,0"
+                        Visibility="{Binding Navigation.IsSimulationWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Margin="2,0,2,5"
+                                   FontWeight="SemiBold"
+                                   Text="{loc:Loc Key=Equipment.SimulationUnitsTitle}" />
+                        <ScrollViewer Grid.Row="1"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Disabled">
+                            <ScrollViewer.Style>
+                                <Style TargetType="ScrollViewer">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Layout.UnitOverviewItems.Count}" Value="0">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ScrollViewer.Style>
+                            <ItemsControl ItemsSource="{Binding Layout.UnitOverviewItems}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Width="320"
+                                                MinHeight="74"
+                                                Margin="3,1,5,3"
+                                                Padding="12,8"
+                                                HorizontalContentAlignment="Stretch"
+                                                Command="{Binding DataContext.ShowEquipmentUnitCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding UnitId}"
+                                                AutomationProperties.Name="{Binding UnitName}"
+                                                Style="{StaticResource GlobalCommandButtonStyle}">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+                                                <DockPanel LastChildFill="True">
+                                                    <TextBlock DockPanel.Dock="Right"
+                                                               Margin="8,0,0,0"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource Text.Primary}"
+                                                               Text="{Binding UnitName}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Foreground="{DynamicResource Accent.Primary}"
+                                                               Text="{Binding StationName}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </DockPanel>
+                                                <TextBlock Grid.Row="1"
+                                                           Margin="0,4,0,0"
+                                                           FontFamily="{StaticResource Typography.Telemetry}"
+                                                           FontSize="11"
+                                                           Foreground="{DynamicResource Text.Secondary}"
+                                                           Text="{Binding CountText}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <StackPanel Grid.Row="1"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Layout.UnitOverviewItems.Count}" Value="0">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Margin="0,0,10,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Equipment.SimulationUnitsEmpty}" />
+                            <Button MinHeight="30"
+                                    Padding="8,0"
+                                    Command="{Binding OpenStationUnitEditorCommand}"
+                                    Content="{loc:Loc Key=Equipment.OutlineAddUnit}"
+                                    AutomationProperties.Name="{loc:Loc Key=Equipment.OutlineAddUnit}"
+                                    Style="{StaticResource PrimaryCommandButtonStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                </Grid>
                 </Grid>
             </Border>
+                </TabItem>
+                <TabItem x:Name="SequenceWorkspaceTab" Header="{loc:Loc Key=Simulation.EditActions}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Border x:Name="ProcessPlanReturnBar"
+                                Padding="10,6"
+                                Background="{DynamicResource Surface.Raised}"
+                                BorderBrush="{DynamicResource Accent.Primary}"
+                                BorderThickness="0,0,0,1"
+                                Visibility="{Binding HasProcessPlanReturnContext, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <DockPanel LastChildFill="True">
+                                <Button x:Name="ReturnToProcessPlanButton"
+                                        DockPanel.Dock="Left"
+                                        Command="{Binding ReturnToProcessPlanCommand}"
+                                        AutomationProperties.Name="{loc:Loc Key=Connections.ReturnToProcessPlan}"
+                                        Style="{StaticResource GlobalCommandButtonStyle}"
+                                        ToolTip="{loc:Loc Key=Connections.ReturnToProcessPlanTooltip}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="ArrowLeft24" />
+                                        <TextBlock Margin="5,0,0,0"
+                                                   Text="{loc:Loc Key=Connections.ReturnToProcessPlan}" />
+                                    </StackPanel>
+                                </Button>
+                                <StackPanel DockPanel.Dock="Right"
+                                            Margin="10,0,0,0"
+                                            Orientation="Horizontal">
+                                    <TextBlock Margin="0,0,8,0"
+                                               VerticalAlignment="Center"
+                                               FontFamily="{StaticResource Typography.Telemetry}"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding ProcessPlanReviewPositionText}" />
+                                    <Button x:Name="PreviousProcessPlanReviewStepButton"
+                                            Margin="0,0,5,0"
+                                            Command="{Binding PreviousProcessPlanReviewStepCommand}"
+                                            AutomationProperties.Name="{loc:Loc Key=Connections.ProcessPlanReviewPrevious}"
+                                            Style="{StaticResource QuietCommandButtonStyle}"
+                                            ToolTip="{loc:Loc Key=Connections.ProcessPlanReviewPreviousTooltip}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="ArrowLeft24" />
+                                            <TextBlock Margin="4,0,0,0"
+                                                       Text="{loc:Loc Key=Connections.ProcessPlanReviewPrevious}" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button x:Name="NextProcessPlanReviewStepButton"
+                                            Command="{Binding NextProcessPlanReviewStepCommand}"
+                                            AutomationProperties.Name="{loc:Loc Key=Connections.ProcessPlanReviewNext}"
+                                            Style="{StaticResource QuietCommandButtonStyle}"
+                                            ToolTip="{loc:Loc Key=Connections.ProcessPlanReviewNextTooltip}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Margin="0,0,4,0"
+                                                       Text="{loc:Loc Key=Connections.ProcessPlanReviewNext}" />
+                                            <ui:SymbolIcon Symbol="Next24" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <TextBlock Margin="10,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{loc:Loc Key=Connections.ReturnToProcessPlanHint}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{loc:Loc Key=Connections.ReturnToProcessPlanHint}" />
+                            </DockPanel>
+                        </Border>
+                        <sequence:SequenceEditorView Grid.Row="1"
+                                                     DataContext="{Binding SequenceEditor}" />
+                    </Grid>
+                </TabItem>
+                <TabItem x:Name="TestScenarioWorkspaceTab" Header="{loc:Loc Key=Simulation.TestScenario}">
+                    <simulation:SimulationTestWorkspaceView />
+                </TabItem>
+            </TabControl>
         </TabItem>
         <TabItem Header="{loc:Loc Key=Connections.Tab}">
-            <project:RecipeConnectionWorkbenchView />
+            <TabControl x:Name="InspectionWorkspaceTabs"
+                        SelectedIndex="{Binding Navigation.SelectedInspectionTabIndex, Mode=TwoWay}">
+                <TabItem Header="{loc:Loc Key=Connections.Tab}">
+                    <project:RecipeConnectionWorkbenchView />
+                </TabItem>
+                <TabItem x:Name="IntegrationWorkspaceTab" Header="{loc:Loc Key=Integration.InspectionWorkspace}">
+                    <simulation:SimulationIntegrationWorkspaceView />
+                </TabItem>
+            </TabControl>
         </TabItem>
-        <TabItem Header="{loc:Loc Key=Shell.Sequence}">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-                <Border x:Name="ProcessPlanReturnBar"
-                        Padding="10,6"
-                        Background="{DynamicResource Surface.Raised}"
-                        BorderBrush="{DynamicResource Accent.Primary}"
-                        BorderThickness="0,0,0,1"
-                        Visibility="{Binding HasProcessPlanReturnContext, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <DockPanel LastChildFill="True">
-                        <Button x:Name="ReturnToProcessPlanButton"
-                                DockPanel.Dock="Left"
-                                Command="{Binding ReturnToProcessPlanCommand}"
-                                AutomationProperties.Name="{loc:Loc Key=Connections.ReturnToProcessPlan}"
-                                Style="{StaticResource GlobalCommandButtonStyle}"
-                                ToolTip="{loc:Loc Key=Connections.ReturnToProcessPlanTooltip}">
-                            <StackPanel Orientation="Horizontal">
-                                <ui:SymbolIcon Symbol="ArrowLeft24" />
-                                <TextBlock Margin="5,0,0,0"
-                                           Text="{loc:Loc Key=Connections.ReturnToProcessPlan}" />
-                            </StackPanel>
-                        </Button>
-                        <StackPanel DockPanel.Dock="Right"
-                                    Margin="10,0,0,0"
-                                    Orientation="Horizontal">
-                            <TextBlock Margin="0,0,8,0"
-                                       VerticalAlignment="Center"
-                                       FontFamily="{StaticResource Typography.Telemetry}"
-                                       FontSize="11"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding ProcessPlanReviewPositionText}" />
-                            <Button x:Name="PreviousProcessPlanReviewStepButton"
-                                    Margin="0,0,5,0"
-                                    Command="{Binding PreviousProcessPlanReviewStepCommand}"
-                                    AutomationProperties.Name="{loc:Loc Key=Connections.ProcessPlanReviewPrevious}"
-                                    Style="{StaticResource QuietCommandButtonStyle}"
-                                    ToolTip="{loc:Loc Key=Connections.ProcessPlanReviewPreviousTooltip}">
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:SymbolIcon Symbol="ArrowLeft24" />
-                                    <TextBlock Margin="4,0,0,0"
-                                               Text="{loc:Loc Key=Connections.ProcessPlanReviewPrevious}" />
-                                </StackPanel>
-                            </Button>
-                            <Button x:Name="NextProcessPlanReviewStepButton"
-                                    Command="{Binding NextProcessPlanReviewStepCommand}"
-                                    AutomationProperties.Name="{loc:Loc Key=Connections.ProcessPlanReviewNext}"
-                                    Style="{StaticResource QuietCommandButtonStyle}"
-                                    ToolTip="{loc:Loc Key=Connections.ProcessPlanReviewNextTooltip}">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Margin="0,0,4,0"
-                                               Text="{loc:Loc Key=Connections.ProcessPlanReviewNext}" />
-                                    <ui:SymbolIcon Symbol="Next24" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                        <TextBlock Margin="10,0,0,0"
-                                   VerticalAlignment="Center"
+        <TabItem Header="{loc:Loc Key=Workspace.Results}" Visibility="Collapsed">
+            <Border x:Name="ResultsWorkspacePanel" Style="{StaticResource PanelSurfaceStyle}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="16">
+                        <TextBlock FontSize="18" FontWeight="SemiBold" Text="{loc:Loc Key=Workspace.Results}" />
+                        <TextBlock Margin="0,8,0,16" TextWrapping="Wrap"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="{loc:Loc Key=Connections.ReturnToProcessPlanHint}"
-                                   TextTrimming="CharacterEllipsis"
-                                   ToolTip="{loc:Loc Key=Connections.ReturnToProcessPlanHint}" />
-                    </DockPanel>
-                </Border>
-                <sequence:SequenceEditorView Grid.Row="1"
-                                             DataContext="{Binding SequenceEditor}" />
-            </Grid>
+                                   Text="{loc:Loc Key=Workspace.ResultsHint}" />
+                        <TextBlock FontWeight="SemiBold" Text="{Binding CommissioningValidationStatusText}" />
+                        <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Text="{Binding CommissioningValidationResultText}" />
+                        <TextBlock Margin="0,6,0,16" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Text.Secondary}" Text="{Binding CommissioningEvidenceStatusText}" />
+                        <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                   Text="{loc:Loc Key=Axis.RecipeHistory}" />
+                        <TextBlock Margin="0,2,0,5"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{Binding CommissioningHistoryStatusText}" />
+                        <ListBox x:Name="CommissioningResultHistoryList"
+                                 MinHeight="120" MaxHeight="280"
+                                 ItemsSource="{Binding CommissioningResultHistoryEntries}"
+                                 SelectedItem="{Binding SelectedCommissioningHistoryEntry, Mode=TwoWay}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="4,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock FontWeight="SemiBold"
+                                                   Text="{Binding Sequence, StringFormat=#{0}}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Margin="8,0,0,0"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{Binding CompletedRuns, StringFormat={}{0}x}" />
+                                        <TextBlock Grid.Column="2"
+                                                   Margin="8,0,0,0"
+                                                   HorizontalAlignment="Right"
+                                                   Style="{StaticResource TelemetryTextStyle}"
+                                                   Text="{Binding ShortEvidenceHash}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock Margin="0,5,0,0"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{Binding CommissioningBaselineStatusText}"
+                                   TextWrapping="Wrap" />
+                        <WrapPanel Margin="0,7,0,0">
+                            <Button x:Name="AcceptCommissioningBaselineButton"
+                                    Margin="0,0,6,4"
+                                    Command="{Binding AcceptCommissioningBaselineCommand}"
+                                    Content="{loc:Loc Key=Axis.RecipeAcceptBaseline}"
+                                    Style="{StaticResource GlobalCommandButtonStyle}"
+                                    AutomationProperties.Name="{loc:Loc Key=Axis.RecipeAcceptBaseline}" />
+                            <Button Margin="0,0,6,4"
+                                    Command="{Binding ClearCommissioningBaselineCommand}"
+                                    Content="{loc:Loc Key=Axis.RecipeClearBaseline}"
+                                    Style="{StaticResource GlobalCommandButtonStyle}" />
+                            <Button x:Name="NavigateCommissioningMismatchButton"
+                                    Margin="0,0,6,4"
+                                    Command="{Binding NavigateToCommissioningMismatchCommand}"
+                                    Content="{loc:Loc Key=Axis.RecipeGoToMismatch}"
+                                    Style="{StaticResource GlobalCommandButtonStyle}" />
+                        </WrapPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
         </TabItem>
     </TabControl>
 </UserControl>

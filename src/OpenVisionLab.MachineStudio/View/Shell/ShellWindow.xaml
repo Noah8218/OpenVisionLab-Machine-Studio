@@ -8,23 +8,25 @@
         xmlns:scene="clr-namespace:OpenVisionLab.MachineStudio.View.Scene"
         xmlns:inspector="clr-namespace:OpenVisionLab.MachineStudio.View.Inspector"
         xmlns:diagnostics="clr-namespace:OpenVisionLab.MachineStudio.View.Diagnostics"
+        xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
         Title="{Binding Title}"
-        MinWidth="1280"
+        MinWidth="1000"
         MinHeight="720"
         Background="{DynamicResource Surface.Root}"
         ExtendsContentIntoTitleBar="True"
         shell:ShellWindow.IsCompactLayout="{Binding Navigation.IsCompactLayout, Mode=TwoWay}"
+        shell:ShellWindow.IsNarrowLayout="{Binding Navigation.IsNarrowLayout, Mode=TwoWay}"
         WindowStartupLocation="CenterScreen">
     <b:Interaction.Behaviors>
         <behavior:ShellKeyboardCommandBehavior
             DeleteCommand="{Binding DeleteLayoutComponentCommand}"
-            DuplicateCommand="{Binding DuplicateLayoutSelectionCommand}" />
+            DuplicateCommand="{Binding DuplicateLayoutSelectionCommand}"
+            SaveCommand="{Binding SaveProjectCommand}"
+            SaveAsCommand="{Binding SaveProjectAsCommand}" />
     </b:Interaction.Behaviors>
     <shell:MachineFluentWindow.InputBindings>
         <KeyBinding Key="N" Modifiers="Control" Command="{Binding NewProjectCommand}" />
         <KeyBinding Key="O" Modifiers="Control" Command="{Binding OpenProjectCommand}" />
-        <KeyBinding Key="S" Modifiers="Control" Command="{Binding SaveProjectCommand}" />
-        <KeyBinding Key="S" Modifiers="Control+Shift" Command="{Binding SaveProjectAsCommand}" />
         <KeyBinding Key="Z" Modifiers="Control" Command="{Binding UndoLayoutEditCommand}" />
         <KeyBinding Key="Y" Modifiers="Control" Command="{Binding RedoLayoutEditCommand}" />
         <KeyBinding Key="C" Modifiers="Control" Command="{Binding CopyLayoutSelectionCommand}" />
@@ -40,31 +42,140 @@
           Background="{DynamicResource Surface.Root}"
           UseLayoutRounding="True"
           SnapsToDevicePixels="True">
+        <Grid.Resources>
+            <Style x:Key="OpenedRecipeVisibility" TargetType="FrameworkElement">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Navigation.IsStartupChoiceVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="32" />
-            <RowDefinition Height="26" />
-            <RowDefinition Height="42" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="24" />
+            <RowDefinition Height="29" />
         </Grid.RowDefinitions>
 
         <shell:StudioTitleBar Grid.Row="0" />
         <shell:MainMenuView Grid.Row="1" />
-        <shell:GlobalCommandBarView Grid.Row="2" />
 
-        <Grid x:Name="WorkspaceRowsGrid" Grid.Row="3">
+        <Grid x:Name="WorkspaceRowsGrid" Grid.Row="2" Style="{StaticResource OpenedRecipeVisibility}">
             <Grid.RowDefinitions>
-                <RowDefinition Height="*" MinHeight="300" />
-                <RowDefinition x:Name="BottomWorkspaceRow" Height="34" />
+                <RowDefinition Height="48" />
+                <RowDefinition Height="51" />
+                <RowDefinition Height="2*" MinHeight="240" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition x:Name="BottomWorkspaceRow">
+                    <RowDefinition.Style>
+                        <Style TargetType="RowDefinition">
+                            <Setter Property="Height" Value="0" />
+                            <Setter Property="MinHeight" Value="0" />
+                            <Setter Property="MaxHeight" Value="0" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsEvidenceExpanded}" Value="True">
+                                    <Setter Property="Height" Value="*" />
+                                    <Setter Property="MinHeight" Value="200" />
+                                    <Setter Property="MaxHeight" Value="10000" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </RowDefinition.Style>
+                </RowDefinition>
             </Grid.RowDefinitions>
 
-            <Grid x:Name="WorkspaceColumnsGrid" Grid.Row="0">
+            <Border Padding="8,5" Background="{DynamicResource Surface.Panel}"
+                    BorderBrush="{DynamicResource Border.Default}" BorderThickness="0,0,0,1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" KeyboardNavigation.TabNavigation="Once">
+                        <RadioButton x:Name="EquipmentWorkspaceButton" GroupName="TaskWorkspace"
+                                     Content="{loc:Loc Key=Workspace.Equipment}"
+                                     IsChecked="{Binding Navigation.IsEquipmentWorkspace, Mode=TwoWay}"
+                                     Style="{StaticResource WorkspaceModeRadioStyle}" />
+                        <RadioButton x:Name="SimulationWorkspaceButton" GroupName="TaskWorkspace"
+                                     Content="{loc:Loc Key=Workspace.Teaching}"
+                                     IsChecked="{Binding Navigation.IsSimulationWorkspace, Mode=TwoWay}"
+                                     Style="{StaticResource WorkspaceModeRadioStyle}" />
+                        <RadioButton x:Name="InspectionWorkspaceButton" GroupName="TaskWorkspace"
+                                     Content="{loc:Loc Key=Workspace.Execution}"
+                                     IsChecked="{Binding Navigation.IsInspectionWorkspace, Mode=TwoWay}"
+                                     Style="{StaticResource WorkspaceModeRadioStyle}" />
+                        <RadioButton x:Name="ResultsWorkspaceButton" GroupName="TaskWorkspace"
+                                     Content="{loc:Loc Key=Workspace.Results}"
+                                     IsChecked="{Binding Navigation.IsResultsWorkspace, Mode=TwoWay}"
+                                     Style="{StaticResource WorkspaceModeRadioStyle}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="2"
+                               MaxWidth="320"
+                               Margin="12,0,8,0"
+                               VerticalAlignment="Center"
+                               TextAlignment="Right"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               AutomationProperties.Name="{Binding Layout.EquipmentScopeContextText}"
+                               Text="{Binding Layout.EquipmentScopeContextText}" />
+                </Grid>
+            </Border>
+
+            <shell:GlobalCommandBarView Grid.Row="1" Style="{StaticResource OpenedRecipeVisibility}" />
+
+            <Grid x:Name="WorkspaceColumnsGrid" Grid.Row="2">
+                <Grid.Resources>
+                    <Style x:Key="WorkspaceInspectorStyle" TargetType="{x:Type inspector:RightToolRegionView}">
+                        <Setter Property="Grid.Column" Value="2" />
+                        <Setter Property="Grid.ColumnSpan" Value="1" />
+                        <Setter Property="HorizontalAlignment" Value="Right" />
+                        <Setter Property="VerticalAlignment" Value="Stretch" />
+                        <Setter Property="Width" Value="405" />
+                        <Setter Property="MinWidth" Value="300" />
+                        <Setter Property="MaxWidth" Value="405" />
+                        <Setter Property="MaxHeight" Value="580" />
+                        <Setter Property="Margin" Value="16,68,16,68" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
+                                <Setter Property="Width" Value="360" />
+                                <Setter Property="Margin" Value="16,68,16,68" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsSimulationWorkspace}" Value="True">
+                                <Setter Property="Margin" Value="16,108,16,68" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsInspectorOpen}" Value="False">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                    <Style x:Key="EquipmentInspectorToggleStyle"
+                           TargetType="Button"
+                           BasedOn="{StaticResource GlobalCommandButtonStyle}">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Setter Property="Content" Value="{loc:Loc Key=Shell.Properties}" />
+                        <Setter Property="AutomationProperties.Name" Value="{loc:Loc Key=Shell.Properties}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsInspectorOpen}" Value="True">
+                                <Setter Property="Content" Value="×" />
+                                <Setter Property="AutomationProperties.Name" Value="{loc:Loc Key=Shell.CloseProperties}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsSimulationWorkspace}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Resources>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition x:Name="LeftWorkspaceColumn" Width="260" MinWidth="220" MaxWidth="420" />
+                    <ColumnDefinition x:Name="LeftWorkspaceColumn" Width="240" MinWidth="185" MaxWidth="420" />
                     <ColumnDefinition Width="4" />
                     <ColumnDefinition x:Name="CenterWorkspaceColumn" Width="*" MinWidth="620" />
-                    <ColumnDefinition Width="4" />
-                    <ColumnDefinition x:Name="RightWorkspaceColumn" Width="320" MinWidth="300" MaxWidth="520" />
+                    <ColumnDefinition x:Name="RightWorkspaceSplitterColumn" Width="0" />
+                    <ColumnDefinition x:Name="RightWorkspaceColumn" Width="0" MinWidth="0" MaxWidth="0" />
                 </Grid.ColumnDefinitions>
 
                 <project:LeftToolRegionView Grid.Column="0" />
@@ -72,20 +183,120 @@
                               HorizontalAlignment="Stretch"
                               VerticalAlignment="Stretch" />
                 <scene:SceneDocumentView Grid.Column="2" />
-                <GridSplitter Grid.Column="3"
+                <GridSplitter Grid.Column="3" Visibility="Collapsed"
                               HorizontalAlignment="Stretch"
                               VerticalAlignment="Stretch" />
-                <inspector:RightToolRegionView Grid.Column="4" />
+                <inspector:RightToolRegionView x:Name="RightToolRegionView"
+                                               Panel.ZIndex="5"
+                                               Style="{StaticResource WorkspaceInspectorStyle}" />
+                <Button Grid.Column="2"
+                        x:Name="WorkspaceInspectorToggleButton"
+                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Margin="12,68,12,0" Width="108" Height="34"
+                        Panel.ZIndex="6"
+                        Command="{Binding Navigation.ToggleInspectorCommand}"
+                        Style="{StaticResource EquipmentInspectorToggleStyle}" />
             </Grid>
 
-            <diagnostics:EventJournalView Grid.Row="0"
-                                          Grid.RowSpan="2"
-                                          Panel.ZIndex="10"
-                                          VerticalAlignment="Bottom" />
+            <GridSplitter x:Name="BottomWorkspaceSplitter" Grid.Row="3" Height="5"
+                          HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                          ResizeDirection="Rows" ResizeBehavior="PreviousAndNext"
+                          Background="{DynamicResource Border.Default}"
+                          Focusable="True" KeyboardIncrement="16"
+                          AutomationProperties.Name="{loc:Loc Key=Diagnostics.Resize}"
+                          Visibility="{Binding Navigation.IsEvidenceExpanded, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <diagnostics:EventJournalView Grid.Row="4" />
         </Grid>
 
-        <project:SemiconductorRecipeGalleryView Grid.Row="3" Panel.ZIndex="100" />
+        <Border Grid.Row="2" Background="{DynamicResource Surface.Root}"
+                Visibility="{Binding Navigation.IsStartupChoiceVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <Border MaxWidth="1060" Margin="24,32" Padding="28" HorizontalAlignment="Stretch"
+                        Background="{DynamicResource Surface.Raised}" BorderBrush="{DynamicResource Border.Default}"
+                        BorderThickness="1" CornerRadius="8">
+                    <StackPanel KeyboardNavigation.TabNavigation="Local">
+                        <TextBlock FontSize="24" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"
+                                   Text="{loc:Loc Key=RecipeEntry.Title}" TextWrapping="Wrap" />
+                        <TextBlock Margin="0,12,0,24" Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{loc:Loc Key=RecipeEntry.Hint}" TextWrapping="Wrap" />
+                        <UniformGrid x:Name="StartupCardsPanel" Rows="1" Columns="3">
+                            <Border MinHeight="196" Margin="7" Padding="16"
+                                    CornerRadius="8" Style="{StaticResource PanelSurfaceStyle}">
+                                <StackPanel>
+                                    <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"
+                                               Text="{loc:Loc Key=RecipeEntry.New}" TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{loc:Loc Key=RecipeEntry.NewDescription}" TextWrapping="Wrap" />
+                                    <Button x:Name="StartBlankLayoutButton" Height="44" Margin="0,16,0,0"
+                                            Command="{Binding NewProjectCommand}" Content="{loc:Loc Key=RecipeEntry.New}"
+                                            AutomationProperties.Name="{loc:Loc Key=RecipeEntry.New}"
+                                            AutomationProperties.HelpText="{loc:Loc Key=RecipeEntry.NewDescription}"
+                                            Style="{StaticResource PrimaryCommandButtonStyle}" />
+                                </StackPanel>
+                            </Border>
+                            <Border MinHeight="196" Margin="7" Padding="16"
+                                    CornerRadius="8" Style="{StaticResource PanelSurfaceStyle}">
+                                <StackPanel>
+                                    <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"
+                                               Text="{loc:Loc Key=RecipeEntry.InspectionTitle}" TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{loc:Loc Key=RecipeEntry.InspectionDescription}" TextWrapping="Wrap" />
+                                    <Button x:Name="StartSampleButton" Height="44" Margin="0,16,0,0"
+                                            Command="{Binding Navigation.OpenBundledSampleCommand}" Content="{loc:Loc Key=RecipeEntry.InspectionOpen}"
+                                            AutomationProperties.Name="{loc:Loc Key=RecipeEntry.InspectionOpen}"
+                                            AutomationProperties.HelpText="{loc:Loc Key=RecipeEntry.InspectionDescription}"
+                                            Style="{StaticResource QuietCommandButtonStyle}"
+                                            ToolTip="{loc:Loc Key=RecipeEntry.InspectionDescription}" />
+                                </StackPanel>
+                            </Border>
+                            <Border MinHeight="196" Margin="7" Padding="16"
+                                    CornerRadius="8" Style="{StaticResource PanelSurfaceStyle}">
+                                <StackPanel>
+                                    <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"
+                                               Text="{loc:Loc Key=RecipeEntry.LargeTitle}" TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{loc:Loc Key=RecipeEntry.LargeDescription}" TextWrapping="Wrap" />
+                                    <Button x:Name="StartLargeLayoutSampleButton" Height="44" Margin="0,16,0,0"
+                                            Command="{Binding Navigation.OpenLargeLayoutSampleCommand}"
+                                            Content="{loc:Loc Key=RecipeEntry.LargeOpen}"
+                                            AutomationProperties.Name="{loc:Loc Key=RecipeEntry.LargeOpen}"
+                                            AutomationProperties.HelpText="{loc:Loc Key=RecipeEntry.LargeDescription}"
+                                            Style="{StaticResource QuietCommandButtonStyle}" />
+                                    <TextBlock Margin="0,8,0,0" FontSize="12" Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{loc:Loc Key=RecipeEntry.LargeHint}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+                        <Border Margin="8,24,8,0" Padding="16" CornerRadius="8"
+                                Style="{StaticResource PanelSurfaceStyle}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"
+                                               Text="{loc:Loc Key=RecipeEntry.Open}" TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{loc:Loc Key=RecipeEntry.OpenDescription}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button x:Name="OpenRecipeButton" Grid.Column="1" MinWidth="168" Height="44"
+                                        Margin="24,0,0,0" Command="{Binding OpenProjectCommand}"
+                                        Content="{loc:Loc Key=RecipeEntry.Open}"
+                                        AutomationProperties.Name="{loc:Loc Key=RecipeEntry.Open}"
+                                        AutomationProperties.HelpText="{loc:Loc Key=RecipeEntry.OpenDescription}"
+                                        Style="{StaticResource GlobalCommandButtonStyle}" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </ScrollViewer>
+        </Border>
+        <project:SemiconductorRecipeGalleryView Grid.Row="2" Panel.ZIndex="100" />
 
-        <shell:StudioStatusBarView Grid.Row="4" />
+        <project:EquipmentComponentLibraryDialogView Grid.Row="0" Grid.RowSpan="4" Panel.ZIndex="110" />
+        <project:NewProjectNameDialogView Grid.Row="0" Grid.RowSpan="4" Panel.ZIndex="120" />
+
+        <shell:StudioStatusBarView Grid.Row="3" />
     </Grid>
 </shell:MachineFluentWindow>

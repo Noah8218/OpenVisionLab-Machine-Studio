@@ -1,3 +1,4 @@
+using System.Globalization;
 using OpenVisionLab.Machine.Core.Channels;
 using OpenVisionLab.Machine.IO.Channels;
 using OpenVisionLab.Machine.Sequence.Runtime;
@@ -42,6 +43,9 @@ internal sealed class SimulationRuntimeState
     private TimeSpan _commandBoundaryTime;
     private string? _projectId;
     private long _runtimeGeneration;
+    private long _workpieceRunOrdinal;
+    private int _workpieceInstanceOrdinal;
+    private string? _activeWorkpieceRunId;
     private string? _resetRetrySequenceId;
     private bool _automaticExternalInspectionRearmRequired;
     private readonly Dictionary<string, VirtualCameraExternalSource> _automaticExternalSources =
@@ -110,6 +114,7 @@ internal sealed class SimulationRuntimeState
     internal TimeSpan CommandBoundaryTime => _commandBoundaryTime;
     internal string? ProjectId => _projectId;
     internal long RuntimeGeneration => _runtimeGeneration;
+    internal string? ActiveWorkpieceRunId => _activeWorkpieceRunId;
     internal string? ResetRetrySequenceId => _resetRetrySequenceId;
     internal bool AutomaticExternalInspectionRearmRequired =>
         _automaticExternalInspectionRearmRequired;
@@ -165,6 +170,8 @@ internal sealed class SimulationRuntimeState
         _cameras.AddRange(runtime.Cameras);
         _signalHub = runtime.SignalHub;
         _machineLayout = runtime.MachineLayout;
+        _activeWorkpieceRunId = null;
+        _workpieceInstanceOrdinal = 0;
         _pickPlaceWorkpiece = runtime.PickPlaceWorkpiece;
         if (configuration.TimeScale.HasValue)
         {
@@ -209,6 +216,8 @@ internal sealed class SimulationRuntimeState
         _cameras.Clear();
         _signalHub = DeterministicSignalHub.Create(Array.Empty<ChannelDefinition>()).Hub!;
         _machineLayout = null;
+        _activeWorkpieceRunId = null;
+        _workpieceInstanceOrdinal = 0;
         _pickPlaceWorkpiece = null;
         _faultRuntime.Clear();
         _conditionScenarioRuntime.Clear();
@@ -253,6 +262,8 @@ internal sealed class SimulationRuntimeState
         _faultRuntime.Clear();
         _signalHub.Reset();
         _machineLayout?.Reset();
+        _activeWorkpieceRunId = null;
+        _workpieceInstanceOrdinal = 0;
         _pickPlaceWorkpiece?.Reset();
         _sequenceRuntime.ResetExecutors();
         _automaticRunRuntime.Reset();
@@ -264,6 +275,65 @@ internal sealed class SimulationRuntimeState
         _activeSequenceId = null;
         _controlOwner = SimulationControlOwner.Definition;
         _runtimeGeneration++;
+    }
+
+    internal void EnsureWorkpieceRunStarted()
+    {
+        if (_activeWorkpieceRunId is not null || _machineLayout is null)
+        {
+            return;
+        }
+
+        long nextOrdinal = _workpieceRunOrdinal + 1;
+        string runId = $"run-{nextOrdinal.ToString("D4", CultureInfo.InvariantCulture)}";
+        if (!_machineLayout.StartWorkpieceRun(runId, out int assignedWorkpieceCount))
+        {
+            return;
+        }
+
+        _workpieceRunOrdinal = nextOrdinal;
+        _activeWorkpieceRunId = runId;
+        _workpieceInstanceOrdinal = assignedWorkpieceCount;
+    }
+
+    internal SequenceContextOperationResult FeedWorkpiece(string componentId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(componentId);
+        if (_activeWorkpieceRunId is null || _machineLayout is null)
+        {
+            return SequenceContextOperationResult.Failure(
+                SequenceContextErrorCode.Unavailable,
+                "A running Workpiece sequence is required before feeding.");
+        }
+
+        int nextOrdinal = _workpieceInstanceOrdinal + 1;
+        string instanceId = $"{_activeWorkpieceRunId}/WP-{nextOrdinal.ToString("D3", CultureInfo.InvariantCulture)}";
+        if (!_machineLayout.TryFeedWorkpiece(componentId, instanceId))
+        {
+            return SequenceContextOperationResult.Failure(
+                SequenceContextErrorCode.Rejected,
+                $"Workpiece position '{componentId}' is missing, occupied, or has a transfer owner.");
+        }
+
+        _workpieceInstanceOrdinal = nextOrdinal;
+        return SequenceContextOperationResult.Success();
+    }
+
+    internal SequenceContextOperationResult EjectWorkpiece(string componentId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(componentId);
+        if (_activeWorkpieceRunId is null || _machineLayout is null)
+        {
+            return SequenceContextOperationResult.Failure(
+                SequenceContextErrorCode.Unavailable,
+                "A running Workpiece sequence is required before ejecting.");
+        }
+
+        return _machineLayout.TryEjectWorkpiece(componentId)
+            ? SequenceContextOperationResult.Success()
+            : SequenceContextOperationResult.Failure(
+                SequenceContextErrorCode.Rejected,
+                $"Workpiece position '{componentId}' is missing, empty, or has a transfer owner.");
     }
 
     internal void SetCommandBoundary()

@@ -12,6 +12,8 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase, IDisposabl
 {
     private readonly Action<CameraImageSourceApplicationResult> _sourceApplied;
     private readonly Func<string, string?> _selectSourceFile;
+    private readonly Dictionary<string, (string Path, int Width, int Height, string PixelFormat)> _drafts =
+        new(StringComparer.Ordinal);
     private MachineProjectDocument _project = new();
     private string? _projectPath;
     private string? _cameraId;
@@ -166,6 +168,7 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase, IDisposabl
             return;
         }
 
+        _drafts.Clear();
         _project = project ?? throw new ArgumentNullException(nameof(project));
         _projectPath = string.IsNullOrWhiteSpace(projectPath) ? null : Path.GetFullPath(projectPath);
         _cameraId = cameraId;
@@ -180,8 +183,17 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase, IDisposabl
             return;
         }
 
+        if (string.Equals(_cameraId, cameraId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        PreserveCurrentDraft();
         _cameraId = cameraId;
-        Synchronize();
+        if (!TryRestoreDraft(cameraId))
+        {
+            Synchronize();
+        }
     }
 
     public void SetProjectPath(string? projectPath, bool isSaved)
@@ -253,6 +265,7 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase, IDisposabl
             Height = _height,
             PixelFormat = _pixelFormatText
         };
+        _drafts.Remove(definition.Id);
         _pathText = _normalizedPath;
         _needsProjectSave = true;
         RefreshValidation();
@@ -269,6 +282,11 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase, IDisposabl
             return;
         }
 
+        if (_cameraId is not null)
+        {
+            _drafts.Remove(_cameraId);
+        }
+
         var source = Definition?.Camera?.SingleImageSource;
         _pathText = source?.SourceRelativePath ?? string.Empty;
         _width = source?.Width ?? 1;
@@ -279,6 +297,41 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase, IDisposabl
         OnPropertyChanged(nameof(Height));
         OnPropertyChanged(nameof(PixelFormatText));
         RefreshValidation();
+    }
+
+    private void PreserveCurrentDraft()
+    {
+        if (_cameraId is null)
+        {
+            return;
+        }
+
+        if (!IsDirty)
+        {
+            _drafts.Remove(_cameraId);
+            return;
+        }
+
+        _drafts[_cameraId] = (_pathText, _width, _height, _pixelFormatText);
+    }
+
+    private bool TryRestoreDraft(string? cameraId)
+    {
+        if (cameraId is null || !_drafts.TryGetValue(cameraId, out var draft))
+        {
+            return false;
+        }
+
+        _pathText = draft.Path;
+        _width = draft.Width;
+        _height = draft.Height;
+        _pixelFormatText = draft.PixelFormat;
+        OnPropertyChanged(nameof(PathText));
+        OnPropertyChanged(nameof(Width));
+        OnPropertyChanged(nameof(Height));
+        OnPropertyChanged(nameof(PixelFormatText));
+        RefreshValidation();
+        return true;
     }
 
     private void RefreshValidation()
@@ -373,6 +426,7 @@ public sealed class CameraImageSourceEditorViewModel : ViewModelBase, IDisposabl
             return;
         }
 
+        _drafts.Clear();
         (BrowseCommand as RelayCommand)?.RaiseCanExecuteChanged();
         (ApplyCommand as RelayCommand)?.RaiseCanExecuteChanged();
         (RevertCommand as RelayCommand)?.RaiseCanExecuteChanged();

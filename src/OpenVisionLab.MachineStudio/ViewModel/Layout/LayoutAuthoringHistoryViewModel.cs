@@ -15,6 +15,7 @@ internal sealed class LayoutAuthoringHistoryViewModel : IDisposable
     private readonly Func<MachineProjectDocument> _projectProvider;
     private readonly Func<bool> _isEditable;
     private readonly Func<bool> _isApplyingProject;
+    private readonly Func<bool> _resolvePendingPlacementDraft;
     private readonly Action _markProjectChanged;
     private readonly Action _updateRunToolAvailability;
     private readonly Action<string?> _refreshDefinitionPresentation;
@@ -44,12 +45,14 @@ internal sealed class LayoutAuthoringHistoryViewModel : IDisposable
         Action notifyHostCommandsChanged,
         Action<string> setStatusMessage,
         Action<string, string> log,
-        Action onDefinitionChanged)
+        Action onDefinitionChanged,
+        Func<bool>? resolvePendingPlacementDraft = null)
     {
         _layout = layout ?? throw new ArgumentNullException(nameof(layout));
         _projectProvider = projectProvider ?? throw new ArgumentNullException(nameof(projectProvider));
         _isEditable = isEditable ?? throw new ArgumentNullException(nameof(isEditable));
         _isApplyingProject = isApplyingProject ?? throw new ArgumentNullException(nameof(isApplyingProject));
+        _resolvePendingPlacementDraft = resolvePendingPlacementDraft ?? (() => true);
         _markProjectChanged = markProjectChanged ?? throw new ArgumentNullException(nameof(markProjectChanged));
         _updateRunToolAvailability = updateRunToolAvailability ?? throw new ArgumentNullException(nameof(updateRunToolAvailability));
         _refreshDefinitionPresentation = refreshDefinitionPresentation ?? throw new ArgumentNullException(nameof(refreshDefinitionPresentation));
@@ -63,27 +66,27 @@ internal sealed class LayoutAuthoringHistoryViewModel : IDisposable
     }
 
     public ICommand UndoCommand => _undoCommand ??= new RelayCommand(
-        _ => Undo(),
+        _ => { if (_resolvePendingPlacementDraft()) Undo(); },
         _ => CanEdit && _history.CanUndo,
         useCommandManagerRequery: false);
 
     public ICommand RedoCommand => _redoCommand ??= new RelayCommand(
-        _ => Redo(),
+        _ => { if (_resolvePendingPlacementDraft()) Redo(); },
         _ => CanEdit && _history.CanRedo,
         useCommandManagerRequery: false);
 
     public ICommand CopyCommand => _copyCommand ??= new RelayCommand(
-        _ => CopySelection(),
+        _ => { if (_resolvePendingPlacementDraft()) CopySelection(); },
         _ => CanEdit && _layout.HasSelection && _layout.Definition is not null,
         useCommandManagerRequery: false);
 
     public ICommand DuplicateCommand => _duplicateCommand ??= new RelayCommand(
-        _ => DuplicateSelection(),
+        _ => { if (_resolvePendingPlacementDraft()) DuplicateSelection(); },
         _ => CanEdit && _layout.HasSelection && _layout.Definition is not null,
         useCommandManagerRequery: false);
 
     public ICommand PasteCommand => _pasteCommand ??= new RelayCommand(
-        _ => PasteSelection(),
+        _ => { if (_resolvePendingPlacementDraft()) PasteSelection(); },
         _ => CanEdit && _clipboard.HasContent && _layout.Definition is not null,
         useCommandManagerRequery: false);
 

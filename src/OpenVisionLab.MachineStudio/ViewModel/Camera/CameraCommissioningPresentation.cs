@@ -75,7 +75,9 @@ internal sealed class CameraCommissioningPresentation
                     : OpenVisionLanguageService.T("Camera.ResultSourceExternalUnverified");
             }
 
-            if (Projection.Snapshot?.Result?.InspectionEvidence is not null)
+            if (Projection.Snapshot?.Result is { } result
+                && (result.InspectionEvidence is not null
+                    || result.Decision is PlaceholderInspectionDecision.Pass or PlaceholderInspectionDecision.Fail))
             {
                 return OpenVisionLanguageService.T("Camera.ResultSourceMock");
             }
@@ -161,7 +163,7 @@ internal sealed class CameraCommissioningPresentation
     /// <summary>
     /// Returns the project-owned image captured by the latest virtual-camera
     /// frame. The path is exposed only after a frame has been acquired so the
-    /// MMI cannot mistake a configured source for a captured frame.
+    /// view cannot mistake a configured source for a captured frame.
     /// </summary>
     internal string? CurrentCameraImagePath => ResolveCapturedImagePath();
 
@@ -213,6 +215,9 @@ internal sealed class CameraCommissioningPresentation
                     .Select(metric =>
                         $"{metric.Key}={metric.Value.ToString("G17", CultureInfo.InvariantCulture)}"))
             : "—";
+
+    internal string CurrentCameraWorkpieceComponentIdText =>
+        Projection.Snapshot?.Result?.WorkpieceComponentId ?? "—";
 
     internal bool HasUsableCameraImageSource => !string.IsNullOrWhiteSpace(Projection.ProjectPath)
         && !string.IsNullOrWhiteSpace(Projection.SelectedCameraRecipe)

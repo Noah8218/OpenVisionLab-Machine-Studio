@@ -12,8 +12,10 @@ internal sealed class DirectExeSmokeOptions
     public int DpiScalePercent { get; init; } = 100;
     public string? SmokeLanguage { get; init; }
     public string? ProjectPath { get; init; }
+    public string? EquipmentOutlineSearchText { get; init; }
     public string? SelectPath { get; init; }
     public string? LayoutSelectId { get; init; }
+    public bool UseTopView { get; init; }
     public string? LayoutSelectMany { get; init; }
     public string? LayoutAlignment { get; init; }
     public string? LayoutAlignmentReportPath { get; init; }
@@ -38,6 +40,8 @@ internal sealed class DirectExeSmokeOptions
     public string? IntegrationPanelState { get; init; }
     public string? IntegrationExchangeRoot { get; init; }
     public string? IntegrationPanelReportPath { get; init; }
+    public string? MmiOperatorState { get; init; }
+    public string? MmiOperatorReportPath { get; init; }
     public bool EditCameraImageSource { get; init; }
     public string? AxisCommissioningReportPath { get; init; }
     public string? AxisCommissioningState { get; init; }
@@ -56,6 +60,7 @@ internal sealed class DirectExeSmokeOptions
     public string? EditMenuState { get; init; }
     public string? DirectSceneGestureState { get; init; }
     public string? GlobalCommandState { get; init; }
+    public string? GlobalCommandStateScreenshotPath { get; init; }
     public string? StartupChoiceState { get; init; }
     public string? RecipeGalleryState { get; init; }
     public string? RecipeGalleryCopyPath { get; init; }
@@ -72,10 +77,17 @@ internal sealed class DirectExeSmokeOptions
     public string? CameraFirstUseState { get; init; }
     public string? ProjectSafetyReportPath { get; init; }
     public string? ProjectSafetySavePath { get; init; }
+    public string? ProjectDiagnosticsReportPath { get; init; }
+    public string? ProjectDiagnosticsScreenshotPath { get; init; }
+    public string? SupportDiagnosticsReportPath { get; init; }
+    public string? SupportDiagnosticsExportPath { get; init; }
+    public string? SupportDiagnosticsScreenshotPath { get; init; }
     public string? UnsavedDialogScreenshotPath { get; init; }
     public string? ProjectOpenFailureDialogScreenshotPath { get; init; }
     public string? EvidenceDrawerState { get; init; }
     public string? LeftToolTab { get; init; }
+    public string? LibraryEntryState { get; init; }
+    public string? LibrarySearchText { get; init; }
     public string? LibraryCardState { get; init; }
     public string? LibraryDefaultAddKind { get; init; }
     public string? DocumentTab { get; init; }
@@ -94,7 +106,9 @@ internal sealed class DirectExeSmokeOptions
     public bool ShowTestScenarioSettings { get; init; }
     public bool TestScenarioBatch { get; init; }
     public string? ScenarioEvidenceExchangePath { get; init; }
+    public string? ScenarioReportPath { get; init; }
     public string ScenarioEvidenceExchangeState { get; init; } = "normal";
+    public string ScenarioReportState { get; init; } = "normal";
     public string? UnifiedCommissioningEvidencePath { get; init; }
     public string UnifiedCommissioningEvidenceState { get; init; } = "normal";
     public string? CommandTracePath { get; init; }

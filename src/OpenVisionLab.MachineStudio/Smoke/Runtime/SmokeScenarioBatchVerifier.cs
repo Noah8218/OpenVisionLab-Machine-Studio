@@ -1,6 +1,9 @@
 using System;
+using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows.Controls;
 using OpenVisionLab.MachineStudio.View.Shell;
 using OpenVisionLab.MachineStudio.ViewModel;
 
@@ -14,8 +17,12 @@ internal static class SmokeScenarioBatchVerifier
         string? projectPath,
         string? scenarioEvidenceExchangePath,
         string scenarioEvidenceExchangeState,
+        string? scenarioReportPath,
+        string scenarioReportState,
         string? unifiedCommissioningEvidencePath,
         string unifiedCommissioningEvidenceState,
+        SmokeWindowCapture windowCapture,
+        string? screenshotPath,
         SmokeUiInteraction uiInteraction)
     {
         vm.SimulationWorkspace.BatchRepetitionCount = 3;
@@ -41,13 +48,86 @@ internal static class SmokeScenarioBatchVerifier
             throw new InvalidOperationException("Repeat validation did not enter a cancellable state.");
         }
 
-        vm.CancelScenarioBatchCommand.Execute(null);
+        var cancellationScreenshotPath = string.IsNullOrWhiteSpace(screenshotPath)
+            ? null
+            : Path.Combine(
+                Path.GetDirectoryName(Path.GetFullPath(screenshotPath)) ?? AppContext.BaseDirectory,
+                "scenario-batch-cancel-requested.png");
+        var cancellationStatusText = cancellationScreenshotPath is null
+            ? null
+            : uiInteraction.FindTextBlock(
+                window,
+                candidate => string.Equals(candidate.Name, "ScenarioBatchStatusText", StringComparison.Ordinal))
+                ?? throw new InvalidOperationException("Repeat validation status text was not rendered.");
+        var cancellationScreenshotCaptured = false;
+        string? cancellationScreenshotError = null;
+        PropertyChangedEventHandler? cancellationHandler = null;
+        if (cancellationStatusText is not null)
+        {
+            cancellationHandler = (_, args) =>
+            {
+                if (cancellationScreenshotCaptured
+                    || !vm.IsBatchCancellationRequested
+                    || !string.Equals(
+                        args.PropertyName,
+                        nameof(MainViewModel.IsBatchCancellationRequested),
+                        StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                try
+                {
+                    cancellationStatusText.GetBindingExpression(TextBlock.TextProperty)?.UpdateTarget();
+                    if (!string.Equals(cancellationStatusText.Text, vm.BatchStatusText, StringComparison.Ordinal)
+                        || vm.CancelScenarioBatchCommand.CanExecute(null))
+                    {
+                        cancellationScreenshotError =
+                            $"Repeat validation cancellation request was not rendered before confirmation "
+                            + $"(ui='{cancellationStatusText.Text}', vm='{vm.BatchStatusText}', "
+                            + $"cancelEnabled={vm.CancelScenarioBatchCommand.CanExecute(null)}).";
+                        return;
+                    }
+
+                    cancellationStatusText.BringIntoView();
+                    cancellationStatusText.UpdateLayout();
+                    windowCapture.Capture(window, cancellationScreenshotPath!);
+                    cancellationScreenshotCaptured = true;
+                }
+                catch (Exception exception)
+                {
+                    cancellationScreenshotError = exception.Message;
+                }
+            };
+            vm.PropertyChanged += cancellationHandler;
+        }
+
+        try
+        {
+            vm.CancelScenarioBatchCommand.Execute(null);
+        }
+        finally
+        {
+            if (cancellationHandler is not null)
+            {
+                vm.PropertyChanged -= cancellationHandler;
+            }
+        }
+
+        if (cancellationScreenshotError is not null)
+        {
+            throw new InvalidOperationException(cancellationScreenshotError);
+        }
+        if (cancellationScreenshotPath is not null && !cancellationScreenshotCaptured)
+        {
+            throw new InvalidOperationException("Repeat validation cancellation request was not rendered.");
+        }
         for (var attempt = 0; attempt < 80 && vm.IsBatchRunning; attempt++)
         {
             await Task.Delay(25);
         }
 
-        if (vm.IsBatchRunning || !vm.BatchWasCanceled)
+        if (vm.IsBatchRunning || !vm.BatchWasCanceled || vm.IsBatchCancellationRequested)
         {
             throw new InvalidOperationException("Repeat validation cancellation did not complete.");
         }
@@ -93,6 +173,17 @@ internal static class SmokeScenarioBatchVerifier
                 vm,
                 scenarioEvidenceExchangePath,
                 scenarioEvidenceExchangeState,
+                projectPath,
+                uiInteraction);
+        }
+
+        if (!string.IsNullOrWhiteSpace(scenarioReportPath))
+        {
+            await SmokeRuntimeEvidenceVerifier.VerifyScenarioBatchReportAsync(
+                window,
+                vm,
+                scenarioReportPath,
+                scenarioReportState,
                 projectPath,
                 uiInteraction);
         }

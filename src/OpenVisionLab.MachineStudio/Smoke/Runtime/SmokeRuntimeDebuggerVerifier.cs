@@ -2,13 +2,16 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
 using OpenVisionLab;
+using OpenVisionLab.Machine.Simulation.Events;
 using OpenVisionLab.Machine.Simulation.Faults;
 using OpenVisionLab.Machine.Simulation.Snapshots;
 using OpenVisionLab.MachineStudio.View.Inspector;
+using OpenVisionLab.MachineStudio.View.Diagnostics;
 using OpenVisionLab.MachineStudio.View.Shell;
 using OpenVisionLab.MachineStudio.ViewModel;
 
@@ -47,7 +50,10 @@ internal static class SmokeRuntimeDebuggerVerifier
         Action<FrameworkElement> movePointerToCenter,
         Action pressSmokePointer,
         Action releaseSmokePointer,
-        string? finalState)
+        string? finalState,
+        SmokeNativeInput input,
+        SmokeWindowCapture capture,
+        string reportPath)
     {
         if (!viewModel.IsRunMode)
         {
@@ -87,11 +93,25 @@ internal static class SmokeRuntimeDebuggerVerifier
 
         var inspector = findInspector(window)
             ?? throw new InvalidOperationException("Run inspector was unavailable.");
+        var journal = SmokeVisualTreeQuery.FindVisualDescendant<EventJournalView>(window)
+            ?? throw new InvalidOperationException("Run records panel was unavailable.");
+        var commandBar = SmokeVisualTreeQuery.FindVisualDescendant<GlobalCommandBarView>(window)
+            ?? throw new InvalidOperationException("Global command bar was unavailable.");
+        var stepButton = commandBar.SemanticSequenceStepButton;
+        var semanticOnly = string.Equals(finalState, "semantic-step", StringComparison.OrdinalIgnoreCase);
+        var evidenceDirectory = Path.GetDirectoryName(Path.GetFullPath(reportPath))!;
+        Check("semantic-step-global-binding", ReferenceEquals(stepButton.Command, debugger.SemanticStepCommand));
+        Check("tick-not-in-command-bar", !SmokeVisualTreeQuery.FindVisualDescendants<Button>(commandBar)
+            .Any(button => ReferenceEquals(button.Command, viewModel.StepCommand)));
+        if (semanticOnly)
+        {
+            Check("ready-disables-semantic-step", !stepButton.IsEnabled && !debugger.SemanticStepCommand.CanExecute(null));
+            capture.Capture(window, Path.Combine(evidenceDirectory, "semantic-ready-disabled.png"));
+        }
         inspector.RunInspectorScrollViewer.ScrollToTop();
         inspector.DebuggerBreakpointsExpander.IsExpanded = true;
         inspector.DebuggerWatchesExpander.IsExpanded = true;
-        inspector.DebuggerTimelineExpander.IsExpanded = true;
-        inspector.DebuggerAlarmsExpander.IsExpanded = true;
+        journal.DebuggerAlarmsExpander.IsExpanded = true;
         inspector.RuntimeDebuggerSectionAnchor.BringIntoView();
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
@@ -148,25 +168,36 @@ internal static class SmokeRuntimeDebuggerVerifier
                 && !string.IsNullOrWhiteSpace(item.HeaderText)));
 
         var tickBeforeSemanticStep = breakpointSnapshot.TickIndex;
-        Check("semantic-step-command-available", inspector.SemanticSequenceStepButton.Command.CanExecute(null));
+        Check("semantic-step-command-available", stepButton.Command.CanExecute(null));
         activateWindow(window);
-        inspector.SemanticSequenceStepButton.BringIntoView();
-        inspector.SemanticSequenceStepButton.Focus();
-        movePointerToCenter(inspector.SemanticSequenceStepButton);
-        Mouse.Capture(inspector.SemanticSequenceStepButton, CaptureMode.SubTree);
+        stepButton.BringIntoView();
+        stepButton.Focus();
+        movePointerToCenter(stepButton);
         Mouse.Synchronize();
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         await Task.Delay(100);
-        Check("semantic-step-keyboard-focus", inspector.SemanticSequenceStepButton.IsKeyboardFocused);
-        Check("semantic-step-hover", inspector.SemanticSequenceStepButton.IsMouseOver);
-        pressSmokePointer();
-        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-        Check("semantic-step-pointer-down", inspector.SemanticSequenceStepButton.IsPressed);
-        releaseSmokePointer();
-        Mouse.Capture(null);
-        if (inspector.SemanticSequenceStepButton.Command.CanExecute(null))
+        var activationDeadline = Environment.TickCount64 + 15000;
+        while (!input.CheckPointerOwnership(window).IsOwned && Environment.TickCount64 < activationDeadline)
         {
-            inspector.SemanticSequenceStepButton.Command.Execute(null);
+            await Task.Delay(100);
+        }
+        var ownership = input.CheckPointerOwnership(window);
+        if (!ownership.IsOwned) throw new InvalidOperationException(ownership.Diagnostic);
+        Check("semantic-step-keyboard-focus", stepButton.IsKeyboardFocused);
+        Check("semantic-step-hover", stepButton.IsMouseOver);
+        if (semanticOnly) capture.Capture(window, Path.Combine(evidenceDirectory, "semantic-hover-focus.png"));
+        try
+        {
+            pressSmokePointer();
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Check("semantic-step-pointer-down", stepButton.IsPressed);
+            if (semanticOnly) capture.Capture(window, Path.Combine(evidenceDirectory, "semantic-pressed.png"));
+            input.SendMouseEvent(0x0004, 0, 0, 0, UIntPtr.Zero);
+            for (var attempt = 0; attempt < 100 && stepButton.IsPressed; attempt++) await Task.Delay(10);
+        }
+        finally
+        {
+            releaseSmokePointer();
         }
         await WaitForAsync(
             () => !debugger.IsOperationPending
@@ -176,6 +207,52 @@ internal static class SmokeRuntimeDebuggerVerifier
                     or SequenceDebugPauseReason.SequenceCompleted,
             "Semantic next-step command did not stop at the next sequence boundary.");
         Check("semantic-step-advanced", viewModel.SceneSnapshots.Latest!.TickIndex > tickBeforeSemanticStep);
+
+        if (semanticOnly)
+        {
+            // Expected transitions come from the authored AutomaticTransferCell fixture,
+            // not from the command's resulting snapshot.
+            Check("mouse-stops-at-authored-next-step", viewModel.SceneSnapshots.Latest!.Sequences
+                .Single(item => item.SequenceId == "auto-transfer-cycle").CurrentStepId == "wait-stopper-extended");
+            var tickBeforeKeyboard = viewModel.SceneSnapshots.Latest.TickIndex;
+            input.MovePointerToCenter(window.SimulationWorkspaceButton);
+            await Task.Delay(100);
+            Check("semantic-step-mouse-leave", !stepButton.IsMouseOver && !stepButton.IsPressed);
+            capture.Capture(window, Path.Combine(evidenceDirectory, "semantic-after-click.png"));
+            Keyboard.Focus(stepButton);
+            if (!input.CheckPointerOwnership(window).IsOwned) throw new InvalidOperationException("Semantic keyboard input lost window ownership.");
+            input.SendKey(0x20);
+            await WaitForAsync(() => !debugger.IsOperationPending && viewModel.SceneSnapshots.Latest!.TickIndex > tickBeforeKeyboard
+                && viewModel.SceneSnapshots.Latest.SequenceDebug.PauseReason == SequenceDebugPauseReason.SemanticStep,
+                "Space did not advance to a semantic boundary.");
+            Check("space-advances-multiple-ticks-to-next-step", viewModel.SceneSnapshots.Latest!.TickIndex > tickBeforeKeyboard + 1
+                && viewModel.SceneSnapshots.Latest.Sequences.Single(item => item.SequenceId == "auto-transfer-cycle").CurrentStepId == "conveyor-forward");
+            capture.Capture(window, Path.Combine(evidenceDirectory, "semantic-keyboard.png"));
+
+            var simulationMenu = SmokeVisualTreeQuery.FindVisualDescendant<MenuItem>(window,
+                item => Equals(item.Header, OpenVisionLanguageService.T("Shell.Simulation")))!;
+            var advancedMenu = SmokeVisualTreeQuery.FindVisualDescendant<MenuItem>(window,
+                item => Equals(item.Header, OpenVisionLanguageService.T("Shell.AdvancedDebugging")))!;
+            Check("tick-only-in-advanced-menu", !simulationMenu.Items.OfType<MenuItem>().Any(item => ReferenceEquals(item.Command, viewModel.StepCommand))
+                && advancedMenu.Items.OfType<MenuItem>().Single().Command == viewModel.StepCommand);
+            var tickBeforeF10 = viewModel.SceneSnapshots.Latest.TickIndex;
+            if (!input.CheckPointerOwnership(window).IsOwned) throw new InvalidOperationException("Tick keyboard input lost window ownership.");
+            input.SendKey(0x79);
+            await WaitForAsync(() => viewModel.SceneSnapshots.Latest!.TickIndex > tickBeforeF10, "F10 did not advance a tick.");
+            await Task.Delay(100);
+            Check("f10-remains-exactly-one-tick", viewModel.SceneSnapshots.Latest!.TickIndex == tickBeforeF10 + 1 && !viewModel.IsRunning);
+
+            viewModel.RunCommand.Execute(null);
+            await WaitForAsync(() => viewModel.IsRunning && !stepButton.IsEnabled, "Running did not disable semantic step.");
+            Check("running-disables-semantic-step", !debugger.SemanticStepCommand.CanExecute(null));
+            capture.Capture(window, Path.Combine(evidenceDirectory, "semantic-running-disabled.png"));
+            viewModel.PauseCommand.Execute(null);
+            await WaitForAsync(() => !viewModel.IsRunning && stepButton.IsEnabled, "Pause did not restore semantic step.");
+            Check("pause-restores-semantic-step", debugger.SemanticStepCommand.CanExecute(null));
+            capture.Capture(window, Path.Combine(evidenceDirectory, "semantic-paused.png"));
+            return new SmokeRuntimeDebuggerReport { Checks = checks, Failures = failures,
+                Monitor = SmokeDpiTestHook.CaptureMonitorEvidence(window) };
+        }
 
         var axisTarget = debugger.WatchTargets.FirstOrDefault(item => item.Kind == RuntimeWatchKind.Axis);
         if (axisTarget is not null)
@@ -213,6 +290,9 @@ internal static class SmokeRuntimeDebuggerVerifier
             && !string.IsNullOrWhiteSpace(item.State)
             && !string.IsNullOrWhiteSpace(item.RecoveryText)));
 
+        viewModel.Navigation.IsEvidenceExpanded = true;
+        viewModel.Navigation.SelectedEvidenceTabIndex = 1;
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         var projectedAlarm = debugger.Alarms.FirstOrDefault(item =>
             string.Equals(item.Source, faultTarget?.Id, StringComparison.Ordinal));
         Check("alarm-history-occurrence-created", projectedAlarm is not null
@@ -220,19 +300,19 @@ internal static class SmokeRuntimeDebuggerVerifier
         if (projectedAlarm is not null)
         {
             Check("alarm-acknowledge-command-available",
-                inspector.AcknowledgeAllAlarmsButton.Command.CanExecute(null));
-            Check("alarm-acknowledge-button-enabled", inspector.AcknowledgeAllAlarmsButton.IsEnabled);
+                journal.AcknowledgeAllAlarmsButton.Command.CanExecute(null));
+            Check("alarm-acknowledge-button-enabled", journal.AcknowledgeAllAlarmsButton.IsEnabled);
             activateWindow(window);
-            inspector.AcknowledgeAllAlarmsButton.BringIntoView();
-            inspector.AcknowledgeAllAlarmsButton.Focus();
-            movePointerToCenter(inspector.AcknowledgeAllAlarmsButton);
-            Mouse.Capture(inspector.AcknowledgeAllAlarmsButton, CaptureMode.SubTree);
+            journal.AcknowledgeAllAlarmsButton.BringIntoView();
+            journal.AcknowledgeAllAlarmsButton.Focus();
+            movePointerToCenter(journal.AcknowledgeAllAlarmsButton);
+            Mouse.Capture(journal.AcknowledgeAllAlarmsButton, CaptureMode.SubTree);
             Mouse.Synchronize();
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             await Task.Delay(100);
             Check("alarm-acknowledge-keyboard-focus",
-                inspector.AcknowledgeAllAlarmsButton.IsKeyboardFocused);
-            Check("alarm-acknowledge-hover", inspector.AcknowledgeAllAlarmsButton.IsMouseOver);
+                journal.AcknowledgeAllAlarmsButton.IsKeyboardFocused);
+            Check("alarm-acknowledge-hover", journal.AcknowledgeAllAlarmsButton.IsMouseOver);
             var alarmPressedObserved = false;
             var alarmPressedDescriptor = System.ComponentModel.DependencyPropertyDescriptor.FromProperty(
                 ButtonBase.IsPressedProperty,
@@ -240,15 +320,15 @@ internal static class SmokeRuntimeDebuggerVerifier
                 ?? throw new InvalidOperationException("The alarm acknowledgement pressed property descriptor was unavailable.");
             EventHandler alarmPressedChanged = (_, _) =>
             {
-                alarmPressedObserved |= inspector.AcknowledgeAllAlarmsButton.IsPressed;
+                alarmPressedObserved |= journal.AcknowledgeAllAlarmsButton.IsPressed;
             };
-            alarmPressedDescriptor.AddValueChanged(inspector.AcknowledgeAllAlarmsButton, alarmPressedChanged);
+            alarmPressedDescriptor.AddValueChanged(journal.AcknowledgeAllAlarmsButton, alarmPressedChanged);
             try
             {
                 pressSmokePointer();
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 Check("alarm-acknowledge-pointer-capture",
-                    inspector.AcknowledgeAllAlarmsButton.IsMouseCaptureWithin
+                    journal.AcknowledgeAllAlarmsButton.IsMouseCaptureWithin
                     || alarmPressedObserved);
                 Check("alarm-acknowledge-pointer-down-observed", alarmPressedObserved);
             }
@@ -256,7 +336,7 @@ internal static class SmokeRuntimeDebuggerVerifier
             {
                 releaseSmokePointer();
                 Mouse.Capture(null);
-                alarmPressedDescriptor.RemoveValueChanged(inspector.AcknowledgeAllAlarmsButton, alarmPressedChanged);
+                alarmPressedDescriptor.RemoveValueChanged(journal.AcknowledgeAllAlarmsButton, alarmPressedChanged);
             }
             if (debugger.AcknowledgeAllAlarmsCommand.CanExecute(null))
             {
@@ -286,6 +366,233 @@ internal static class SmokeRuntimeDebuggerVerifier
             && !projectedAlarm.IsActive
             && projectedAlarm.ClearedTick.HasValue
             && debugger.AlarmHistory.Contains(projectedAlarm));
+
+        journal.DebuggerAlarmHistoryExpander.IsExpanded = true;
+        journal.DebuggerAlarmHistoryExpander.BringIntoView();
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        var alarmHistoryFilter = debugger.AlarmHistoryFilters
+            .SingleOrDefault(item => item.State == RuntimeAlarmHistoryFilterState.Cleared);
+        Check("alarm-history-filter-control-visible",
+            journal.DebuggerAlarmHistoryFilterComboBox.IsVisible
+            && journal.DebuggerAlarmHistoryFilterComboBox.Items.Count == 5);
+        if (alarmHistoryFilter is not null)
+        {
+            journal.DebuggerAlarmHistoryFilterComboBox.BringIntoView();
+            journal.DebuggerAlarmHistoryFilterComboBox.Focus();
+            Keyboard.Focus(journal.DebuggerAlarmHistoryFilterComboBox);
+            journal.DebuggerAlarmHistoryFilterComboBox.IsDropDownOpen = true;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Check("alarm-history-filter-keyboard-focus",
+                journal.DebuggerAlarmHistoryFilterComboBox.IsKeyboardFocusWithin);
+            Check("alarm-history-filter-popup-open",
+                journal.DebuggerAlarmHistoryFilterComboBox.IsDropDownOpen);
+            journal.DebuggerAlarmHistoryFilterComboBox.IsDropDownOpen = false;
+            journal.DebuggerAlarmHistoryFilterComboBox.SelectedItem = alarmHistoryFilter;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Check("alarm-history-filter-two-way-selection",
+                debugger.SelectedAlarmHistoryFilter?.State == RuntimeAlarmHistoryFilterState.Cleared);
+            Check("alarm-history-filter-applied",
+                debugger.VisibleAlarmHistory.Count > 0
+                && debugger.VisibleAlarmHistory.All(item => !item.IsActive));
+
+            var unacknowledgedFilter = debugger.AlarmHistoryFilters
+                .Single(item => item.State == RuntimeAlarmHistoryFilterState.Unacknowledged);
+            journal.DebuggerAlarmHistoryFilterComboBox.SelectedItem = unacknowledgedFilter;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Check("alarm-history-filter-empty-state",
+                debugger.HasAlarmHistory
+                && !debugger.HasVisibleAlarmHistory
+                && journal.DebuggerAlarmHistoryEmptyTextBlock.IsVisible);
+            Check("alarm-history-filter-empty-text",
+                journal.DebuggerAlarmHistoryEmptyTextBlock.Text == debugger.AlarmHistoryEmptyText);
+
+            var allAlarmHistoryFilter = debugger.AlarmHistoryFilters.Single(item => item.State is null);
+            journal.DebuggerAlarmHistoryFilterComboBox.SelectedItem = allAlarmHistoryFilter;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Check("alarm-history-filter-clears-to-all",
+                debugger.SelectedAlarmHistoryFilter?.State is null
+                && debugger.VisibleAlarmHistory.Count == debugger.AlarmHistory.Count
+                && !debugger.HasAlarmHistoryEmptyState);
+        }
+
+        viewModel.Navigation.SelectedEvidenceTabIndex = 0;
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        var faultFilter = debugger.TimelineFilters.FirstOrDefault(item => item.Key == "Fault");
+        Check("timeline-filter-control-visible",
+            journal.DebuggerTimelineFilterComboBox.IsVisible
+            && journal.DebuggerTimelineFilterComboBox.Items.Count >= 2);
+        if (faultFilter is not null)
+        {
+            journal.DebuggerTimelineFilterComboBox.BringIntoView();
+            journal.DebuggerTimelineFilterComboBox.Focus();
+            Keyboard.Focus(journal.DebuggerTimelineFilterComboBox);
+            journal.DebuggerTimelineFilterComboBox.IsDropDownOpen = true;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Check("timeline-filter-keyboard-focus",
+                journal.DebuggerTimelineFilterComboBox.IsKeyboardFocusWithin);
+            Check("timeline-filter-popup-open",
+                journal.DebuggerTimelineFilterComboBox.IsDropDownOpen);
+            journal.DebuggerTimelineFilterComboBox.IsDropDownOpen = false;
+            journal.DebuggerTimelineFilterComboBox.SelectedItem = faultFilter;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Check("timeline-filter-two-way-selection",
+                debugger.SelectedTimelineFilter?.Key == "Fault");
+            Check("timeline-filter-applied",
+                debugger.HasTimeline
+                && debugger.Timeline.All(item => item.Category == OpenVisionLanguageService.T("Runtime.Category.Fault")));
+
+            for (var index = 0; index < 200; index++)
+            {
+                debugger.ApplyEvent(new SimulationEvent(
+                    10_000 + index,
+                    10_000 + index,
+                    TimeSpan.FromMilliseconds(index * 5),
+                    "Sequence",
+                    $"Smoke.Sequence.{index}",
+                    $"Smoke sequence {index}"));
+            }
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Check("timeline-filter-empty-state",
+                !debugger.HasTimeline && journal.DebuggerTimelineEmptyTextBlock.IsVisible);
+            Check("timeline-filter-clear-remains-available",
+                debugger.ClearTimelineCommand.CanExecute(null));
+            debugger.ClearTimelineCommand.Execute(null);
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Check("timeline-filter-clears-to-all",
+                debugger.SelectedTimelineFilter?.Key == string.Empty
+                && debugger.TimelineFilters.Count == 1
+                && !debugger.HasTimeline);
+        }
+        else
+        {
+            Check("timeline-filter-keyboard-focus", false);
+            Check("timeline-filter-popup-open", false);
+            Check("timeline-filter-two-way-selection", false);
+            Check("timeline-filter-applied", false);
+            Check("timeline-filter-empty-state", false);
+            Check("timeline-filter-clear-remains-available", false);
+            Check("timeline-filter-clears-to-all", false);
+        }
+
+        debugger.ApplyEvent(new SimulationEvent(
+            20_000,
+            20_000,
+            TimeSpan.FromMilliseconds(5),
+            "Sequence",
+            "Smoke.Sequence.Severity",
+            "Smoke sequence severity"));
+        debugger.ApplyEvent(new SimulationEvent(
+            20_001,
+            20_001,
+            TimeSpan.FromMilliseconds(10),
+            "Fault",
+            "Smoke.Fault.Severity",
+            "Smoke fault severity"));
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
+        var alarmSeverityFilter = debugger.TimelineSeverityFilters.FirstOrDefault(item => item.Key == "Alarm");
+        Check("timeline-severity-filter-control-visible",
+            journal.DebuggerTimelineSeverityFilterComboBox.IsVisible
+            && journal.DebuggerTimelineSeverityFilterComboBox.Items.Count == 5);
+        if (alarmSeverityFilter is not null)
+        {
+            journal.DebuggerTimelineSeverityFilterComboBox.BringIntoView();
+            journal.DebuggerTimelineSeverityFilterComboBox.Focus();
+            Keyboard.Focus(journal.DebuggerTimelineSeverityFilterComboBox);
+            journal.DebuggerTimelineSeverityFilterComboBox.IsDropDownOpen = true;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Check("timeline-severity-filter-keyboard-focus",
+                journal.DebuggerTimelineSeverityFilterComboBox.IsKeyboardFocusWithin);
+            Check("timeline-severity-filter-popup-open",
+                journal.DebuggerTimelineSeverityFilterComboBox.IsDropDownOpen);
+            journal.DebuggerTimelineSeverityFilterComboBox.IsDropDownOpen = false;
+            journal.DebuggerTimelineSeverityFilterComboBox.SelectedItem = alarmSeverityFilter;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Check("timeline-severity-filter-two-way-selection",
+                debugger.SelectedTimelineSeverityFilter?.Key == "Alarm");
+            Check("timeline-severity-filter-applied",
+                debugger.HasTimeline
+                && debugger.Timeline.All(item => item.Code == "Smoke.Fault.Severity"));
+
+            var sequenceFilter = debugger.TimelineFilters.FirstOrDefault(item => item.Key == "Sequence");
+            Check("timeline-severity-filter-category-option-available", sequenceFilter is not null);
+            if (sequenceFilter is not null)
+            {
+                debugger.SelectedTimelineFilter = sequenceFilter;
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                journal.DebuggerTimelineEmptyTextBlock.BringIntoView();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Check("timeline-severity-filter-combined-selection",
+                    debugger.SelectedTimelineFilter?.Key == "Sequence"
+                    && debugger.SelectedTimelineSeverityFilter?.Key == "Alarm");
+                Check("timeline-severity-filter-combined-empty-state",
+                    !debugger.HasTimeline && journal.DebuggerTimelineEmptyTextBlock.IsVisible);
+                Check("timeline-severity-filter-clear-remains-available",
+                    debugger.ClearTimelineCommand.CanExecute(null));
+            }
+            else
+            {
+                Check("timeline-severity-filter-combined-selection", false);
+                Check("timeline-severity-filter-combined-empty-state", false);
+                Check("timeline-severity-filter-clear-remains-available", false);
+            }
+
+            debugger.ClearTimelineCommand.Execute(null);
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Check("timeline-severity-filter-clears-to-all",
+                debugger.SelectedTimelineFilter?.Key == string.Empty
+                && debugger.SelectedTimelineSeverityFilter?.Key == string.Empty
+                && !debugger.HasTimeline);
+        }
+        else
+        {
+            Check("timeline-severity-filter-keyboard-focus", false);
+            Check("timeline-severity-filter-popup-open", false);
+            Check("timeline-severity-filter-two-way-selection", false);
+            Check("timeline-severity-filter-applied", false);
+            Check("timeline-severity-filter-combined-selection", false);
+            Check("timeline-severity-filter-combined-empty-state", false);
+            Check("timeline-severity-filter-clear-remains-available", false);
+            Check("timeline-severity-filter-clears-to-all", false);
+        }
+
+        debugger.ApplyEvent(new SimulationEvent(
+            30_000,
+            30_000,
+            TimeSpan.FromMilliseconds(15),
+            "Command",
+            "Smoke.Command.Context",
+            "Smoke command context",
+            "smoke-command-123"));
+        debugger.ApplyEvent(new SimulationEvent(
+            30_001,
+            30_001,
+            TimeSpan.FromMilliseconds(20),
+            "Sequence",
+            "Smoke.Sequence.NoCommand",
+            "Smoke sequence without command"));
+        debugger.SelectedTimelineFilter = debugger.TimelineFilters.Single(item => item.Key == string.Empty);
+        debugger.SelectedTimelineSeverityFilter = debugger.TimelineSeverityFilters
+            .Single(item => item.Key == string.Empty);
+        journal.DebuggerTimelineList.BringIntoView();
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        var renderedTimelineText = SmokeVisualTreeQuery.FindVisualDescendants<TextBlock>(
+                journal.DebuggerTimelineList)
+            .Select(item => item.Text)
+            .ToArray();
+        Check("timeline-command-context-model",
+            debugger.Timeline.Any(item => item.CommandId == "smoke-command-123"
+                && item.CommandIdText.Contains("smoke-command-123", StringComparison.Ordinal))
+            && debugger.Timeline.Any(item => item.Code == "Smoke.Sequence.NoCommand"
+                && item.CommandId is null));
+        Check("timeline-command-context-rendered",
+            renderedTimelineText.Any(item =>
+                item.Contains("smoke-command-123", StringComparison.Ordinal)));
+        Check("timeline-no-command-rendered",
+            renderedTimelineText.Any(item => string.Equals(
+                item,
+                OpenVisionLanguageService.T("Debugger.TimelineNoCommand"),
+                StringComparison.Ordinal)));
 
         var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
         OpenVisionLanguageService.SetLanguage(
@@ -320,9 +627,15 @@ internal static class SmokeRuntimeDebuggerVerifier
 
         if (string.Equals(finalState, "alarms", StringComparison.OrdinalIgnoreCase))
         {
-            inspector.DebuggerAlarmHistoryExpander.IsExpanded = true;
-            inspector.DebuggerAlarmsExpander.BringIntoView();
-            inspector.DebuggerAlarmHistoryExpander.BringIntoView();
+            viewModel.Navigation.SelectedEvidenceTabIndex = 1;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            journal.DebuggerAlarmHistoryExpander.IsExpanded = true;
+            journal.DebuggerAlarmsExpander.BringIntoView();
+            journal.DebuggerAlarmHistoryExpander.BringIntoView();
+        }
+        else if (string.Equals(finalState, "timeline", StringComparison.OrdinalIgnoreCase))
+        {
+            viewModel.Navigation.SelectedEvidenceTabIndex = 0;
         }
         else if (string.IsNullOrWhiteSpace(finalState)
             || string.Equals(finalState, "top", StringComparison.OrdinalIgnoreCase))
@@ -333,7 +646,7 @@ internal static class SmokeRuntimeDebuggerVerifier
         else
         {
             throw new ArgumentException(
-                $"Unsupported --smoke-runtime-debugger-state '{finalState}'. Expected top or alarms.");
+                $"Unsupported --smoke-runtime-debugger-state '{finalState}'. Expected top, timeline, or alarms.");
         }
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         return new SmokeRuntimeDebuggerReport

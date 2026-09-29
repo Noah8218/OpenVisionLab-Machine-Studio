@@ -69,6 +69,29 @@ public sealed class DeterministicSimulationCommandTraceTests
     }
 
     [Fact]
+    public void CommandCodec_RoundTripsFiniteFastForwardBudget()
+    {
+        var command = new FastForwardCommand(17);
+
+        Assert.True(
+            DeterministicSimulationCommandTraceCommandCodec.TrySerializeArguments(
+                command,
+                out var arguments,
+                out var replayabilityReason),
+            replayabilityReason);
+        Assert.Equal(17, arguments.GetProperty("tickBudget").GetInt32());
+        Assert.True(
+            DeterministicSimulationCommandTraceCommandCodec.TryCreateCommand(
+                nameof(FastForwardCommand),
+                arguments,
+                out var restored,
+                out var error),
+            error);
+
+        Assert.Equal(17, Assert.IsType<FastForwardCommand>(restored).TickBudget);
+    }
+
+    [Fact]
     public void CommandCodec_ReportsNonReplayableRealTimeCommands()
     {
         Assert.False(
@@ -77,6 +100,61 @@ public sealed class DeterministicSimulationCommandTraceTests
                 out _,
                 out var replayabilityReason));
         Assert.Contains("real-time", replayabilityReason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CommandCodec_ReportsExternalResultAsNonReplayableInput()
+    {
+        var transactionId = Guid.NewGuid();
+        var handoffMessageId = Guid.NewGuid();
+        var acknowledgementMessageId = Guid.NewGuid();
+        var consumer = new ExternalInspectionConsumerIdentity(
+            "OpenVisionLab.TwoDStudio",
+            "1.0.0",
+            new string('1', 40),
+            "Clean");
+        var correlation = new ExternalInspectionCorrelationIdentity(
+            "project",
+            "1.0",
+            "sequence",
+            "step",
+            "camera",
+            "camera/frame/00000001",
+            "camera/frame/00000001",
+            "mm",
+            "TwoD",
+            "Image",
+            new string('A', 64),
+            new string('B', 64),
+            consumer);
+        var command = new ApplyExternalInspectionResultCommand(
+            new SimulationRuntimeIdentity("project", 1),
+            new ExternalInspectionMessageChain(
+                transactionId,
+                handoffMessageId,
+                transactionId,
+                handoffMessageId,
+                acknowledgementMessageId,
+                transactionId,
+                handoffMessageId,
+                acknowledgementMessageId,
+                Guid.NewGuid(),
+                new string('C', 64)),
+            correlation,
+            correlation,
+            consumer,
+            consumer,
+            acknowledgementAccepted: true,
+            ExternalInspectionResultStatus.Completed,
+            ExternalInspectionOutcome.Pass,
+            "run-1");
+
+        Assert.False(
+            DeterministicSimulationCommandTraceCommandCodec.TrySerializeArguments(
+                command,
+                out _,
+                out var replayabilityReason));
+        Assert.Contains("external inspection Result", replayabilityReason, StringComparison.Ordinal);
     }
 
     [Fact]

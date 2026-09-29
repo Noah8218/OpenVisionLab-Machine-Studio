@@ -108,6 +108,10 @@ public sealed class MachineProjectLayoutBehaviorBindingValidator
                         componentsById,
                         errors);
                     break;
+
+                case LayoutComponentKind.Camera:
+                    ValidateCameraBinding(layout, component, devicesById, errors);
+                    break;
             }
         }
 
@@ -679,6 +683,43 @@ public sealed class MachineProjectLayoutBehaviorBindingValidator
                 layout.Id,
                 component.Id,
                 $"Workpiece carrier '{workpiece.ConveyorComponentId}' must identify a Conveyor in the same layout."));
+        }
+    }
+
+    private static void ValidateCameraBinding(
+        MachineLayoutDefinition layout,
+        LayoutComponentDefinition component,
+        ILookup<string, DeviceDefinition> devicesById,
+        ICollection<MachineProjectLayoutValidationError> errors)
+    {
+        if (string.IsNullOrWhiteSpace(component.BehaviorBindingId))
+        {
+            errors.Add(Error(
+                MachineProjectLayoutValidationErrorCode.MissingBehaviorBinding,
+                layout.Id,
+                component.Id,
+                "Camera requires a virtual-camera behavior binding."));
+            return;
+        }
+
+        var matchingDevices = devicesById[component.BehaviorBindingId].Take(2).ToArray();
+        if (matchingDevices.Length > 1)
+        {
+            errors.Add(Error(
+                MachineProjectLayoutValidationErrorCode.AmbiguousBehaviorBinding,
+                layout.Id,
+                component.Id,
+                $"Camera device binding '{component.BehaviorBindingId}' is ambiguous."));
+            return;
+        }
+
+        if (matchingDevices.SingleOrDefault() is not { Kind: DeviceKind.Camera })
+        {
+            errors.Add(Error(
+                MachineProjectLayoutValidationErrorCode.CameraDeviceBindingInvalid,
+                layout.Id,
+                component.Id,
+                $"Camera binding '{component.BehaviorBindingId}' must identify a Camera device."));
         }
     }
 

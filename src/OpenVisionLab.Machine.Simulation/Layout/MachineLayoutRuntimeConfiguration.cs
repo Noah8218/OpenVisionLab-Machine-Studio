@@ -363,7 +363,8 @@ public sealed record WorkpieceRuntimeConfiguration : LayoutComponentRuntimeConfi
         string conveyorComponentId,
         WorkpieceInspectionState inspectionState,
         LayoutRuntimeTransform baseTransform,
-        LayoutRuntimeSize size)
+        LayoutRuntimeSize size,
+        bool initiallyPresent = true)
         : base(id, name, LayoutComponentKind.Workpiece, baseTransform, size)
     {
         Type = RequiredIdentifier(type, nameof(type));
@@ -376,11 +377,13 @@ public sealed record WorkpieceRuntimeConfiguration : LayoutComponentRuntimeConfi
         }
 
         InspectionState = inspectionState;
+        InitiallyPresent = initiallyPresent;
     }
 
     public string Type { get; }
     public string ConveyorComponentId { get; }
     public WorkpieceInspectionState InspectionState { get; }
+    public bool InitiallyPresent { get; }
 }
 
 public sealed record LoadLockRuntimeConfiguration

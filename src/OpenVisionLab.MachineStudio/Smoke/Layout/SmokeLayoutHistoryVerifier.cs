@@ -166,7 +166,16 @@ internal static class SmokeLayoutHistoryVerifier
         Check("addRedo", viewModel.Layout.Items.Count == initialComponentCount + 1);
 
         viewModel.Layout.Select(addedFrameId!);
-        Execute(viewModel.DeleteLayoutComponentCommand);
+        var removalPrompt = viewModel.LayoutComponentRemovalPrompt;
+        try
+        {
+            viewModel.LayoutComponentRemovalPrompt = (_, _) => true;
+            Execute(viewModel.DeleteLayoutComponentCommand);
+        }
+        finally
+        {
+            viewModel.LayoutComponentRemovalPrompt = removalPrompt;
+        }
         Check("deleteApplied", viewModel.Layout.Items.Count == initialComponentCount);
         Execute(viewModel.UndoLayoutEditCommand);
         Check("deleteUndo", viewModel.Layout.Items.Count == initialComponentCount + 1);

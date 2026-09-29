@@ -97,6 +97,54 @@ public sealed class CameraImageSourceEditorViewModelTests
         }
     }
 
+    [Fact]
+    public void CameraSelectionRoundTripRestoresEachUnsavedDraft()
+    {
+        var viewModel = new CameraImageSourceEditorViewModel((_, _) => { }, _ => null);
+        viewModel.Load(CreateProject(), null, "camera-1");
+        viewModel.PathText = "images/camera-1.raw";
+        viewModel.Width = 640;
+        viewModel.Height = 480;
+        viewModel.PixelFormatText = "Mono8";
+
+        viewModel.SelectCamera("camera-2");
+        viewModel.PathText = "images/camera-2.raw";
+        viewModel.Width = 1280;
+        viewModel.Height = 720;
+        viewModel.PixelFormatText = "Mono16";
+
+        viewModel.SelectCamera("camera-1");
+
+        Assert.Equal("images/camera-1.raw", viewModel.PathText);
+        Assert.Equal(640, viewModel.Width);
+        Assert.Equal(480, viewModel.Height);
+        Assert.Equal("Mono8", viewModel.PixelFormatText);
+
+        viewModel.SelectCamera("camera-2");
+
+        Assert.Equal("images/camera-2.raw", viewModel.PathText);
+        Assert.Equal(1280, viewModel.Width);
+        Assert.Equal(720, viewModel.Height);
+        Assert.Equal("Mono16", viewModel.PixelFormatText);
+    }
+
+    [Fact]
+    public void RevertClearsPreservedDraftForCurrentCamera()
+    {
+        var viewModel = new CameraImageSourceEditorViewModel((_, _) => { }, _ => null);
+        viewModel.Load(CreateProject(), null, "camera-1");
+        viewModel.Width = 640;
+        viewModel.SelectCamera("camera-2");
+        viewModel.SelectCamera("camera-1");
+
+        viewModel.RevertCommand.Execute(null);
+        viewModel.SelectCamera("camera-2");
+        viewModel.SelectCamera("camera-1");
+
+        Assert.Equal(1, viewModel.Width);
+        Assert.False(viewModel.IsDirty);
+    }
+
     private static MachineProjectDocument CreateProject()
     {
         var project = new MachineProjectDocument { Name = "Camera source" };
@@ -104,6 +152,13 @@ public sealed class CameraImageSourceEditorViewModelTests
         {
             Id = "camera-1",
             Name = "Camera 1",
+            Kind = DeviceKind.Camera,
+            Camera = new VirtualCameraDefinition()
+        });
+        project.Devices.Add(new DeviceDefinition
+        {
+            Id = "camera-2",
+            Name = "Camera 2",
             Kind = DeviceKind.Camera,
             Camera = new VirtualCameraDefinition()
         });

@@ -7,6 +7,8 @@ public enum CompiledSequenceStepKind
     MoveAxis,
     WaitAxisDone,
     TriggerCamera,
+    FeedWorkpiece,
+    EjectWorkpiece,
     WaitVisionResult,
     CallSubsequence,
     Complete
@@ -77,10 +79,33 @@ public sealed record TriggerCameraStep(
     string CameraId,
     string RecipeId,
     string? NextStepId,
-    string? ErrorStepId)
+    string? ErrorStepId,
+    string? WorkpieceComponentId = null)
     : CompiledSequenceStep(Id, Name, NextStepId, ErrorStepId, TimeSpan.Zero)
 {
     public override CompiledSequenceStepKind Kind => CompiledSequenceStepKind.TriggerCamera;
+}
+
+public sealed record FeedWorkpieceStep(
+    string Id,
+    string Name,
+    string WorkpieceComponentId,
+    string? NextStepId,
+    string? ErrorStepId)
+    : CompiledSequenceStep(Id, Name, NextStepId, ErrorStepId, TimeSpan.Zero)
+{
+    public override CompiledSequenceStepKind Kind => CompiledSequenceStepKind.FeedWorkpiece;
+}
+
+public sealed record EjectWorkpieceStep(
+    string Id,
+    string Name,
+    string WorkpieceComponentId,
+    string? NextStepId,
+    string? ErrorStepId)
+    : CompiledSequenceStep(Id, Name, NextStepId, ErrorStepId, TimeSpan.Zero)
+{
+    public override CompiledSequenceStepKind Kind => CompiledSequenceStepKind.EjectWorkpiece;
 }
 
 public sealed record WaitVisionResultStep(

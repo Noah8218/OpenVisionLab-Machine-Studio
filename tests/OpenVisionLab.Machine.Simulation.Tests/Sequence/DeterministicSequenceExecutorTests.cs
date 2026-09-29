@@ -273,6 +273,175 @@ public sealed class DeterministicSequenceExecutorTests
     }
 
     [Fact]
+    public void LoopBackEdge_ConsumesOneTickPerIterationAndExitsWhenSignalChanges()
+    {
+        var definition = new SequenceDefinition
+        {
+            Id = "bounded-loop",
+            Steps =
+            {
+                new SequenceStepDefinition
+                {
+                    Id = "loop",
+                    Action = SequenceStepAction.WaitSignal,
+                    TargetId = "di.start",
+                    Parameter = "true",
+                    TimeoutMs = 5,
+                    NextStepId = "complete",
+                    ErrorStepId = "loop"
+                },
+                SequenceCompilerTests.Step("complete", SequenceStepAction.Complete, string.Empty, string.Empty)
+            }
+        };
+        var compiled = new SequenceCompiler().Compile(definition, SequenceCompilerTests.Targets()).Sequence!;
+        var executor = new DeterministicSequenceExecutor(compiled);
+        var context = new LoopContext { TrueOnRead = 3 };
+
+        Assert.True(executor.Start().IsSuccess);
+        var first = executor.Tick(TimeSpan.FromMilliseconds(5), context);
+        var second = executor.Tick(TimeSpan.FromMilliseconds(5), context);
+        var third = executor.Tick(TimeSpan.FromMilliseconds(5), context);
+        var completed = executor.Tick(TimeSpan.Zero, context);
+
+        Assert.True(first.Transitioned);
+        Assert.Equal("loop", first.CurrentStepId);
+        Assert.Equal(SequenceExecutionErrorCode.StepTimedOut, first.Error!.Code);
+        Assert.True(second.Transitioned);
+        Assert.Equal("loop", second.CurrentStepId);
+        Assert.Equal(SequenceExecutionErrorCode.StepTimedOut, second.Error!.Code);
+        Assert.True(third.Transitioned);
+        Assert.Equal("complete", third.CurrentStepId);
+        Assert.Null(third.Error);
+        Assert.Equal(SequenceExecutionStatus.Completed, completed.Snapshot.Status);
+        Assert.Equal(4, completed.Snapshot.TickCount);
+        Assert.Equal(TimeSpan.FromMilliseconds(15), completed.Snapshot.TotalElapsed);
+        Assert.Equal(3, context.ReadCount);
+    }
+
+    [Fact]
+    public void InfiniteLoop_StopsAtInclusiveWatchdogBudget()
+    {
+        var definition = new SequenceDefinition
+        {
+            Id = "infinite-loop",
+            WatchdogTimeoutMs = 15,
+            Steps =
+            {
+                new SequenceStepDefinition
+                {
+                    Id = "loop",
+                    Action = SequenceStepAction.WaitSignal,
+                    TargetId = "di.start",
+                    Parameter = "true",
+                    NextStepId = "loop"
+                }
+            }
+        };
+        var compiled = new SequenceCompiler().Compile(definition, SequenceCompilerTests.Targets()).Sequence!;
+        var executor = new DeterministicSequenceExecutor(compiled);
+        var context = new LoopContext { TrueOnRead = int.MaxValue };
+
+        Assert.True(executor.Start().IsSuccess);
+        var first = executor.Tick(TimeSpan.FromMilliseconds(5), context);
+        var second = executor.Tick(TimeSpan.FromMilliseconds(5), context);
+        var boundary = executor.Tick(TimeSpan.FromMilliseconds(5), context);
+
+        Assert.Equal(SequenceExecutionStatus.Running, first.Snapshot.Status);
+        Assert.Equal(SequenceExecutionStatus.Running, second.Snapshot.Status);
+        Assert.Equal("loop", second.CurrentStepId);
+        Assert.Equal(SequenceExecutionStatus.Faulted, boundary.Snapshot.Status);
+        Assert.Equal(SequenceExecutionErrorCode.SequenceWatchdogTimedOut, boundary.Error!.Code);
+        Assert.Equal(3, boundary.Snapshot.TickCount);
+        Assert.Equal(TimeSpan.FromMilliseconds(15), boundary.Snapshot.TotalElapsed);
+        Assert.Equal(3, context.ReadCount);
+    }
+
+    [Fact]
+    public void WaitTimeout_UsesIndependentBeforeEqualAndAfterBoundaryResults()
+    {
+        var before = CreateWaitTimeoutExecutor(10);
+        var beforeResult = before.Tick(TimeSpan.FromMilliseconds(9), new LoopContext());
+
+        var equal = CreateWaitTimeoutExecutor(10);
+        var equalResult = equal.Tick(TimeSpan.FromMilliseconds(10), new LoopContext());
+
+        var after = CreateWaitTimeoutExecutor(10);
+        var afterResult = after.Tick(TimeSpan.FromMilliseconds(11), new LoopContext());
+
+        Assert.Equal(SequenceExecutionStatus.Running, beforeResult.Snapshot.Status);
+        Assert.Null(beforeResult.Error);
+        Assert.Equal(TimeSpan.FromMilliseconds(9), beforeResult.Snapshot.ElapsedInStep);
+        Assert.Equal(SequenceExecutionStatus.Faulted, equalResult.Snapshot.Status);
+        Assert.Equal(SequenceExecutionErrorCode.StepTimedOut, equalResult.Error!.Code);
+        Assert.Equal(TimeSpan.FromMilliseconds(10), equalResult.Snapshot.ElapsedInStep);
+        Assert.Equal(SequenceExecutionStatus.Faulted, afterResult.Snapshot.Status);
+        Assert.Equal(SequenceExecutionErrorCode.StepTimedOut, afterResult.Error!.Code);
+        Assert.Equal(TimeSpan.FromMilliseconds(11), afterResult.Snapshot.ElapsedInStep);
+    }
+
+    [Fact]
+    public void WaitSignalAtTimeoutBoundaryWinsWhenConditionIsSatisfied()
+    {
+        var executor = CreateWaitTimeoutExecutor(10);
+        var context = new LoopContext { TrueOnRead = 1 };
+
+        var boundary = executor.Tick(TimeSpan.FromMilliseconds(10), context);
+
+        Assert.Equal(SequenceExecutionStatus.Running, boundary.Snapshot.Status);
+        Assert.Equal("complete", boundary.CurrentStepId);
+        Assert.Null(boundary.Error);
+        Assert.Equal(TimeSpan.FromMilliseconds(10), boundary.Snapshot.TotalElapsed);
+    }
+
+    [Fact]
+    public void ZeroElapsedImmediateStepCompletesWithoutAdvancingSimulationTime()
+    {
+        var definition = new SequenceDefinition
+        {
+            Id = "zero-delay",
+            Steps =
+            {
+                SequenceCompilerTests.Step("complete", SequenceStepAction.Complete, string.Empty, string.Empty)
+            }
+        };
+        var compiled = new SequenceCompiler().Compile(definition).Sequence!;
+        var executor = new DeterministicSequenceExecutor(compiled);
+        Assert.True(executor.Start().IsSuccess);
+
+        var result = executor.Tick(TimeSpan.Zero, new LoopContext());
+
+        Assert.Equal(SequenceExecutionStatus.Completed, result.Snapshot.Status);
+        Assert.Equal(TimeSpan.Zero, result.Snapshot.TotalElapsed);
+        Assert.Equal(1, result.Snapshot.TickCount);
+        Assert.Null(result.Error);
+    }
+
+    private static DeterministicSequenceExecutor CreateWaitTimeoutExecutor(int timeoutMs)
+    {
+        var definition = new SequenceDefinition
+        {
+            Id = "wait-boundary",
+            Steps =
+            {
+                new SequenceStepDefinition
+                {
+                    Id = "wait",
+                    Action = SequenceStepAction.WaitSignal,
+                    TargetId = "di.start",
+                    Parameter = "true",
+                    TimeoutMs = timeoutMs,
+                    NextStepId = "complete"
+                },
+                SequenceCompilerTests.Step("complete", SequenceStepAction.Complete, string.Empty, string.Empty)
+            }
+        };
+        var compiled = new SequenceCompiler().Compile(definition, SequenceCompilerTests.Targets()).Sequence!;
+        var executor = new DeterministicSequenceExecutor(compiled);
+        Assert.True(executor.Start().IsSuccess);
+        return executor;
+    }
+
+    [Fact]
     public void FailedMove_UsesDeclaredErrorRouteWithoutAdditionalTransition()
     {
         var definition = new SequenceDefinition
@@ -433,6 +602,27 @@ public sealed class DeterministicSequenceExecutorTests
         Assert.Equal("camera-error", trigger.CurrentStepId);
         Assert.Equal(SequenceExecutionErrorCode.CameraTriggerFailed, trigger.Error!.Code);
         Assert.Empty(context.ReadAcquisitionIds);
+    }
+
+    private sealed class LoopContext : ISequenceRuntimeContext
+    {
+        public int TrueOnRead { get; init; } = int.MaxValue;
+        public int ReadCount { get; private set; }
+
+        public SequenceSignalReadResult ReadSignal(string signalId)
+        {
+            ReadCount++;
+            return SequenceSignalReadResult.Success(ReadCount >= TrueOnRead);
+        }
+
+        public SequenceContextOperationResult SetSignal(string signalId, bool value) =>
+            SequenceContextOperationResult.Success();
+
+        public SequenceContextOperationResult RequestAxisMove(string axisId, double targetPosition) =>
+            SequenceContextOperationResult.Success();
+
+        public SequenceAxisMotionReadResult ReadAxisMotionState(string axisId) =>
+            SequenceAxisMotionReadResult.Success(SequenceAxisMotionState.Completed);
     }
 
     private sealed class FakeContext : ISequenceRuntimeContext

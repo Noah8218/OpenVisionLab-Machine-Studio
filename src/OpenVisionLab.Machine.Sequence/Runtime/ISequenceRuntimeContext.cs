@@ -96,6 +96,32 @@ public interface ISequenceRuntimeContext
             SequenceContextErrorCode.Unavailable,
             "Camera triggering is not available in this runtime context.");
 
+    SequenceCameraTriggerResult TriggerCamera(
+        string cameraId,
+        string recipeId,
+        string? workpieceComponentId) => string.IsNullOrWhiteSpace(workpieceComponentId)
+        ? TriggerCamera(cameraId, recipeId)
+        : SequenceCameraTriggerResult.Failure(
+            SequenceContextErrorCode.Unavailable,
+            "Workpiece-associated camera triggering is not available in this runtime context.");
+
+    SequenceCameraTriggerResult TriggerCamera(
+        string cameraId,
+        string recipeId,
+        string? workpieceComponentId,
+        string? sequenceId,
+        string? sequenceStepId) => TriggerCamera(cameraId, recipeId, workpieceComponentId);
+
+    SequenceContextOperationResult FeedWorkpiece(string workpieceComponentId) =>
+        SequenceContextOperationResult.Failure(
+            SequenceContextErrorCode.Unavailable,
+            "Workpiece feeding is not available in this runtime context.");
+
+    SequenceContextOperationResult EjectWorkpiece(string workpieceComponentId) =>
+        SequenceContextOperationResult.Failure(
+            SequenceContextErrorCode.Unavailable,
+            "Workpiece ejection is not available in this runtime context.");
+
     SequenceVisionResultReadResult ReadVisionResult(string cameraId, string acquisitionId) =>
         SequenceVisionResultReadResult.Failure(
             SequenceContextErrorCode.Unavailable,

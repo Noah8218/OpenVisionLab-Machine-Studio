@@ -90,6 +90,23 @@ public sealed class DeterministicInspectionHandoffTests
         AssertFaulted(hub, layout);
     }
 
+    [Fact]
+    public void AwaitingExternalResult_RemainsInspectingWithoutCompletionFeedback()
+    {
+        var (hub, layout) = CreateLayout();
+        SetInput(hub, "di.position", true);
+        Tick(layout, Camera(VirtualCameraState.Idle));
+
+        Tick(layout, Camera(VirtualCameraState.AwaitingExternalResult, ordinal: 1));
+        Assert.Equal(InspectionHandoffState.Inspecting, Handoff(layout).State);
+        AssertSignal(hub, "di.complete", false);
+        AssertSignal(hub, "do.accept", false);
+
+        Tick(layout, Camera(VirtualCameraState.AwaitingExternalResult, ordinal: 1));
+        Assert.Equal(InspectionHandoffState.Inspecting, Handoff(layout).State);
+        AssertSignal(hub, "di.complete", false);
+    }
+
     private static void CompleteHandoff(DeterministicSignalHub hub, DeterministicMachineLayout layout)
     {
         SetInput(hub, "di.position", true);

@@ -4,7 +4,7 @@ namespace OpenVisionLab.Machine.Core.Projects;
 
 public sealed class MachineProjectDocument
 {
-    public const string CurrentSchema = "1.12";
+    public const string CurrentSchema = "1.18";
 
     [JsonPropertyName("schema")]
     public string Schema { get; set; } = CurrentSchema;
@@ -23,6 +23,9 @@ public sealed class MachineProjectDocument
 
     [JsonPropertyName("simulation")]
     public SimulationDefinition Simulation { get; set; } = new();
+
+    [JsonPropertyName("stations")]
+    public List<MachineStationDefinition> Stations { get; set; } = new();
 
     [JsonPropertyName("layouts")]
     public List<Layouts.MachineLayoutDefinition> Layouts { get; set; } = new();
@@ -44,6 +47,27 @@ public sealed class MachineProjectDocument
 
     [JsonPropertyName("sequences")]
     public List<Sequences.SequenceDefinition> Sequences { get; set; } = new();
+}
+
+public sealed class MachineStationDefinition
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("units")]
+    public List<MachineUnitDefinition> Units { get; set; } = new();
+}
+
+public sealed class MachineUnitDefinition
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
 }
 
 public sealed record SemiconductorStationSetupDefinition

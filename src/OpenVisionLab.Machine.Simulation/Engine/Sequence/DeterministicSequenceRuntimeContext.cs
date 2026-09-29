@@ -19,6 +19,9 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
     private readonly TimeSpan _eventTime;
     private readonly bool _waitForExternalResult;
     private readonly IReadOnlyDictionary<string, VirtualCameraExternalSource> _externalSources;
+    private readonly Func<string, string?>? _workpieceInstanceIdAccessor;
+    private readonly Func<string, SequenceContextOperationResult>? _workpieceFeedHandler;
+    private readonly Func<string, SequenceContextOperationResult>? _workpieceEjectHandler;
 
     public DeterministicSequenceRuntimeContext(
         DeterministicSignalHub signalHub,
@@ -28,7 +31,10 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
         TimeSpan eventTime,
         Action<string, string, string, long, TimeSpan> emit,
         bool waitForExternalResult = false,
-        IReadOnlyDictionary<string, VirtualCameraExternalSource>? externalSources = null)
+        IReadOnlyDictionary<string, VirtualCameraExternalSource>? externalSources = null,
+        Func<string, string?>? workpieceInstanceIdAccessor = null,
+        Func<string, SequenceContextOperationResult>? workpieceFeedHandler = null,
+        Func<string, SequenceContextOperationResult>? workpieceEjectHandler = null)
     {
         _signalHub = signalHub;
         _axes = axes;
@@ -39,6 +45,9 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
         _waitForExternalResult = waitForExternalResult;
         _externalSources = externalSources
             ?? new Dictionary<string, VirtualCameraExternalSource>(StringComparer.Ordinal);
+        _workpieceInstanceIdAccessor = workpieceInstanceIdAccessor;
+        _workpieceFeedHandler = workpieceFeedHandler;
+        _workpieceEjectHandler = workpieceEjectHandler;
     }
 
     public SequenceSignalReadResult ReadSignal(string signalId)
@@ -128,6 +137,20 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
     }
 
     public SequenceCameraTriggerResult TriggerCamera(string cameraId, string recipeId)
+        => TriggerCamera(cameraId, recipeId, workpieceComponentId: null, sequenceId: null, sequenceStepId: null);
+
+    public SequenceCameraTriggerResult TriggerCamera(
+        string cameraId,
+        string recipeId,
+        string? workpieceComponentId)
+        => TriggerCamera(cameraId, recipeId, workpieceComponentId, sequenceId: null, sequenceStepId: null);
+
+    public SequenceCameraTriggerResult TriggerCamera(
+        string cameraId,
+        string recipeId,
+        string? workpieceComponentId,
+        string? sequenceId,
+        string? sequenceStepId)
     {
         var camera = _cameras.FirstOrDefault(candidate =>
             string.Equals(candidate.Id, cameraId, StringComparison.Ordinal));
@@ -136,6 +159,18 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
             return SequenceCameraTriggerResult.Failure(
                 SequenceContextErrorCode.TargetNotFound,
                 $"Virtual camera '{cameraId}' was not found.");
+        }
+
+        string? workpieceInstanceId = null;
+        if (!string.IsNullOrWhiteSpace(workpieceComponentId))
+        {
+            workpieceInstanceId = _workpieceInstanceIdAccessor?.Invoke(workpieceComponentId);
+            if (string.IsNullOrWhiteSpace(workpieceInstanceId))
+            {
+                return SequenceCameraTriggerResult.Failure(
+                    SequenceContextErrorCode.Rejected,
+                    $"Workpiece position '{workpieceComponentId}' has no active instance to inspect.");
+            }
         }
 
         VirtualCameraFrameEvidence? frameEvidence = null;
@@ -155,7 +190,9 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
             recipeId,
             frameEvidence,
             inspectionEvidence: null,
-            waitForExternalResult: _waitForExternalResult);
+            waitForExternalResult: _waitForExternalResult,
+            workpieceComponentId: workpieceComponentId,
+            workpieceInstanceId: workpieceInstanceId);
         if (!trigger.IsAccepted || string.IsNullOrWhiteSpace(trigger.AcquisitionId))
         {
             var contextCode = trigger.ErrorCode switch
@@ -168,14 +205,37 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
                 $"Virtual camera '{cameraId}' trigger failed: {trigger.ErrorCode}.");
         }
 
+        string sequenceContext = string.IsNullOrWhiteSpace(sequenceId)
+            || string.IsNullOrWhiteSpace(sequenceStepId)
+                ? string.Empty
+                : $" in sequence '{sequenceId}' at step '{sequenceStepId}'";
+        string workpieceContext = string.IsNullOrWhiteSpace(workpieceComponentId)
+            ? string.Empty
+            : $" for workpiece component '{workpieceComponentId}'";
+        string workpieceInstanceContext = string.IsNullOrWhiteSpace(workpieceInstanceId)
+            ? string.Empty
+            : $" instance '{workpieceInstanceId}'";
         _emit(
             "Camera",
             "CameraTriggered",
-            $"{cameraId} started {trigger.AcquisitionId} for recipe '{recipeId}'.",
+            $"{cameraId} started {trigger.AcquisitionId} for recipe '{recipeId}'{sequenceContext}" +
+            $"{workpieceContext}{workpieceInstanceContext}.",
             _eventTick,
             _eventTime);
         return SequenceCameraTriggerResult.Success(trigger.AcquisitionId);
     }
+
+    public SequenceContextOperationResult FeedWorkpiece(string workpieceComponentId) =>
+        _workpieceFeedHandler?.Invoke(workpieceComponentId)
+        ?? SequenceContextOperationResult.Failure(
+            SequenceContextErrorCode.Unavailable,
+            "Workpiece feeding is not available in this runtime context.");
+
+    public SequenceContextOperationResult EjectWorkpiece(string workpieceComponentId) =>
+        _workpieceEjectHandler?.Invoke(workpieceComponentId)
+        ?? SequenceContextOperationResult.Failure(
+            SequenceContextErrorCode.Unavailable,
+            "Workpiece ejection is not available in this runtime context.");
 
     public SequenceVisionResultReadResult ReadVisionResult(
         string cameraId,

@@ -116,13 +116,16 @@
                                FontSize="18"
                                FontWeight="SemiBold"
                                TextWrapping="Wrap" />
-                    <TextBlock x:Name="MessageText"
-                               Margin="0,10,0,0"
-                               MaxHeight="240"
-                               Foreground="{DynamicResource Text.Secondary}"
-                               FontSize="13"
-                               LineHeight="20"
-                               TextWrapping="Wrap" />
+                    <ScrollViewer Margin="0,10,0,0"
+                                  MaxHeight="240"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="MessageText"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   FontSize="13"
+                                   LineHeight="20"
+                                   TextWrapping="Wrap" />
+                    </ScrollViewer>
                 </StackPanel>
 
                 <StackPanel Grid.Row="1"

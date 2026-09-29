@@ -82,6 +82,72 @@ public sealed class CameraCommissioningViewModelTests
     }
 
     [Fact]
+    public void ResultToPendingToResetClearsStaleCameraDetailsWithoutChangingProject()
+    {
+        OpenVisionLanguageService.Load();
+        var project = CreateProject();
+        var projection = CreateProjection(CreateResultSnapshot());
+        using var viewModel = CreateViewModel(project, projection, () => projection);
+        viewModel.LoadProject(project, null);
+        var projectBefore = new ProjectDocumentStore().SerializeForEvidence(project);
+        var changedProperties = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        Assert.Equal("camera-1", viewModel.SelectedCameraId);
+        Assert.Equal("inspection-1", viewModel.CurrentCameraInspectionIdText);
+        Assert.Contains("workpiece-component-1", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
+        Assert.Equal(OpenVisionLanguageService.T("Camera.ResultSourceMock"), viewModel.CurrentCameraResultSourceText);
+
+        changedProperties.Clear();
+        projection = projection with { Snapshot = CreatePendingSnapshot() };
+        viewModel.RefreshProjection();
+
+        Assert.Equal("camera-1", viewModel.SelectedCameraId);
+        Assert.Equal(OpenVisionLanguageService.T("Shell.ResultPending"), viewModel.CurrentCameraResultText);
+        Assert.Equal(OpenVisionLanguageService.T("Camera.ResultSourcePending"), viewModel.CurrentCameraResultSourceText);
+        Assert.Equal("—", viewModel.CurrentCameraInspectionIdText);
+        Assert.DoesNotContain("acquisition-1", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
+        Assert.DoesNotContain("inspection-1", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
+        Assert.DoesNotContain("workpiece-component-1", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
+        AssertContainsResultProjectionNotifications(changedProperties);
+
+        changedProperties.Clear();
+        projection = projection with
+        {
+            Snapshot = new VirtualCameraSnapshot(
+                "camera-1",
+                "Camera 1",
+                VirtualCameraState.Idle,
+                0,
+                null,
+                null,
+                0,
+                0,
+                null,
+                null)
+        };
+        viewModel.RefreshProjection();
+
+        Assert.Equal("camera-1", viewModel.SelectedCameraId);
+        Assert.Equal("—", viewModel.CurrentCameraResultText);
+        Assert.Equal(OpenVisionLanguageService.T("Camera.ResultSourceNone"), viewModel.CurrentCameraResultSourceText);
+        Assert.Equal("—", viewModel.CurrentCameraInspectionIdText);
+        Assert.DoesNotContain("acquisition-1", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
+        Assert.DoesNotContain("inspection-1", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
+        Assert.DoesNotContain("workpiece-component-1", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
+        AssertContainsResultProjectionNotifications(changedProperties);
+        Assert.Equal(projectBefore, new ProjectDocumentStore().SerializeForEvidence(project));
+    }
+
+    private static void AssertContainsResultProjectionNotifications(IEnumerable<string?> changedProperties)
+    {
+        Assert.Contains(nameof(CameraCommissioningViewModel.CurrentCameraResultText), changedProperties);
+        Assert.Contains(nameof(CameraCommissioningViewModel.CurrentCameraResultSourceText), changedProperties);
+        Assert.Contains(nameof(CameraCommissioningViewModel.CurrentCameraInspectionIdText), changedProperties);
+        Assert.Contains(nameof(CameraCommissioningViewModel.CurrentCameraEvidenceDetailsText), changedProperties);
+    }
+
+    [Fact]
     public void DisposeClosesImageSourceEditorAdmission()
     {
         var root = Path.Combine(
@@ -156,7 +222,7 @@ public sealed class CameraCommissioningViewModelTests
         Assert.Empty(changedProperties);
     }
 
-    private static CameraCommissioningViewModel CreateViewModel(
+    internal static CameraCommissioningViewModel CreateViewModel(
         MachineProjectDocument project,
         CameraCommissioningProjection projection,
         Func<CameraCommissioningProjection>? projectionAccessor = null)
@@ -210,8 +276,8 @@ public sealed class CameraCommissioningViewModelTests
             _ => { });
     }
 
-    private static CameraCommissioningProjection CreateProjection() => new(
-        new VirtualCameraSnapshot(
+    private static CameraCommissioningProjection CreateProjection(VirtualCameraSnapshot? snapshot = null) => new(
+        snapshot ?? new VirtualCameraSnapshot(
             "camera-1",
             "Camera 1",
             VirtualCameraState.Idle,
@@ -243,6 +309,61 @@ public sealed class CameraCommissioningViewModelTests
         IsAutomaticRunActive: false,
         ActiveSequenceStatus: null);
 
+    private static VirtualCameraSnapshot CreateResultSnapshot()
+    {
+        var frame = new VirtualCameraFrameEvidence(
+            "frame-camera-1",
+            "images/part.pgm",
+            new string('A', 64),
+            4,
+            2,
+            2,
+            "Mono8");
+        var inspection = new VirtualCameraInspectionEvidence(
+            "inspection-1",
+            "acquisition-1",
+            "camera-1",
+            "alpha",
+            frame.FrameId,
+            PlaceholderInspectionDecision.Pass,
+            "Pass result",
+            new Dictionary<string, double> { ["score"] = 0.9 });
+        var result = new VirtualCameraAcquisitionResult(
+            "acquisition-1",
+            "camera-1",
+            "alpha",
+            1,
+            PlaceholderInspectionDecision.Pass,
+            frame,
+            inspection,
+            WorkpieceComponentId: "workpiece-component-1",
+            WorkpieceInstanceId: "run-1/WP-001");
+
+        return new VirtualCameraSnapshot(
+            "camera-1",
+            "Camera 1",
+            VirtualCameraState.FrameReady,
+            1,
+            result.AcquisitionId,
+            result.RecipeId,
+            0,
+            0,
+            result,
+            frame);
+    }
+
+    private static VirtualCameraSnapshot CreatePendingSnapshot() => new(
+        "camera-1",
+        "Camera 1",
+        VirtualCameraState.AwaitingExternalResult,
+        2,
+        "acquisition-2",
+        "alpha",
+        0,
+        0,
+        null,
+        null);
+
     private static SimulationSnapshot CreateSnapshot() => new(
         TimeSpan.Zero,
         0,
@@ -255,7 +376,7 @@ public sealed class CameraCommissioningViewModelTests
         Array.Empty<SequenceExecutionSnapshot>(),
         Array.Empty<VirtualCameraSnapshot>());
 
-    private static MachineProjectDocument CreateProject()
+    internal static MachineProjectDocument CreateProject()
     {
         var project = new MachineProjectDocument { Name = "Camera workspace" };
         project.Devices.AddRange(

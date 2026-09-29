@@ -15,6 +15,7 @@ using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Core.Sequences;
 using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.Machine.Core.Devices;
+using OpenVisionLab.Machine.Infrastructure.Integration;
 using OpenVisionLab.Machine.Sequence.Authoring;
 using OpenVisionLab.Machine.Simulation.Axis;
 using OpenVisionLab.Machine.Simulation.Camera;
@@ -30,10 +31,13 @@ using OpenVisionLab.Machine.Simulation.Snapshots;
 using OpenVisionLab.Machine.Simulation.Workpieces;
 using OpenVisionLab.MachineStudio.Model;
 using OpenVisionLab.MachineStudio.View;
+using OpenVisionLab.MachineStudio.View.Diagnostics;
+using OpenVisionLab.MachineStudio.View.Dialogs;
 using OpenVisionLab.MachineStudio.View.Inspector;
 using OpenVisionLab.MachineStudio.View.Project;
 using OpenVisionLab.MachineStudio.View.Scene;
 using OpenVisionLab.MachineStudio.View.Shell;
+using OpenVisionLab.MachineStudio.View.Simulation;
 using OpenVisionLab.MachineStudio.ViewModel;
 using OpenVisionLab.Wpf.MessageDialogs;
 using static OpenVisionLab.MachineStudio.DirectExeSmokeArgumentParser;
@@ -90,8 +94,15 @@ internal static class DirectExeSmokeHost
         var initialProject = initialProjectLoad.Project;
         var initialProjectPath = initialProjectLoad.InitialProjectPath;
         var startupSamplePath = initialProjectLoad.StartupSamplePath;
+        var mmiFixture = string.IsNullOrWhiteSpace(smokeOptions.MmiOperatorState)
+            ? null
+            : PrepareMmiOperatorSmokeFixture(smokeOptions.MmiOperatorReportPath!);
 
-        var vm = new MainViewModel(initialProject, initialProjectPath, startupSamplePath);
+        var vm = new MainViewModel(
+            initialProject,
+            initialProjectPath,
+            startupSamplePath,
+            mmiFixture?.SettingsPath);
         if (smokeOptions.IsSmokeRun)
         {
             vm.UnsavedProjectPrompt = () => UnsavedProjectDecision.Discard;
@@ -115,6 +126,11 @@ internal static class DirectExeSmokeHost
         if (smokeOptions.UseRunLayout)
         {
             vm.IsRunMode = true;
+            vm.Navigation.IsSimulationWorkspace = true;
+        }
+        if (!string.IsNullOrWhiteSpace(smokeOptions.EquipmentOutlineSearchText))
+        {
+            vm.Layout.EquipmentOutlineSearchText = smokeOptions.EquipmentOutlineSearchText;
         }
 
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
@@ -139,6 +155,7 @@ internal static class DirectExeSmokeHost
                 smokeOptions.AnalogIoAuthoringSavePath,
                 smokeOptions.ScreenshotPath,
                 root => FindVisualDescendant<RightToolRegionView>(root),
+                root => FindVisualDescendant<SceneDocumentView>(root),
                 windowCapture.Capture);
             analogAuthoringReport.Save(smokeOptions.AnalogIoAuthoringReportPath!);
             Console.WriteLine(
@@ -159,6 +176,8 @@ internal static class DirectExeSmokeHost
         {
             var buttonName = smokeOptions.StartupChoiceState.StartsWith("sample", StringComparison.OrdinalIgnoreCase)
                 ? "StartSampleButton"
+                : smokeOptions.StartupChoiceState.StartsWith("open", StringComparison.OrdinalIgnoreCase)
+                ? "OpenRecipeButton"
                 : "StartBlankLayoutButton";
             var button = FindVisualDescendant<Button>(
                 window,
@@ -204,6 +223,7 @@ internal static class DirectExeSmokeHost
         SmokeDigitalIoCommissioningReport? digitalIoCommissioningReport = null;
         SmokeCameraCommissioningReport? cameraCommissioningReport = null;
         SmokeIntegrationResultReport? integrationPanelReport = null;
+        SmokeMmiOperatorLayoutReport? mmiOperatorReport = null;
         SmokeAxisCommissioningReport? axisCommissioningReport = null;
         SmokeMultiAxisCommissioningReport? multiAxisRecipeReport = null;
         SmokeCylinderCommissioningReport? cylinderCommissioningReport = null;
@@ -216,6 +236,8 @@ internal static class DirectExeSmokeHost
         SmokeWorkflowReport? connectionWorkbenchReport = null;
         SmokeCameraFirstUseReport? cameraFirstUseReport = null;
         SmokeProjectSafetyReport? projectSafetyReport = null;
+        SmokeProjectDiagnosticsReport? projectDiagnosticsReport = null;
+        SmokeSupportDiagnosticsReport? supportDiagnosticsReport = null;
 
         if (!string.IsNullOrWhiteSpace(smokeOptions.RecipeGalleryState))
         {
@@ -353,6 +375,91 @@ internal static class DirectExeSmokeHost
             await Task.Delay(100);
         }
 
+        if (smokeOptions.LibraryEntryState is { } libraryEntryState
+            && (libraryEntryState.Equals("tab", StringComparison.OrdinalIgnoreCase)
+                || libraryEntryState.Equals("equipment-tab", StringComparison.OrdinalIgnoreCase)
+                || libraryEntryState.Equals("equipment-dialog", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (!libraryEntryState.Equals("tab", StringComparison.OrdinalIgnoreCase))
+            {
+                vm.Navigation.SelectedDocumentTabIndex = 0;
+            }
+
+            var unitId = vm.ProjectStations
+                .SelectMany(station => station.Units)
+                .Select(unit => unit.Id)
+                .FirstOrDefault()
+                ?? throw new InvalidOperationException("The library entry smoke requires a project unit.");
+            vm.ShowEquipmentUnitCommand.Execute(unitId);
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            if (libraryEntryState.Equals("equipment-dialog", StringComparison.OrdinalIgnoreCase))
+            {
+                var openLibraryCommand = vm.OpenEquipmentComponentLibraryDialogCommand;
+                var canOpenLibrary = openLibraryCommand.CanExecute(null);
+                AssertSmoke(
+                    canOpenLibrary,
+                    "Equipment component dialog could not open: " +
+                    $"editable={vm.IsSceneEditable}, equipment={vm.Navigation.IsEquipmentWorkspace}, " +
+                    $"activeUnitId={vm.Layout.ActiveUnitId ?? "<none>"}, " +
+                    $"stationEditor={vm.IsStationUnitEditorOpen}, bulkMoveEditor={vm.IsBulkMoveEditorOpen}.");
+                openLibraryCommand.Execute(null);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                AssertSmoke(
+                    vm.IsEquipmentComponentLibraryDialogOpen,
+                    "Equipment component dialog command completed without opening its ViewModel state.");
+                var dialogView = FindVisualDescendant<EquipmentComponentLibraryDialogView>(window)
+                    ?? throw new InvalidOperationException("Equipment component dialog view was not available.");
+                AssertSmoke(
+                    dialogView.Visibility == Visibility.Visible && dialogView.IsVisible,
+                    "Equipment component dialog ViewModel state was open, but its View was not visible.");
+                AssertSmoke(
+                    dialogView.ActualWidth >= window.ActualWidth - 1
+                    && dialogView.ActualHeight >= window.ActualHeight - 1,
+                    $"Equipment component dialog did not cover the shell: " +
+                    $"view={dialogView.ActualWidth:F0}x{dialogView.ActualHeight:F0}, " +
+                    $"window={window.ActualWidth:F0}x{window.ActualHeight:F0}.");
+            }
+            else
+            {
+                vm.Navigation.OpenComponentLibraryCommand.Execute(null);
+            }
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        }
+
+        if (smokeOptions.LibrarySearchText is not null)
+        {
+            vm.Layout.LibrarySearchText = smokeOptions.LibrarySearchText;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        }
+
+        if (smokeOptions.LibraryEntryState?.Equals("equipment-dialog", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            var dialogView = FindVisualDescendant<EquipmentComponentLibraryDialogView>(window)
+                ?? throw new InvalidOperationException("Equipment component dialog view was not available.");
+            var searchBox = FindVisualDescendant<TextBox>(dialogView, candidate =>
+                string.Equals(candidate.Name, "LibrarySearchTextBox", StringComparison.Ordinal));
+            if (!string.IsNullOrWhiteSpace(smokeOptions.ScreenshotPath))
+            {
+                var screenshotDirectory = Path.GetDirectoryName(Path.GetFullPath(smokeOptions.ScreenshotPath))!;
+                windowCapture.Capture(window, Path.Combine(screenshotDirectory, "diagnostic-before-assert.png"));
+            }
+            AssertSmoke(
+                searchBox is { IsVisible: true }
+                && string.Equals(searchBox.Text, smokeOptions.LibrarySearchText, StringComparison.Ordinal)
+                && vm.Layout.FilteredLibraryItems.Count == 1,
+                $"Equipment component dialog search did not render its filtered library result: " +
+                $"found={searchBox is not null}, visible={searchBox?.IsVisible}, " +
+                $"text={searchBox?.Text ?? "<missing>"}, " +
+                $"filteredCount={vm.Layout.FilteredLibraryItems.Count}, " +
+                $"viewSize={dialogView.ActualWidth:F0}x{dialogView.ActualHeight:F0}.");
+            var centerHit = window.InputHitTest(new Point(window.ActualWidth / 2, window.ActualHeight / 2))
+                as DependencyObject;
+            AssertSmoke(
+                IsVisualDescendantOf(dialogView, centerHit),
+                $"Equipment component dialog was not the topmost center hit target; " +
+                $"hit={centerHit?.GetType().Name ?? "<none>"}.");
+        }
+
         if (!string.IsNullOrWhiteSpace(smokeOptions.LibraryCardState))
         {
             var leftTools = FindVisualDescendant<LeftToolRegionView>(window)
@@ -361,25 +468,20 @@ internal static class DirectExeSmokeHost
                 leftTools,
                 candidate => ReferenceEquals(candidate.ItemsSource, vm.Layout.LibraryItems))
                 ?? throw new InvalidOperationException("Layout library list was not available.");
-            var cards = FindVisualDescendants<Button>(libraryList)
-                .Where(button => button.DataContext is ComponentLibraryItem)
-                .ToArray();
-            AssertSmoke(cards.Length == 7, $"Expected 7 library cards; found {cards.Length}.");
             AssertSmoke(
-                cards.All(button =>
-                {
-                    var point = button.TransformToAncestor(libraryList).Transform(new Point());
-                    return button.IsVisible
-                        && point.Y >= -0.5
-                        && point.Y + button.ActualHeight <= libraryList.ActualHeight + 0.5;
-                }),
-                "Not every library card was visible without scrolling.");
-            AssertSmoke(
-                !FindVisualDescendants<ScrollBar>(libraryList).Any(scrollBar =>
-                    scrollBar.Orientation == Orientation.Vertical && scrollBar.IsVisible),
-                "The layout library exposed a vertical scrollbar.");
+                libraryList.Items.Count == vm.Layout.LibraryItems.Count,
+                $"Expected {vm.Layout.LibraryItems.Count} library cards; found {libraryList.Items.Count}.");
+            libraryList.ScrollIntoView(libraryList.Items[^1]);
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            var lastContainer = libraryList.ItemContainerGenerator.ContainerFromIndex(libraryList.Items.Count - 1) as ListBoxItem;
+            AssertSmoke(lastContainer?.IsVisible == true, "The last library card was not reachable by scrolling.");
 
-            var firstCard = cards[0];
+            libraryList.ScrollIntoView(libraryList.Items[0]);
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            var firstContainer = libraryList.ItemContainerGenerator.ContainerFromIndex(0) as ListBoxItem
+                ?? throw new InvalidOperationException("The first library card container was not available.");
+            var firstCard = FindVisualDescendant<Button>(firstContainer)
+                ?? throw new InvalidOperationException("The first library card was not available.");
             firstCard.Focus();
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             nativeInput.MovePointerToCenter(firstCard);
@@ -401,8 +503,38 @@ internal static class DirectExeSmokeHost
 
         if (!string.IsNullOrWhiteSpace(smokeOptions.LibraryDefaultAddKind))
         {
-            if (!Enum.TryParse<LayoutComponentKind>(smokeOptions.LibraryDefaultAddKind, ignoreCase: true, out var kind) ||
-                !vm.TryAddLayoutComponent(kind))
+            if (!Enum.TryParse<LayoutComponentKind>(smokeOptions.LibraryDefaultAddKind, ignoreCase: true, out var kind))
+            {
+                throw new ArgumentException(
+                    $"Unsupported or unavailable --smoke-library-default-add '{smokeOptions.LibraryDefaultAddKind}'.");
+            }
+
+            if (vm.IsEquipmentComponentLibraryDialogOpen)
+            {
+                var project = vm.ProjectTree.Roots.Single().Model as MachineProjectDocument
+                    ?? throw new InvalidOperationException("The Equipment library smoke project was not available.");
+                var componentCountBefore = project.Layouts.Sum(layout => layout.Components.Count);
+                if (!string.IsNullOrWhiteSpace(smokeOptions.ScreenshotPath))
+                {
+                    var screenshotDirectory = Path.GetDirectoryName(Path.GetFullPath(smokeOptions.ScreenshotPath))!;
+                    windowCapture.Capture(
+                        window,
+                        Path.Combine(screenshotDirectory, $"before-library-add-{kind}.png"));
+                }
+
+                vm.AddEquipmentComponentFromLibraryCommand.Execute(kind);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var componentCountAfter = project.Layouts.Sum(layout => layout.Components.Count);
+                var added = componentCountAfter == componentCountBefore + 1
+                    && !vm.IsEquipmentComponentLibraryDialogOpen;
+                var rejected = componentCountAfter == componentCountBefore
+                    && vm.IsEquipmentComponentLibraryDialogOpen
+                    && !string.IsNullOrWhiteSpace(vm.EquipmentComponentLibraryDialogStatusText);
+                AssertSmoke(
+                    added || rejected,
+                    "Equipment component dialog add produced neither one component nor a visible rejected-add reason.");
+            }
+            else if (!vm.TryAddLayoutComponent(kind))
             {
                 throw new ArgumentException(
                     $"Unsupported or unavailable --smoke-library-default-add '{smokeOptions.LibraryDefaultAddKind}'.");
@@ -520,6 +652,12 @@ internal static class DirectExeSmokeHost
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         }
 
+        if (smokeOptions.UseTopView)
+        {
+            vm.Layout.ShowTopViewCommand.Execute(null);
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        }
+
         if (!string.IsNullOrWhiteSpace(smokeOptions.LayoutSelectMany))
         {
             var selectionIds = smokeOptions.LayoutSelectMany.Split(
@@ -553,6 +691,38 @@ internal static class DirectExeSmokeHost
             }
         }
 
+        if (GetArgumentValue(args, "--smoke-layout-delete-dialog-screenshot") is { } removalDialogPath)
+        {
+            var components = vm.Layout.SelectedItems.Select(item => item.Component)
+                .OfType<LayoutComponentDefinition>().ToArray();
+            if (initialProject is null || components.Length == 0)
+            {
+                throw new ArgumentException("A loaded project and layout selection are required for the removal dialog capture.");
+            }
+
+            var ids = components.Select(component => component.Id).ToArray();
+            var impacts = new LayoutComponentAuthoringService().GetRemovalImpacts(initialProject, ids);
+            var dialog = new WpfMessageDialogWindow(
+                MainMessageDialogHost.CreateLayoutRemovalDialogOptions(components, impacts))
+            {
+                Owner = window,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+            dialog.Show();
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            windowCapture.Capture(dialog, removalDialogPath);
+            if (GetArgumentValue(args, "--smoke-layout-delete-dialog-bottom-screenshot") is { } bottomPath)
+            {
+                var messageScroll = FindVisualDescendant<ScrollViewer>(dialog)
+                    ?? throw new InvalidOperationException("The removal message scroll region was not found.");
+                AssertSmoke(messageScroll.ScrollableHeight > 0, "The long removal impact list was not scrollable.");
+                messageScroll.ScrollToBottom();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                windowCapture.Capture(dialog, bottomPath);
+            }
+            dialog.Close();
+        }
+
         if (!string.IsNullOrWhiteSpace(smokeOptions.AxisTuningState))
         {
             await SmokeAxisTuningStateVerifier.ApplyAsync(window, vm, smokeOptions.AxisTuningState, uiInteraction);
@@ -566,6 +736,10 @@ internal static class DirectExeSmokeHost
                     "--smoke-layout-property-state requires a layout selection.");
             }
 
+            if (vm.OpenEquipmentPropertiesCommand.CanExecute(null))
+            {
+                vm.OpenEquipmentPropertiesCommand.Execute(null);
+            }
             await SmokeLayoutPropertyStateVerifier.ApplyAsync(window, vm, smokeOptions.LayoutPropertyState, uiInteraction);
         }
 
@@ -774,6 +948,9 @@ internal static class DirectExeSmokeHost
                     "--smoke-test-scenario-settings requires --smoke-run-layout.");
             }
 
+            vm.Navigation.IsSimulationWorkspace = true;
+            vm.Navigation.SelectedExecutionTabIndex = 2;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             var testScenarioAnchor = FindVisualDescendant<TextBlock>(
                 window,
                 textBlock => string.Equals(
@@ -787,9 +964,9 @@ internal static class DirectExeSmokeHost
 
             testScenarioAnchor.BringIntoView();
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            var rightInspector = FindVisualDescendant<
-                OpenVisionLab.MachineStudio.View.Inspector.RightToolRegionView>(window)
-                ?? throw new InvalidOperationException("Run inspector was unavailable.");
+            var testWorkspace = FindVisualDescendant<
+                OpenVisionLab.MachineStudio.View.Simulation.SimulationTestWorkspaceView>(window)
+                ?? throw new InvalidOperationException("Test workspace was unavailable.");
 
             var settingsState = smokeOptions.TestScenarioSettingsState ?? "normal";
             vm.SimulationWorkspace.RequireAutomaticCycleCompleted = true;
@@ -831,22 +1008,17 @@ internal static class DirectExeSmokeHost
             }
 
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            rightInspector.ScenarioAssertionsSectionAnchor.BringIntoView();
+            testWorkspace.ScenarioAssertionsSectionAnchor.BringIntoView();
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            var rightInspectorScroll = FindVisualDescendant<ScrollViewer>(
-                rightInspector,
-                scrollViewer => scrollViewer.IsVisible
-                    && scrollViewer.VerticalScrollBarVisibility == ScrollBarVisibility.Auto
-                    && scrollViewer.ScrollableHeight > 0);
-            rightInspectorScroll?.ScrollToVerticalOffset(
-                rightInspectorScroll.VerticalOffset + (width <= 1280 ? 660 : 650));
+            testWorkspace.FinalEquipmentExpectedStateTextBox.BringIntoView();
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             if (!settingsState.Equals("disabled", StringComparison.OrdinalIgnoreCase)
                 && !settingsState.Equals("validation", StringComparison.OrdinalIgnoreCase)
-                && (rightInspector.ScheduledFaultInjectTickTextBox.Text != "403"
-                    || rightInspector.ScheduledFaultHoldTicksTextBox.Text != "3"
-                    || rightInspector.MinimumCompletedCyclesTextBox.Text != "1"
-                    || rightInspector.FinalEquipmentExpectedStateTextBox.Text != "Extended"))
+                && (testWorkspace.ScheduledFaultInjectTickTextBox.Text != "403"
+                    || testWorkspace.ScheduledFaultHoldTicksTextBox.Text != "3"
+                    || testWorkspace.MinimumCompletedCyclesTextBox.Text != "1"
+                    || testWorkspace.FinalEquipmentExpectedStateTextBox.Text != "Extended"))
             {
                 throw new InvalidOperationException(
                     "Test Scenario values were not rendered from the current settings.");
@@ -857,31 +1029,31 @@ internal static class DirectExeSmokeHost
                 case "normal":
                     if (!vm.SimulationWorkspace.IsScheduledFaultConfigurationValid
                         || !vm.SimulationWorkspace.IsAssertionConfigurationValid
-                        || rightInspector.ScheduledFaultValidationText.IsVisible
-                        || rightInspector.ScenarioAssertionValidationText.IsVisible)
+                        || testWorkspace.ScheduledFaultValidationText.IsVisible
+                        || testWorkspace.ScenarioAssertionValidationText.IsVisible)
                     {
                         throw new InvalidOperationException("Valid Test Scenario settings were not rendered normally.");
                     }
                     break;
                 case "focus":
                     window.Activate();
-                    rightInspector.FinalEquipmentExpectedStateTextBox.Focus();
+                    testWorkspace.FinalEquipmentExpectedStateTextBox.Focus();
                     break;
                 case "hover":
-                    nativeInput.MovePointerToCenter(rightInspector.FinalEquipmentStateAssertionCheckBox);
+                    nativeInput.MovePointerToCenter(testWorkspace.FinalEquipmentStateAssertionCheckBox);
                     break;
                 case "pressed":
                     window.Activate();
-                    rightInspector.FinalEquipmentStateAssertionCheckBox.Focus();
+                    testWorkspace.FinalEquipmentStateAssertionCheckBox.Focus();
                     await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                    nativeInput.MovePointerToCenter(rightInspector.FinalEquipmentStateAssertionCheckBox);
+                    nativeInput.MovePointerToCenter(testWorkspace.FinalEquipmentStateAssertionCheckBox);
                     nativeInput.PressLeftButton();
                     nativeInput.MarkPointerHeld();
                     break;
                 case "disabled":
-                    if (rightInspector.ScheduledFaultTargetComboBox.IsEnabled
-                        || rightInspector.FinalEquipmentTargetComboBox.IsEnabled
-                        || rightInspector.FinalEquipmentExpectedStateTextBox.IsEnabled)
+                    if (testWorkspace.ScheduledFaultTargetComboBox.IsEnabled
+                        || testWorkspace.FinalEquipmentTargetComboBox.IsEnabled
+                        || testWorkspace.FinalEquipmentExpectedStateTextBox.IsEnabled)
                     {
                         throw new InvalidOperationException("Disabled Test Scenario settings remained interactive.");
                     }
@@ -889,22 +1061,22 @@ internal static class DirectExeSmokeHost
                 case "validation":
                     if (vm.SimulationWorkspace.IsScheduledFaultConfigurationValid
                         || vm.SimulationWorkspace.IsAssertionConfigurationValid
-                        || !rightInspector.ScheduledFaultValidationText.IsVisible
-                        || !rightInspector.ScenarioAssertionValidationText.IsVisible)
+                        || !testWorkspace.ScheduledFaultValidationText.IsVisible
+                        || !testWorkspace.ScenarioAssertionValidationText.IsVisible)
                     {
                         throw new InvalidOperationException("Invalid Test Scenario settings were not surfaced.");
                     }
-                    rightInspector.ScenarioAssertionValidationText.BringIntoView();
+                    testWorkspace.ScenarioAssertionValidationText.BringIntoView();
                     break;
                 case "open-popup":
                     window.Activate();
-                    rightInspector.FinalEquipmentTargetComboBox.Focus();
-                    rightInspector.FinalEquipmentTargetComboBox.ApplyTemplate();
-                    rightInspector.FinalEquipmentTargetComboBox.IsDropDownOpen = true;
+                    testWorkspace.FinalEquipmentTargetComboBox.Focus();
+                    testWorkspace.FinalEquipmentTargetComboBox.ApplyTemplate();
+                    testWorkspace.FinalEquipmentTargetComboBox.IsDropDownOpen = true;
                     await window.Dispatcher.InvokeAsync(
                         () => { },
                         DispatcherPriority.ApplicationIdle);
-                    if (!rightInspector.FinalEquipmentTargetComboBox.IsDropDownOpen)
+                    if (!testWorkspace.FinalEquipmentTargetComboBox.IsDropDownOpen)
                     {
                         throw new InvalidOperationException("Assertion equipment popup did not open.");
                     }
@@ -938,14 +1110,21 @@ internal static class DirectExeSmokeHost
                     "--smoke-test-scenario-batch requires --smoke-run-layout.");
             }
 
+            vm.Navigation.IsSimulationWorkspace = true;
+            vm.Navigation.SelectedExecutionTabIndex = 2;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             await SmokeScenarioBatchVerifier.VerifyAsync(
                 window,
                 vm,
                 smokeOptions.ProjectPath,
                 smokeOptions.ScenarioEvidenceExchangePath,
                 smokeOptions.ScenarioEvidenceExchangeState,
+                smokeOptions.ScenarioReportPath,
+                smokeOptions.ScenarioReportState,
                 smokeOptions.UnifiedCommissioningEvidencePath,
                 smokeOptions.UnifiedCommissioningEvidenceState,
+                windowCapture,
+                smokeOptions.ScreenshotPath,
                 uiInteraction);
 
             var repeatValidationAnchor = FindVisualDescendant<TextBlock>(
@@ -956,19 +1135,10 @@ internal static class DirectExeSmokeHost
                     StringComparison.Ordinal));
             repeatValidationAnchor?.BringIntoView();
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            var rightInspector = FindVisualDescendant<
-                OpenVisionLab.MachineStudio.View.Inspector.RightToolRegionView>(window);
-            rightInspector?.ScenarioAssertionOutcomesPanel.BringIntoView();
+            var testWorkspace = FindVisualDescendant<
+                OpenVisionLab.MachineStudio.View.Simulation.SimulationTestWorkspaceView>(window);
+            testWorkspace?.ScenarioAssertionOutcomesPanel.BringIntoView();
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            var rightInspectorScroll = rightInspector is null
-                ? null
-                : FindVisualDescendant<ScrollViewer>(
-                    rightInspector,
-                    scrollViewer => scrollViewer.IsVisible
-                        && scrollViewer.VerticalScrollBarVisibility == ScrollBarVisibility.Auto
-                        && scrollViewer.ScrollableHeight > 0);
-            rightInspectorScroll?.ScrollToVerticalOffset(
-                rightInspectorScroll.VerticalOffset + (width <= 1280 ? 290 : 110));
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             await Task.Delay(100);
         }
@@ -1000,6 +1170,8 @@ internal static class DirectExeSmokeHost
         if (smokeOptions.SaveBatchPersistence || smokeOptions.VerifyBatchPersistence || smokeOptions.VerifyStaleBatchPersistence)
         {
             vm.IsRunMode = true;
+            vm.Navigation.IsSimulationWorkspace = true;
+            vm.Navigation.SelectedExecutionTabIndex = 2;
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             var repeatValidationAnchor = FindVisualDescendant<TextBlock>(
                 window,
@@ -1009,17 +1181,8 @@ internal static class DirectExeSmokeHost
                     StringComparison.Ordinal));
             repeatValidationAnchor?.BringIntoView();
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            var rightInspector = FindVisualDescendant<
-                OpenVisionLab.MachineStudio.View.Inspector.RightToolRegionView>(window);
-            var rightInspectorScroll = rightInspector is null
-                ? null
-                : FindVisualDescendant<ScrollViewer>(
-                    rightInspector,
-                    scrollViewer => scrollViewer.IsVisible
-                        && scrollViewer.VerticalScrollBarVisibility == ScrollBarVisibility.Auto
-                        && scrollViewer.ScrollableHeight > 0);
-            rightInspectorScroll?.ScrollToVerticalOffset(
-                rightInspectorScroll.VerticalOffset + (width <= 1280 ? 330 : 150));
+            var testWorkspace = FindVisualDescendant<
+                OpenVisionLab.MachineStudio.View.Simulation.SimulationTestWorkspaceView>(window);
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             await Task.Delay(100);
         }
@@ -1075,7 +1238,10 @@ internal static class DirectExeSmokeHost
                     nativeInput.MarkPointerHeld();
                 },
                 nativeInput.ReleasePointer,
-                smokeOptions.RuntimeDebuggerState);
+                smokeOptions.RuntimeDebuggerState,
+                nativeInput,
+                windowCapture,
+                smokeOptions.RuntimeDebuggerReportPath);
             runtimeDebuggerReport.Save(smokeOptions.RuntimeDebuggerReportPath);
         }
 
@@ -1144,10 +1310,32 @@ internal static class DirectExeSmokeHost
                 vm,
                 smokeOptions.IntegrationPanelState,
                 smokeOptions.IntegrationExchangeRoot,
-                root => FindVisualDescendant<RightToolRegionView>(root));
+                root => FindVisualDescendant<RightToolRegionView>(root),
+                root => FindVisualDescendant<SimulationIntegrationWorkspaceView>(root));
             if (!string.IsNullOrWhiteSpace(smokeOptions.IntegrationPanelReportPath))
             {
                 integrationPanelReport.Save(smokeOptions.IntegrationPanelReportPath);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(smokeOptions.MmiOperatorState))
+        {
+            mmiOperatorReport = await SmokeMmiOperatorLayoutVerifier.VerifyAsync(
+                window,
+                vm,
+                smokeOptions.MmiOperatorState,
+                mmiFixture!.SettingsPath,
+                Path.GetDirectoryName(Path.GetFullPath(smokeOptions.MmiOperatorReportPath!))!,
+                uiInteraction,
+                nativeInput,
+                windowCapture);
+            mmiOperatorReport.Save(smokeOptions.MmiOperatorReportPath!);
+            Console.WriteLine(
+                $"Machine Studio inspection interaction smoke "
+                + $"{(mmiOperatorReport.IsValid ? "passed" : "failed")}. ");
+            foreach (var failure in mmiOperatorReport.Failures)
+            {
+                Console.Error.WriteLine($"  - {failure}");
             }
         }
 
@@ -1257,7 +1445,13 @@ internal static class DirectExeSmokeHost
 
         if (!string.IsNullOrWhiteSpace(smokeOptions.GlobalCommandState) && !globalCommandSmokeHandled)
         {
-            await SmokeGlobalCommandStateVerifier.ApplyAsync(window, vm, smokeOptions.GlobalCommandState, uiInteraction);
+            await SmokeGlobalCommandStateVerifier.ApplyAsync(
+                window,
+                vm,
+                smokeOptions.GlobalCommandState,
+                uiInteraction,
+                windowCapture,
+                smokeOptions.GlobalCommandStateScreenshotPath);
         }
 
         if (vm.SelectedEquipmentStatus is { } selectedEquipmentStatus)
@@ -1283,6 +1477,7 @@ internal static class DirectExeSmokeHost
                     target.Activate();
                     nativeInput.ActivateWindow(target);
                 },
+                nativeInput.CheckPointerOwnership,
                 nativeInput.MovePointerToCenter,
                 nativeInput.SendMouseEvent,
                 nativeInput.MarkPointerHeld,
@@ -1304,6 +1499,48 @@ internal static class DirectExeSmokeHost
                 $"Project safety smoke {(projectSafetyReport.IsValid ? "passed" : "failed")}.");
         }
 
+        if (!string.IsNullOrWhiteSpace(smokeOptions.ProjectDiagnosticsReportPath))
+        {
+            if (string.IsNullOrWhiteSpace(smokeOptions.ProjectPath))
+            {
+                throw new ArgumentException(
+                    "--smoke-project is required with --smoke-project-diagnostics-report.");
+            }
+
+            projectDiagnosticsReport = await SmokeProjectDiagnosticsVerifier.VerifyAsync(
+                window,
+                vm,
+                smokeOptions.ProjectPath,
+                nativeInput,
+                windowCapture,
+                smokeOptions.ProjectDiagnosticsScreenshotPath);
+            projectDiagnosticsReport.Save(smokeOptions.ProjectDiagnosticsReportPath);
+            Console.WriteLine(
+                $"Project diagnostics smoke {(projectDiagnosticsReport.IsValid ? "passed" : "failed") }.");
+            foreach (var failure in projectDiagnosticsReport.Failures)
+            {
+                Console.Error.WriteLine($"  - {failure}");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(smokeOptions.SupportDiagnosticsReportPath))
+        {
+            supportDiagnosticsReport = await SmokeSupportDiagnosticsVerifier.VerifyAsync(
+                window,
+                vm,
+                smokeOptions.SupportDiagnosticsExportPath!,
+                nativeInput,
+                windowCapture,
+                smokeOptions.SupportDiagnosticsScreenshotPath);
+            supportDiagnosticsReport.Save(smokeOptions.SupportDiagnosticsReportPath);
+            Console.WriteLine(
+                $"Support diagnostics smoke {(supportDiagnosticsReport.IsValid ? "passed" : "failed") }.");
+            foreach (var failure in supportDiagnosticsReport.Failures)
+            {
+                Console.Error.WriteLine($"  - {failure}");
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(smokeOptions.UnifiedCommissioningEvidencePath))
         {
             var unifiedEvidenceAnchor = FindVisualDescendant<TextBlock>(
@@ -1314,6 +1551,12 @@ internal static class DirectExeSmokeHost
                     StringComparison.Ordinal));
             unifiedEvidenceAnchor?.BringIntoView();
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        }
+
+        if (GetArgumentValue(args, "--smoke-workspace") is { } workspace)
+        {
+            await SmokeWorkspaceNavigationVerifier.ApplyAsync(window, vm, workspace,
+                GetArgumentValue(args, "--smoke-workspace-report"), nativeInput, windowCapture);
         }
 
         SmokeLayoutReport? layoutReport = null;
@@ -1368,6 +1611,7 @@ internal static class DirectExeSmokeHost
         }
 
         if (!string.IsNullOrEmpty(smokeOptions.ScreenshotPath) ||
+            !string.IsNullOrEmpty(smokeOptions.GlobalCommandStateScreenshotPath) ||
             !string.IsNullOrEmpty(smokeOptions.LayoutReportPath) ||
             !string.IsNullOrEmpty(smokeOptions.SmokePerfReportPath) ||
             roundTripReport is not null ||
@@ -1384,6 +1628,7 @@ internal static class DirectExeSmokeHost
             digitalIoCommissioningReport is not null ||
             cameraCommissioningReport is not null ||
             integrationPanelReport is not null ||
+            mmiOperatorReport is not null ||
             axisCommissioningReport is not null ||
             multiAxisRecipeReport is not null ||
             cylinderCommissioningReport is not null ||
@@ -1396,6 +1641,8 @@ internal static class DirectExeSmokeHost
             connectionWorkbenchReport is not null ||
             cameraFirstUseReport is not null ||
             projectSafetyReport is not null ||
+            projectDiagnosticsReport is not null ||
+            supportDiagnosticsReport is not null ||
             smokeOptions.PerformSmokePerf)
         {
             if (string.Equals(smokeOptions.CameraFirstUseState, "pressed", StringComparison.OrdinalIgnoreCase)
@@ -1435,6 +1682,7 @@ internal static class DirectExeSmokeHost
                 new DirectExeSmokeFailureCheck(faultManagerReport?.IsValid ?? true, 13),
                 new DirectExeSmokeFailureCheck(cameraCommissioningReport?.IsValid ?? true, 18),
                 new DirectExeSmokeFailureCheck(integrationPanelReport?.IsValid ?? true, 26),
+                new DirectExeSmokeFailureCheck(mmiOperatorReport?.IsValid ?? true, 29),
                 new DirectExeSmokeFailureCheck(axisCommissioningReport?.IsValid ?? true, 14),
                 new DirectExeSmokeFailureCheck(multiAxisRecipeReport?.IsValid ?? true, 19),
                 new DirectExeSmokeFailureCheck(cylinderCommissioningReport?.IsValid ?? true, 15),
@@ -1446,7 +1694,9 @@ internal static class DirectExeSmokeHost
                 new DirectExeSmokeFailureCheck(connectionWorkbenchDefaultReport?.IsValid ?? true, 21),
                 new DirectExeSmokeFailureCheck(connectionWorkbenchReport?.IsValid ?? true, 21),
                 new DirectExeSmokeFailureCheck(cameraFirstUseReport?.IsValid ?? true, 24),
-                new DirectExeSmokeFailureCheck(projectSafetyReport?.IsValid ?? true, 22));
+                new DirectExeSmokeFailureCheck(projectSafetyReport?.IsValid ?? true, 22),
+                new DirectExeSmokeFailureCheck(projectDiagnosticsReport?.IsValid ?? true, 27),
+                new DirectExeSmokeFailureCheck(supportDiagnosticsReport?.IsValid ?? true, 28));
             Application.Current.Shutdown(exitCode);
         }
     }
@@ -1540,12 +1790,68 @@ internal static class DirectExeSmokeHost
         await Task.Delay(150);
     }
 
+    private static MmiOperatorSmokeFixture PrepareMmiOperatorSmokeFixture(string reportPath)
+    {
+        var fullReportPath = Path.GetFullPath(reportPath);
+        if (!fullReportPath.StartsWith("D:\\", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                "Machine Studio inspection smoke evidence must be stored on the D: test-data drive.",
+                nameof(reportPath));
+        }
+
+        var evidenceRoot = Path.GetDirectoryName(fullReportPath)
+            ?? throw new ArgumentException("Machine Studio inspection smoke report must include a directory.", nameof(reportPath));
+        var fixtureRoot = Path.Combine(evidenceRoot, "mmi-fixture");
+        var exchangeRoot = Path.Combine(fixtureRoot, "exchange");
+        Directory.CreateDirectory(exchangeRoot);
+        var recipePaths = new[]
+        {
+            Path.Combine(fixtureRoot, "recipe-alpha.2d.json"),
+            Path.Combine(fixtureRoot, "recipe-beta.2d.json")
+        };
+        File.WriteAllText(recipePaths[0], "{\"schema\":\"2d-recipe-smoke\",\"name\":\"Inspection Recipe Alpha\"}");
+        File.WriteAllText(recipePaths[1], "{\"schema\":\"2d-recipe-smoke\",\"name\":\"Inspection Recipe Beta\"}");
+
+        var settingsPath = Path.Combine(fixtureRoot, "integration-exchange.json");
+        new MachineIntegrationSetupStore(settingsPath).Save(new MachineIntegrationSetup
+        {
+            ExchangeRoot = exchangeRoot,
+            InspectionRecipePath = recipePaths[0],
+            RecipeCatalogPaths = recipePaths,
+            TwoDConsumerVersion = "2.2.0-dev.smoke",
+            TwoDConsumerCommit = new string('0', 40),
+            TcpListenAddress = "127.0.0.1",
+            TcpListenPort = 45101,
+            TcpPeerHost = "127.0.0.1",
+            TcpPeerPort = 45102
+        });
+        return new(settingsPath);
+    }
+
+    private sealed record MmiOperatorSmokeFixture(string SettingsPath);
+
     private static void AssertSmoke(bool condition, string message)
     {
         if (!condition)
         {
             throw new InvalidOperationException(message);
         }
+    }
+
+    private static bool IsVisualDescendantOf(DependencyObject ancestor, DependencyObject? candidate)
+    {
+        while (candidate is not null)
+        {
+            if (ReferenceEquals(candidate, ancestor))
+            {
+                return true;
+            }
+
+            candidate = VisualTreeHelper.GetParent(candidate);
+        }
+
+        return false;
     }
 
     private static void SelectLayoutItemsThroughScene(

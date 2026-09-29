@@ -8,6 +8,7 @@ public enum SequenceAuthoringTargetKind
     DigitalOutput,
     Axis,
     Camera,
+    Workpiece,
     Subsequence
 }
 
@@ -96,6 +97,20 @@ public sealed class SequenceStepTemplateCatalog
                 0,
                 SequenceAuthoringTargetKind.Camera),
             Template(
+                "feed-workpiece",
+                "Feed workpiece",
+                SequenceStepAction.FeedWorkpiece,
+                "",
+                0,
+                SequenceAuthoringTargetKind.Workpiece),
+            Template(
+                "eject-workpiece",
+                "Eject workpiece",
+                SequenceStepAction.EjectWorkpiece,
+                "",
+                0,
+                SequenceAuthoringTargetKind.Workpiece),
+            Template(
                 "call-subsequence",
                 "Call subsequence",
                 SequenceStepAction.CallSubsequence,
@@ -174,6 +189,7 @@ public sealed class SequenceStepTemplateCatalog
                 $"Template '{template.Name}' has no compatible authored target.");
         }
 
+        bool requiresWorkpiece = template.Action is SequenceStepAction.FeedWorkpiece or SequenceStepAction.EjectWorkpiece;
         string parameter = template.Action == SequenceStepAction.MoveAxis
             ? target.DefaultParameter
             : template.DefaultParameter;
@@ -182,7 +198,7 @@ public sealed class SequenceStepTemplateCatalog
             Id = stepId,
             Name = template.Name,
             Action = template.Action,
-            TargetId = target.Id,
+            TargetId = requiresWorkpiece ? string.Empty : target.Id,
             Parameter = parameter,
             TimeoutMs = template.DefaultTimeoutMs
         });
@@ -210,6 +226,8 @@ public sealed class SequenceStepTemplateCatalog
             [SequenceAuthoringTargetKind.Axis],
         SequenceStepAction.TriggerCamera or SequenceStepAction.WaitVisionResult =>
             [SequenceAuthoringTargetKind.Camera],
+        SequenceStepAction.FeedWorkpiece or SequenceStepAction.EjectWorkpiece =>
+            [SequenceAuthoringTargetKind.Workpiece],
         SequenceStepAction.CallSubsequence => [SequenceAuthoringTargetKind.Subsequence],
         _ => Array.Empty<SequenceAuthoringTargetKind>()
     };

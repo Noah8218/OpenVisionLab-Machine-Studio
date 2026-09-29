@@ -40,11 +40,13 @@ public sealed class DeterministicWaferHandlerTests
     public void Tick_TransferDetachesWhileHeldAndReattachesAtDestination()
     {
         var (hub, layout) = CreateLayout();
+        Assert.True(layout.StartWorkpieceRun("run-0001"));
         SetInput(hub, "di.source", true);
         SetOutput(hub, "do.conveyor.run", true);
 
         layout.Tick(Axes(0, 260));
         LayoutComponentSnapshot source = Workpiece(layout);
+        Assert.Equal("run-0001/WP-001", source.WorkpieceInstanceId);
         Assert.Equal(WaferHandlerOwnershipState.Source, source.TransferOwnershipState);
         Assert.Equal("transport", source.CarrierComponentId);
         Assert.Equal(0.5, source.X, precision: 10);
@@ -53,6 +55,7 @@ public sealed class DeterministicWaferHandlerTests
         SetOutput(hub, "do.pick", true);
         layout.Tick(Axes(0, 260));
         LayoutComponentSnapshot held = Workpiece(layout);
+        Assert.Equal(source.WorkpieceInstanceId, held.WorkpieceInstanceId);
         Assert.Equal(WaferHandlerOwnershipState.Handler, held.TransferOwnershipState);
         Assert.Null(held.CarrierComponentId);
         Assert.Null(held.CarrierPosition);
@@ -66,6 +69,7 @@ public sealed class DeterministicWaferHandlerTests
         SetOutput(hub, "do.place", true);
         layout.Tick(Axes(140, 260));
         LayoutComponentSnapshot placed = Workpiece(layout);
+        Assert.Equal(source.WorkpieceInstanceId, placed.WorkpieceInstanceId);
         Assert.Equal(WaferHandlerOwnershipState.Destination, placed.TransferOwnershipState);
         Assert.Equal("transport", placed.CarrierComponentId);
         Assert.Equal(1, placed.CarrierPosition!.Value, precision: 10);
@@ -76,6 +80,7 @@ public sealed class DeterministicWaferHandlerTests
 
         layout.Reset();
         LayoutComponentSnapshot reset = Workpiece(layout);
+        Assert.Null(reset.WorkpieceInstanceId);
         Assert.Equal(WaferHandlerOwnershipState.Source, reset.TransferOwnershipState);
         Assert.Equal("handler", reset.TransferOwnerId);
         Assert.Equal("transport", reset.CarrierComponentId);

@@ -236,6 +236,65 @@ public sealed class DeterministicMachineLayout
     /// </summary>
     public void Reset() => _runtimeResetter.Reset(ResetSimulationOwnedSignals);
 
+    internal bool StartWorkpieceRun(string runId)
+        => StartWorkpieceRun(runId, out _);
+
+    internal bool StartWorkpieceRun(string runId, out int assignedWorkpieceCount)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(runId);
+        assignedWorkpieceCount = 0;
+        if (_orderedWorkpieces.Length == 0)
+        {
+            return false;
+        }
+        if (_orderedWorkpieces.Any(workpiece => workpiece.WorkpieceInstanceId is not null))
+        {
+            throw new InvalidOperationException("Workpiece run identities must be reset before a new run starts.");
+        }
+
+        foreach (var workpiece in _orderedWorkpieces)
+        {
+            if (!workpiece.IsPresent)
+            {
+                continue;
+            }
+
+            assignedWorkpieceCount++;
+            workpiece.AssignWorkpieceInstanceId(
+                $"{runId}/WP-{assignedWorkpieceCount.ToString("D3", System.Globalization.CultureInfo.InvariantCulture)}");
+        }
+
+        return true;
+    }
+
+    internal bool TryFeedWorkpiece(string? componentId, string workpieceInstanceId)
+    {
+        if (string.IsNullOrWhiteSpace(componentId)
+            || !_componentsById.TryGetValue(componentId, out var component)
+            || component is not WorkpieceRuntimeState workpiece
+            || !workpiece.TryFeed(workpieceInstanceId))
+        {
+            return false;
+        }
+
+        var conveyor = (ConveyorRuntimeState)_componentsById[workpiece.WorkpieceConfiguration.ConveyorComponentId];
+        workpiece.UpdateCarrierPosition(conveyor);
+        return true;
+    }
+
+    internal bool TryEjectWorkpiece(string? componentId) =>
+        !string.IsNullOrWhiteSpace(componentId)
+        && _componentsById.TryGetValue(componentId, out var component)
+        && component is WorkpieceRuntimeState workpiece
+        && workpiece.TryEject();
+
+    internal string? GetWorkpieceInstanceId(string? componentId) =>
+        !string.IsNullOrWhiteSpace(componentId)
+        && _componentsById.TryGetValue(componentId, out var component)
+        && component is WorkpieceRuntimeState workpiece
+            ? workpiece.WorkpieceInstanceId
+            : null;
+
     public ReadOnlyCollection<LayoutComponentSnapshot> CaptureSnapshots() =>
         new(CaptureSnapshotsCore());
 

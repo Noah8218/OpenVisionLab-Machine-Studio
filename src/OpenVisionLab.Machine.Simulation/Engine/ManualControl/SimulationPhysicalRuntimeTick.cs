@@ -121,11 +121,18 @@ internal sealed class SimulationPhysicalRuntimeTick
             else if (cameraTick.Transition == VirtualCameraTickTransition.FrameReady)
             {
                 var acquisition = cameraTick.CompletedAcquisition!;
+                string workpieceContext = string.IsNullOrWhiteSpace(acquisition.WorkpieceComponentId)
+                    ? string.Empty
+                    : $"; workpiece component '{acquisition.WorkpieceComponentId}'";
+                if (!string.IsNullOrWhiteSpace(acquisition.WorkpieceInstanceId))
+                {
+                    workpieceContext += $"; workpiece instance '{acquisition.WorkpieceInstanceId}'";
+                }
                 Emit(
                     "Camera",
                     "CameraFrameReady",
                     $"{camera.Id} frame {acquisition.AcquisitionId} is ready for recipe " +
-                    $"'{acquisition.RecipeId}'" +
+                    $"'{acquisition.RecipeId}'{workpieceContext}" +
                     (acquisition.FrameEvidence is null
                         ? "."
                         : $"; SHA-256 {acquisition.FrameEvidence.ContentSha256}."),
@@ -136,9 +143,9 @@ internal sealed class SimulationPhysicalRuntimeTick
                     acquisition.InspectionEvidence is { } inspection
                         ? $"{acquisition.AcquisitionId} inspection {inspection.InspectionId} result = " +
                           $"{inspection.Decision.ToString().ToUpperInvariant()}; " +
-                          $"metrics {FormatInspectionMetrics(inspection.Metrics)}."
+                          $"metrics {FormatInspectionMetrics(inspection.Metrics)}{workpieceContext}."
                         : $"{acquisition.AcquisitionId} placeholder result = " +
-                          $"{acquisition.Decision.ToString().ToUpperInvariant()}.",
+                          $"{acquisition.Decision.ToString().ToUpperInvariant()}{workpieceContext}.",
                     context);
             }
             else if (cameraTick.Transition == VirtualCameraTickTransition.ExternalResultPending)

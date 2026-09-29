@@ -15,6 +15,7 @@ public enum MachineProjectLayoutValidationErrorCode
     UnsupportedComponentKind,
     InvalidTransform,
     InvalidSize,
+    InvalidVerticalEnvelope,
     MissingBehaviorBinding,
     UnsupportedBehaviorBinding,
     AxisBindingNotFound,
@@ -44,12 +45,23 @@ public enum MachineProjectLayoutValidationErrorCode
     ConveyorChannelIdsMustBeDistinct,
     ConveyorSpeedInvalid,
     WorkpieceDeviceBindingInvalid,
+    CameraDeviceBindingInvalid,
     WorkpieceTypeRequired,
     WorkpieceConveyorComponentRequired,
     WorkpieceConveyorComponentNotFound,
     WorkpieceCarrierMustBeConveyor,
     WorkpieceInspectionStateInvalid,
-    AmbiguousBehaviorBinding
+    AmbiguousBehaviorBinding,
+    StationsRequired,
+    StationIdRequired,
+    StationNameRequired,
+    DuplicateStationId,
+    StationUnitsRequired,
+    UnitIdRequired,
+    UnitNameRequired,
+    DuplicateUnitId,
+    InvalidComponentUnitId,
+    ComponentUnitNotFound
 }
 
 public sealed record MachineProjectLayoutValidationError(
@@ -83,6 +95,7 @@ public sealed class MachineProjectLayoutValidator
 
         var errors = new List<MachineProjectLayoutValidationError>();
         var layouts = project.Layouts ?? new List<MachineLayoutDefinition>();
+        var unitIds = ValidateStations(project.Stations, errors);
         var layoutIds = new HashSet<string>(StringComparer.Ordinal);
         var componentIds = new HashSet<string>(StringComparer.Ordinal);
 
@@ -155,7 +168,7 @@ public sealed class MachineProjectLayoutValidator
                     continue;
                 }
 
-                ValidateComponentDefinition(layout, component, componentIds, errors);
+                ValidateComponentDefinition(layout, component, componentIds, unitIds, errors);
             }
         }
 
@@ -167,6 +180,7 @@ public sealed class MachineProjectLayoutValidator
         MachineLayoutDefinition layout,
         LayoutComponentDefinition component,
         ISet<string> componentIds,
+        ISet<string> unitIds,
         ICollection<MachineProjectLayoutValidationError> errors)
     {
         if (string.IsNullOrWhiteSpace(component.Id))
@@ -193,6 +207,26 @@ public sealed class MachineProjectLayoutValidator
                 layout.Id,
                 component.Id,
                 "Every layout component requires a name."));
+        }
+
+        if (component.UnitId is not null)
+        {
+            if (string.IsNullOrWhiteSpace(component.UnitId))
+            {
+                errors.Add(Error(
+                    MachineProjectLayoutValidationErrorCode.InvalidComponentUnitId,
+                    layout.Id,
+                    component.Id,
+                    "A component unit id must be null or name an existing unit."));
+            }
+            else if (!unitIds.Contains(component.UnitId))
+            {
+                errors.Add(Error(
+                    MachineProjectLayoutValidationErrorCode.ComponentUnitNotFound,
+                    layout.Id,
+                    component.Id,
+                    $"Component unit '{component.UnitId}' was not found."));
+            }
         }
 
         if (!Enum.IsDefined(component.Kind))
@@ -228,6 +262,125 @@ public sealed class MachineProjectLayoutValidator
                 component.Id,
                 "Component width and height must be finite and positive."));
         }
+
+        if (component.VerticalEnvelope is { } verticalEnvelope &&
+            (!double.IsFinite(verticalEnvelope.BaseElevation) ||
+             !double.IsFinite(verticalEnvelope.Height) ||
+             verticalEnvelope.Height <= 0))
+        {
+            errors.Add(Error(
+                MachineProjectLayoutValidationErrorCode.InvalidVerticalEnvelope,
+                layout.Id,
+                component.Id,
+                "Component vertical envelope must have a finite base elevation and positive finite height."));
+        }
+    }
+
+    private static HashSet<string> ValidateStations(
+        IReadOnlyCollection<MachineStationDefinition>? stations,
+        ICollection<MachineProjectLayoutValidationError> errors)
+    {
+        var stationIds = new HashSet<string>(StringComparer.Ordinal);
+        var unitIds = new HashSet<string>(StringComparer.Ordinal);
+        if (stations is null)
+        {
+            errors.Add(Error(
+                MachineProjectLayoutValidationErrorCode.StationsRequired,
+                null,
+                null,
+                "Station definitions cannot be null."));
+            return unitIds;
+        }
+
+        foreach (MachineStationDefinition? station in stations)
+        {
+            if (station is null)
+            {
+                errors.Add(Error(
+                    MachineProjectLayoutValidationErrorCode.StationIdRequired,
+                    null,
+                    null,
+                    "Station entries cannot be null."));
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(station.Id))
+            {
+                errors.Add(Error(
+                    MachineProjectLayoutValidationErrorCode.StationIdRequired,
+                    null,
+                    null,
+                    "Every station requires a stable id."));
+            }
+            else if (!stationIds.Add(station.Id))
+            {
+                errors.Add(Error(
+                    MachineProjectLayoutValidationErrorCode.DuplicateStationId,
+                    null,
+                    null,
+                    $"Station id '{station.Id}' is duplicated."));
+            }
+
+            if (string.IsNullOrWhiteSpace(station.Name))
+            {
+                errors.Add(Error(
+                    MachineProjectLayoutValidationErrorCode.StationNameRequired,
+                    null,
+                    null,
+                    $"Station '{station.Id}' requires a name."));
+            }
+
+            if (station.Units is null)
+            {
+                errors.Add(Error(
+                    MachineProjectLayoutValidationErrorCode.StationUnitsRequired,
+                    null,
+                    null,
+                    $"Station '{station.Id}' unit list cannot be null."));
+                continue;
+            }
+
+            foreach (MachineUnitDefinition? unit in station.Units)
+            {
+                if (unit is null)
+                {
+                    errors.Add(Error(
+                        MachineProjectLayoutValidationErrorCode.UnitIdRequired,
+                        null,
+                        null,
+                        $"Station '{station.Id}' contains a null unit."));
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(unit.Id))
+                {
+                    errors.Add(Error(
+                        MachineProjectLayoutValidationErrorCode.UnitIdRequired,
+                        null,
+                        null,
+                        $"Every unit in station '{station.Id}' requires a stable id."));
+                }
+                else if (!unitIds.Add(unit.Id))
+                {
+                    errors.Add(Error(
+                        MachineProjectLayoutValidationErrorCode.DuplicateUnitId,
+                        null,
+                        null,
+                        $"Unit id '{unit.Id}' is duplicated."));
+                }
+
+                if (string.IsNullOrWhiteSpace(unit.Name))
+                {
+                    errors.Add(Error(
+                        MachineProjectLayoutValidationErrorCode.UnitNameRequired,
+                        null,
+                        null,
+                        $"Unit '{unit.Id}' requires a name."));
+                }
+            }
+        }
+
+        return unitIds;
     }
 
     private static MachineProjectLayoutValidationError Error(

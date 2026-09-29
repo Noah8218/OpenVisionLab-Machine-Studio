@@ -18,6 +18,8 @@ internal sealed class SequenceStepEditorCollection : IDisposable
         SequenceStepAction.MoveAxis,
         SequenceStepAction.WaitAxisDone,
         SequenceStepAction.TriggerCamera,
+        SequenceStepAction.FeedWorkpiece,
+        SequenceStepAction.EjectWorkpiece,
         SequenceStepAction.WaitVisionResult,
         SequenceStepAction.CallSubsequence
     };
@@ -56,11 +58,13 @@ internal sealed class SequenceStepEditorCollection : IDisposable
     internal void Populate(
         SequenceDefinition sequence,
         IReadOnlyList<SequenceAuthoringTarget> authoringTargets,
+        IReadOnlyList<SequenceAuthoringTarget> workpieceTargets,
         IReadOnlyList<SequenceExpectedStateTarget> expectedStateTargets)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(sequence);
         ArgumentNullException.ThrowIfNull(authoringTargets);
+        ArgumentNullException.ThrowIfNull(workpieceTargets);
         ArgumentNullException.ThrowIfNull(expectedStateTargets);
 
         IReadOnlyList<SequenceAuthoringTarget> sequenceTargets =
@@ -74,6 +78,7 @@ internal sealed class SequenceStepEditorCollection : IDisposable
                 SupportedNonTerminalActions,
                 _templateCatalog,
                 sequenceTargets,
+                workpieceTargets,
                 expectedStateTargets);
             item.DefinitionChanged += OnStepDefinitionChanged;
             Items.Add(item);

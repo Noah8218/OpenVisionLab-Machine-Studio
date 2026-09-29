@@ -62,7 +62,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
     [
         nameof(ModeText), nameof(ModeTransitionStatusText), nameof(StateText),
         nameof(LeftPanelHeaderText), nameof(RightPanelHeaderText),
-        nameof(ProjectStatusText), nameof(SelectionStatusText),
+        nameof(ProjectStatusText), nameof(SelectionStatusText), nameof(NewProjectNameValidationText),
+        nameof(StationUnitValidationText), nameof(StationUnitRemovalHintText),
         nameof(SimulationStatusText), nameof(TickStatusText), nameof(FixedStepStatusText),
         nameof(RunStatusText), nameof(ControlOwnerHelpText), nameof(ControlOwnerText),
         nameof(SceneControlText), nameof(CurrentAxisName), nameof(CurrentAxisStateText),
@@ -136,19 +137,54 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
     private bool _pendingDesignMode;
     private int _modeTransitionGeneration;
     private bool _isApplyingProject;
+    private bool _isResolvingPlacementDraft;
     private bool _runtimeDefinitionDirty;
     private bool _sessionCloseRequested;
     private bool _disposed;
     private int _automaticExternalPublishInFlight;
+    private bool _isStationUnitEditorOpen;
+    private bool _isEquipmentComponentLibraryDialogOpen;
+    private bool _isNewProjectNameDialogOpen;
+    private bool _newProjectNameValidationAttempted;
+    private string _newProjectNameDraft = string.Empty;
+    private string _equipmentComponentLibraryDialogStatusText = string.Empty;
+    private bool _isCreatingNewStation;
+    private string _stationNameDraft = string.Empty;
+    private string _unitNameDraft = string.Empty;
+    private string? _selectedStationId;
+    private bool _isBulkMoveEditorOpen;
+    private bool _isEquipmentSinglePartCheckOpen;
+    private bool _isEquipmentDriveTabOpen;
+    private string _bulkMoveXText = "0";
+    private string _bulkMoveZText = "0";
 
     #endregion
 
     #region Command Backing Fields
 
     private ICommand? _newProjectCommand;
+    private ICommand? _confirmNewProjectNameCommand;
+    private ICommand? _cancelNewProjectNameCommand;
     private ICommand? _openProjectCommand;
     private ICommand? _saveProjectCommand;
     private ICommand? _saveProjectAsCommand;
+    private ICommand? _openStationUnitEditorCommand;
+    private ICommand? _addStationUnitCommand;
+    private ICommand? _cancelStationUnitEditorCommand;
+    private ICommand? _removeEquipmentUnitCommand;
+    private ICommand? _removeSelectedStationCommand;
+    private ICommand? _openBulkMoveEditorCommand;
+    private ICommand? _applyBulkMoveCommand;
+    private ICommand? _cancelBulkMoveCommand;
+    private ICommand? _openEquipmentPropertiesCommand;
+    private ICommand? _openEquipmentDriveTabCommand;
+    private ICommand? _openEquipmentSinglePartCheckCommand;
+    private ICommand? _addEquipmentLayoutComponentCommand;
+    private ICommand? _openEquipmentComponentLibraryDialogCommand;
+    private ICommand? _closeEquipmentComponentLibraryDialogCommand;
+    private ICommand? _addEquipmentComponentFromLibraryCommand;
+    private ICommand? _showEquipmentOverviewCommand;
+    private ICommand? _showEquipmentUnitCommand;
     private ICommand? _runCommand;
     private ICommand? _pauseCommand;
     private ICommand? _abortSequenceCommand;
@@ -180,11 +216,16 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         string? initialProjectPath = null,
         string? startupSamplePath = null,
         string? integrationSettingsPath = null,
-        TimeSpan? automaticExternalInspectionWallTimeout = null)
+        TimeSpan? automaticExternalInspectionWallTimeout = null,
+        string? largeLayoutSamplePath = null)
     {
         OpenVisionLanguageService.Load();
         UnsavedProjectPrompt = _mainMessageDialogHost.ShowUnsavedProjectPrompt;
+        PlacementDraftPrompt = _mainMessageDialogHost.ShowPlacementDraftPrompt;
         ProjectOpenFailurePresenter = _mainMessageDialogHost.ShowProjectOpenFailure;
+        LayoutComponentRemovalPrompt = _mainMessageDialogHost.ConfirmLayoutComponentRemoval;
+        EquipmentUnitRemovalPrompt = _mainMessageDialogHost.ConfirmEquipmentUnitRemoval;
+        EquipmentStationRemovalPrompt = _mainMessageDialogHost.ConfirmEquipmentStationRemoval;
         _simulationSession = new(
             SimulationFixedStep,
             automaticExternalInspectionWallTimeout);
@@ -209,15 +250,20 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
             HandleProjectSaveFailure,
             name => _projectFileDialogHost.SelectProjectSaveAs(name),
             fileName => _projectFileDialogHost.SelectRecipeCopyDestination(fileName),
-            () => OpenVisionLanguageService.T("Gallery.TemplateOverwriteRejected"));
+            () => OpenVisionLanguageService.T("Gallery.TemplateOverwriteRejected"),
+            largeLayoutSamplePath);
         _shellNavigation = new(
-            initialProject is null && _projectLifecycle.HasStartupSample,
+            initialProject is null,
             () => !_disposed && !_sessionCloseRequested && !_isApplyingProject && !IsValidationBusy,
             () => !_disposed && !_sessionCloseRequested && !_isApplyingProject && !IsValidationBusy &&
                   _projectLifecycle.HasStartupSample,
             OpenBundledSampleAsync,
             OnBlankLayoutStarted,
-            HandleCommandException);
+            HandleCommandException,
+            canOpenLargeLayoutSample: () => !_disposed && !_sessionCloseRequested && !_isApplyingProject && !IsValidationBusy &&
+                                            _projectLifecycle.HasLargeLayoutSample,
+            openLargeLayoutSampleAsync: OpenLargeLayoutSampleAsync,
+            resolvePendingPlacementDraft: TryResolvePendingPlacementDraft);
         _shellNavigation.PropertyChanged += OnShellNavigationPropertyChanged;
         _shellNavigation.LanguageChanged += OnLanguageChanged;
         var initialRuntime = BuildRuntimeConfiguration(CurrentProject);
@@ -261,8 +307,9 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
             HandleCommandException);
 
         ProjectTree = new ProjectTreeViewModel();
+        ProjectTree.ResolvePendingPlacementDraft = TryResolvePendingPlacementDraft;
         Properties = new PropertiesViewModel();
-        Layout = new MachineLayoutViewModel();
+        Layout = new MachineLayoutViewModel(TryResolvePendingPlacementDraft);
         _manualEquipment = new(
             _equipmentCommandDispatcher,
             CreateManualEquipmentProjection,
@@ -518,6 +565,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         _layoutAuthoring = new LayoutAuthoringWorkspace(
             Layout,
             () => CurrentProject,
+            ResolveLayoutAuthoringUnitId,
             () => IsSceneEditable,
             () => _isApplyingProject,
             () => !_disposed && !_sessionCloseRequested,
@@ -533,7 +581,9 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
                 }
             },
             _runtimeObservabilityJournal.Log,
-            OnLayoutDefinitionChanged);
+            OnLayoutDefinitionChanged,
+            (components, impacts) => LayoutComponentRemovalPrompt(components, impacts),
+            TryResolvePendingPlacementDraft);
         _runtimeProjectionCoordinator = new(
             MultiAxisCommissioningRecipe,
             SimulationWorkspace,
@@ -598,6 +648,10 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         finally
         {
             _isApplyingProject = false;
+        }
+        if (initialProject is null)
+        {
+            SimulationWorkspace.SaveProjectScenario(CurrentProject.Simulation);
         }
         AcceptCurrentProjectAsSaved();
         _runtimeObservabilityJournal.Log("System", "Deterministic machine runtime ready · fixed step 5 ms");
@@ -821,7 +875,11 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         _camera.GetSelectedDefinition(RuntimeProjection.CurrentCamera?.Id);
 
     internal Func<UnsavedProjectDecision> UnsavedProjectPrompt { get; set; }
+    internal Func<PlacementDraftDecision> PlacementDraftPrompt { get; set; }
     internal Action<string> ProjectOpenFailurePresenter { get; set; }
+    internal Func<IReadOnlyList<LayoutComponentDefinition>, IReadOnlyList<LayoutComponentRemovalImpact>, bool> LayoutComponentRemovalPrompt { get; set; }
+    internal Func<MachineStationDefinition, MachineUnitDefinition, bool> EquipmentUnitRemovalPrompt { get; set; }
+    internal Func<MachineStationDefinition, bool> EquipmentStationRemovalPrompt { get; set; }
     internal string? CurrentProjectPath => _projectLifecycle.CurrentPath;
     internal bool IsSessionCloseRequested => _sessionCloseRequested;
 
@@ -882,7 +940,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
                 return;
             }
 
-            if (value && IsRunning)
+            if (value && IsRunMode)
             {
                 BeginDesignModeTransition();
                 return;
@@ -932,6 +990,251 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
 
     public bool IsStartupChoiceVisible => Navigation.IsStartupChoiceVisible;
 
+    public bool IsNewProjectNameDialogOpen
+    {
+        get => _isNewProjectNameDialogOpen;
+        private set
+        {
+            if (!SetProperty(ref _isNewProjectNameDialogOpen, value)) return;
+            RaiseCanExecuteChanged(_newProjectCommand);
+            RaiseCanExecuteChanged(_confirmNewProjectNameCommand);
+            RaiseCanExecuteChanged(_cancelNewProjectNameCommand);
+        }
+    }
+
+    public string NewProjectNameDraft
+    {
+        get => _newProjectNameDraft;
+        set
+        {
+            if (!SetProperty(ref _newProjectNameDraft, value ?? string.Empty)) return;
+            if (_newProjectNameValidationAttempted)
+            {
+                OnPropertyChanged(nameof(NewProjectNameValidationText));
+                OnPropertyChanged(nameof(HasNewProjectNameValidationError));
+            }
+        }
+    }
+
+    public bool HasNewProjectNameValidationError => _newProjectNameValidationAttempted
+        && !ProjectLifecycleCoordinator.TryNormalizeNewProjectName(NewProjectNameDraft, out _);
+
+    public string NewProjectNameValidationText => !HasNewProjectNameValidationError
+        ? string.Empty
+        : string.IsNullOrWhiteSpace(NewProjectNameDraft)
+            ? OpenVisionLanguageService.T("Project.NewRecipeNameRequired")
+            : OpenVisionLanguageService.T("Project.NewRecipeNameTooLong");
+
+    public bool IsStationUnitEditorOpen
+    {
+        get => _isStationUnitEditorOpen;
+        private set
+        {
+            if (!SetProperty(ref _isStationUnitEditorOpen, value)) return;
+            OnPropertyChanged(nameof(StationUnitValidationText));
+            OnPropertyChanged(nameof(StationUnitRemovalHintText));
+            OnPropertyChanged(nameof(HasSelectedStationChildren));
+            RaiseCanExecuteChanged(_addStationUnitCommand);
+            RaiseCanExecuteChanged(_cancelStationUnitEditorCommand);
+            RaiseCanExecuteChanged(_removeEquipmentUnitCommand);
+            RaiseCanExecuteChanged(_removeSelectedStationCommand);
+            RaiseCanExecuteChanged(_openStationUnitEditorCommand);
+            RaiseCanExecuteChanged(_openBulkMoveEditorCommand);
+            RaiseCanExecuteChanged(_openEquipmentPropertiesCommand);
+            RaiseCanExecuteChanged(_openEquipmentDriveTabCommand);
+            RaiseCanExecuteChanged(_openEquipmentSinglePartCheckCommand);
+            RaiseCanExecuteChanged(_addEquipmentLayoutComponentCommand);
+            RaiseCanExecuteChanged(_removeEquipmentUnitCommand);
+        }
+    }
+
+    public bool IsEquipmentComponentLibraryDialogOpen
+    {
+        get => _isEquipmentComponentLibraryDialogOpen;
+        private set
+        {
+            if (!SetProperty(ref _isEquipmentComponentLibraryDialogOpen, value)) return;
+            if (!value) EquipmentComponentLibraryDialogStatusText = string.Empty;
+            RaiseCanExecuteChanged(_openEquipmentComponentLibraryDialogCommand);
+            RaiseCanExecuteChanged(_closeEquipmentComponentLibraryDialogCommand);
+            RaiseCanExecuteChanged(_addEquipmentComponentFromLibraryCommand);
+        }
+    }
+
+    public string EquipmentComponentLibraryDialogStatusText
+    {
+        get => _equipmentComponentLibraryDialogStatusText;
+        private set => SetProperty(ref _equipmentComponentLibraryDialogStatusText, value ?? string.Empty);
+    }
+
+    public bool IsBulkMoveEditorOpen
+    {
+        get => _isBulkMoveEditorOpen;
+        private set
+        {
+            if (!SetProperty(ref _isBulkMoveEditorOpen, value)) return;
+            RaiseCanExecuteChanged(_openBulkMoveEditorCommand);
+            RaiseCanExecuteChanged(_applyBulkMoveCommand);
+            RaiseCanExecuteChanged(_cancelBulkMoveCommand);
+            RaiseCanExecuteChanged(_removeEquipmentUnitCommand);
+            RaiseCanExecuteChanged(_removeSelectedStationCommand);
+            RaiseCanExecuteChanged(_openStationUnitEditorCommand);
+            RaiseCanExecuteChanged(_openEquipmentPropertiesCommand);
+            RaiseCanExecuteChanged(_openEquipmentDriveTabCommand);
+            RaiseCanExecuteChanged(_openEquipmentSinglePartCheckCommand);
+            RaiseCanExecuteChanged(_addEquipmentLayoutComponentCommand);
+        }
+    }
+
+    public bool IsEquipmentSinglePartCheckOpen
+    {
+        get => _isEquipmentSinglePartCheckOpen;
+        private set
+        {
+            if (!SetProperty(ref _isEquipmentSinglePartCheckOpen, value)) return;
+            OnPropertyChanged(nameof(RightPanelHeaderText));
+        }
+    }
+
+    public bool IsEquipmentDriveTabOpen
+    {
+        get => _isEquipmentDriveTabOpen;
+        private set => SetProperty(ref _isEquipmentDriveTabOpen, value);
+    }
+
+    public string BulkMoveXText
+    {
+        get => _bulkMoveXText;
+        set
+        {
+            if (!SetProperty(ref _bulkMoveXText, value ?? string.Empty)) return;
+            OnPropertyChanged(nameof(BulkMoveValidationText));
+            RaiseCanExecuteChanged(_applyBulkMoveCommand);
+        }
+    }
+
+    public string BulkMoveZText
+    {
+        get => _bulkMoveZText;
+        set
+        {
+            if (!SetProperty(ref _bulkMoveZText, value ?? string.Empty)) return;
+            OnPropertyChanged(nameof(BulkMoveValidationText));
+            RaiseCanExecuteChanged(_applyBulkMoveCommand);
+        }
+    }
+
+    public string BulkMoveTitleText => string.Format(
+        CultureInfo.CurrentCulture,
+        OpenVisionLanguageService.T("Equipment.BulkMoveTitle"),
+        Layout.SelectionCount);
+
+    public string BulkMoveValidationText => TryGetBulkMoveOffsets(out _, out _)
+        ? string.Empty
+        : OpenVisionLanguageService.T("Equipment.BulkMoveInvalid");
+
+    public bool IsCreatingNewStation
+    {
+        get => _isCreatingNewStation;
+        set
+        {
+            if (!SetProperty(ref _isCreatingNewStation, value)) return;
+            OnPropertyChanged(nameof(StationUnitValidationText));
+            OnPropertyChanged(nameof(StationUnitRemovalHintText));
+            OnPropertyChanged(nameof(HasSelectedStationChildren));
+            RaiseCanExecuteChanged(_addStationUnitCommand);
+            RaiseCanExecuteChanged(_removeSelectedStationCommand);
+        }
+    }
+
+    public string StationNameDraft
+    {
+        get => _stationNameDraft;
+        set
+        {
+            if (!SetProperty(ref _stationNameDraft, value ?? string.Empty)) return;
+            OnPropertyChanged(nameof(StationUnitValidationText));
+            RaiseCanExecuteChanged(_addStationUnitCommand);
+        }
+    }
+
+    public string UnitNameDraft
+    {
+        get => _unitNameDraft;
+        set
+        {
+            if (!SetProperty(ref _unitNameDraft, value ?? string.Empty)) return;
+            OnPropertyChanged(nameof(StationUnitValidationText));
+            RaiseCanExecuteChanged(_addStationUnitCommand);
+        }
+    }
+
+    public string? SelectedStationId
+    {
+        get => _selectedStationId;
+        set
+        {
+            if (!SetProperty(ref _selectedStationId, value)) return;
+            OnPropertyChanged(nameof(StationUnitValidationText));
+            OnPropertyChanged(nameof(StationUnitRemovalHintText));
+            OnPropertyChanged(nameof(HasSelectedStationChildren));
+            RaiseCanExecuteChanged(_addStationUnitCommand);
+            RaiseCanExecuteChanged(_removeSelectedStationCommand);
+        }
+    }
+
+    public IReadOnlyList<MachineStationDefinition> ProjectStations => CurrentProject.Stations;
+
+    public string StationUnitValidationText
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(UnitNameDraft) || UnitNameDraft.Trim().Length > 80)
+            {
+                return OpenVisionLanguageService.T("Equipment.StationUnitUnitNameRequired");
+            }
+
+            if (IsCreatingNewStation)
+            {
+                return string.IsNullOrWhiteSpace(StationNameDraft) || StationNameDraft.Trim().Length > 80
+                    ? OpenVisionLanguageService.T("Equipment.StationUnitStationNameRequired")
+                    : string.Empty;
+            }
+
+            return ProjectStations.Any(station => string.Equals(station.Id, SelectedStationId, StringComparison.Ordinal))
+                ? string.Empty
+                : OpenVisionLanguageService.T("Equipment.StationUnitStationRequired");
+        }
+    }
+
+    public string StationUnitRemovalHintText
+    {
+        get
+        {
+            var station = SelectedExistingStation;
+            return station is { Units.Count: > 0 }
+                ? string.Format(CultureInfo.CurrentCulture,
+                    OpenVisionLanguageService.T("Equipment.StationRemovalRequiresEmpty"), station.Units.Count)
+                : string.Empty;
+        }
+    }
+
+    public bool HasSelectedStationChildren => SelectedExistingStation is { Units.Count: > 0 };
+
+    private MachineStationDefinition? SelectedExistingStation => !IsCreatingNewStation
+        ? ProjectStations.FirstOrDefault(station => string.Equals(station.Id, SelectedStationId, StringComparison.Ordinal))
+        : null;
+
+    private bool CanRemoveSelectedStation => IsStationUnitEditorOpen
+        && IsSceneEditable
+        && (Navigation.IsEquipmentWorkspace || Navigation.IsSimulationWorkspace)
+        && !IsCreatingNewStation
+        && !IsBulkMoveEditorOpen
+        && !_isApplyingProject
+        && !_sessionCloseRequested
+        && !_disposed
+        && SelectedExistingStation is { Units.Count: 0 };
+
     public bool HasProcessPlanReturnContext => _recipeAuthoring.ProcessPlanReview.HasReturnContext;
     public string? ProcessPlanReturnStepId => _recipeAuthoring.ProcessPlanReview.ReturnStepId;
     public string ProcessPlanReviewPositionText => _recipeAuthoring.ProcessPlanReview.ReviewPositionText;
@@ -959,6 +1262,14 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
     private SimulationSnapshot PresentationSnapshot =>
         SceneSnapshotSource.Latest ?? SceneSnapshots.Latest ?? _simulationSession.Engine.CurrentSnapshot;
     public bool IsSceneEditable => IsDesignMode && !DryRunPlayback.IsActive;
+    private bool CanAddStationUnit => IsStationUnitEditorOpen
+        && IsSceneEditable
+        && Navigation.IsEquipmentWorkspace
+        && !IsBulkMoveEditorOpen
+        && !_isApplyingProject
+        && !_sessionCloseRequested
+        && !_disposed
+        && string.IsNullOrEmpty(StationUnitValidationText);
     public bool IsDryRunPlaybackActive => DryRunPlayback.IsActive;
     public string DryRunPlaybackTitleText => DryRunPlayback.TitleText;
     public string DryRunPlaybackDetailText => DryRunPlayback.DetailText;
@@ -1129,10 +1440,10 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
     public string StateText => IsRunning
         ? OpenVisionLanguageService.T("Shell.Running")
         : OpenVisionLanguageService.T("Shell.Paused");
-    public string LeftPanelHeaderText => IsRunMode
-        ? OpenVisionLanguageService.T("Shell.RunSummary")
-        : OpenVisionLanguageService.T("Shell.Project");
-    public string RightPanelHeaderText => IsRunMode
+    public string LeftPanelHeaderText => OpenVisionLanguageService.T("Shell.Project");
+    public string RightPanelHeaderText => IsEquipmentSinglePartCheckOpen
+        ? OpenVisionLanguageService.T("Equipment.SinglePartCheck")
+        : IsRunMode
         ? OpenVisionLanguageService.T("Shell.Runtime")
         : OpenVisionLanguageService.T("Shell.Properties");
     public string ProjectStatusText => string.Format(
@@ -1390,10 +1701,19 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
 
     public ICommand OpenBundledSampleCommand => Navigation.OpenBundledSampleCommand;
 
-    public ICommand NewProjectCommand => _newProjectCommand ??= CreateAsyncCommand(async _ =>
-    {
-        await CreateNewProjectAsync();
-    }, _ => !_isApplyingProject && !IsValidationBusy);
+    public ICommand OpenLargeLayoutSampleCommand => Navigation.OpenLargeLayoutSampleCommand;
+
+    public ICommand NewProjectCommand => _newProjectCommand ??= CreateRelayCommand(
+        _ => OpenNewProjectNameDialog(),
+        _ => !_isApplyingProject && !IsValidationBusy && !IsNewProjectNameDialogOpen);
+
+    public ICommand ConfirmNewProjectNameCommand => _confirmNewProjectNameCommand ??= CreateAsyncCommand(
+        async _ => await ConfirmNewProjectNameAsync(),
+        _ => IsNewProjectNameDialogOpen && !_isApplyingProject && !IsValidationBusy);
+
+    public ICommand CancelNewProjectNameCommand => _cancelNewProjectNameCommand ??= CreateRelayCommand(
+        _ => CloseNewProjectNameDialog(),
+        _ => IsNewProjectNameDialogOpen);
 
     public ICommand OpenProjectCommand => _openProjectCommand ??= CreateAsyncCommand(async _ =>
     {
@@ -1408,11 +1728,11 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
     public ICommand SaveProjectCommand => _saveProjectCommand ??= CreateAsyncCommand(async _ =>
     {
         await TrySaveCurrentProjectAsync();
-    }, _ => !_isApplyingProject && !IsValidationBusy && !string.IsNullOrWhiteSpace(CurrentProject.Name));
+    }, _ => !IsStartupChoiceVisible && !_isApplyingProject && !IsValidationBusy && !string.IsNullOrWhiteSpace(CurrentProject.Name));
 
     public ICommand SaveProjectAsCommand => _saveProjectAsCommand ??= CreateAsyncCommand(
         async _ => await TrySaveCurrentProjectAsync(saveAs: true),
-        _ => !_isApplyingProject && !IsValidationBusy && !string.IsNullOrWhiteSpace(CurrentProject.Name));
+        _ => !IsStartupChoiceVisible && !_isApplyingProject && !IsValidationBusy && !string.IsNullOrWhiteSpace(CurrentProject.Name));
 
     public ICommand RunCommand => _runCommand ??= CreateAsyncCommand(
         async _ =>
@@ -1420,7 +1740,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
             _multiAxisCommissioningExecutionWorkflow.InvalidatePendingExecution();
             await _simulationSession.RunControl.RunAsync();
         },
-        _ => !_isModeTransitioning && _simulationSession.RunControl.CanRun());
+        _ => !IsStartupChoiceVisible && !_isModeTransitioning && _simulationSession.RunControl.CanRun());
 
     public ICommand PauseCommand => _pauseCommand ??= CreateAsyncCommand(
         async _ =>
@@ -1446,7 +1766,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
             _multiAxisCommissioningExecutionWorkflow.InvalidatePendingExecution();
             await _simulationSession.RunControl.StepAsync();
         },
-        _ => _simulationSession.RunControl.CanStep());
+        _ => !IsStartupChoiceVisible && _simulationSession.RunControl.CanStep());
 
     public ICommand ResetCommand => _resetCommand ??= CreateAsyncCommand(
         async _ =>
@@ -1454,7 +1774,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
             _multiAxisCommissioningExecutionWorkflow.InvalidatePendingExecution();
             await _simulationSession.RunControl.ResetAsync();
         },
-        _ => _simulationSession.RunControl.CanReset());
+        _ => !IsStartupChoiceVisible && _simulationSession.RunControl.CanReset());
 
     public ICommand StartTestScenarioCommand => _startTestScenarioCommand ??= CreateAsyncCommand(
         async _ => await _simulationScenarioExecutionCoordinator.StartAsync(),
@@ -1622,6 +1942,139 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
 
     public ICommand AddLayoutComponentCommand => _layoutAuthoring.AddLayoutComponentCommand;
 
+    public ICommand AddEquipmentLayoutComponentCommand => _addEquipmentLayoutComponentCommand ??= CreateRelayCommand(
+        AddEquipmentLayoutComponent,
+        _ => IsSceneEditable && Navigation.IsEquipmentWorkspace && !IsStationUnitEditorOpen && !IsBulkMoveEditorOpen);
+
+    public ICommand OpenEquipmentComponentLibraryDialogCommand => _openEquipmentComponentLibraryDialogCommand ??= CreateRelayCommand(
+        _ => OpenEquipmentComponentLibraryDialog(),
+        _ => IsSceneEditable && Navigation.IsEquipmentWorkspace && !IsEquipmentComponentLibraryDialogOpen
+            && !IsStationUnitEditorOpen && !IsBulkMoveEditorOpen);
+
+    public ICommand CloseEquipmentComponentLibraryDialogCommand => _closeEquipmentComponentLibraryDialogCommand ??= CreateRelayCommand(
+        _ => IsEquipmentComponentLibraryDialogOpen = false,
+        _ => IsEquipmentComponentLibraryDialogOpen);
+
+    public ICommand AddEquipmentComponentFromLibraryCommand => _addEquipmentComponentFromLibraryCommand ??= CreateRelayCommand(
+        AddEquipmentComponentFromLibrary,
+        parameter => IsEquipmentComponentLibraryDialogOpen
+            && IsSceneEditable
+            && Navigation.IsEquipmentWorkspace
+            && !IsStationUnitEditorOpen
+            && !IsBulkMoveEditorOpen
+            && parameter is LayoutComponentKind kind
+            && Layout.FilteredLibraryItems.Any(item => item.Kind == kind)
+            && AddEquipmentLayoutComponentCommand.CanExecute(kind));
+
+    public ICommand ShowEquipmentOverviewCommand => _showEquipmentOverviewCommand ??= CreateRelayCommand(
+        _ =>
+        {
+            if (!TryResolvePendingPlacementDraft()) return;
+            _selectionSynchronization.ClearSelection();
+            Layout.ShowOverview();
+            Navigation.IsInspectorOpen = false;
+            IsBulkMoveEditorOpen = false;
+        });
+
+    public ICommand ShowEquipmentUnitCommand => _showEquipmentUnitCommand ??= CreateRelayCommand(
+        parameter =>
+        {
+            if (parameter is not string unitId || string.IsNullOrWhiteSpace(unitId))
+            {
+                return;
+            }
+
+            if (!TryResolvePendingPlacementDraft()) return;
+            _selectionSynchronization.ClearSelection();
+            Layout.ShowUnit(unitId);
+            Navigation.IsInspectorOpen = false;
+            IsBulkMoveEditorOpen = false;
+        });
+
+    public ICommand OpenStationUnitEditorCommand => _openStationUnitEditorCommand ??= CreateRelayCommand(
+        _ => OpenStationUnitEditor(),
+        _ => IsSceneEditable
+            && (Navigation.IsEquipmentWorkspace || Navigation.IsSimulationWorkspace)
+            && !IsStationUnitEditorOpen
+            && !IsBulkMoveEditorOpen);
+
+    public ICommand AddStationUnitCommand => _addStationUnitCommand ??= CreateRelayCommand(
+        _ => AddStationUnit(),
+        _ => CanAddStationUnit);
+
+    public ICommand CancelStationUnitEditorCommand => _cancelStationUnitEditorCommand ??= CreateRelayCommand(
+        _ => CancelStationUnitEditor(),
+        _ => IsStationUnitEditorOpen);
+
+    public ICommand RemoveEquipmentUnitCommand => _removeEquipmentUnitCommand ??= CreateRelayCommand(
+        RemoveEquipmentUnit,
+        CanRemoveEquipmentUnit);
+
+    public ICommand RemoveSelectedStationCommand => _removeSelectedStationCommand ??= CreateRelayCommand(
+        _ => RemoveSelectedStation(),
+        _ => CanRemoveSelectedStation);
+
+    public ICommand OpenBulkMoveEditorCommand => _openBulkMoveEditorCommand ??= CreateRelayCommand(
+        _ => OpenBulkMoveEditor(),
+        _ => IsSceneEditable
+            && Navigation.IsEquipmentWorkspace
+            && Layout.HasSelection
+            && !IsStationUnitEditorOpen
+            && !IsBulkMoveEditorOpen);
+
+    public ICommand OpenEquipmentPropertiesCommand => _openEquipmentPropertiesCommand ??= CreateRelayCommand(
+        _ =>
+        {
+            if (!TryResolvePendingPlacementDraft()) return;
+            IsEquipmentSinglePartCheckOpen = false;
+            IsEquipmentDriveTabOpen = false;
+            Navigation.IsInspectorOpen = true;
+        },
+        _ => IsSceneEditable
+            && Navigation.IsEquipmentWorkspace
+            && Layout.HasSelection
+            && !IsStationUnitEditorOpen
+            && !IsBulkMoveEditorOpen);
+
+    public ICommand OpenEquipmentDriveTabCommand => _openEquipmentDriveTabCommand ??= CreateRelayCommand(
+        _ =>
+        {
+            if (!TryResolvePendingPlacementDraft()) return;
+            IsEquipmentSinglePartCheckOpen = false;
+            IsEquipmentDriveTabOpen = true;
+            Navigation.IsInspectorOpen = true;
+        },
+        _ => IsSceneEditable
+            && Navigation.IsEquipmentWorkspace
+            && Layout.HasSelection
+            && !IsStationUnitEditorOpen
+            && !IsBulkMoveEditorOpen);
+
+    public ICommand OpenEquipmentSinglePartCheckCommand => _openEquipmentSinglePartCheckCommand ??= CreateRelayCommand(
+        _ =>
+        {
+            if (!TryResolvePendingPlacementDraft()) return;
+            IsEquipmentSinglePartCheckOpen = true;
+            IsEquipmentDriveTabOpen = false;
+            Navigation.IsInspectorOpen = true;
+        },
+        _ => IsSceneEditable
+            && Navigation.IsEquipmentWorkspace
+            && Layout.SelectionCount == 1
+            && !IsStationUnitEditorOpen
+            && !IsBulkMoveEditorOpen);
+
+    public ICommand ApplyBulkMoveCommand => _applyBulkMoveCommand ??= CreateRelayCommand(
+        _ => ApplyBulkMove(),
+        _ => IsBulkMoveEditorOpen
+            && IsSceneEditable
+            && Layout.HasSelection
+            && TryGetBulkMoveOffsets(out var ignoredX, out var ignoredZ));
+
+    public ICommand CancelBulkMoveCommand => _cancelBulkMoveCommand ??= CreateRelayCommand(
+        _ => IsBulkMoveEditorOpen = false,
+        _ => IsBulkMoveEditorOpen);
+
     public ICommand DeleteLayoutComponentCommand => _layoutAuthoring.DeleteLayoutComponentCommand;
 
     public ICommand SceneSelectionRequestedCommand => _layoutAuthoring.SceneSelectionRequestedCommand;
@@ -1668,14 +2121,95 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
 
     #region Project File Operations
 
-    internal Task<bool> OpenProjectAsync(string path) =>
-        _projectLifecycle.OpenProjectAsync(path);
+    private bool TryResolvePendingPlacementDraft()
+    {
+        var editor = Layout?.SelectedComponentEditor;
+        if (editor is null || !editor.HasPendingInspectorDraft) return true;
+        if (_isResolvingPlacementDraft) return false;
 
-    internal Task<bool> OpenProjectReplacingCurrentAsync(string path) =>
-        _projectLifecycle.OpenProjectReplacingCurrentAsync(path);
+        _isResolvingPlacementDraft = true;
+        try
+        {
+            switch (PlacementDraftPrompt())
+            {
+                case PlacementDraftDecision.Apply:
+                    return editor.TryApplyInspectorDraft();
+                case PlacementDraftDecision.Discard:
+                    editor.DiscardInspectorDraft();
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        finally
+        {
+            _isResolvingPlacementDraft = false;
+        }
+    }
 
-    internal Task<bool> CreateNewProjectAsync() =>
-        _projectLifecycle.CreateNewProjectAsync();
+    internal Task<bool> OpenProjectAsync(string path) => TryResolvePendingPlacementDraft()
+        ? _projectLifecycle.OpenProjectAsync(path)
+        : Task.FromResult(false);
+
+    internal Task<bool> OpenProjectReplacingCurrentAsync(string path) => TryResolvePendingPlacementDraft()
+        ? _projectLifecycle.OpenProjectReplacingCurrentAsync(path)
+        : Task.FromResult(false);
+
+    internal Task<bool> CreateNewProjectAsync() => TryResolvePendingPlacementDraft()
+        ? _projectLifecycle.CreateNewProjectAsync()
+        : Task.FromResult(false);
+
+    internal Task<bool> CreateNewProjectAsync(string? name)
+    {
+        if (!ProjectLifecycleCoordinator.TryNormalizeNewProjectName(name, out var normalizedName)
+            || !TryResolvePendingPlacementDraft())
+        {
+            return Task.FromResult(false);
+        }
+
+        return _projectLifecycle.CreateNewProjectAsync(normalizedName);
+    }
+
+    internal async Task<bool> ConfirmNewProjectNameAsync()
+    {
+        if (!IsNewProjectNameDialogOpen || _disposed || _isApplyingProject || IsValidationBusy)
+        {
+            return false;
+        }
+
+        _newProjectNameValidationAttempted = true;
+        OnPropertyChanged(nameof(NewProjectNameValidationText));
+        OnPropertyChanged(nameof(HasNewProjectNameValidationError));
+        if (!ProjectLifecycleCoordinator.TryNormalizeNewProjectName(NewProjectNameDraft, out var name))
+        {
+            return false;
+        }
+
+        if (!await CreateNewProjectAsync(name))
+        {
+            return false;
+        }
+
+        CloseNewProjectNameDialog();
+        return true;
+    }
+
+    private void OpenNewProjectNameDialog()
+    {
+        _newProjectNameValidationAttempted = false;
+        OnPropertyChanged(nameof(NewProjectNameValidationText));
+        OnPropertyChanged(nameof(HasNewProjectNameValidationError));
+        NewProjectNameDraft = OpenVisionLanguageService.T("Project.NewRecipeDefaultName");
+        IsNewProjectNameDialogOpen = true;
+    }
+
+    private void CloseNewProjectNameDialog()
+    {
+        _newProjectNameValidationAttempted = false;
+        IsNewProjectNameDialogOpen = false;
+        OnPropertyChanged(nameof(NewProjectNameValidationText));
+        OnPropertyChanged(nameof(HasNewProjectNameValidationError));
+    }
 
     private void OnBlankLayoutStarted()
     {
@@ -1688,23 +2222,31 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         InvalidateCommands();
     }
 
-    private Task OpenBundledSampleAsync() =>
-        _projectLifecycle.OpenBundledSampleAsync();
+    private Task OpenBundledSampleAsync() => TryResolvePendingPlacementDraft()
+        ? _projectLifecycle.OpenBundledSampleAsync()
+        : Task.CompletedTask;
 
-    internal Task SaveProjectAsync(string path) =>
-        _projectLifecycle.SaveProjectAsync(path);
+    private Task OpenLargeLayoutSampleAsync() => TryResolvePendingPlacementDraft()
+        ? _projectLifecycle.OpenLargeLayoutSampleAsync()
+        : Task.CompletedTask;
+
+    internal Task SaveProjectAsync(string path) => TryResolvePendingPlacementDraft()
+        ? _projectLifecycle.SaveProjectAsync(path)
+        : Task.FromException(new OperationCanceledException("Placement changes remain unapplied."));
 
     private Task<bool> CreateSemiconductorRecipeCopyAsync(
         SemiconductorRecipeGalleryItemViewModel recipe,
         string? destinationPath) => CreateSemiconductorRecipeCopyCoreAsync(recipe, destinationPath);
 
-    private Task<bool> TrySaveCurrentProjectAsync(bool saveAs = false) =>
-        _projectLifecycle.TrySaveCurrentProjectAsync(saveAs);
+    private Task<bool> TrySaveCurrentProjectAsync(bool saveAs = false) => TryResolvePendingPlacementDraft()
+        ? _projectLifecycle.TrySaveCurrentProjectAsync(saveAs)
+        : Task.FromResult(false);
 
     private async Task<bool> CreateSemiconductorRecipeCopyCoreAsync(
         SemiconductorRecipeGalleryItemViewModel recipe,
         string? destinationPath)
     {
+        if (!TryResolvePendingPlacementDraft()) return false;
         var copied = await _projectLifecycle.CreateSemiconductorRecipeCopyAsync(recipe, destinationPath);
         if (!copied)
         {
@@ -1722,6 +2264,289 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
     #endregion
 
     #region Layout Authoring And Scene Interaction
+
+    private void OpenStationUnitEditor()
+    {
+        if (!IsSceneEditable
+            || (!Navigation.IsEquipmentWorkspace && !Navigation.IsSimulationWorkspace)
+            || !TryResolvePendingPlacementDraft())
+        {
+            return;
+        }
+
+        IsEquipmentSinglePartCheckOpen = false;
+        var firstStation = CurrentProject.Stations.FirstOrDefault();
+        IsCreatingNewStation = firstStation is null;
+        SelectedStationId = firstStation?.Id;
+        StationNameDraft = OpenVisionLanguageService.T(
+            "Equipment.StationUnitDefaultStation",
+            "새 스테이션",
+            "New station");
+        UnitNameDraft = OpenVisionLanguageService.T(
+            "Equipment.StationUnitDefaultUnit",
+            "새 유닛",
+            "New unit");
+        OnPropertyChanged(nameof(ProjectStations));
+        IsStationUnitEditorOpen = true;
+    }
+
+    private void OpenEquipmentComponentLibraryDialog()
+    {
+        if (!IsSceneEditable || !Navigation.IsEquipmentWorkspace || IsEquipmentComponentLibraryDialogOpen
+            || IsStationUnitEditorOpen || IsBulkMoveEditorOpen)
+        {
+            return;
+        }
+
+        if (ResolveActiveEquipmentUnitId() is null)
+        {
+            OpenStationUnitEditor();
+            return;
+        }
+
+        if (!TryResolvePendingPlacementDraft()) return;
+        Layout.LibrarySearchText = string.Empty;
+        EquipmentComponentLibraryDialogStatusText = string.Empty;
+        IsEquipmentComponentLibraryDialogOpen = true;
+    }
+
+    private void AddEquipmentComponentFromLibrary(object? parameter)
+    {
+        if (!IsEquipmentComponentLibraryDialogOpen
+            || !IsSceneEditable
+            || !Navigation.IsEquipmentWorkspace
+            || IsStationUnitEditorOpen
+            || IsBulkMoveEditorOpen
+            || parameter is not LayoutComponentKind kind
+            || !AddEquipmentLayoutComponentCommand.CanExecute(kind)
+            || !Layout.FilteredLibraryItems.Any(item => item.Kind == kind))
+        {
+            return;
+        }
+
+        var componentCountBefore = CurrentProject.Layouts.Sum(layout => layout.Components.Count);
+        var statusBefore = StatusMessage;
+        AddEquipmentLayoutComponentCommand.Execute(kind);
+        if (CurrentProject.Layouts.Sum(layout => layout.Components.Count) > componentCountBefore)
+        {
+            IsEquipmentComponentLibraryDialogOpen = false;
+        }
+        else if (!string.Equals(StatusMessage, statusBefore, StringComparison.Ordinal))
+        {
+            EquipmentComponentLibraryDialogStatusText = StatusMessage;
+        }
+    }
+
+    private void AddEquipmentLayoutComponent(object? parameter)
+    {
+        if (!TryResolvePendingPlacementDraft()) return;
+        if (ResolveActiveEquipmentUnitId() is null)
+        {
+            StatusMessage = OpenVisionLanguageService.T("Equipment.LibraryUnitRequired");
+            OpenStationUnitEditor();
+            return;
+        }
+
+        if (AddLayoutComponentCommand.CanExecute(parameter))
+        {
+            AddLayoutComponentCommand.Execute(parameter);
+        }
+    }
+
+    private void AddStationUnit()
+    {
+        if (!CanAddStationUnit)
+        {
+            return;
+        }
+
+        MachineStationDefinition station;
+        if (IsCreatingNewStation)
+        {
+            station = new MachineStationDefinition
+            {
+                Id = Guid.NewGuid().ToString("n"),
+                Name = StationNameDraft.Trim()
+            };
+            CurrentProject.Stations.Add(station);
+        }
+        else
+        {
+            var existingStation = CurrentProject.Stations.FirstOrDefault(item =>
+                string.Equals(item.Id, SelectedStationId, StringComparison.Ordinal));
+            if (existingStation is null)
+            {
+                OnPropertyChanged(nameof(StationUnitValidationText));
+                RaiseCanExecuteChanged(_addStationUnitCommand);
+                return;
+            }
+
+            station = existingStation;
+        }
+
+        var unit = new MachineUnitDefinition
+        {
+            Id = Guid.NewGuid().ToString("n"),
+            Name = UnitNameDraft.Trim()
+        };
+        station.Units.Add(unit);
+
+        MarkProjectChanged(requiresRuntimeRebuild: false);
+        RefreshDefinitionPresentation(null);
+        OnPropertyChanged(nameof(ProjectStations));
+        ProjectTree.SelectedNode = ProjectTree.Roots
+            .SelectMany(root => root.Children)
+            .Where(group => group.Kind == TreeNodeKind.Stations)
+            .SelectMany(group => group.Children)
+            .SelectMany(stationNode => stationNode.Children)
+            .FirstOrDefault(unitNode => string.Equals(unitNode.Id, unit.Id, StringComparison.Ordinal));
+        IsStationUnitEditorOpen = false;
+        StatusMessage = OpenVisionLanguageService.T("Equipment.StationUnitAddedStatus");
+        InvalidateCommands();
+    }
+
+    private void CancelStationUnitEditor() => IsStationUnitEditorOpen = false;
+
+    private bool CanRemoveEquipmentUnit(object? parameter) => IsSceneEditable
+        && (Navigation.IsEquipmentWorkspace || Navigation.IsSimulationWorkspace)
+        && !IsStationUnitEditorOpen
+        && !IsEquipmentComponentLibraryDialogOpen
+        && !IsBulkMoveEditorOpen
+        && !_isApplyingProject
+        && !_sessionCloseRequested
+        && !_disposed
+        && parameter is string unitId
+        && !string.IsNullOrWhiteSpace(unitId)
+        && FindStationAndUnit(unitId) is not null;
+
+    private void RemoveEquipmentUnit(object? parameter)
+    {
+        if (parameter is not string unitId || !CanRemoveEquipmentUnit(unitId)
+            || FindStationAndUnit(unitId) is not { } target)
+        {
+            return;
+        }
+
+        if (!TryResolvePendingPlacementDraft())
+        {
+            return;
+        }
+
+        var assignedComponentCount = CurrentProject.Layouts
+            .SelectMany(layout => layout.Components)
+            .Count(component => string.Equals(component.UnitId, target.Unit.Id, StringComparison.Ordinal));
+        if (assignedComponentCount > 0)
+        {
+            StatusMessage = string.Format(CultureInfo.CurrentCulture,
+                OpenVisionLanguageService.T("Equipment.UnitRemovalBlocked"), target.Unit.Name, assignedComponentCount);
+            return;
+        }
+
+        if (!EquipmentUnitRemovalPrompt(target.Station, target.Unit))
+        {
+            return;
+        }
+
+        target.Station.Units.Remove(target.Unit);
+        OnPropertyChanged(nameof(StationUnitRemovalHintText));
+        OnPropertyChanged(nameof(HasSelectedStationChildren));
+        RaiseCanExecuteChanged(_removeSelectedStationCommand);
+        MarkProjectChanged(requiresRuntimeRebuild: false);
+        RefreshDefinitionPresentation(null);
+        StatusMessage = string.Format(CultureInfo.CurrentCulture,
+            OpenVisionLanguageService.T("Equipment.UnitRemovedStatus"), target.Unit.Name);
+    }
+
+    private void RemoveSelectedStation()
+    {
+        var station = SelectedExistingStation;
+        if (!CanRemoveSelectedStation || station is null)
+        {
+            return;
+        }
+
+        if (!TryResolvePendingPlacementDraft())
+        {
+            return;
+        }
+
+        if (station.Units.Count > 0)
+        {
+            OnPropertyChanged(nameof(StationUnitRemovalHintText));
+            return;
+        }
+
+        if (!EquipmentStationRemovalPrompt(station))
+        {
+            return;
+        }
+
+        CurrentProject.Stations.Remove(station);
+        OnPropertyChanged(nameof(ProjectStations));
+        SelectedStationId = null;
+        IsCreatingNewStation = true;
+        StationNameDraft = OpenVisionLanguageService.T("Equipment.StationUnitDefaultStation");
+        MarkProjectChanged(requiresRuntimeRebuild: false);
+        RefreshDefinitionPresentation(null);
+        StatusMessage = string.Format(CultureInfo.CurrentCulture,
+            OpenVisionLanguageService.T("Equipment.StationRemovedStatus"), station.Name);
+    }
+
+    private (MachineStationDefinition Station, MachineUnitDefinition Unit)? FindStationAndUnit(string unitId)
+    {
+        foreach (var station in CurrentProject.Stations)
+        {
+            var unit = station.Units.FirstOrDefault(candidate =>
+                string.Equals(candidate.Id, unitId, StringComparison.Ordinal));
+            if (unit is not null)
+            {
+                return (station, unit);
+            }
+        }
+
+        return null;
+    }
+
+    private void OpenBulkMoveEditor()
+    {
+        if (!TryResolvePendingPlacementDraft()) return;
+        IsEquipmentSinglePartCheckOpen = false;
+        BulkMoveXText = "0";
+        BulkMoveZText = "0";
+        IsBulkMoveEditorOpen = true;
+    }
+
+    private void ApplyBulkMove()
+    {
+        if (TryGetBulkMoveOffsets(out var deltaX, out var deltaZ))
+        {
+            _layoutAuthoring.TryMoveSelectionBy(deltaX, deltaZ);
+        }
+        IsBulkMoveEditorOpen = false;
+    }
+
+    private bool TryGetBulkMoveOffsets(out double deltaX, out double deltaZ)
+    {
+        var hasX = double.TryParse(BulkMoveXText, NumberStyles.Float, CultureInfo.CurrentCulture, out deltaX);
+        var hasZ = double.TryParse(BulkMoveZText, NumberStyles.Float, CultureInfo.CurrentCulture, out deltaZ);
+        return hasX && hasZ && double.IsFinite(deltaX) && double.IsFinite(deltaZ);
+    }
+
+    private string? ResolveLayoutAuthoringUnitId() => Navigation.IsEquipmentWorkspace
+        ? ResolveActiveEquipmentUnitId()
+        : ProjectTree.SelectedNode is { Kind: TreeNodeKind.Unit, Model: MachineUnitDefinition unit }
+            ? unit.Id
+            : null;
+
+    private string? ResolveActiveEquipmentUnitId()
+    {
+        var activeUnitId = Layout.ActiveUnitId;
+        return activeUnitId is not null && CurrentProject.Stations
+            .SelectMany(station => station.Units)
+            .Any(unit => string.Equals(unit.Id, activeUnitId, StringComparison.Ordinal))
+                ? activeUnitId
+                : null;
+    }
 
     public bool TryAddLayoutComponent(
         LayoutComponentKind kind,
@@ -1816,10 +2641,11 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         _runtimeDefinitionDirty = false;
         UpdateRunToolAvailability();
         IsRunning = false;
-        IsDesignMode = true;
+        ApplyDesignMode(true);
         var currentSnapshot = _simulationSession.Engine.CurrentSnapshot;
         SceneSnapshots.Publish(currentSnapshot);
         ApplyMonitorSnapshot(currentSnapshot);
+        SimulationWorkspace.AcceptRuntimeProjectionDefaults();
         AcceptCurrentProjectAsSaved();
     }
 
@@ -1987,6 +2813,11 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         _runtimeProjectionCoordinator.Apply(
             snapshot,
             CreateRuntimeProjectionSelection());
+        var activeSequence = IsRunMode && RuntimeProjection.CurrentSequence?.Status == SequenceExecutionStatus.Running
+            ? RuntimeProjection.CurrentSequence
+            : null;
+        SequenceEditor.ApplyRuntimeStep(activeSequence?.ActiveSequenceId ?? activeSequence?.SequenceId,
+            activeSequence?.CurrentStepId);
         Integration.RefreshRuntimeCommandState();
         NotifyProjectAndRuntimeChanged();
     }
@@ -2316,7 +3147,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
 
     private void RefreshProjectIdentity()
     {
-        Title = $"OpenVisionLab Machine Studio · {ProjectDisplayName}{(HasUnsavedChanges ? " *" : string.Empty)}";
+        Title = IsStartupChoiceVisible ? "OpenVisionLab Machine Studio" : $"OpenVisionLab Machine Studio · {ProjectDisplayName}{(HasUnsavedChanges ? " *" : string.Empty)}";
         OnPropertyChanged(nameof(ProjectStatusText));
         OnPropertyChanged(nameof(SceneTitleText));
     }
@@ -2406,7 +3237,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
                 _camera.SetProjectPath(null, isSaved: true);
                 Navigation.HideStartupChoice();
                 Navigation.SelectedLeftToolTabIndex = 0;
-                StatusMessage = OpenVisionLanguageService.T("Scene.SampleOpenedStatus");
+                StatusMessage = OpenVisionLanguageService.T("Scene.ExampleOpenedStoppedStatus");
                 _runtimeObservabilityJournal.Log("Project", $"Opened bundled sample · {transition.Project.Name}");
                 InvalidateCommands();
                 break;
@@ -2457,8 +3288,9 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         _mainMessageDialogHost.ShowProjectSaveFailure(exception.Message);
     }
 
-    internal Task<bool> TryResolveUnsavedChangesAsync() =>
-        _projectLifecycle.TryResolveUnsavedChangesAsync();
+    internal Task<bool> TryResolveUnsavedChangesAsync() => TryResolvePendingPlacementDraft()
+        ? _projectLifecycle.TryResolveUnsavedChangesAsync()
+        : Task.FromResult(false);
 
     private void HandleProjectOpenFailure(Exception exception)
     {
@@ -2563,7 +3395,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
 
     private void ApplyDesignMode(bool value)
     {
-        if (!SetProperty(ref _isDesignMode, value))
+        if (!SetProperty(ref _isDesignMode, value, nameof(IsDesignMode)))
         {
             return;
         }
@@ -2583,6 +3415,10 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         Layout.IsEditable = IsSceneEditable;
         RecipeConnections.IsEditable = value;
         SequenceEditor.IsEditable = value;
+        if (value)
+        {
+            SequenceEditor.ApplyRuntimeStep(null, null);
+        }
         UpdateRunToolAvailability();
         if (_manualEquipment.HasSelectedManualEquipment)
         {
@@ -2616,14 +3452,14 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
 
     private async Task CompleteDesignModeTransitionAsync(int generation)
     {
-        var pauseAccepted = false;
+        var resetAccepted = false;
         var timedOut = false;
         Exception? failure = null;
         try
         {
             using var timeout = new CancellationTokenSource(RuntimeShutdownTimeout);
-            pauseAccepted = await _simulationSession.RunControl
-                .PauseForDesignModeAsync(timeout.Token)
+            resetAccepted = await _simulationSession.RunControl
+                .ResetForDesignModeAsync(timeout.Token)
                 .WaitAsync(timeout.Token);
         }
         catch (OperationCanceledException) when (_disposed || _simulationSession.RuntimeLoop.CancellationToken.IsCancellationRequested)
@@ -2647,15 +3483,17 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
 
         _isModeTransitioning = false;
         OnPropertyChanged(nameof(IsModeTransitioning));
+        OnPropertyChanged(nameof(IsDesignMode));
+        OnPropertyChanged(nameof(IsRunMode));
         OnPropertyChanged(nameof(ModeText));
         OnPropertyChanged(nameof(ModeTransitionStatusText));
 
         if (failure is not null)
         {
             StatusMessage = OpenVisionLanguageService.T(
-                "Shell.DesignTransitionFailed",
-                "설계 모드 전환 실패: 일시정지 중 오류가 발생했습니다.",
-                "Design mode transition failed: the pause operation raised an error.");
+                "Shell.EditResetTransitionFailed",
+                "설계 모드 전환 실패: 실행 종료·초기화 중 오류가 발생했습니다.",
+                "Design mode transition failed: the reset operation raised an error.");
             _runtimeObservabilityJournal.Log(
                 "Simulation",
                 $"Design mode transition failed · {failure.GetType().Name}: {failure.Message}");
@@ -2663,17 +3501,17 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
             return;
         }
 
-        if (!pauseAccepted)
+        if (!resetAccepted)
         {
             StatusMessage = timedOut
                 ? OpenVisionLanguageService.T(
-                    "Shell.DesignTransitionTimeout",
-                    "설계 모드 전환 실패: 시뮬레이션 일시정지 시간이 초과되었습니다.",
-                    "Design mode transition failed: simulation pause timed out.")
+                    "Shell.EditResetTransitionTimeout",
+                    "설계 모드 전환 실패: 시뮬레이션 종료·초기화 시간이 초과되었습니다.",
+                    "Design mode transition failed: simulation reset timed out.")
                 : OpenVisionLanguageService.T(
-                    "Shell.DesignTransitionRejected",
-                    "설계 모드 전환 실패: 시뮬레이션 일시정지가 거부되었습니다.",
-                    "Design mode transition failed: simulation pause was rejected.");
+                    "Shell.EditResetTransitionRejected",
+                    "설계 모드 전환 실패: 시뮬레이션 종료·초기화가 거부되었습니다.",
+                    "Design mode transition failed: simulation reset was rejected.");
             InvalidateCommands();
             return;
         }
@@ -2682,29 +3520,29 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         {
             ApplyDesignMode(true);
             StatusMessage = OpenVisionLanguageService.T(
-                "Shell.DesignTransitionCompleted",
-                "시뮬레이션이 일시정지되어 설계 모드로 전환되었습니다.",
-                "The simulation is paused and Design mode is ready.");
+                "Shell.EditResetTransitionCompleted",
+                "실행을 끝내고 초기화했습니다. 설정을 수정한 뒤 새로 시운전하세요.",
+                "The run ended and was reset. Edit the settings before starting a new test.");
         }
         else
         {
             StatusMessage = OpenVisionLanguageService.T(
-                "Shell.DesignTransitionCanceled",
-                "설계 모드 요청이 취소되었습니다. 시뮬레이션은 일시정지 상태입니다.",
-                "The Design mode request was canceled. The simulation is paused.");
+                "Shell.EditResetTransitionCanceled",
+                "설계 모드 요청이 취소되었습니다. 실행은 종료·초기화된 상태입니다.",
+                "The Design mode request was canceled. The run has ended and was reset.");
             InvalidateCommands();
         }
     }
 
     private string GetModeTransitionStatusText() => _pendingDesignMode
         ? OpenVisionLanguageService.T(
-            "Shell.DesignTransitionPending",
-            "일시정지 후 설계 모드로 전환 중",
-            "Pausing before entering Design mode")
+            "Shell.EditResetTransitionPending",
+            "실행 종료·초기화 후 편집으로 전환 중",
+            "Ending and resetting the run before editing")
         : OpenVisionLanguageService.T(
-            "Shell.DesignTransitionRunRequested",
-            "설계 모드 요청이 취소되었습니다. 안전한 일시정지를 완료하는 중입니다.",
-            "Design mode request canceled; completing the safe pause");
+            "Shell.EditResetTransitionRunRequested",
+            "설계 모드 요청이 취소되었습니다. 실행 종료·초기화를 완료하는 중입니다.",
+            "Design mode request canceled; completing the run reset");
 
     #endregion
 
@@ -2719,6 +3557,10 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
 
         OnPropertyChanged(nameof(IsMultiAxisCommissioningRecipeSelection));
         OnPropertyChanged(nameof(SelectionStatusText));
+        if (ProjectTree.SelectedNode?.Kind == TreeNodeKind.Unit)
+        {
+            Navigation.IsInspectorOpen = false;
+        }
         if (isAxisSelection)
         {
             ApplyMonitorSnapshot(SceneSnapshots.Latest ?? _simulationSession.Engine.CurrentSnapshot);
@@ -2741,6 +3583,16 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         OnPropertyChanged(nameof(SelectionStatusText));
         OnPropertyChanged(nameof(HasSelectedEquipment));
         OnPropertyChanged(nameof(SelectedEquipmentStatus));
+        OnPropertyChanged(nameof(BulkMoveTitleText));
+        if (Layout.SelectionCount != 1)
+        {
+            IsEquipmentSinglePartCheckOpen = false;
+        }
+        RaiseCanExecuteChanged(_openBulkMoveEditorCommand);
+        RaiseCanExecuteChanged(_applyBulkMoveCommand);
+        RaiseCanExecuteChanged(_openEquipmentPropertiesCommand);
+        RaiseCanExecuteChanged(_openEquipmentDriveTabCommand);
+        RaiseCanExecuteChanged(_openEquipmentSinglePartCheckCommand);
         RefreshManualEquipmentProjection(SceneSnapshots.Latest ?? _simulationSession.Engine.CurrentSnapshot);
         RefreshCameraCommissioningProjection();
         NotifyManualCommissioningChanged(invalidateCommands: false);
@@ -3276,6 +4128,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         if (stage is not null)
         {
             Layout.Select(stage.Id);
+            Navigation.IsEquipmentWorkspace = true;
         }
         StatusMessage = string.Format(
             CultureInfo.CurrentCulture,
@@ -3853,6 +4706,40 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
             return;
         }
 
+        if (args.PropertyName is nameof(ShellNavigationViewModel.SelectedWorkspaceIndex)
+            or nameof(ShellNavigationViewModel.IsEquipmentWorkspace)
+            or nameof(ShellNavigationViewModel.IsSimulationWorkspace))
+        {
+            if (!Navigation.IsEquipmentWorkspace)
+            {
+                IsEquipmentComponentLibraryDialogOpen = false;
+            }
+
+            if (!Navigation.IsEquipmentWorkspace && !Navigation.IsSimulationWorkspace)
+            {
+                IsStationUnitEditorOpen = false;
+                IsBulkMoveEditorOpen = false;
+                IsEquipmentSinglePartCheckOpen = false;
+            }
+
+            RaiseCanExecuteChanged(_openStationUnitEditorCommand);
+            RaiseCanExecuteChanged(_addStationUnitCommand);
+            RaiseCanExecuteChanged(_removeEquipmentUnitCommand);
+            RaiseCanExecuteChanged(_removeSelectedStationCommand);
+            RaiseCanExecuteChanged(_openBulkMoveEditorCommand);
+            RaiseCanExecuteChanged(_applyBulkMoveCommand);
+            RaiseCanExecuteChanged(_openEquipmentPropertiesCommand);
+            RaiseCanExecuteChanged(_openEquipmentDriveTabCommand);
+            RaiseCanExecuteChanged(_openEquipmentSinglePartCheckCommand);
+            RaiseCanExecuteChanged(_addEquipmentLayoutComponentCommand);
+        }
+
+        if (args.PropertyName == nameof(ShellNavigationViewModel.IsInspectorOpen)
+            && !Navigation.IsInspectorOpen)
+        {
+            IsEquipmentSinglePartCheckOpen = false;
+        }
+
         switch (args.PropertyName)
         {
             case nameof(ShellNavigationViewModel.IsCompactLayout):
@@ -3866,6 +4753,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
                 break;
             case nameof(ShellNavigationViewModel.IsStartupChoiceVisible):
                 OnPropertyChanged(nameof(IsStartupChoiceVisible));
+                RefreshProjectIdentity();
+                InvalidateCommands();
                 break;
             case nameof(ShellNavigationViewModel.SelectedLanguageOption):
                 OnPropertyChanged(nameof(SelectedLanguageOption));
@@ -3984,9 +4873,26 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
     {
         Navigation.InvalidateCommands();
         RaiseCanExecuteChanged(_newProjectCommand);
+        RaiseCanExecuteChanged(_confirmNewProjectNameCommand);
+        RaiseCanExecuteChanged(_cancelNewProjectNameCommand);
         RaiseCanExecuteChanged(_openProjectCommand);
         RaiseCanExecuteChanged(_saveProjectCommand);
         RaiseCanExecuteChanged(_saveProjectAsCommand);
+        RaiseCanExecuteChanged(_openStationUnitEditorCommand);
+        RaiseCanExecuteChanged(_addStationUnitCommand);
+        RaiseCanExecuteChanged(_cancelStationUnitEditorCommand);
+        RaiseCanExecuteChanged(_removeEquipmentUnitCommand);
+        RaiseCanExecuteChanged(_removeSelectedStationCommand);
+        RaiseCanExecuteChanged(_openBulkMoveEditorCommand);
+        RaiseCanExecuteChanged(_applyBulkMoveCommand);
+        RaiseCanExecuteChanged(_cancelBulkMoveCommand);
+        RaiseCanExecuteChanged(_openEquipmentPropertiesCommand);
+        RaiseCanExecuteChanged(_openEquipmentDriveTabCommand);
+        RaiseCanExecuteChanged(_openEquipmentSinglePartCheckCommand);
+        RaiseCanExecuteChanged(_addEquipmentLayoutComponentCommand);
+        RaiseCanExecuteChanged(_openEquipmentComponentLibraryDialogCommand);
+        RaiseCanExecuteChanged(_showEquipmentOverviewCommand);
+        RaiseCanExecuteChanged(_showEquipmentUnitCommand);
         RaiseCanExecuteChanged(_runCommand);
         RaiseCanExecuteChanged(_pauseCommand);
         RaiseCanExecuteChanged(_abortSequenceCommand);
@@ -4024,6 +4930,17 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
 
     private void InvalidateModeCommands()
     {
+        RaiseCanExecuteChanged(_openStationUnitEditorCommand);
+        RaiseCanExecuteChanged(_addStationUnitCommand);
+        RaiseCanExecuteChanged(_removeEquipmentUnitCommand);
+        RaiseCanExecuteChanged(_removeSelectedStationCommand);
+        RaiseCanExecuteChanged(_openBulkMoveEditorCommand);
+        RaiseCanExecuteChanged(_applyBulkMoveCommand);
+        RaiseCanExecuteChanged(_openEquipmentPropertiesCommand);
+        RaiseCanExecuteChanged(_openEquipmentDriveTabCommand);
+        RaiseCanExecuteChanged(_openEquipmentSinglePartCheckCommand);
+        RaiseCanExecuteChanged(_addEquipmentLayoutComponentCommand);
+        RaiseCanExecuteChanged(_openEquipmentComponentLibraryDialogCommand);
         RaiseCanExecuteChanged(_runCommand);
         RaiseCanExecuteChanged(_pauseCommand);
         RaiseCanExecuteChanged(_abortSequenceCommand);

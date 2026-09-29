@@ -1,7 +1,8 @@
 {
   "schema": "1.0",
   "inventoryRoots": [
-    "src/OpenVisionLab.MachineStudio/Assets"
+    "src/OpenVisionLab.MachineStudio/Assets",
+    "docs/images"
   ],
   "extensions": [
     ".png",
@@ -83,6 +84,28 @@
       "vendorReferenceStatus": "none-recorded",
       "distributionStatus": "approved",
       "reviewNote": "Project owner attested on 2026-08-19 that OpenVisionLab created the asset with OpenAI GPT, used no external reference material, and authorizes repository inclusion and redistribution; visual review found no logo or model badge."
+    },
+    {
+      "path": "docs/images/equipment-setup.png",
+      "sha256": "8ba4509ff78caa8e99f1634b4e481b27aeb2e6e472816dfd2e39ac7cb0052dc2",
+      "mediaType": "image/png",
+      "purpose": "Actual WPF equipment setup and oblique scene",
+      "originSummary": "Unedited first-party Machine Studio development-window capture, 2026-09-29, 1920x1032 work area of a 1920x1080 display. Not an HTML render or reconstructed product image.",
+      "firstRecordedCommit": "Introduced by the v0.2.0-dev.62 source update; no release tag.",
+      "vendorReferenceStatus": "none-recorded",
+      "distributionStatus": "approved",
+      "reviewNote": "Project owner requested public README UI illustrations on 2026-09-29. Visually reviewed: only the Machine Studio window, no customer data, credentials, file paths or vendor logos. The image is historical UI evidence, not a complete validation of the source version."
+    },
+    {
+      "path": "docs/images/equipment-overview.png",
+      "sha256": "2be84723b151f3076887813d5fc931d07a2e6921f40e83443ded3c6c83ea70f9",
+      "mediaType": "image/png",
+      "purpose": "Actual WPF large-layout unit overview",
+      "originSummary": "Unedited first-party Machine Studio development-window capture, 2026-09-29, 1920x1032 work area of a 1920x1080 display. Not an HTML render or reconstructed product image.",
+      "firstRecordedCommit": "Introduced by the v0.2.0-dev.62 source update; no release tag.",
+      "vendorReferenceStatus": "none-recorded",
+      "distributionStatus": "approved",
+      "reviewNote": "Project owner requested public README UI illustrations on 2026-09-29. Visually reviewed: only the Machine Studio window, no customer data, credentials, file paths or vendor logos. The image is historical UI evidence, not a complete validation of the source version."
     }
   ]
 }

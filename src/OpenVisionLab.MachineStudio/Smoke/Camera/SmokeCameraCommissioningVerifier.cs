@@ -219,6 +219,7 @@ internal static class SmokeCameraCommissioningVerifier
         var sourcePath = Path.Combine(
             Path.GetDirectoryName(Path.GetFullPath(projectPath))!,
             viewModel.CurrentCameraSourceText.Replace('/', Path.DirectorySeparatorChar));
+        var originalSourceBytes = await File.ReadAllBytesAsync(sourcePath);
         await using (var stream = File.OpenRead(sourcePath))
         {
             var expectedSha256 = Convert.ToHexString(await SHA256.HashDataAsync(stream));
@@ -262,6 +263,31 @@ internal static class SmokeCameraCommissioningVerifier
             && ready.Result?.FrameEvidence == evidence
             && ready.Result.Decision == PlaceholderInspectionDecision.Pass
             && viewModel.CurrentCameraFrameHashText == evidence.ContentSha256);
+        var provenanceDetails = viewModel.CurrentCameraEvidenceDetailsText;
+        Check("localMockProvenanceIsExplicit",
+            provenanceDetails.Contains(OpenVisionLanguageService.T("Camera.ResultSource"), StringComparison.Ordinal)
+            && provenanceDetails.Contains(
+                OpenVisionLanguageService.T("Camera.ResultSourceMock"),
+                StringComparison.Ordinal)
+            && provenanceDetails.Contains(
+                OpenVisionLanguageService.T("Camera.VerificationModelOnly"),
+                StringComparison.Ordinal)
+            && provenanceDetails.Contains(evidence.ContentSha256, StringComparison.Ordinal)
+            && provenanceDetails.Contains(
+                OpenVisionLanguageService.T("Camera.ModelDeterministicMock"),
+                StringComparison.Ordinal)
+            && provenanceDetails.Contains(
+                string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    OpenVisionLanguageService.T(
+                        "Camera.ClockFixedStep",
+                        "고정 스텝 시뮬레이션 ({0} ms/tick)",
+                        "Fixed-step simulation ({0} ms/tick)"),
+                    "5"),
+                StringComparison.Ordinal));
+        var provenanceInspector = SmokeVisualTreeQuery.FindVisualDescendant<RightToolRegionView>(window);
+        Check("localMockProvenanceRendersInCameraDetails",
+            provenanceInspector?.CameraExecutionEvidenceDetailsTextBlock.Text == provenanceDetails);
         Check("deterministicRunnerPublishesCorrelatedEvidence",
             firstInspection is not null
             && firstInspection.AcquisitionId == evidence.FrameId
@@ -307,6 +333,47 @@ internal static class SmokeCameraCommissioningVerifier
             && viewModel.CurrentCameraInspectionIdText == firstInspection!.InspectionId
             && viewModel.CurrentCameraInspectionMessageText == firstInspection.Message
             && viewModel.CurrentCameraInspectionMetricsText.Contains("PixelCount=", StringComparison.Ordinal));
+
+        if (editImageSource)
+        {
+            var mutatedSourceBytes = originalSourceBytes.ToArray();
+            mutatedSourceBytes[^1] ^= 0xFF;
+            await File.WriteAllBytesAsync(sourcePath, mutatedSourceBytes);
+            try
+            {
+                if (!await viewModel.OpenProjectAsync(projectPath))
+                {
+                    throw new InvalidOperationException(
+                        "Changed-source camera project could not be reopened.");
+                }
+
+                await WaitForAsync(
+                    () => !viewModel.IsRunning
+                        && viewModel.SceneSnapshots.Latest?.Cameras[0].State == VirtualCameraState.Idle,
+                    "Changed-source project reopen restored a runtime camera acquisition.");
+                Check("reopenRejectsChangedFrameSource",
+                    viewModel.LatestVisionEvidence?.EvidenceHash == firstPackage.EvidenceHash
+                    && viewModel.VisionEvidenceStatusText == OpenVisionLanguageService.T("Camera.EvidenceStale"));
+            }
+            finally
+            {
+                await File.WriteAllBytesAsync(sourcePath, originalSourceBytes);
+            }
+
+            if (!await viewModel.OpenProjectAsync(projectPath))
+            {
+                throw new InvalidOperationException(
+                    "Restored-source camera project could not be reopened.");
+            }
+
+            await WaitForAsync(
+                () => !viewModel.IsRunning
+                    && viewModel.SceneSnapshots.Latest?.Cameras[0].State == VirtualCameraState.Idle,
+                "Restored-source project reopen restored a runtime camera acquisition.");
+            Check("reopenRevalidatesRestoredFrameSource",
+                viewModel.LatestVisionEvidence?.EvidenceHash == firstPackage.EvidenceHash
+                && viewModel.VisionEvidenceStatusText == OpenVisionLanguageService.T("Camera.EvidenceRestored"));
+        }
 
         viewModel.ResetCommand.Execute(null);
         await WaitForAsync(
@@ -523,7 +590,25 @@ internal static class SmokeCameraCommissioningVerifier
         capture.Capture(window, Path.Combine(evidenceDirectory, "bindings-keyboard-focus.png"));
         if (inspector.RevertCameraSourceButton.IsKeyboardFocused)
         {
-            input.SendKey(0x20);
+            var inputSource = PresentationSource.FromVisual(inspector.RevertCameraSourceButton)
+                ?? throw new InvalidOperationException(
+                    "The camera source Revert button had no presentation source.");
+            inspector.RevertCameraSourceButton.RaiseEvent(new KeyEventArgs(
+                Keyboard.PrimaryDevice,
+                inputSource,
+                Environment.TickCount,
+                Key.Space)
+            {
+                RoutedEvent = Keyboard.KeyDownEvent
+            });
+            inspector.RevertCameraSourceButton.RaiseEvent(new KeyEventArgs(
+                Keyboard.PrimaryDevice,
+                inputSource,
+                Environment.TickCount,
+                Key.Space)
+            {
+                RoutedEvent = Keyboard.KeyUpEvent
+            });
         }
         await Task.Delay(100);
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);

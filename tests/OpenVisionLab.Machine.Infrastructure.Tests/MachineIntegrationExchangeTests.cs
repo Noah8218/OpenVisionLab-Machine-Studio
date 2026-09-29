@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using OpenVisionLab.Integration.Contracts;
 using OpenVisionLab.Machine.Infrastructure.Integration;
 using OpenVisionLab.TestSupport;
@@ -128,18 +129,43 @@ public sealed class MachineIntegrationExchangeTests
                 fixture.TransactionDirectory,
                 IntegrationTransactionLayout.AcknowledgementFileName),
             IntegrationContractJson.SerializeCanonical(acknowledgement));
+        var resultDocumentBytes = IntegrationContractJson.SerializeCanonical(result);
         File.WriteAllBytes(
             Path.Combine(
                 fixture.TransactionDirectory,
                 IntegrationTransactionLayout.ResultFileName),
-            IntegrationContractJson.SerializeCanonical(result));
+            resultDocumentBytes);
 
         var read = MachineIntegrationExchange.ReadResult(
             fixture.Root,
             fixture.Handoff.TransactionId);
+        var validated = MachineIntegrationExchange.ReadValidatedResult(
+            fixture.Root,
+            fixture.Handoff.TransactionId);
+        var handoffDocument = File.ReadAllText(
+            Path.Combine(
+                fixture.TransactionDirectory,
+                IntegrationTransactionLayout.HandoffFileName));
+        Assert.Contains(fixture.Handoff.TransactionId.ToString("D"), handoffDocument, StringComparison.Ordinal);
+        Assert.Contains(fixture.Handoff.Context.FrameId, handoffDocument, StringComparison.Ordinal);
+        Assert.Contains(fixture.Handoff.Context.InputSha256, handoffDocument, StringComparison.Ordinal);
+        Assert.Contains(result.MessageId.ToString("D"), Encoding.UTF8.GetString(resultDocumentBytes), StringComparison.Ordinal);
+        Assert.Contains(result.Correlation.AcquisitionId, Encoding.UTF8.GetString(resultDocumentBytes), StringComparison.Ordinal);
+        Assert.Contains(result.Correlation.FrameId, Encoding.UTF8.GetString(resultDocumentBytes), StringComparison.Ordinal);
 
         Assert.Equal(IntegrationInspectionOutcome.Pass, read.Outcome);
         Assert.Equal("run-1", read.RunId);
+        Assert.Equal(fixture.Handoff.TransactionId, validated.Handoff.TransactionId);
+        Assert.Equal(fixture.Handoff.MessageId, validated.Handoff.MessageId);
+        Assert.Equal(fixture.Handoff.Context.ProjectId, validated.Handoff.Context.ProjectId);
+        Assert.Equal(fixture.Handoff.Context.Artifacts, validated.Handoff.Context.Artifacts);
+        Assert.Equal(acknowledgement, validated.Acknowledgement);
+        Assert.Equal(result.MessageId, validated.Result.MessageId);
+        Assert.Equal(result.Outcome, validated.Result.Outcome);
+        Assert.Equal(result.RunId, validated.Result.RunId);
+        Assert.Equal(
+            Convert.ToHexString(SHA256.HashData(resultDocumentBytes)),
+            validated.ResultDocumentSha256);
     }
 
     [Fact]

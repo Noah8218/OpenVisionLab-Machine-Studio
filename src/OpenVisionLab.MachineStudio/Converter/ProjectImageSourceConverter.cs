@@ -8,7 +8,7 @@ using System.Windows.Media.Imaging;
 namespace OpenVisionLab.MachineStudio.Converter;
 
 /// <summary>
-/// Loads project-owned image files for the MMI preview. WPF does not decode
+/// Loads project-owned image files for the inspection preview. WPF does not decode
 /// the Mono8 PGM fixtures used by the virtual-camera contract, so the small
 /// PGM reader keeps that existing source format visible without adding an
 /// imaging dependency to the domain or simulation projects.

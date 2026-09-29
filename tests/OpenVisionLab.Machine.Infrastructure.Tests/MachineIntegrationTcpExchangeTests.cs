@@ -49,6 +49,52 @@ public sealed class MachineIntegrationTcpExchangeTests
     }
 
     [Fact]
+    public async Task CancelTransactionSendsAuthenticatedRequestAndReturnsConsumerReceipt()
+    {
+        using var fixture = new TcpFixture();
+        var key = SHA256.HashData(Encoding.UTF8.GetBytes("machine-tcp-cancel-key"));
+        var handoff = await MachineIntegrationHandoffPublisher.PublishAsync(
+            fixture.SenderRoot,
+            fixture.CreateRequest());
+        await using var consumer = new TcpIntegrationServer(
+            IntegrationApplicationIds.TwoDStudio,
+            fixture.ReceiverRoot,
+            IPAddress.Loopback,
+            0,
+            key);
+        consumer.CancellationRequested += (request, _) => Task.FromResult(
+            new TcpIntegrationCancellationReceipt(
+                request.RequestId,
+                request.TransactionId,
+                TcpIntegrationCancellationStatus.Accepted,
+                Idempotent: false,
+                IntegrationApplicationIds.TwoDStudio));
+        await consumer.StartAsync();
+        var endpoint = consumer.LocalEndpoint
+            ?? throw new InvalidOperationException("The consumer listener did not expose an endpoint.");
+        await using var sender = new MachineIntegrationTcpExchange(fixture.SenderRoot, key);
+
+        var request = new IntegrationCancelRequestV2(
+            IntegrationContractSchema.V2,
+            IntegrationMessageKind.CancelRequest,
+            Guid.NewGuid(),
+            handoff.TransactionId,
+            handoff.MessageId,
+            DateTimeOffset.UtcNow,
+            handoff.Producer,
+            "Machine test cancellation");
+        var receipt = await sender.CancelTransactionAsync(
+            new TcpIntegrationEndpoint(IPAddress.Loopback.ToString(), endpoint.Port),
+            request);
+
+        Assert.Equal(request.RequestId, receipt.RequestId);
+        Assert.Equal(request.TransactionId, receipt.TransactionId);
+        Assert.Equal(TcpIntegrationCancellationStatus.Accepted, receipt.Status);
+        Assert.Equal(IntegrationApplicationIds.TwoDStudio, receipt.PeerApplicationId);
+        Assert.False(receipt.Idempotent);
+    }
+
+    [Fact]
     public async Task WrongKeyIsRejectedAndListenerCanRestartWithoutImplicitActions()
     {
         using var fixture = new TcpFixture();

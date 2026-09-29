@@ -46,6 +46,8 @@ public sealed class SequenceEditorViewModel : ViewModelBase
     private MachineProjectDocument _project = new();
     private IReadOnlyList<SequenceAuthoringTarget> _authoringTargets =
         Array.Empty<SequenceAuthoringTarget>();
+    private IReadOnlyList<SequenceAuthoringTarget> _workpieceTargets =
+        Array.Empty<SequenceAuthoringTarget>();
     private IReadOnlyList<SequenceExpectedStateTarget> _expectedStateTargets =
         Array.Empty<SequenceExpectedStateTarget>();
     private SequenceDefinition? _selectedSequence;
@@ -66,6 +68,8 @@ public sealed class SequenceEditorViewModel : ViewModelBase
     private string _lastValidationSignature = string.Empty;
     private int _lastValidationErrorCount;
     private bool _hasValidationSnapshot;
+    private string? _runtimeSequenceId;
+    private string? _runtimeStepId;
 
     public SequenceEditorViewModel()
     {
@@ -127,6 +131,12 @@ public sealed class SequenceEditorViewModel : ViewModelBase
     }
 
     public bool HasSelectedStep => SelectedStep is not null;
+    public bool HasExecutingStep => string.Equals(SelectedSequence?.Id, _runtimeSequenceId, StringComparison.Ordinal)
+        && !string.IsNullOrEmpty(_runtimeStepId);
+    public string CurrentRuntimeStepName => HasExecutingStep
+        ? Steps.FirstOrDefault(step => string.Equals(step.Id, _runtimeStepId, StringComparison.Ordinal))?.DisplayName
+            ?? _runtimeStepId ?? string.Empty
+        : string.Empty;
 
     public bool IsEditable
     {
@@ -194,6 +204,8 @@ public sealed class SequenceEditorViewModel : ViewModelBase
     public void Load(MachineProjectDocument project)
     {
         ArgumentNullException.ThrowIfNull(project);
+        _runtimeSequenceId = null;
+        _runtimeStepId = null;
         _project = project;
         ResetValidationComparison();
         string? preferredId = project.Simulation.AutomaticRun?.SequenceId
@@ -224,10 +236,36 @@ public sealed class SequenceEditorViewModel : ViewModelBase
         LoadSteps(selectedStepId);
     }
 
+    public void ApplyRuntimeStep(string? sequenceId, string? stepId)
+    {
+        if (_disposed || (string.Equals(_runtimeSequenceId, sequenceId, StringComparison.Ordinal)
+            && string.Equals(_runtimeStepId, stepId, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        _runtimeSequenceId = sequenceId;
+        _runtimeStepId = stepId;
+        UpdateExecutionStepIndicators();
+    }
+
+    private void UpdateExecutionStepIndicators()
+    {
+        bool selectedSequenceIsRunning = string.Equals(SelectedSequence?.Id, _runtimeSequenceId, StringComparison.Ordinal)
+            && !string.IsNullOrEmpty(_runtimeStepId);
+        foreach (SequenceStepEditorItem step in Steps)
+        {
+            step.IsExecuting = selectedSequenceIsRunning && string.Equals(step.Id, _runtimeStepId, StringComparison.Ordinal);
+        }
+        OnPropertyChanged(nameof(HasExecutingStep));
+        OnPropertyChanged(nameof(CurrentRuntimeStepName));
+    }
+
     private void LoadAuthoringTargets()
     {
         SequenceAuthoringTargetCatalogSnapshot targetCatalog = _targetCatalog.Build(_project);
         _authoringTargets = targetCatalog.AuthoringTargets;
+        _workpieceTargets = targetCatalog.WorkpieceTargets;
         _expectedStateTargets = targetCatalog.ExpectedStateTargets;
         string? preferredTemplateId = SelectedTemplate?.Id;
         Templates.Clear();
@@ -257,6 +295,7 @@ public sealed class SequenceEditorViewModel : ViewModelBase
         OnPropertyChanged(nameof(StructuralEditStatus));
         OnPropertyChanged(nameof(ValidationComparisonText));
         _stepEditors.RefreshLocalization();
+        OnPropertyChanged(nameof(CurrentRuntimeStepName));
         Validate();
     }
 
@@ -330,9 +369,11 @@ public sealed class SequenceEditorViewModel : ViewModelBase
         SelectedStep = null;
         if (SelectedSequence is not null)
         {
-            _stepEditors.Populate(SelectedSequence, _authoringTargets, _expectedStateTargets);
+        _stepEditors.Populate(SelectedSequence, _authoringTargets, _workpieceTargets, _expectedStateTargets);
             SelectedStep = _stepEditors.Find(selectedStepId) ?? Steps.FirstOrDefault();
         }
+
+        UpdateExecutionStepIndicators();
 
         Validate();
         CommandManager.InvalidateRequerySuggested();
@@ -538,6 +579,8 @@ public sealed class SequenceEditorViewModel : ViewModelBase
             or SequenceCompilationErrorCode.UnknownSignal
             or SequenceCompilationErrorCode.UnknownAxis
             or SequenceCompilationErrorCode.UnknownCamera => "Step.TargetId",
+        SequenceCompilationErrorCode.UnexpectedWorkpieceComponentId
+            or SequenceCompilationErrorCode.UnknownWorkpieceComponent => "Step.WorkpieceComponentId",
         SequenceCompilationErrorCode.InvalidBooleanParameter
             or SequenceCompilationErrorCode.InvalidNumericParameter
             or SequenceCompilationErrorCode.UnexpectedParameter

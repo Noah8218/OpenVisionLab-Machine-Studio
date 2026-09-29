@@ -34,6 +34,90 @@ public class ProjectDocumentStoreTests
     }
 
     [Fact]
+    public void Save_CameraLayoutComponent_UsesCurrentSchemaAndRoundTripsItsBinding()
+    {
+        var camera = new LayoutComponentDefinition
+        {
+            Id = "camera-1",
+            Name = "Top camera",
+            Kind = LayoutComponentKind.Camera,
+            BehaviorBindingId = "device.camera-1"
+        };
+        var project = new MachineProjectDocument
+        {
+            Name = "Camera layout",
+            Layouts =
+            {
+                new MachineLayoutDefinition
+                {
+                    Id = "main",
+                    Name = "Main",
+                    Components = { camera }
+                }
+            }
+        };
+
+        var saved = _store.Save(project);
+        var loaded = _store.Load(saved);
+
+        Assert.Equal(MachineProjectDocument.CurrentSchema, project.Schema);
+        Assert.Equal(MachineProjectDocument.CurrentSchema, loaded.Schema);
+        var restored = Assert.Single(Assert.Single(loaded.Layouts).Components);
+        Assert.Equal(LayoutComponentKind.Camera, restored.Kind);
+        Assert.Equal("device.camera-1", restored.BehaviorBindingId);
+    }
+
+    [Fact]
+    public void Load_Schema16TriggerCameraWithoutAssociationRemainsUnboundAndUpgradesSafely()
+    {
+        const string legacyJson = """{"schema":"1.16","sequences":[{"id":"sequence-1","steps":[{"id":"trigger","action":"TriggerCamera","targetId":"camera-1","parameter":"presence-check"}]}]}""";
+
+        MachineProjectDocument project = _store.Load(legacyJson);
+
+        Assert.Equal("1.16", project.Schema);
+        Assert.Null(Assert.Single(Assert.Single(project.Sequences).Steps).WorkpieceComponentId);
+        string saved = _store.Save(project);
+
+        Assert.Equal(MachineProjectDocument.CurrentSchema, project.Schema);
+        Assert.DoesNotContain("workpieceComponentId", saved, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Save_WorkpieceInitialPresence_RoundTripsExplicitFalseAndOmitsLegacyDefault()
+    {
+        var project = new MachineProjectDocument
+        {
+            Name = "Workpiece presence",
+            Devices =
+            {
+                new DeviceDefinition
+                {
+                    Id = "workpiece.empty",
+                    Name = "Empty position",
+                    Kind = DeviceKind.Workpiece,
+                    Workpiece = new WorkpieceDefinition
+                    {
+                        Type = "Test Part",
+                        ConveyorComponentId = "conveyor.main",
+                        InitiallyPresent = false
+                    }
+                }
+            }
+        };
+
+        string saved = _store.Save(project);
+        MachineProjectDocument restored = _store.Load(saved);
+        MachineProjectDocument legacy = _store.Load(
+            """{"schema":"1.17","devices":[{"id":"workpiece.legacy","kind":"Workpiece","workpiece":{"type":"Test Part","conveyorComponentId":"conveyor.main"}}]}""");
+
+        Assert.Equal(MachineProjectDocument.CurrentSchema, restored.Schema);
+        Assert.False(Assert.IsType<WorkpieceDefinition>(Assert.Single(restored.Devices).Workpiece).InitiallyPresent);
+        Assert.Null(Assert.IsType<WorkpieceDefinition>(Assert.Single(legacy.Devices).Workpiece).InitiallyPresent);
+        Assert.DoesNotContain("initiallyPresent", _store.Save(legacy), StringComparison.Ordinal);
+        Assert.Equal(MachineProjectDocument.CurrentSchema, legacy.Schema);
+    }
+
+    [Fact]
     public void SerializeForEvidence_IgnoresModifiedTimestamp()
     {
         var document = new MachineProjectDocument
@@ -440,6 +524,8 @@ public class ProjectDocumentStoreTests
     [InlineData("1.0")]
     [InlineData("1.10")]
     [InlineData("1.11")]
+    [InlineData("1.15")]
+    [InlineData("1.16")]
     [InlineData(MachineProjectDocument.CurrentSchema)]
     public void Load_CurrentAndEarlierSchemas_RemainReadable(string schema)
     {
@@ -450,7 +536,7 @@ public class ProjectDocumentStoreTests
     }
 
     [Theory]
-    [InlineData("1.13")]
+    [InlineData("1.19")]
     [InlineData("2.0")]
     [InlineData("future")]
     public void Load_UnsupportedSchema_IsRejected(string schema)
@@ -582,6 +668,182 @@ public class ProjectDocumentStoreTests
     }
 
     [Fact]
+    public async Task Mch005_SaveAsync_CancelledAfterTemporaryWritePreservesCommittedFilesAndMetadata()
+    {
+        var directory = CreatePersistenceTestDirectory("cancelled-after-temporary-write");
+        var path = Path.Combine(directory, "machine.ovmachine");
+        try
+        {
+            await _fileStore.SaveAsync(new MachineProjectDocument { Name = "Before" }, path);
+            await _fileStore.SaveAsync(new MachineProjectDocument { Name = "Committed" }, path);
+            var primaryBefore = await File.ReadAllBytesAsync(path);
+            var backupBefore = await File.ReadAllBytesAsync(path + ".bak");
+            using var cancellation = new CancellationTokenSource();
+            var cancelledStore = new ProjectDocumentFileStore(
+                new ProjectDocumentStore(),
+                afterTemporaryFileWritten: _ => cancellation.Cancel(),
+                beforeCommit: null);
+            var document = new MachineProjectDocument
+            {
+                Schema = "1.10",
+                Name = "Cancelled before commit",
+                ModifiedAt = new DateTimeOffset(2026, 8, 10, 0, 0, 0, TimeSpan.Zero)
+            };
+            var schemaBefore = document.Schema;
+            var modifiedAtBefore = document.ModifiedAt;
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => cancelledStore.SaveAsync(document, path, cancellation.Token));
+
+            Assert.True(cancellation.IsCancellationRequested);
+            Assert.Equal(primaryBefore, await File.ReadAllBytesAsync(path));
+            Assert.Equal(backupBefore, await File.ReadAllBytesAsync(path + ".bak"));
+            Assert.Equal(schemaBefore, document.Schema);
+            Assert.Equal(modifiedAtBefore, document.ModifiedAt);
+            Assert.Empty(Directory.EnumerateFiles(directory, ".*.tmp"));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Mch005_SaveAsync_CancellationAfterCommitBoundaryReturnsCommittedSave()
+    {
+        var directory = CreatePersistenceTestDirectory("cancelled-after-commit-boundary");
+        var path = Path.Combine(directory, "machine.ovmachine");
+        try
+        {
+            await _fileStore.SaveAsync(new MachineProjectDocument { Name = "Before" }, path);
+            await _fileStore.SaveAsync(new MachineProjectDocument { Name = "Committed" }, path);
+            var primaryBefore = await File.ReadAllBytesAsync(path);
+            using var cancellation = new CancellationTokenSource();
+            var committedStore = new ProjectDocumentFileStore(
+                new ProjectDocumentStore(),
+                afterTemporaryFileWritten: null,
+                beforeCommit: _ => cancellation.Cancel());
+            var document = new MachineProjectDocument
+            {
+                Schema = "1.10",
+                Name = "Committed after boundary",
+                ModifiedAt = new DateTimeOffset(2026, 8, 10, 0, 0, 0, TimeSpan.Zero)
+            };
+            var modifiedAtBefore = document.ModifiedAt;
+
+            await committedStore.SaveAsync(document, path, cancellation.Token);
+
+            Assert.True(cancellation.IsCancellationRequested);
+            Assert.Equal(MachineProjectDocument.CurrentSchema, document.Schema);
+            Assert.NotEqual(modifiedAtBefore, document.ModifiedAt);
+            Assert.Equal("Committed after boundary", (await committedStore.LoadAsync(path)).Name);
+            Assert.Equal(primaryBefore, await File.ReadAllBytesAsync(path + ".bak"));
+            Assert.Empty(Directory.EnumerateFiles(directory, ".*.tmp"));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Mch006_SaveAsync_PreservesPrimaryExceptionWhenTemporaryCleanupAlsoFails()
+    {
+        var directory = CreatePersistenceTestDirectory("cleanup-double-failure");
+        var path = Path.Combine(directory, "machine.ovmachine");
+        var primaryException = new IOException("primary commit failure");
+        var cleanupException = new IOException("temporary cleanup failure");
+        try
+        {
+            var store = new ProjectDocumentFileStore(
+                new ProjectDocumentStore(),
+                afterTemporaryFileWritten: null,
+                beforeCommit: _ => throw primaryException,
+                deleteTemporaryFile: _ => throw cleanupException);
+            var document = new MachineProjectDocument
+            {
+                Schema = "1.10",
+                Name = "Double failure",
+                ModifiedAt = new DateTimeOffset(2026, 8, 10, 0, 0, 0, TimeSpan.Zero)
+            };
+            var schemaBefore = document.Schema;
+            var modifiedAtBefore = document.ModifiedAt;
+
+            var exception = await Assert.ThrowsAsync<IOException>(
+                () => store.SaveAsync(document, path));
+
+            Assert.Same(primaryException, exception);
+            Assert.Equal("primary commit failure", exception.Message);
+            Assert.Contains(nameof(ProjectDocumentFileStore.SaveAsync), exception.StackTrace, StringComparison.Ordinal);
+            var temporaryPath = Assert.IsType<string>(
+                exception.Data[ProjectDocumentFileStore.TemporaryCleanupPathDataKey]);
+            Assert.StartsWith(directory, temporaryPath, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(
+                "temporary cleanup failure",
+                Assert.IsType<string>(
+                    exception.Data[ProjectDocumentFileStore.TemporaryCleanupFailureDataKey]),
+                StringComparison.Ordinal);
+            Assert.Equal(schemaBefore, document.Schema);
+            Assert.Equal(modifiedAtBefore, document.ModifiedAt);
+            Assert.True(File.Exists(temporaryPath));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Mch006_SaveAsync_ReportsCleanupOnlyFailureWithoutConvertingSaveToSuccess()
+    {
+        var directory = CreatePersistenceTestDirectory("cleanup-only-failure");
+        var path = Path.Combine(directory, "machine.ovmachine");
+        var cleanupException = new IOException("temporary cleanup failure after commit");
+        try
+        {
+            var store = new ProjectDocumentFileStore(
+                new ProjectDocumentStore(),
+                afterTemporaryFileWritten: null,
+                beforeCommit: null,
+                deleteTemporaryFile: temporaryPath =>
+                {
+                    File.WriteAllText(temporaryPath, "leftover after commit");
+                    throw cleanupException;
+                });
+            var document = new MachineProjectDocument
+            {
+                Schema = "1.10",
+                Name = "Cleanup only",
+                ModifiedAt = new DateTimeOffset(2026, 8, 10, 0, 0, 0, TimeSpan.Zero)
+            };
+            var modifiedAtBefore = document.ModifiedAt;
+
+            var exception = await Assert.ThrowsAsync<IOException>(
+                () => store.SaveAsync(document, path));
+
+            Assert.Same(cleanupException, exception);
+            Assert.Equal("temporary cleanup failure after commit", exception.Message);
+            var temporaryPath = Assert.IsType<string>(
+                exception.Data[ProjectDocumentFileStore.TemporaryCleanupPathDataKey]);
+            Assert.True(File.Exists(temporaryPath));
+            Assert.Equal(
+                "Cleanup only",
+                (await store.LoadAsync(path)).Name);
+            Assert.Equal(MachineProjectDocument.CurrentSchema, document.Schema);
+            Assert.NotEqual(modifiedAtBefore, document.ModifiedAt);
+            Assert.Contains(
+                "temporary cleanup failure after commit",
+                Assert.IsType<string>(
+                    exception.Data[ProjectDocumentFileStore.TemporaryCleanupFailureDataKey]),
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task LoadAsync_CorruptPrimaryLoadsValidBackupWithoutRewritingSources()
     {
         var directory = CreatePersistenceTestDirectory("corrupt-primary");
@@ -684,6 +946,187 @@ public class ProjectDocumentStoreTests
 
             Assert.Equal("Recovered semantic damage", loaded.Name);
             Assert.Equal(primaryJson, await File.ReadAllTextAsync(path));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Mch003_LoadWithProvenanceAsync_ReportsPrimaryForHealthyFile()
+    {
+        var directory = CreatePersistenceTestDirectory("provenance-primary");
+        var path = Path.Combine(directory, "machine.ovmachine");
+        try
+        {
+            await _fileStore.SaveAsync(new MachineProjectDocument { Name = "Primary" }, path);
+
+            var result = await _fileStore.LoadWithProvenanceAsync(path);
+
+            Assert.Equal("Primary", result.Document.Name);
+            Assert.Equal(Path.GetFullPath(path), result.ProjectPath);
+            Assert.Equal(Path.GetFullPath(path), result.SourcePath);
+            Assert.Equal(ProjectDocumentLoadSource.Primary, result.Source);
+            Assert.Null(result.RecoveryReason);
+            Assert.False(result.IsRecoveredFromBackup);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Mch003_LoadWithProvenanceAsync_ReportsInvalidPrimaryAndPreservesFiles()
+    {
+        var directory = CreatePersistenceTestDirectory("provenance-invalid-primary");
+        var path = Path.Combine(directory, "machine.ovmachine");
+        var backupPath = path + ".bak";
+        const string primaryJson = "corrupted primary";
+        try
+        {
+            var backupJson = _store.Save(new MachineProjectDocument { Name = "Backup" });
+            await File.WriteAllTextAsync(path, primaryJson);
+            await File.WriteAllTextAsync(backupPath, backupJson);
+            var primaryBefore = await File.ReadAllBytesAsync(path);
+            var backupBefore = await File.ReadAllBytesAsync(backupPath);
+
+            var result = await _fileStore.LoadWithProvenanceAsync(path);
+
+            Assert.Equal("Backup", result.Document.Name);
+            Assert.Equal(Path.GetFullPath(path), result.ProjectPath);
+            Assert.Equal(Path.GetFullPath(backupPath), result.SourcePath);
+            Assert.Equal(ProjectDocumentLoadSource.Backup, result.Source);
+            Assert.Equal(ProjectDocumentRecoveryReason.PrimaryInvalid, result.RecoveryReason);
+            Assert.True(result.IsRecoveredFromBackup);
+            Assert.Equal(primaryBefore, await File.ReadAllBytesAsync(path));
+            Assert.Equal(backupBefore, await File.ReadAllBytesAsync(backupPath));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Mch003_LoadWithProvenanceAsync_ReportsMissingPrimary()
+    {
+        var directory = CreatePersistenceTestDirectory("provenance-missing-primary");
+        var path = Path.Combine(directory, "machine.ovmachine");
+        var backupPath = path + ".bak";
+        try
+        {
+            var backupJson = _store.Save(new MachineProjectDocument { Name = "Missing primary backup" });
+            await File.WriteAllTextAsync(backupPath, backupJson);
+
+            var result = await _fileStore.LoadWithProvenanceAsync(path);
+
+            Assert.Equal("Missing primary backup", result.Document.Name);
+            Assert.Equal(ProjectDocumentLoadSource.Backup, result.Source);
+            Assert.Equal(ProjectDocumentRecoveryReason.PrimaryMissing, result.RecoveryReason);
+            Assert.False(File.Exists(path));
+            Assert.Equal(backupJson, await File.ReadAllTextAsync(backupPath));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Mch003_LoadWithProvenanceAsync_ReportsUnreadablePrimaryWhenBackupIsValid()
+    {
+        var directory = CreatePersistenceTestDirectory("provenance-unreadable-primary");
+        var path = Path.Combine(directory, "machine.ovmachine");
+        var backupPath = path + ".bak";
+        try
+        {
+            Directory.CreateDirectory(path);
+            var backupJson = _store.Save(new MachineProjectDocument { Name = "Unreadable primary backup" });
+            await File.WriteAllTextAsync(backupPath, backupJson);
+
+            var result = await _fileStore.LoadWithProvenanceAsync(path);
+
+            Assert.Equal("Unreadable primary backup", result.Document.Name);
+            Assert.Equal(ProjectDocumentLoadSource.Backup, result.Source);
+            Assert.Equal(ProjectDocumentRecoveryReason.PrimaryUnreadable, result.RecoveryReason);
+            Assert.True(Directory.Exists(path));
+            Assert.Equal(backupJson, await File.ReadAllTextAsync(backupPath));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Mch003_LoadWithProvenanceAsync_UnsupportedPrimarySchemaDoesNotFallback()
+    {
+        var directory = CreatePersistenceTestDirectory("provenance-future-primary");
+        var path = Path.Combine(directory, "machine.ovmachine");
+        var backupPath = path + ".bak";
+        const string primaryJson = "{\"schema\":\"2.0\",\"name\":\"future\"}";
+        try
+        {
+            var backupJson = _store.Save(new MachineProjectDocument { Name = "Older backup" });
+            await File.WriteAllTextAsync(path, primaryJson);
+            await File.WriteAllTextAsync(backupPath, backupJson);
+
+            var exception = await Assert.ThrowsAsync<ProjectDocumentLoadException>(
+                () => _fileStore.LoadWithProvenanceAsync(path));
+
+            Assert.Equal(ProjectDocumentLoadErrorCode.UnsupportedSchema, exception.ErrorCode);
+            Assert.Equal("2.0", exception.ProjectSchema);
+            Assert.Equal(primaryJson, await File.ReadAllTextAsync(path));
+            Assert.Equal(backupJson, await File.ReadAllTextAsync(backupPath));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Mch003_LoadWithProvenanceAsync_BothSourcesCorruptRethrowsPrimary()
+    {
+        var directory = CreatePersistenceTestDirectory("provenance-both-corrupt");
+        var path = Path.Combine(directory, "machine.ovmachine");
+        var backupPath = path + ".bak";
+        const string primaryJson = "corrupted primary";
+        const string backupJson = "corrupted backup";
+        try
+        {
+            await File.WriteAllTextAsync(path, primaryJson);
+            await File.WriteAllTextAsync(backupPath, backupJson);
+
+            await Assert.ThrowsAsync<System.Text.Json.JsonException>(
+                () => _fileStore.LoadWithProvenanceAsync(path));
+
+            Assert.Equal(primaryJson, await File.ReadAllTextAsync(path));
+            Assert.Equal(backupJson, await File.ReadAllTextAsync(backupPath));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Mch003_LoadWithProvenance_SyncReportsBackupSource()
+    {
+        var directory = CreatePersistenceTestDirectory("provenance-sync");
+        var path = Path.Combine(directory, "machine.ovmachine");
+        try
+        {
+            File.WriteAllText(path, "corrupted primary");
+            File.WriteAllText(path + ".bak", _store.Save(new MachineProjectDocument { Name = "Sync backup" }));
+
+            var result = _fileStore.LoadWithProvenance(path);
+
+            Assert.Equal("Sync backup", result.Document.Name);
+            Assert.Equal(ProjectDocumentLoadSource.Backup, result.Source);
+            Assert.Equal(ProjectDocumentRecoveryReason.PrimaryInvalid, result.RecoveryReason);
         }
         finally
         {

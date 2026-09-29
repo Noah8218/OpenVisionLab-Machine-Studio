@@ -38,6 +38,9 @@
     <None Include="..\..\samples\AutomaticTransferCell\AutomaticTransferCell.ovmachine"
           Link="Samples\AutomaticTransferCell.ovmachine"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\LargeLayoutExploration\LargeLayoutExploration.ovmachine"
+          Link="Samples\LargeLayoutExploration.ovmachine"
+          CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\SemiconductorRecipes\01-FoupLoadPort.ovmachine"
           Link="SemiconductorRecipes\01-FoupLoadPort.ovmachine"
           CopyToOutputDirectory="PreserveNewest" />

@@ -274,6 +274,71 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task AutomaticLateResultSurvivesSourceContextRefreshAndIsQuarantined()
+    {
+        using var fixture = new IntegrationFixture();
+        var context = fixture.CreateContext() with
+        {
+            CurrentCamera = fixture.CreateContext().CurrentCamera! with
+            {
+                State = VirtualCameraState.AwaitingExternalResult,
+                Result = null
+            }
+        };
+        var snapshot = CreateSimulationSnapshot(context.CurrentCamera!);
+        var dispatched = 0;
+        using var viewModel = new MachineIntegrationViewModel(
+            () => context,
+            fixture.CreateProducer,
+            () => context.ProjectId,
+            fixture.SettingsPath,
+            simulationSnapshotProvider: () => snapshot,
+            dispatchSimulationCommandAsync: command =>
+            {
+                Interlocked.Increment(ref dispatched);
+                return Task.FromResult(new SimulationCommandResult(
+                    command.CommandId,
+                    false,
+                    snapshot.TickIndex,
+                    snapshot.SimulationTime,
+                    SimulationCommandErrorCode.ExternalInspectionNotPending,
+                    "late result quarantined"));
+            });
+        viewModel.Setup.ExchangeRoot = fixture.ExchangeRoot;
+        viewModel.Setup.InspectionRecipePath = fixture.RecipePath;
+        viewModel.Setup.TwoDConsumerVersion = "2.1.0";
+        viewModel.Setup.TwoDConsumerCommit = new string('2', 40);
+        viewModel.Setup.WaitForExternalResult = true;
+        viewModel.RefreshSourceContext();
+
+        var published = await viewModel.PublishAutomaticExternalInspectionAsync();
+        Assert.Equal(MachineIntegrationParticipantOutcome.Completed, published.Outcome);
+        var handoff = Assert.Single(MachineIntegrationExchange.DiscoverTransactions(fixture.ExchangeRoot)).Handoff;
+
+        context = context with
+        {
+            CurrentCamera = context.CurrentCamera! with
+            {
+                State = VirtualCameraState.Faulted,
+                FrameEvidence = null,
+                Result = null
+            }
+        };
+        snapshot = CreateSimulationSnapshot(context.CurrentCamera!, runtimeGeneration: 8);
+        viewModel.RefreshSourceContext();
+        PublishPassResult(fixture.ExchangeRoot, handoff, viewModel.Setup.TwoDConsumerIdentity!);
+
+        viewModel.RefreshResultsCommand.Execute(null);
+        await WaitForAsync(() =>
+            !viewModel.IsBusy
+            && viewModel.StatusText.Contains("Late external Result was quarantined", StringComparison.Ordinal));
+
+        Assert.Equal(1, Volatile.Read(ref dispatched));
+        Assert.Contains("Late external Result was quarantined", viewModel.StatusText, StringComparison.Ordinal);
+        Assert.False(viewModel.CanApplyResultToSimulation);
+    }
+
+    [Fact]
     public async Task AutomaticExternalRejectedAcknowledgementInvokesAbortCallback()
     {
         using var fixture = new IntegrationFixture();
@@ -502,9 +567,22 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
         Assert.Equal("45102", reloaded.Setup.TcpPeerPortText);
     }
 
-    [Fact]
-    public void MmiRecipeCatalogRestoresActiveSelectionAndRemovalKeepsSourceFile()
+    [Theory]
+    [InlineData(OpenVisionLanguage.Korean)]
+    [InlineData(OpenVisionLanguage.English)]
+    public void InspectionLabelsAndRecipeRoundTripPreserveProductIdentity(OpenVisionLanguage language)
     {
+        OpenVisionLanguageService.SetLanguage(language, save: false);
+        string[] labelKeys = ["Integration.InspectionRecipeManager", "Integration.InspectionRecipeManagerHint",
+            "Integration.InspectionRecipeAddTooltip", "Integration.InspectionRecipeRemoveTooltip",
+            "Integration.InspectionWorkspaceTitle", "Integration.InspectionWorkspaceHint",
+            "Integration.InspectionActiveRecipeTooltip", "Integration.InspectionWorkspace"];
+        foreach (var key in labelKeys)
+        {
+            var text = OpenVisionLanguageService.T(key);
+            Assert.NotEqual(key, text);
+            Assert.DoesNotContain("MMI", text, StringComparison.OrdinalIgnoreCase);
+        }
         using var fixture = new IntegrationFixture();
         var alternateRecipePath = Path.Combine(
             Path.GetDirectoryName(fixture.RecipePath)!,
@@ -519,8 +597,10 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
         viewModel.Setup.ExchangeRoot = fixture.ExchangeRoot;
         viewModel.Setup.InspectionRecipePath = fixture.RecipePath;
         viewModel.Setup.AddRecipeCommand.Execute(null);
+        Assert.DoesNotContain("MMI", viewModel.StatusText, StringComparison.OrdinalIgnoreCase);
         viewModel.Setup.InspectionRecipePath = fixture.RecipePath;
         viewModel.Setup.SaveSetupCommand.Execute(null);
+        Assert.DoesNotContain("MMI", viewModel.StatusText, StringComparison.OrdinalIgnoreCase);
 
         Assert.Equal(
             new[] { alternateRecipePath, fixture.RecipePath },
@@ -538,6 +618,7 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
         Assert.Equal(fixture.RecipePath, reloaded.Setup.SelectedRecipe?.Path);
 
         reloaded.Setup.RemoveRecipeCommand.Execute(reloaded.Setup.SelectedRecipe);
+        Assert.DoesNotContain("MMI", reloaded.StatusText, StringComparison.OrdinalIgnoreCase);
 
         Assert.Equal(alternateRecipePath, reloaded.Setup.SelectedRecipe?.Path);
         Assert.True(File.Exists(fixture.RecipePath));
@@ -1568,7 +1649,9 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
         Assert.Contains("3D", viewModel.ProjectionStatusText, StringComparison.Ordinal);
     }
 
-    private static SimulationSnapshot CreateSimulationSnapshot(VirtualCameraSnapshot camera) =>
+    private static SimulationSnapshot CreateSimulationSnapshot(
+        VirtualCameraSnapshot camera,
+        long runtimeGeneration = 7) =>
         new(
             TimeSpan.FromMilliseconds(15),
             3,
@@ -1583,7 +1666,7 @@ public sealed class MachineIntegrationViewModelTests : IDisposable
             AutomaticRunSnapshot.NotConfigured,
             Array.Empty<LayoutComponentSnapshot>(),
             projectId: "project-1",
-            runtimeGeneration: 7);
+            runtimeGeneration: runtimeGeneration);
 
     private static void PublishPassResult(
         string exchangeRoot,

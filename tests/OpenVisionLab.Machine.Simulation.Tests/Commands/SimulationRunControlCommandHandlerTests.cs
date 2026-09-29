@@ -26,6 +26,35 @@ public sealed class SimulationRunControlCommandHandlerTests
     }
 
     [Fact]
+    public void Apply_FastForwardSchedulesFiniteBudgetOnlyWhilePaused()
+    {
+        var handler = new SimulationRunControlCommandHandler();
+        var context = CreateContext();
+
+        var outcome = handler.Apply(new FastForwardCommand(7), context);
+
+        Assert.True(outcome.Result.IsAccepted, outcome.Result.Detail);
+        Assert.Equal(SimulationRunMode.FastForward, outcome.RunMode);
+        Assert.Equal(SimulationControlOwner.Manual, outcome.ControlOwner);
+        Assert.Equal(7, outcome.PendingSteps);
+        Assert.Equal(SequenceDebugPauseReason.None, context.SequenceDebugState.CreateSnapshot().PauseReason);
+    }
+
+    [Fact]
+    public void Apply_FastForwardRejectsActiveRealtimeRun()
+    {
+        var handler = new SimulationRunControlCommandHandler();
+        var context = CreateContext(runMode: SimulationRunMode.RealTime);
+
+        var outcome = handler.Apply(new FastForwardCommand(1), context);
+
+        Assert.False(outcome.Result.IsAccepted);
+        Assert.Equal(SimulationCommandErrorCode.InvalidRunMode, outcome.Result.ErrorCode);
+        Assert.Null(outcome.RunMode);
+        Assert.Null(outcome.PendingSteps);
+    }
+
+    [Fact]
     public void Apply_StepIncrementsPendingStepsOnlyFromAllowedModes()
     {
         var handler = new SimulationRunControlCommandHandler();

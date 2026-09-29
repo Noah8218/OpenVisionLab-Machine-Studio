@@ -37,10 +37,13 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" MinHeight="110" />
-                <RowDefinition Height="228" />
             </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="390" />
+                <ColumnDefinition Width="410" />
+            </Grid.ColumnDefinitions>
 
-            <Border Grid.Row="0" Style="{StaticResource PanelHeaderStyle}">
+            <Border Grid.Row="0" Grid.ColumnSpan="2" Style="{StaticResource PanelHeaderStyle}">
                 <Grid>
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource PanelHeaderTextStyle}" Text="{loc:Loc Key=Sequence.Editor}" />
@@ -57,7 +60,7 @@
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="1" Margin="10,8,10,7">
+            <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="10,8,10,7">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -124,8 +127,164 @@
                 </WrapPanel>
             </Grid>
 
-            <DataGrid Grid.Row="2"
-                      Margin="10,0,10,8"
+            <TabControl Grid.Row="2" Margin="10,0,10,8">
+                <TabItem Header="{loc:Loc Key=Sequence.GraphView}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid Margin="8,6,8,2">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasExecutingStep}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Margin="0,0,8,0" Foreground="{DynamicResource State.Warning}"
+                                       Text="{loc:Loc Key=Left.CurrentStep}" />
+                            <TextBlock Grid.Column="1" FontWeight="SemiBold"
+                                       Text="{Binding CurrentRuntimeStepName}" TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                        <Border Grid.Row="1" Margin="8,2,8,8" Padding="12"
+                                BorderBrush="{DynamicResource Border.Default}"
+                                BorderThickness="1" CornerRadius="7">
+                    <ListBox ItemsSource="{Binding Steps}"
+                             BorderThickness="0"
+                             SelectedItem="{Binding SelectedStep, Mode=TwoWay}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.Background>
+                            <DrawingBrush TileMode="Tile" Viewbox="0,0,18,18" ViewboxUnits="Absolute"
+                                          Viewport="0,0,18,18" ViewportUnits="Absolute">
+                                <DrawingBrush.Drawing>
+                                    <GeometryDrawing Brush="#325363">
+                                        <GeometryDrawing.Geometry>
+                                            <EllipseGeometry Center="1,1" RadiusX="1" RadiusY="1" />
+                                        </GeometryDrawing.Geometry>
+                                    </GeometryDrawing>
+                                </DrawingBrush.Drawing>
+                            </DrawingBrush>
+                        </ListBox.Background>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Margin" Value="8,8,8,18" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <ContentPresenter HorizontalAlignment="Stretch" />
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel MaxWidth="420" HorizontalAlignment="Center">
+                                <Border MaxWidth="420" HorizontalAlignment="Stretch"
+                                        Padding="2" BorderThickness="2" CornerRadius="8">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="BorderBrush" Value="Transparent" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsExecuting}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource State.Warning}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                <Border Padding="12,9" CornerRadius="6">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="{DynamicResource Surface.Raised}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+                                            <Setter Property="BorderThickness" Value="1" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource Surface.Hover}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                                                    <Setter Property="BorderThickness" Value="2" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                                                    <Setter Property="BorderThickness" Value="2" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="26" />
+                                                <ColumnDefinition Width="*" />
+                                                 <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock FontWeight="SemiBold" Foreground="{DynamicResource Accent.Primary}"
+                                                       Text="{Binding Order}" />
+                                            <TextBlock Grid.Column="1" FontWeight="SemiBold"
+                                                       Text="{Binding DisplayName}" TextWrapping="Wrap" />
+                                             <TextBlock Grid.Column="2" Margin="8,0,0,0" FontSize="10"
+                                                        Foreground="{DynamicResource State.Warning}"
+                                                        Text="{loc:Loc Key=Shell.Running}">
+                                                 <TextBlock.Style>
+                                                     <Style TargetType="TextBlock">
+                                                         <Setter Property="Visibility" Value="Collapsed" />
+                                                         <Style.Triggers>
+                                                             <DataTrigger Binding="{Binding IsExecuting}" Value="True">
+                                                                 <Setter Property="Visibility" Value="Visible" />
+                                                             </DataTrigger>
+                                                         </Style.Triggers>
+                                                     </Style>
+                                                 </TextBlock.Style>
+                                             </TextBlock>
+                                        </Grid>
+                                        <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{Binding Action, Converter={StaticResource LocalizedSequenceActionConverter}}" />
+                                        <TextBlock Margin="0,2,0,0" Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{Binding TargetId}" TextWrapping="Wrap" />
+                                        <TextBlock Margin="0,5,0,0" Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{Binding ValidationText}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                                </Border>
+                                    <TextBlock Margin="0,5,0,0"
+                                               HorizontalAlignment="Center"
+                                               FontSize="10"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding TransitionSummary}"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding TransitionSummary}" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                        </Border>
+                    </Grid>
+                </TabItem>
+                <TabItem Header="{loc:Loc Key=Sequence.TableView}">
+            <DataGrid
+                      Margin="0"
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"
                       CanUserDeleteRows="False"
@@ -166,17 +325,18 @@
                     </DataGridTemplateColumn>
                 </DataGrid.Columns>
             </DataGrid>
+                </TabItem>
+            </TabControl>
 
-            <Grid Grid.Row="3" Margin="10,0,10,10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*" MinWidth="330" />
-                    <ColumnDefinition Width="8" />
-                    <ColumnDefinition Width="*" MinWidth="180" />
-                </Grid.ColumnDefinitions>
+            <ScrollViewer Grid.Row="2" Grid.Column="1" Margin="0,0,10,8"
+                          HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
 
-                <Border Grid.Column="0" Padding="10,8" Style="{StaticResource InspectorCardStyle}">
+                <Border Margin="0,0,0,8" Padding="10,8" Style="{StaticResource InspectorCardStyle}">
                     <Grid IsEnabled="{Binding IsEditable}">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -207,20 +367,39 @@
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
-                        <TextBlock Grid.Row="1" Grid.Column="2" Margin="8,0,7,0"
-                                   Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Target}" />
+                        <TextBlock Grid.Row="2"
+                                   Text="{loc:Loc Key=Sequence.Target}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource SequenceFieldLabelStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedStep.UsesWorkpieceAsTarget}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                         <ComboBox x:Name="SequenceTargetComboBox"
-                                  Grid.Row="1" Grid.Column="3"
+                                  Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3"
                                   DisplayMemberPath="Name"
                                   IsEnabled="{Binding SelectedStep.HasTargetOptions}"
                                   ItemsSource="{Binding SelectedStep.AvailableTargets}"
                                   SelectedValue="{Binding SelectedStep.TargetId, Mode=TwoWay}"
                                   SelectedValuePath="Id"
-                                  ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}"
-                                  Style="{StaticResource SequenceComboBoxStyle}" />
+                                  ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}">
+                            <ComboBox.Style>
+                                <Style TargetType="ComboBox" BasedOn="{StaticResource SequenceComboBoxStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedStep.UsesWorkpieceAsTarget}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ComboBox.Style>
+                        </ComboBox>
 
-                        <TextBlock Grid.Row="2" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Value}" />
-                        <Grid Grid.Row="2" Grid.Column="1">
+                        <TextBlock Grid.Row="3" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Value}" />
+                        <Grid Grid.Row="3" Grid.Column="1">
                             <TextBox IsEnabled="{Binding SelectedStep.IsParameterEditable}"
                                      Text="{Binding SelectedStep.Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                                 <TextBox.Style>
@@ -247,70 +426,100 @@
                                 </ComboBox.Style>
                             </ComboBox>
                         </Grid>
-                        <TextBlock Grid.Row="2" Grid.Column="2" Margin="8,0,7,0"
+                        <TextBlock Grid.Row="3" Grid.Column="2" Margin="8,0,7,0"
                                    Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Timeout}" />
-                        <TextBox Grid.Row="2" Grid.Column="3"
+                        <TextBox Grid.Row="3" Grid.Column="3"
                                  IsEnabled="{Binding SelectedStep.IsTimeoutEditable}"
                                  Style="{StaticResource SequenceTextBoxStyle}"
                                  Text="{Binding SelectedStep.TimeoutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                        <TextBlock Grid.Row="3" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Next}" />
-                        <TextBox Grid.Row="3" Grid.Column="1"
+                        <TextBlock Grid.Row="4" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Next}" />
+                        <TextBox Grid.Row="4" Grid.Column="1"
                                  Style="{StaticResource SequenceTextBoxStyle}"
                                  Text="{Binding SelectedStep.NextStepId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Grid.Row="3" Grid.Column="2" Margin="8,0,7,0"
+                        <TextBlock Grid.Row="4" Grid.Column="2" Margin="8,0,7,0"
                                    Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Error}" />
-                        <TextBox Grid.Row="3" Grid.Column="3"
+                        <TextBox Grid.Row="4" Grid.Column="3"
                                  Style="{StaticResource SequenceTextBoxStyle}"
                                  Text="{Binding SelectedStep.ErrorStepId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                        <TextBlock Grid.Row="4" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Failure}" />
-                        <TextBox Grid.Row="4" Grid.Column="1"
+                        <TextBlock Grid.Row="5" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Failure}" />
+                        <TextBox Grid.Row="5" Grid.Column="1"
                                  Style="{StaticResource SequenceTextBoxStyle}"
                                  Text="{Binding SelectedStep.FailureStepId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Grid.Row="4" Grid.Column="2" Margin="8,0,7,0"
+                        <TextBlock Grid.Row="5" Grid.Column="2" Margin="8,0,7,0"
                                    Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.StepId}" />
-                        <TextBox Grid.Row="4" Grid.Column="3"
+                        <TextBox Grid.Row="5" Grid.Column="3"
                                  IsReadOnly="True"
                                  Style="{StaticResource SequenceTextBoxStyle}"
                                  Text="{Binding SelectedStep.Id, Mode=OneWay}" />
 
-                        <Grid Grid.Row="5" Grid.ColumnSpan="4" Margin="0,3,0,0">
+                        <Grid Grid.Row="6" Grid.ColumnSpan="4" Margin="0,3,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="8" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="8" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="8" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <CheckBox VerticalAlignment="Center"
+                            <CheckBox Grid.ColumnSpan="2" VerticalAlignment="Center"
                                       AutomationProperties.Name="{loc:Loc Key=Sequence.ExpectedCheckpoint}"
                                       Content="{loc:Loc Key=Sequence.ExpectedCheckpoint}"
                                       IsChecked="{Binding SelectedStep.HasExpectedState, Mode=TwoWay}"
                                       IsEnabled="{Binding SelectedStep.CanSetExpectedState}"
                                       ToolTip="{loc:Loc Key=Sequence.ExpectedCheckpointTooltip}" />
-                            <ComboBox Grid.Column="2"
+                            <ComboBox Grid.Row="1" Grid.ColumnSpan="2"
                                       DisplayMemberPath="Name"
                                       IsEnabled="{Binding SelectedStep.HasExpectedState}"
                                       ItemsSource="{Binding SelectedStep.AvailableExpectedStateTargets}"
                                       SelectedValue="{Binding SelectedStep.ExpectedTargetId, Mode=TwoWay}"
                                       SelectedValuePath="Id"
                                       Style="{StaticResource SequenceComboBoxStyle}" />
-                            <TextBlock Grid.Column="4"
+                            <TextBlock Grid.Row="2"
                                        Style="{StaticResource SequenceFieldLabelStyle}"
                                        Text="{loc:Loc Key=Sequence.ExpectedState}" />
-                            <ComboBox Grid.Column="6"
+                            <ComboBox Grid.Row="2" Grid.Column="1"
                                       IsEnabled="{Binding SelectedStep.HasExpectedState}"
                                       ItemsSource="{Binding SelectedStep.AvailableExpectedStates}"
                                       SelectedItem="{Binding SelectedStep.ExpectedState, Mode=TwoWay}"
                                       Style="{StaticResource SequenceComboBoxStyle}" />
                         </Grid>
+
+                        <Grid Grid.Row="7" Grid.ColumnSpan="4" Margin="0,4,0,0">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedStep.HasWorkpieceTargetOptions}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="58" />
+                                <ColumnDefinition Width="5*" />
+                                <ColumnDefinition Width="58" />
+                                <ColumnDefinition Width="7*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.ColumnSpan="2"
+                                       Style="{StaticResource SequenceFieldLabelStyle}"
+                                       Text="{loc:Loc Key=Sequence.WorkpieceTarget}" />
+                            <ComboBox Grid.Column="2"
+                                      Grid.ColumnSpan="2"
+                                      AutomationProperties.Name="{loc:Loc Key=Sequence.WorkpieceTarget}"
+                                      DisplayMemberPath="Name"
+                                      ItemsSource="{Binding SelectedStep.AvailableWorkpieceTargets}"
+                                      SelectedValue="{Binding SelectedStep.WorkpieceComponentId, Mode=TwoWay}"
+                                      SelectedValuePath="Id"
+                                      Style="{StaticResource SequenceComboBoxStyle}" />
+                        </Grid>
                     </Grid>
                 </Border>
 
-                <Border Grid.Column="2" Padding="10,8" Style="{StaticResource InspectorCardStyle}">
+                <Border Padding="10,8" Style="{StaticResource InspectorCardStyle}">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -382,7 +591,8 @@
                         </ListBox>
                     </Grid>
                 </Border>
-            </Grid>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
     </Border>
 </UserControl>

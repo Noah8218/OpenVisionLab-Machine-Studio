@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using OpenVisionLab.Machine.Simulation.Axis;
 using OpenVisionLab.MachineStudio.View.Inspector;
+using OpenVisionLab.MachineStudio.View.Scene;
 using OpenVisionLab.MachineStudio.View.Shell;
 using OpenVisionLab.MachineStudio.ViewModel;
 
@@ -22,6 +23,8 @@ internal static class SmokeMultiAxisCommissioningStateVerifier
     {
         var inspector = SmokeVisualTreeQuery.FindVisualDescendant<RightToolRegionView>(window)
             ?? throw new InvalidOperationException("Right inspector was unavailable.");
+        var document = SmokeVisualTreeQuery.FindVisualDescendant<SceneDocumentView>(window)
+            ?? throw new InvalidOperationException("Scene document was unavailable.");
         switch (state.ToLowerInvariant())
         {
             case "design":
@@ -126,6 +129,8 @@ internal static class SmokeMultiAxisCommissioningStateVerifier
                     || state.Equals("baseline-mismatch", StringComparison.OrdinalIgnoreCase)
                     || state.Equals("baseline-mismatch-x", StringComparison.OrdinalIgnoreCase))
                 {
+                    viewModel.Navigation.IsResultsWorkspace = true;
+                    await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                     viewModel.MultiAxisCommissioningRecipe.ValidationRepetitions = 2;
                     var initialHistoryCount = viewModel.CommissioningResultHistory.Entries.Length;
                     viewModel.ValidateMultiAxisCommissioningRecipeCommand.Execute(null);
@@ -148,15 +153,15 @@ internal static class SmokeMultiAxisCommissioningStateVerifier
                     {
                         if (state.Equals("baseline-pressed", StringComparison.OrdinalIgnoreCase))
                         {
-                            inspector.AcceptCommissioningBaselineButton.BringIntoView();
+                            document.AcceptCommissioningBaselineButton.BringIntoView();
                             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                             interaction.ActivateWindow();
-                            interaction.MovePointerToCenter(inspector.AcceptCommissioningBaselineButton);
+                            interaction.MovePointerToCenter(document.AcceptCommissioningBaselineButton);
                             await Task.Delay(100);
                             interaction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
                             interaction.MarkSmokePointerHeld();
                             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                            if (!inspector.AcceptCommissioningBaselineButton.IsPressed)
+                            if (!document.AcceptCommissioningBaselineButton.IsPressed)
                             {
                                 throw new InvalidOperationException("Baseline accept did not enter pointer-down state.");
                             }
@@ -192,7 +197,10 @@ internal static class SmokeMultiAxisCommissioningStateVerifier
                                         $"Commissioning baseline mismatch did not target axis '{expectedAxisId}'.");
                                 }
                                 viewModel.NavigateToCommissioningMismatchCommand.Execute(null);
-                                if (viewModel.Layout.SelectedItem?.Id != expectedAxisId)
+                                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                                if (viewModel.Layout.SelectedItem?.Id != expectedAxisId
+                                    || !viewModel.Navigation.IsEquipmentWorkspace || !document.SceneViewport.IsVisible
+                                    || !viewModel.IsRunMode || viewModel.IsRunning)
                                 {
                                     throw new InvalidOperationException(
                                         $"Commissioning mismatch navigation did not select axis '{expectedAxisId}'.");
@@ -203,15 +211,15 @@ internal static class SmokeMultiAxisCommissioningStateVerifier
                     if (state.Equals("baseline-mismatch", StringComparison.OrdinalIgnoreCase)
                         || state.Equals("baseline-mismatch-x", StringComparison.OrdinalIgnoreCase))
                     {
-                        inspector.NavigateCommissioningMismatchButton.BringIntoView();
+                        document.SceneViewport.BringIntoView();
                     }
                     else if (state.Equals("baseline-accepted", StringComparison.OrdinalIgnoreCase))
                     {
-                        inspector.AcceptCommissioningBaselineButton.BringIntoView();
+                        document.AcceptCommissioningBaselineButton.BringIntoView();
                     }
                     else
                     {
-                        inspector.CommissioningResultHistoryList.BringIntoView();
+                        document.CommissioningResultHistoryList.BringIntoView();
                     }
                 }
                 else if (state.Equals("validated", StringComparison.OrdinalIgnoreCase)

@@ -85,7 +85,7 @@ public sealed class ShellNavigationViewModelTests
     }
 
     [Fact]
-    public void SelectionAndCompactStateRaiseOnlyNavigationProperties()
+    public void SelectionAndAdaptiveLayoutStateRaiseOnlyNavigationProperties()
     {
         using var viewModel = new ShellNavigationViewModel(
             isStartupChoiceVisible: false,
@@ -100,13 +100,48 @@ public sealed class ShellNavigationViewModelTests
         viewModel.SelectedDocumentTabIndex = 2;
         viewModel.SelectedLeftToolTabIndex = 1;
         viewModel.IsCompactLayout = true;
+        viewModel.IsNarrowLayout = true;
 
         Assert.Equal(
             [
-                nameof(ShellNavigationViewModel.SelectedDocumentTabIndex),
                 nameof(ShellNavigationViewModel.SelectedLeftToolTabIndex),
-                nameof(ShellNavigationViewModel.IsCompactLayout)
+                nameof(ShellNavigationViewModel.IsEquipmentOutlineVisible),
+                nameof(ShellNavigationViewModel.SelectedWorkspaceIndex),
+                nameof(ShellNavigationViewModel.IsEquipmentWorkspace),
+                nameof(ShellNavigationViewModel.IsSimulationWorkspace),
+                nameof(ShellNavigationViewModel.IsInspectionWorkspace),
+                nameof(ShellNavigationViewModel.IsResultsWorkspace),
+                nameof(ShellNavigationViewModel.IsEquipmentOutlineVisible),
+                nameof(ShellNavigationViewModel.SelectedExecutionTabIndex),
+                nameof(ShellNavigationViewModel.SelectedDocumentTabIndex),
+                nameof(ShellNavigationViewModel.SelectedDocumentContentIndex),
+                nameof(ShellNavigationViewModel.SelectedLeftToolTabIndex),
+                nameof(ShellNavigationViewModel.IsEquipmentOutlineVisible),
+                nameof(ShellNavigationViewModel.IsCompactLayout),
+                nameof(ShellNavigationViewModel.IsNarrowLayout)
             ],
+            changed);
+    }
+
+    [Fact]
+    public void InspectionSettingsExpandedIsSessionPresentationState()
+    {
+        using var viewModel = new ShellNavigationViewModel(
+            isStartupChoiceVisible: false,
+            canStartBlankLayout: () => false,
+            canOpenBundledSample: () => false,
+            openBundledSampleAsync: () => Task.CompletedTask,
+            onBlankLayoutStarted: () => { },
+            onCommandException: exception => throw exception);
+        var changed = new List<string>();
+        viewModel.PropertyChanged += (_, args) => changed.Add(args.PropertyName ?? string.Empty);
+
+        viewModel.IsInspectionSettingsExpanded = true;
+        viewModel.IsInspectionSettingsExpanded = false;
+
+        Assert.False(viewModel.IsInspectionSettingsExpanded);
+        Assert.Equal(
+            [nameof(ShellNavigationViewModel.IsInspectionSettingsExpanded), nameof(ShellNavigationViewModel.IsInspectionSettingsExpanded)],
             changed);
     }
 
@@ -142,6 +177,90 @@ public sealed class ShellNavigationViewModelTests
     }
 
     [Fact]
+    public void R19WorkspacesRouteToExistingPagesAndPreserveSubworkspaceSelection()
+    {
+        using var navigation = new ShellNavigationViewModel(false, () => false, () => false,
+            () => Task.CompletedTask, () => { }, exception => throw exception);
+
+        navigation.IsSimulationWorkspace = true;
+        navigation.SelectedExecutionTabIndex = 1;
+        Assert.Equal(2, navigation.SelectedDocumentTabIndex);
+        Assert.Equal(0, navigation.SelectedDocumentContentIndex);
+        navigation.IsEquipmentWorkspace = true;
+        Assert.Equal(0, navigation.SelectedExecutionTabIndex);
+        navigation.IsSimulationWorkspace = true;
+        Assert.Equal(1, navigation.SelectedExecutionTabIndex);
+        Assert.Equal(2, navigation.SelectedDocumentTabIndex);
+
+        navigation.IsInspectionWorkspace = true;
+        navigation.SelectedInspectionTabIndex = 1;
+        Assert.Equal(1, navigation.SelectedDocumentTabIndex);
+        navigation.IsResultsWorkspace = true;
+        Assert.Equal(3, navigation.SelectedDocumentTabIndex);
+        navigation.IsInspectionWorkspace = true;
+        Assert.Equal(1, navigation.SelectedInspectionTabIndex);
+        Assert.Equal(1, navigation.SelectedDocumentTabIndex);
+
+        navigation.SelectedDocumentTabIndex = 2;
+        Assert.True(navigation.IsSimulationWorkspace);
+        Assert.Equal(1, navigation.SelectedExecutionTabIndex);
+        navigation.SelectedWorkspaceIndex = -1;
+        navigation.SelectedDocumentTabIndex = 99;
+        Assert.True(navigation.IsSimulationWorkspace);
+        Assert.Equal(2, navigation.SelectedDocumentTabIndex);
+        navigation.SelectedDocumentTabIndex = 0;
+        Assert.True(navigation.IsEquipmentWorkspace);
+        Assert.Equal(0, navigation.SelectedDocumentContentIndex);
+    }
+
+    [Fact]
+    public void OpenComponentLibraryCommandSelectsLibraryWithoutChangingEquipmentWorkspace()
+    {
+        using var navigation = new ShellNavigationViewModel(false, () => false, () => false,
+            () => Task.CompletedTask, () => { }, exception => throw exception);
+        navigation.IsEquipmentWorkspace = true;
+        navigation.SelectedLeftToolTabIndex = 0;
+
+        navigation.OpenComponentLibraryCommand.Execute(null);
+
+        Assert.Equal(1, navigation.SelectedLeftToolTabIndex);
+        Assert.True(navigation.IsEquipmentWorkspace);
+        navigation.Dispose();
+        Assert.False(navigation.OpenComponentLibraryCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void EquipmentOutlineAndSequenceActionsStayOnExistingNavigationOwners()
+    {
+        using var navigation = new ShellNavigationViewModel(false, () => false, () => false,
+            () => Task.CompletedTask, () => { }, exception => throw exception);
+
+        Assert.True(navigation.IsEquipmentOutlineVisible);
+        navigation.IsSimulationWorkspace = true;
+
+        Assert.Equal(3, navigation.SelectedLeftToolTabIndex);
+        Assert.True(navigation.IsEquipmentOutlineVisible);
+        navigation.SelectedLeftToolTabIndex = 1;
+        Assert.False(navigation.IsEquipmentOutlineVisible);
+        navigation.SelectedLeftToolTabIndex = 3;
+        Assert.True(navigation.IsEquipmentOutlineVisible);
+        navigation.SelectedLeftToolTabIndex = 2;
+        Assert.False(navigation.IsEquipmentOutlineVisible);
+
+        navigation.IsEquipmentWorkspace = true;
+
+        Assert.Equal(0, navigation.SelectedLeftToolTabIndex);
+        Assert.True(navigation.IsEquipmentOutlineVisible);
+        navigation.OpenSequenceEditorCommand.Execute(null);
+        Assert.True(navigation.IsSimulationWorkspace);
+        Assert.Equal(1, navigation.SelectedExecutionTabIndex);
+        Assert.Equal(2, navigation.SelectedDocumentTabIndex);
+
+        navigation.Dispose();
+        Assert.False(navigation.OpenSequenceEditorCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void DisposalNotifiesStartupCommandsOfFinalAdmission()
     {
         using var viewModel = new ShellNavigationViewModel(
@@ -162,5 +281,97 @@ public sealed class ShellNavigationViewModelTests
         Assert.False(viewModel.OpenBundledSampleCommand.CanExecute(null));
         Assert.Equal(1, startNotifications);
         Assert.Equal(1, openNotifications);
+    }
+
+    [Fact]
+    public void SimulationSubtabsRetainTheirSelectionAcrossWorkspaceChanges()
+    {
+        using var navigation = new ShellNavigationViewModel(false, () => false, () => false,
+            () => Task.CompletedTask, () => { }, exception => throw exception);
+        navigation.SelectedExecutionTabIndex = 1;
+        Assert.Equal(0, navigation.SelectedExecutionTabIndex);
+        navigation.IsSimulationWorkspace = true;
+        navigation.SelectedExecutionTabIndex = 1;
+        Assert.Equal(2, navigation.SelectedDocumentTabIndex);
+        Assert.Equal(0, navigation.SelectedDocumentContentIndex);
+        navigation.SelectedExecutionTabIndex = -1;
+        navigation.SelectedExecutionTabIndex = 2;
+        Assert.Equal(2, navigation.SelectedExecutionTabIndex);
+        Assert.Equal(0, navigation.SelectedDocumentTabIndex);
+        navigation.SelectedExecutionTabIndex = 3;
+        Assert.Equal(2, navigation.SelectedExecutionTabIndex);
+        navigation.IsEquipmentWorkspace = true;
+        Assert.Equal(0, navigation.SelectedExecutionTabIndex);
+        navigation.SelectedExecutionTabIndex = 0;
+        navigation.IsResultsWorkspace = true;
+        Assert.Equal(3, navigation.SelectedDocumentTabIndex);
+        navigation.IsSimulationWorkspace = true;
+        Assert.Equal(2, navigation.SelectedExecutionTabIndex);
+        Assert.Equal(0, navigation.SelectedDocumentContentIndex);
+    }
+
+    [Fact]
+    public void EvidencePanelRetainsTabAcrossCollapseAndWorkspaceChangesWithoutProjectActions()
+    {
+        using var navigation = new ShellNavigationViewModel(false, () => false, () => false,
+            () => throw new InvalidOperationException("Navigation must not open a project."),
+            () => throw new InvalidOperationException("Navigation must not create a layout."), exception => throw exception);
+        navigation.IsSimulationWorkspace = true;
+        navigation.SelectedExecutionTabIndex = 2;
+        navigation.IsEvidenceExpanded = true;
+        navigation.SelectedEvidenceTabIndex = 2;
+        navigation.IsEvidenceExpanded = false;
+        navigation.IsInspectionWorkspace = true;
+        navigation.IsSimulationWorkspace = true;
+        navigation.SelectedEvidenceTabIndex = -1;
+        navigation.SelectedEvidenceTabIndex = 4;
+        navigation.IsEvidenceExpanded = true;
+
+        Assert.Equal(2, navigation.SelectedEvidenceTabIndex);
+        Assert.Equal(2, navigation.SelectedExecutionTabIndex);
+        Assert.True(navigation.IsEvidenceExpanded);
+    }
+
+    [Fact]
+    public void InspectorAndEvidenceDrawerCommandsToggleAndResetWithWorkspaceNavigation()
+    {
+        using var navigation = new ShellNavigationViewModel(false, () => false, () => false,
+            () => throw new InvalidOperationException("Navigation must not open a project."),
+            () => throw new InvalidOperationException("Navigation must not create a layout."), exception => throw exception);
+
+        Assert.False(navigation.IsInspectorOpen);
+        Assert.True(navigation.ToggleInspectorCommand.CanExecute(null));
+        navigation.ToggleInspectorCommand.Execute(null);
+        Assert.True(navigation.IsInspectorOpen);
+        navigation.ToggleInspectorCommand.Execute(null);
+        Assert.False(navigation.IsInspectorOpen);
+
+        navigation.ToggleEvidenceDrawerCommand.Execute(null);
+        Assert.True(navigation.IsEvidenceExpanded);
+        navigation.ToggleEvidenceDrawerCommand.Execute(null);
+        Assert.False(navigation.IsEvidenceExpanded);
+
+        navigation.ToggleInspectorCommand.Execute(null);
+        navigation.IsSimulationWorkspace = true;
+        Assert.False(navigation.IsInspectorOpen);
+        Assert.True(navigation.ToggleInspectorCommand.CanExecute(null));
+        navigation.ToggleInspectorCommand.Execute(null);
+        Assert.True(navigation.IsInspectorOpen);
+
+        navigation.IsInspectionWorkspace = true;
+        Assert.False(navigation.IsInspectorOpen);
+        Assert.True(navigation.ToggleInspectorCommand.CanExecute(null));
+        navigation.ToggleInspectorCommand.Execute(null);
+        Assert.True(navigation.IsInspectorOpen);
+
+        navigation.IsResultsWorkspace = true;
+        Assert.False(navigation.IsInspectorOpen);
+        Assert.True(navigation.ToggleInspectorCommand.CanExecute(null));
+        navigation.ToggleInspectorCommand.Execute(null);
+        Assert.True(navigation.IsInspectorOpen);
+
+        navigation.IsEquipmentWorkspace = true;
+        Assert.False(navigation.IsInspectorOpen);
+        Assert.True(navigation.ToggleInspectorCommand.CanExecute(null));
     }
 }

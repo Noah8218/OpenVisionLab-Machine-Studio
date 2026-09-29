@@ -111,6 +111,45 @@ public sealed class DeterministicSequenceRuntimeContextTests
         Assert.Equal(SequenceContextErrorCode.TargetNotFound, missing.Error!.Code);
     }
 
+    [Fact]
+    public void Context_DelegatesFeedAndEjectAndReportsUnavailableWhenUnbound()
+    {
+        var creation = DeterministicSignalHub.Create(Array.Empty<ChannelDefinition>());
+        Assert.True(creation.IsAccepted, creation.ErrorCode.ToString());
+        var operations = new List<string>();
+        var context = new DeterministicSequenceRuntimeContext(
+            creation.Hub!,
+            Array.Empty<ServoAxisComponent>(),
+            Array.Empty<DeterministicVirtualCamera>(),
+            eventTick: 0,
+            eventTime: TimeSpan.Zero,
+            (_, _, _, _, _) => { },
+            workpieceFeedHandler: id =>
+            {
+                operations.Add($"feed:{id}");
+                return SequenceContextOperationResult.Success();
+            },
+            workpieceEjectHandler: id =>
+            {
+                operations.Add($"eject:{id}");
+                return SequenceContextOperationResult.Success();
+            });
+
+        Assert.True(context.FeedWorkpiece("piece-1").IsSuccess);
+        Assert.True(context.EjectWorkpiece("piece-1").IsSuccess);
+        Assert.Equal(new[] { "feed:piece-1", "eject:piece-1" }, operations);
+
+        var unbound = new DeterministicSequenceRuntimeContext(
+            creation.Hub!,
+            Array.Empty<ServoAxisComponent>(),
+            Array.Empty<DeterministicVirtualCamera>(),
+            eventTick: 0,
+            eventTime: TimeSpan.Zero,
+            (_, _, _, _, _) => { });
+        Assert.Equal(SequenceContextErrorCode.Unavailable, unbound.FeedWorkpiece("piece-1").Error!.Code);
+        Assert.Equal(SequenceContextErrorCode.Unavailable, unbound.EjectWorkpiece("piece-1").Error!.Code);
+    }
+
     private static ServoAxisComponent CreateAxis() => new(new AxisConfiguration
     {
         Id = "x",

@@ -1,0 +1,30 @@
+{
+  "schema": "openvisionlab.machine/vision-fixture/1",
+  "decoder": "P2-Mono8",
+  "fixtures": [
+    {
+      "id": "normal",
+      "file": "normal-mono8.pgm",
+      "byteLength": 113,
+      "width": 4,
+      "height": 3,
+      "stride": 4,
+      "pixelFormat": "Mono8",
+      "expectedFeature": "no-bright-patch",
+      "brightPixelThreshold": 200,
+      "sha256": "6B83256DB8E4EA350B5CBADBBAC8A73B14D50EE1FD3CEA57DD076342CFAB6158"
+    },
+    {
+      "id": "bad",
+      "file": "bad-mono8.pgm",
+      "byteLength": 109,
+      "width": 4,
+      "height": 3,
+      "stride": 4,
+      "pixelFormat": "Mono8",
+      "expectedFeature": "bright-center-patch",
+      "brightPixelThreshold": 200,
+      "sha256": "7AFB4A0051074D67623030355377349D428098696AE2C32CA4AD727D496694AE"
+    }
+  ]
+}

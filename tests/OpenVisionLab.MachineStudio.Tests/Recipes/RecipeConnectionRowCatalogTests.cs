@@ -155,6 +155,9 @@ public sealed class RecipeConnectionRowCatalogTests
         Assert.False(row.IsValid);
         Assert.False(row.IsConnected);
         Assert.Equal(validationError.Message, row.ValidationText);
+        Assert.Single(row.ValidationIssues);
+        Assert.Equal("Component.BehaviorBindingId", row.ValidationPropertyText);
+        Assert.Contains("invalid-stage", row.ValidationIssues[0].LocationText);
     }
 
     [Fact]

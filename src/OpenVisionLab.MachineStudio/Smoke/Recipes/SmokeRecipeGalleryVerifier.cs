@@ -34,6 +34,7 @@ internal sealed class SmokeRecipeGalleryReport
             }));
     }
 }
+
 internal static class SmokeRecipeGalleryVerifier
 {
     private const uint MouseEventLeftDown = 0x0002;

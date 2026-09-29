@@ -200,6 +200,12 @@ public sealed class MachineProjectRuntimeCompiler
             return Failure(errors);
         }
 
+        MachineLayoutRuntimeConfiguration? layout = _layoutCompiler.Compile(
+            project,
+            layoutDefinitions!,
+            channelKinds,
+            errors);
+
         IReadOnlyList<CompiledSequence> sequences = Array.Empty<CompiledSequence>();
         if (!HasErrorsInDependencies(errors))
         {
@@ -208,14 +214,13 @@ public sealed class MachineProjectRuntimeCompiler
                 channelKinds!,
                 axes,
                 cameras,
+                layout?.Components
+                    .OfType<WorkpieceRuntimeConfiguration>()
+                    .Select(component => component.Id)
+                    ?? Enumerable.Empty<string>(),
                 errors);
         }
 
-        MachineLayoutRuntimeConfiguration? layout = _layoutCompiler.Compile(
-            project,
-            layoutDefinitions!,
-            channelKinds,
-            errors);
         AutomaticRunConfiguration? automaticRun = _automaticRunCompiler.Compile(
             simulation.AutomaticRun,
             sequences,

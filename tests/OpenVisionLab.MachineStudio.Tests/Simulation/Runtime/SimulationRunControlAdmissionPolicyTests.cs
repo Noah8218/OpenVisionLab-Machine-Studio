@@ -31,6 +31,11 @@ public sealed class SimulationRunControlAdmissionPolicyTests
         {
             ActiveSequenceStatus = SequenceExecutionStatus.Faulted
         }));
+        Assert.False(SimulationRunControlAdmissionPolicy.CanRun(automatic with
+        {
+            AutomaticRunActive = true,
+            AutomaticExternalInspectionWaiting = true
+        }));
     }
 
     [Fact]
@@ -51,6 +56,7 @@ public sealed class SimulationRunControlAdmissionPolicyTests
         var running = CreateState() with
         {
             ActiveSequenceStatus = SequenceExecutionStatus.Running,
+            ActiveSequenceId = "automatic-transfer-cycle",
             RuntimeDefinitionDirty = false
         };
         Assert.True(SimulationRunControlAdmissionPolicy.CanAbortSequence(running));
@@ -88,6 +94,11 @@ public sealed class SimulationRunControlAdmissionPolicyTests
         };
         Assert.False(SimulationRunControlAdmissionPolicy.CanStep(automatic));
         Assert.True(SimulationRunControlAdmissionPolicy.CanStep(automatic with { AutomaticRunActive = true }));
+        Assert.False(SimulationRunControlAdmissionPolicy.CanStep(automatic with
+        {
+            AutomaticRunActive = true,
+            AutomaticExternalInspectionWaiting = true
+        }));
     }
 
     [Fact]

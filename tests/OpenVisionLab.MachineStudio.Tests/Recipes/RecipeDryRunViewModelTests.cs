@@ -47,6 +47,122 @@ public sealed class RecipeDryRunViewModelTests
     }
 
     [Fact]
+    public void ReadinessComparisonTracksBaselineChangesAndRequiresRerunAfterEdit()
+    {
+        OpenVisionLanguageService.Load();
+        var project = LoadProject("AutomaticTransferCell.ovmachine");
+        string? readinessError = null;
+        var viewModel = CreateViewModel(
+            () => readinessError,
+            _ => Task.FromResult(CreateResult(project, project.Sequences[0].Id)));
+
+        viewModel.Load(project);
+        viewModel.ValidateSimulationReadinessCommand.Execute(null);
+        Assert.Equal(
+            OpenVisionLanguageService.T("Connections.ReadinessComparisonInitial"),
+            viewModel.ReadinessComparisonText);
+
+        viewModel.ValidateSimulationReadinessCommand.Execute(null);
+        Assert.Equal(
+            OpenVisionLanguageService.T("Connections.ReadinessComparisonUnchanged"),
+            viewModel.ReadinessComparisonText);
+
+        readinessError = "invalid connection";
+        viewModel.ValidateSimulationReadinessCommand.Execute(null);
+        Assert.Equal(
+            OpenVisionLanguageService.T("Connections.ReadinessComparisonRegressed"),
+            viewModel.ReadinessComparisonText);
+
+        readinessError = null;
+        viewModel.ValidateSimulationReadinessCommand.Execute(null);
+        Assert.Equal(
+            OpenVisionLanguageService.T("Connections.ReadinessComparisonImproved"),
+            viewModel.ReadinessComparisonText);
+
+        viewModel.Load(project);
+        Assert.Null(viewModel.ReadinessPassed);
+        Assert.Equal(
+            OpenVisionLanguageService.T("Connections.ReadinessComparisonRerunRequired"),
+            viewModel.ReadinessComparisonText);
+    }
+
+    [Fact]
+    public void ProjectRevisionChangeMarksReadinessStaleAndRequiresRevalidation()
+    {
+        OpenVisionLanguageService.Load();
+        var project = LoadProject("AutomaticTransferCell.ovmachine");
+        var viewModel = CreateViewModel(
+            () => null,
+            _ => Task.FromResult(CreateResult(project, project.Sequences[0].Id)));
+
+        viewModel.Load(project);
+        viewModel.ValidateSimulationReadinessCommand.Execute(null);
+        Assert.True(viewModel.ReadinessPassed);
+        Assert.False(viewModel.IsReadinessStale);
+
+        viewModel.SetProjectRevision(2);
+
+        Assert.Null(viewModel.ReadinessPassed);
+        Assert.True(viewModel.IsReadinessStale);
+        Assert.Equal(
+            OpenVisionLanguageService.T("Connections.ReadinessStale"),
+            viewModel.ReadinessStatusText);
+        Assert.Contains("1", viewModel.ReadinessDetailText, StringComparison.Ordinal);
+        Assert.Contains("2", viewModel.ReadinessDetailText, StringComparison.Ordinal);
+        Assert.False(viewModel.RunRecipeDryRunCommand.CanExecute(null));
+        Assert.False(viewModel.HasRecipeDryRunResult);
+
+        viewModel.ValidateSimulationReadinessCommand.Execute(null);
+
+        Assert.True(viewModel.ReadinessPassed);
+        Assert.False(viewModel.IsReadinessStale);
+        Assert.True(viewModel.RunRecipeDryRunCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task ProjectRevisionChangeRejectsLateResultEvenAfterRevalidation()
+    {
+        var project = LoadProject("AutomaticTransferCell.ovmachine");
+        var result = CreateResult(project, project.Sequences[0].Id);
+        var resultSource = new TaskCompletionSource<RecipeDryRunResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var viewModel = CreateViewModel(
+            () => null,
+            _ => resultSource.Task);
+
+        viewModel.Load(project);
+        viewModel.ValidateSimulationReadinessCommand.Execute(null);
+        viewModel.RunRecipeDryRunCommand.Execute(null);
+        Assert.True(viewModel.IsRecipeDryRunRunning);
+
+        viewModel.SetProjectRevision(2);
+        viewModel.ValidateSimulationReadinessCommand.Execute(null);
+        Assert.True(viewModel.ReadinessPassed);
+        resultSource.SetResult(result);
+        await Task.Yield();
+
+        Assert.Null(viewModel.RecipeDryRunResult);
+        Assert.False(viewModel.IsRecipeDryRunRunning);
+    }
+
+    [Fact]
+    public void SameRevisionLocalizationReloadPreservesReadinessWithoutMarkingStale()
+    {
+        var project = LoadProject("AutomaticTransferCell.ovmachine");
+        var viewModel = CreateViewModel(
+            () => null,
+            _ => Task.FromResult(CreateResult(project, project.Sequences[0].Id)));
+
+        viewModel.Load(project);
+        viewModel.ValidateSimulationReadinessCommand.Execute(null);
+        viewModel.Load(project, preserveReadiness: true);
+
+        Assert.True(viewModel.ReadinessPassed);
+        Assert.False(viewModel.IsReadinessStale);
+        Assert.True(viewModel.RunRecipeDryRunCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task RunProjectsResultAndRoutesStepActionsWithoutMutatingProject()
     {
         var project = LoadProject("AutomaticTransferCell.ovmachine");

@@ -15,7 +15,8 @@ public enum LayoutItemKind
     DigitalSensor,
     PneumaticCylinder,
     Conveyor,
-    Workpiece
+    Workpiece,
+    Camera
 }
 
 public sealed class LayoutItem : INotifyPropertyChanged
@@ -39,9 +40,14 @@ public sealed class LayoutItem : INotifyPropertyChanged
     public LayoutComponentDefinition? Component => _component;
     public double Width => _component?.Size.Width ?? 80;
     public double Height => _component?.Size.Height ?? 40;
+    public bool HasExplicitVerticalEnvelope => _component?.VerticalEnvelope is not null;
+    public double VerticalBaseElevation => _component?.VerticalEnvelope?.BaseElevation ?? 0;
+    public double VerticalHeight => _component?.VerticalEnvelope?.Height ??
+        LayoutVerticalEnvelope.GetSchematicHeight(Width, Height);
     public double RotationDegrees => _component?.Transform.RotationDegrees ?? 0;
     public int ZIndex => _component?.ZIndex ?? 0;
     public string? BehaviorBindingId => _component?.BehaviorBindingId;
+    public string? UnitId => _component?.UnitId;
 
     public bool IsSelected
     {
@@ -153,6 +159,10 @@ public sealed class LayoutItem : INotifyPropertyChanged
             _component.Size.Width = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(Width));
+            if (_component.VerticalEnvelope is null)
+            {
+                OnPropertyChanged(nameof(VerticalHeight));
+            }
             DefinitionChanged?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -170,6 +180,82 @@ public sealed class LayoutItem : INotifyPropertyChanged
             _component.Size.Height = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(Height));
+            if (_component.VerticalEnvelope is null)
+            {
+                OnPropertyChanged(nameof(VerticalHeight));
+            }
+            DefinitionChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public double CurrentVerticalBaseElevation
+    {
+        get => VerticalBaseElevation;
+        set
+        {
+            if (_component is null)
+            {
+                return;
+            }
+
+            var current = _component.VerticalEnvelope;
+            if (current?.BaseElevation == value || current is null && value == 0)
+            {
+                return;
+            }
+
+            _component.VerticalEnvelope = new LayoutVerticalEnvelope
+            {
+                BaseElevation = value,
+                Height = current?.Height ?? VerticalHeight
+            };
+            OnPropertyChanged(nameof(VerticalBaseElevation));
+            OnPropertyChanged(nameof(HasExplicitVerticalEnvelope));
+            DefinitionChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public double CurrentVerticalHeight
+    {
+        get => VerticalHeight;
+        set
+        {
+            if (_component is null)
+            {
+                return;
+            }
+
+            var current = _component.VerticalEnvelope;
+            if (current?.Height == value || current is null && value == VerticalHeight)
+            {
+                return;
+            }
+
+            _component.VerticalEnvelope = new LayoutVerticalEnvelope
+            {
+                BaseElevation = current?.BaseElevation ?? 0,
+                Height = value
+            };
+            OnPropertyChanged(nameof(VerticalHeight));
+            OnPropertyChanged(nameof(HasExplicitVerticalEnvelope));
+            DefinitionChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public string? CurrentUnitId
+    {
+        get => UnitId;
+        set
+        {
+            var normalized = string.IsNullOrWhiteSpace(value) ? null : value;
+            if (_component is null || string.Equals(_component.UnitId, normalized, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _component.UnitId = normalized;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(UnitId));
             DefinitionChanged?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -240,6 +326,7 @@ public sealed class LayoutItem : INotifyPropertyChanged
             LayoutComponentKind.PneumaticCylinder => LayoutItemKind.PneumaticCylinder,
             LayoutComponentKind.Conveyor => LayoutItemKind.Conveyor,
             LayoutComponentKind.Workpiece => LayoutItemKind.Workpiece,
+            LayoutComponentKind.Camera => LayoutItemKind.Camera,
             _ => throw new ArgumentOutOfRangeException(nameof(component), component.Kind, null)
         };
         Model = component;

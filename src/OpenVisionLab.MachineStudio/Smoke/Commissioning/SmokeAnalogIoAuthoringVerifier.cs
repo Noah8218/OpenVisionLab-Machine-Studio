@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using OpenVisionLab.MachineStudio.Model;
 using OpenVisionLab.MachineStudio.View.Inspector;
+using OpenVisionLab.MachineStudio.View.Scene;
 using OpenVisionLab.MachineStudio.View.Shell;
 using OpenVisionLab.MachineStudio.ViewModel;
 
@@ -44,10 +45,12 @@ internal static class SmokeAnalogIoAuthoringVerifier
         string? savePath,
         string? screenshotPath,
         Func<DependencyObject, RightToolRegionView?> findInspector,
+        Func<DependencyObject, SceneDocumentView?> findScene,
         Action<Window, string> captureScreenshot)
     {
         var checks = new Dictionary<string, bool>(StringComparer.Ordinal);
         var failures = new List<string>();
+        var exitPlaybackAfterScreenshot = false;
         void Check(string name, bool passed)
         {
             checks[name] = passed;
@@ -100,7 +103,38 @@ internal static class SmokeAnalogIoAuthoringVerifier
             valueTextBox.SelectAll();
             Check("initial-value-field-focused", valueTextBox.IsKeyboardFocusWithin);
 
-            if (state.Equals("invalid", StringComparison.OrdinalIgnoreCase))
+            if (state.Equals("playback-lock", StringComparison.OrdinalIgnoreCase))
+            {
+                var scene = findScene(window)
+                    ?? throw new InvalidOperationException("The scene document was not available.");
+                var playbackSnapshot = viewModel.SceneSnapshots.Latest
+                    ?? throw new InvalidOperationException("The initial scene snapshot was not available.");
+                var playbackStep = new RecipeDryRunStepPresentation(
+                    "smoke-sequence",
+                    "analog-playback-lock",
+                    null,
+                    "#1",
+                    "Analog playback lock",
+                    "tick 0",
+                    false,
+                    false,
+                    false,
+                    string.Empty,
+                    playbackSnapshot);
+
+                viewModel.DryRunPlayback.Show(playbackStep, [playbackStep]);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
+                Check("dry-run-playback-active", viewModel.IsDryRunPlaybackActive);
+                Check("scene-editing-locked-during-playback", !viewModel.IsSceneEditable);
+                Check("analog-field-disabled-during-playback", !valueTextBox.IsEnabled);
+                Check("scene-identity-hidden-during-playback", !scene.SceneIdentityCard.IsVisible);
+                Check("playback-does-not-dirty-project", !viewModel.HasUnsavedChanges);
+                Check("playback-does-not-run", !viewModel.IsRunning);
+                Check("playback-keeps-live-tick", viewModel.SceneSnapshots.Latest?.TickIndex == tickBeforeEdit);
+                exitPlaybackAfterScreenshot = true;
+            }
+            else if (state.Equals("invalid", StringComparison.OrdinalIgnoreCase))
             {
                 valueTextBox.Text = "NaN";
                 valueTextBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
@@ -158,11 +192,26 @@ internal static class SmokeAnalogIoAuthoringVerifier
             captureScreenshot(window, screenshotPath);
         }
 
+        if (exitPlaybackAfterScreenshot)
+        {
+            viewModel.DryRunPlayback.Exit();
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Check("dry-run-playback-exited", !viewModel.IsDryRunPlaybackActive);
+            Check("analog-field-reenabled-after-playback", valueTextBox.IsEnabled);
+            var scene = findScene(window)
+                ?? throw new InvalidOperationException("The scene document was not available.");
+            Check("scene-identity-restored-after-playback", scene.SceneIdentityCard.IsVisible);
+        }
+
+        var monitor = SmokeDpiTestHook.CaptureMonitorEvidence(window);
+        Check("window-intersects-selected-monitor", monitor.WindowIntersectsMonitor);
+        Check("window-contained-by-selected-monitor", monitor.WindowContainedByMonitor);
+
         return new SmokeAnalogIoAuthoringReport
         {
             Checks = checks,
             Failures = failures,
-            Monitor = SmokeDpiTestHook.CaptureMonitorEvidence(window)
+            Monitor = monitor
         };
     }
 

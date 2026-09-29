@@ -9,6 +9,7 @@ public enum LayoutComponentAuthoringFailureKind
     ActiveLayoutRequired,
     SensorTargetRequired,
     WorkpieceCarrierRequired,
+    CameraDeviceRequired,
     UnsupportedComponentKind,
     InvalidDefinition
 }
@@ -41,6 +42,29 @@ public sealed record LayoutComponentRemovalResult(
     public bool IsSuccess => RemovedComponent is not null && Failure is null;
 }
 
+public enum LayoutComponentRemovalReferenceKind
+{
+    Target,
+    Workpiece,
+    ExpectedTarget
+}
+
+public sealed record LayoutComponentRemovalImpact(
+    string SequenceId,
+    string SequenceName,
+    string StepId,
+    string StepName,
+    string ComponentId,
+    LayoutComponentRemovalReferenceKind ReferenceKind);
+
+public sealed record LayoutComponentsRemovalResult(
+    IReadOnlyList<LayoutComponentDefinition> RemovedComponents,
+    LayoutComponentDefinition? BlockingComponent,
+    LayoutComponentRemovalFailureKind? Failure)
+{
+    public bool IsSuccess => RemovedComponents.Count > 0 && Failure is null;
+}
+
 /// <summary>
 /// Owns project-level composition policy for authored layout components.
 /// It is stateless and has no dependency on WPF or the Machine Studio shell.
@@ -55,7 +79,8 @@ public sealed class LayoutComponentAuthoringService
         LayoutComponentKind kind,
         string? selectedComponentId = null,
         double? worldX = null,
-        double? worldY = null)
+        double? worldY = null,
+        string? unitId = null)
     {
         ArgumentNullException.ThrowIfNull(project);
 
@@ -101,6 +126,11 @@ public sealed class LayoutComponentAuthoringService
                 componentFailure ?? new(LayoutComponentAuthoringFailureKind.UnsupportedComponentKind));
         }
 
+        if (unitId is not null)
+        {
+            component.UnitId = unitId;
+        }
+
         if (worldX is { } dropX && worldY is { } dropY)
         {
             _placementService.Place(project, layout, component, dropX, dropY);
@@ -140,18 +170,88 @@ public sealed class LayoutComponentAuthoringService
         MachineLayoutDefinition layout,
         string componentId)
     {
+        var result = TryRemove(project, layout, new[] { componentId });
+        return new(
+            result.RemovedComponents.FirstOrDefault(),
+            result.BlockingComponent,
+            result.Failure);
+    }
+
+    public IReadOnlyList<LayoutComponentRemovalImpact> GetRemovalImpacts(
+        MachineProjectDocument project,
+        IReadOnlyCollection<string> componentIds)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        ArgumentNullException.ThrowIfNull(componentIds);
+
+        var ids = componentIds.ToHashSet(StringComparer.Ordinal);
+        var references = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var component in project.Layouts.SelectMany(layout => layout.Components).Where(component => ids.Contains(component.Id)))
+        {
+            references.TryAdd(component.Id, component.Id);
+            if (!string.IsNullOrWhiteSpace(component.BehaviorBindingId))
+            {
+                references.TryAdd(component.BehaviorBindingId, component.Id);
+            }
+        }
+
+        var impacts = new List<LayoutComponentRemovalImpact>();
+        foreach (var sequence in project.Sequences)
+        {
+            foreach (var step in sequence.Steps)
+            {
+                AddRemovalImpact(
+                    impacts,
+                    references,
+                    sequence.Id,
+                    sequence.Name,
+                    step.Id,
+                    step.Name,
+                    step.TargetId,
+                    LayoutComponentRemovalReferenceKind.Target);
+                AddRemovalImpact(
+                    impacts,
+                    references,
+                    sequence.Id,
+                    sequence.Name,
+                    step.Id,
+                    step.Name,
+                    step.WorkpieceComponentId,
+                    LayoutComponentRemovalReferenceKind.Workpiece);
+                AddRemovalImpact(
+                    impacts,
+                    references,
+                    sequence.Id,
+                    sequence.Name,
+                    step.Id,
+                    step.Name,
+                    step.ExpectedTargetId,
+                    LayoutComponentRemovalReferenceKind.ExpectedTarget);
+            }
+        }
+
+        return impacts;
+    }
+
+    public LayoutComponentsRemovalResult TryRemove(
+        MachineProjectDocument project,
+        MachineLayoutDefinition layout,
+        IReadOnlyCollection<string> componentIds)
+    {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(layout);
+        ArgumentNullException.ThrowIfNull(componentIds);
 
-        var component = layout.Components.FirstOrDefault(candidate =>
-            string.Equals(candidate.Id, componentId, StringComparison.Ordinal));
-        if (component is null)
+        var ids = componentIds.Where(id => !string.IsNullOrWhiteSpace(id)).ToHashSet(StringComparer.Ordinal);
+        var components = layout.Components.Where(component => ids.Contains(component.Id)).ToArray();
+        if (ids.Count == 0 || components.Length != ids.Count)
         {
-            return new(null, null, LayoutComponentRemovalFailureKind.NotFound);
+            return new(Array.Empty<LayoutComponentDefinition>(), null, LayoutComponentRemovalFailureKind.NotFound);
         }
 
         var dependentSensorComponent = project.Layouts
             .SelectMany(definition => definition.Components)
+            .Where(candidate => !ids.Contains(candidate.Id))
             .Where(candidate => candidate.Kind == LayoutComponentKind.DigitalSensor)
             .Select(candidate => new
             {
@@ -160,20 +260,18 @@ public sealed class LayoutComponentAuthoringService
                     string.Equals(device.Id, candidate.BehaviorBindingId, StringComparison.Ordinal))
             })
             .FirstOrDefault(candidate =>
-                string.Equals(
-                    candidate.Device?.Sensor?.TargetComponentId,
-                    component.Id,
-                    StringComparison.Ordinal));
+                candidate.Device?.Sensor is { } sensor && ids.Contains(sensor.TargetComponentId));
         if (dependentSensorComponent is not null)
         {
             return new(
-                null,
+                Array.Empty<LayoutComponentDefinition>(),
                 dependentSensorComponent.Component,
                 LayoutComponentRemovalFailureKind.SensorDependency);
         }
 
         var dependentWorkpiece = project.Layouts
             .SelectMany(definition => definition.Components)
+            .Where(candidate => !ids.Contains(candidate.Id))
             .Where(candidate => candidate.Kind == LayoutComponentKind.Workpiece)
             .Select(candidate => new
             {
@@ -181,21 +279,34 @@ public sealed class LayoutComponentAuthoringService
                 Device = project.Devices.FirstOrDefault(device =>
                     string.Equals(device.Id, candidate.BehaviorBindingId, StringComparison.Ordinal))
             })
-            .FirstOrDefault(candidate => string.Equals(
-                candidate.Device?.Workpiece?.ConveyorComponentId,
-                component.Id,
-                StringComparison.Ordinal));
+            .FirstOrDefault(candidate =>
+                candidate.Device?.Workpiece is { } workpiece && ids.Contains(workpiece.ConveyorComponentId));
         if (dependentWorkpiece is not null)
         {
             return new(
-                null,
+                Array.Empty<LayoutComponentDefinition>(),
                 dependentWorkpiece.Component,
                 LayoutComponentRemovalFailureKind.WorkpieceDependency);
         }
 
-        return layout.Components.Remove(component)
-            ? new(component, null, null)
-            : new(null, null, LayoutComponentRemovalFailureKind.NotFound);
+        layout.Components.RemoveAll(component => ids.Contains(component.Id));
+        return new(components, null, null);
+    }
+
+    private static void AddRemovalImpact(
+        ICollection<LayoutComponentRemovalImpact> impacts,
+        IReadOnlyDictionary<string, string> componentIds,
+        string sequenceId,
+        string sequenceName,
+        string stepId,
+        string stepName,
+        string? referencedComponentId,
+        LayoutComponentRemovalReferenceKind referenceKind)
+    {
+        if (referencedComponentId is not null && componentIds.TryGetValue(referencedComponentId, out var componentId))
+        {
+            impacts.Add(new(sequenceId, sequenceName, stepId, stepName, componentId, referenceKind));
+        }
     }
 
     private static void RollBackAddition(

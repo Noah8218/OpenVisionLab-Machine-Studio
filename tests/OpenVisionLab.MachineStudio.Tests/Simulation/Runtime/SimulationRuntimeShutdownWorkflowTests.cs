@@ -39,6 +39,7 @@ public sealed class SimulationRuntimeShutdownWorkflowTests
         var diagnostics = new List<SimulationRuntimeShutdownDiagnostic>();
         var dispatchDepth = 0;
         var diagnosticsOutsideDispatch = 0;
+        var resourceDisposeDispatches = 0;
         var workflow = new SimulationRuntimeShutdownWorkflow(
             engine,
             loop,
@@ -55,6 +56,7 @@ public sealed class SimulationRuntimeShutdownWorkflowTests
             },
             action =>
             {
+                var resourcesWereDisposed = resources.IsDisposed;
                 Interlocked.Increment(ref dispatchDepth);
                 try
                 {
@@ -63,6 +65,11 @@ public sealed class SimulationRuntimeShutdownWorkflowTests
                 finally
                 {
                     Interlocked.Decrement(ref dispatchDepth);
+                }
+
+                if (!resourcesWereDisposed && resources.IsDisposed)
+                {
+                    Interlocked.Increment(ref resourceDisposeDispatches);
                 }
 
                 return Task.CompletedTask;
@@ -74,6 +81,7 @@ public sealed class SimulationRuntimeShutdownWorkflowTests
         Assert.Equal(RuntimeShutdownOutcome.Completed, result.Outcome);
         Assert.NotEmpty(diagnostics);
         Assert.Equal(0, Volatile.Read(ref diagnosticsOutsideDispatch));
+        Assert.Equal(1, Volatile.Read(ref resourceDisposeDispatches));
     }
 
     [Fact]
@@ -260,6 +268,63 @@ public sealed class SimulationRuntimeShutdownWorkflowTests
         Assert.Equal("EventJournal", result.Stage);
         Assert.Equal("EventJournal", diagnostics[^1].Stage);
         Assert.Contains("incomplete canonical event evidence", diagnostics[^1].Message);
+    }
+
+    [Fact]
+    public async Task MarksShutdownIncompleteWhenCanonicalConsumerIsUnavailable()
+    {
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings
+            {
+                FixedStep = TimeSpan.FromMilliseconds(1),
+                TimeScale = 1,
+                EventBufferCapacity = 8,
+                CanonicalEventJournalCapacity = 8
+            });
+        using var loop = new SimulationRuntimeLoop(
+            engine,
+            static action =>
+            {
+                action();
+                return Task.CompletedTask;
+            },
+            _ => { },
+            _ => { },
+            static () => { },
+            _ => { },
+            _ => { },
+            _ => { },
+            _ => { });
+        var workspace = new SimulationWorkspaceViewModel();
+        var resources = new SimulationRuntimeResourceOwner(engine, loop, workspace);
+        var runControl = CreateRunControlWorkflow(engine);
+        var diagnostics = new List<SimulationRuntimeShutdownDiagnostic>();
+        var workflow = new SimulationRuntimeShutdownWorkflow(
+            engine,
+            loop,
+            resources,
+            runControl,
+            diagnostics.Add,
+            static action =>
+            {
+                action();
+                return Task.CompletedTask;
+            });
+
+        loop.Start(new SimulationRuntimeConfiguration([], [], []));
+        await WaitForAsync(() => engine.EventJournal.TotalEventCount >= 2);
+
+        var result = await workflow.ShutdownAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(RuntimeShutdownOutcome.Incomplete, result.Outcome);
+        Assert.NotNull(result.EventJournal);
+        Assert.True(result.EventJournal!.IsComplete);
+        Assert.NotNull(result.EventConsumption);
+        Assert.False(result.EventConsumption!.IsAvailable);
+        Assert.Equal("EventJournal", result.Stage);
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Kind == SimulationOperationalDiagnosticKind.ShutdownIncomplete);
     }
 
     [Fact]

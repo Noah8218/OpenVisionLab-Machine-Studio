@@ -31,6 +31,15 @@ public static class OpenVisionLanguageService
     private const string ProductDirectoryName = "MachineStudio";
     private const string CatalogFileName = "localization_catalog.tsv";
     private const string LanguageFileName = "language.txt";
+    private static readonly Dictionary<string, (string Korean, string English)> LegacyWorkspaceDefaults =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Equipment.OutlineNoMatches"] = ("일치하는 부품이 없습니다.", "No matching parts"),
+            ["Equipment.OutlineSearch"] = ("이름 · ID · 종류 · 유닛 검색", "Search name · ID · kind · unit"),
+            ["Workspace.Teaching"] = ("동작·검사 티칭", "Motion & inspection teaching"),
+            ["Workspace.Execution"] = ("실행·검증", "Run & validate"),
+            ["Workspace.Results"] = ("결과·비교", "Results & comparison")
+        };
     private static readonly object SyncRoot = new();
     private static readonly Dictionary<string, OpenVisionLocalizationEntry> Entries = new(StringComparer.OrdinalIgnoreCase);
     private static bool loaded;
@@ -132,24 +141,35 @@ public static class OpenVisionLanguageService
         }
     }
 
-    private static void EnsureCatalogFile()
+    private static void EnsureCatalogFile() => EnsureCatalogFile(CatalogPath, ReadEmbeddedCatalog());
+
+    internal static void EnsureCatalogFile(string catalogPath, string embeddedCatalog)
     {
-        Directory.CreateDirectory(GetConfigDirectory());
-        var defaults = ParseCatalog(ReadEmbeddedCatalog())
+        ArgumentException.ThrowIfNullOrWhiteSpace(catalogPath);
+        ArgumentNullException.ThrowIfNull(embeddedCatalog);
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(catalogPath))!);
+        var defaults = ParseCatalog(embeddedCatalog)
             .ToDictionary(entry => entry.Key, StringComparer.OrdinalIgnoreCase);
-        if (!File.Exists(CatalogPath))
+        if (!File.Exists(catalogPath))
         {
-            File.WriteAllText(CatalogPath, BuildCatalog(defaults.Values), Encoding.UTF8);
+            File.WriteAllText(catalogPath, BuildCatalog(defaults.Values), Encoding.UTF8);
             return;
         }
 
-        var current = ParseCatalog(File.ReadAllText(CatalogPath, Encoding.UTF8))
+        var current = ParseCatalog(File.ReadAllText(catalogPath, Encoding.UTF8))
             .ToDictionary(entry => entry.Key, StringComparer.OrdinalIgnoreCase);
         var changed = false;
         foreach (var entry in defaults.Values)
         {
-            if (current.ContainsKey(entry.Key))
+            if (current.TryGetValue(entry.Key, out var existing))
             {
+                if (LegacyWorkspaceDefaults.TryGetValue(entry.Key, out var previousDefault)
+                    && existing.Korean == previousDefault.Korean
+                    && existing.English == previousDefault.English)
+                {
+                    current[entry.Key] = entry;
+                    changed = true;
+                }
                 continue;
             }
 
@@ -159,7 +179,7 @@ public static class OpenVisionLanguageService
 
         if (changed)
         {
-            File.WriteAllText(CatalogPath, BuildCatalog(current.Values), Encoding.UTF8);
+            File.WriteAllText(catalogPath, BuildCatalog(current.Values), Encoding.UTF8);
         }
     }
 
@@ -265,12 +285,18 @@ public static class OpenVisionLanguageService
         }
     }
 
-    private static string GetConfigDirectory() =>
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            CompanyDirectoryName,
-            ProductDirectoryName,
-            ConfigDirectoryName);
+    private static string GetConfigDirectory()
+    {
+        var smokeConfigDirectory = Environment.GetEnvironmentVariable(
+            "OPENVISIONLAB_MACHINE_STUDIO_SMOKE_CONFIG_DIR");
+        return !string.IsNullOrWhiteSpace(smokeConfigDirectory)
+            ? Path.GetFullPath(smokeConfigDirectory)
+            : Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                CompanyDirectoryName,
+                ProductDirectoryName,
+                ConfigDirectoryName);
+    }
 
     private sealed record OpenVisionLocalizationEntry(string Key, string Korean, string English);
 }

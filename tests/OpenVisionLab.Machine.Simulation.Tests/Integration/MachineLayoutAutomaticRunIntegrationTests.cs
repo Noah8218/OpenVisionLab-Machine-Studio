@@ -121,6 +121,39 @@ public sealed class MachineLayoutAutomaticRunIntegrationTests
     }
 
     [Fact]
+    public async Task SequenceReadsPhysicalSensorWrittenEarlierInTheSameFixedTick()
+    {
+        using var engine = await CreateEngineAsync();
+        var configured = await engine.EnqueueCommandAsync(
+            new ConfigureRuntimeCommand(CreatePhysicalSensorWaitRuntime()));
+        Assert.True(configured.IsAccepted, configured.Detail);
+
+        var started = await engine.EnqueueCommandAsync(new StartSequenceCommand("sensor-sequence"));
+        Assert.True(started.IsAccepted, started.Detail);
+
+        var stepped = await engine.EnqueueCommandAsync(new StepCommand());
+        SimulationSnapshot snapshot = engine.CurrentSnapshot;
+        SequenceExecutionSnapshot sequence = Assert.Single(snapshot.Sequences);
+
+        Assert.True(stepped.IsAccepted, stepped.Detail);
+        Assert.Equal(1, snapshot.TickIndex);
+        Assert.True(Signal(snapshot, SensorInputId));
+        Assert.Equal("set-done", sequence.CurrentStepId);
+        Assert.False(Signal(snapshot, "do.done"));
+
+        await engine.StopAsync();
+        IReadOnlyList<SimulationEvent> events = await ReadAllEventsAsync(engine);
+        SimulationEvent sensorActivated = Assert.Single(events, item => item.Code == "SensorActivated");
+        SimulationEvent sequenceTransition = Assert.Single(
+            events,
+            item => item.Code == "SequenceStepTransition"
+                && item.Message.Contains("wait-sensor", StringComparison.Ordinal));
+
+        Assert.Equal(sensorActivated.TickIndex, sequenceTransition.TickIndex);
+        Assert.True(sensorActivated.EventIndex < sequenceTransition.EventIndex);
+    }
+
+    [Fact]
     public async Task ConfigureRuntime_RejectsInvalidLayoutBindingsWithoutReplacingCurrentRuntime()
     {
         using var engine = await CreateEngineAsync();
@@ -181,6 +214,61 @@ public sealed class MachineLayoutAutomaticRunIntegrationTests
                 Repeat: true,
                 RepeatDelayMilliseconds: 10),
             CreateLayout(layoutAxisId));
+
+    private static SimulationRuntimeConfiguration CreatePhysicalSensorWaitRuntime()
+    {
+        var channels = new[]
+        {
+            Channel(SensorInputId, ChannelKind.DigitalInput),
+            Channel("do.done", ChannelKind.DigitalOutput)
+        };
+        var definition = new SequenceDefinition
+        {
+            Id = "sensor-sequence",
+            Name = "Physical Sensor Sequence",
+            Steps =
+            {
+                Step("wait-sensor", SequenceStepAction.WaitSignal, SensorInputId, "true", "set-done"),
+                Step("set-done", SequenceStepAction.SetSignal, "do.done", "true", "complete"),
+                Step("complete", SequenceStepAction.Complete, string.Empty, string.Empty, null)
+            }
+        };
+        var compilation = new SequenceCompiler().Compile(
+            definition,
+            new SequenceCompilationTargets(
+                channels.ToDictionary(channel => channel.Id, channel => channel.Kind, StringComparer.Ordinal),
+                Array.Empty<string>()));
+        Assert.True(compilation.IsSuccess);
+
+        var layout = new MachineLayoutRuntimeConfiguration(
+            "layout.sensor",
+            "Physical Sensor Layout",
+            new LayoutComponentRuntimeConfiguration[]
+            {
+                new MachineFrameRuntimeConfiguration(
+                    "target.sensor",
+                    "Sensor Target",
+                    new LayoutRuntimeTransform(0, 0),
+                    new LayoutRuntimeSize(10, 10)),
+                new DigitalSensorRuntimeConfiguration(
+                    SensorId,
+                    "Physical Sensor",
+                    SensorInputId,
+                    "target.sensor",
+                    onDelayTicks: 0,
+                    offDelayTicks: 0,
+                    new LayoutRuntimeTransform(0, 0),
+                    new LayoutRuntimeSize(10, 10))
+            });
+
+        return new SimulationRuntimeConfiguration(
+            Array.Empty<AxisConfiguration>(),
+            channels,
+            new[] { compilation.Sequence! },
+            Array.Empty<OpenVisionLab.Machine.Simulation.Camera.VirtualCameraConfiguration>(),
+            null,
+            layout);
+    }
 
     private static AxisConfiguration AxisConfiguration() =>
         new()
@@ -268,6 +356,15 @@ public sealed class MachineLayoutAutomaticRunIntegrationTests
             TimeoutMs = timeoutMilliseconds
         };
 
+    private static ChannelDefinition Channel(string id, ChannelKind kind) =>
+        new()
+        {
+            Id = id,
+            Name = id,
+            Kind = kind,
+            InitialValue = 0
+        };
+
     private static void AssertLayoutAtHomeWithSensorLow(SimulationSnapshot snapshot)
     {
         Assert.Equal(0, Axis(snapshot).Position);
@@ -298,6 +395,9 @@ public sealed class MachineLayoutAutomaticRunIntegrationTests
         SimulationSnapshot snapshot,
         string componentId) =>
         Assert.Single(snapshot.LayoutComponents, component => component.Id == componentId);
+
+    private static bool Signal(SimulationSnapshot snapshot, string id) =>
+        Assert.Single(snapshot.Signals, signal => signal.Id == id).Value;
 
     private static async Task<IReadOnlyList<SimulationEvent>> ReadAllEventsAsync(
         FixedStepSimulationEngine engine)

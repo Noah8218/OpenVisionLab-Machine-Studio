@@ -25,6 +25,7 @@ public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisp
     private readonly RelayCommand resetScenarioCommand;
     private readonly SimulationScenarioProjectMapper scenarioProjectMapper = new();
     private readonly ObservableCollection<SimulationScenarioProfile> scenarioProfiles = [];
+    private SimulationScenarioProjectSnapshot? persistedProjectSnapshot;
     private HashSet<string> availableFinalEquipmentTargetIds = new(StringComparer.Ordinal);
     private SimulationScenarioProfile? selectedScenarioProfile;
     private string scenarioProfilePath = string.Empty;
@@ -561,7 +562,9 @@ public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisp
     public void LoadProjectScenario(SimulationDefinition simulation)
     {
         ArgumentNullException.ThrowIfNull(simulation);
-        ApplyProjectSnapshot(scenarioProjectMapper.Load(simulation, scenarioProfiles));
+        var snapshot = scenarioProjectMapper.Load(simulation, scenarioProfiles);
+        ApplyProjectSnapshot(snapshot);
+        persistedProjectSnapshot = snapshot;
         OnPropertyChanged(nameof(SelectedScenarioProfile));
         OnPropertyChanged(nameof(ScenarioSeed));
         OnPropertyChanged(nameof(ScenarioDurationCycles));
@@ -596,8 +599,17 @@ public sealed class SimulationWorkspaceViewModel : INotifyPropertyChanged, IDisp
     public void SaveProjectScenario(SimulationDefinition simulation)
     {
         ArgumentNullException.ThrowIfNull(simulation);
-        scenarioProjectMapper.Save(simulation, CreateProjectSnapshot());
+        var snapshot = CreateProjectSnapshot();
+        if (Equals(persistedProjectSnapshot, snapshot))
+        {
+            return;
+        }
+
+        scenarioProjectMapper.Save(simulation, snapshot);
+        persistedProjectSnapshot = snapshot;
     }
+
+    internal void AcceptRuntimeProjectionDefaults() => persistedProjectSnapshot = CreateProjectSnapshot();
 
     public void Dispose()
     {

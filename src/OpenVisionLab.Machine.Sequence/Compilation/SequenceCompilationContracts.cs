@@ -12,10 +12,12 @@ public enum SequenceCompilationErrorCode
     UnsupportedAction,
     TargetIdRequired,
     UnexpectedTargetId,
+    UnexpectedWorkpieceComponentId,
     InvalidBooleanParameter,
     InvalidNumericParameter,
     UnexpectedParameter,
     InvalidTimeout,
+    WorkpieceComponentIdRequired,
     InvalidWatchdogTimeout,
     UnknownSubsequence,
     SubsequenceCycle,
@@ -27,6 +29,7 @@ public enum SequenceCompilationErrorCode
     InvalidSignalKind,
     UnknownAxis,
     UnknownCamera,
+    UnknownWorkpieceComponent,
     RecipeIdRequired,
     FailureStepRequired,
     FailureStepNotFound,
@@ -69,6 +72,7 @@ public sealed class SequenceCompilationTargets
     private readonly HashSet<string> _axisIds;
     private readonly HashSet<string> _cameraIds;
     private readonly HashSet<string> _sequenceIds;
+    private readonly HashSet<string> _workpieceComponentIds;
 
     public SequenceCompilationTargets(
         IReadOnlyDictionary<string, ChannelKind> channels,
@@ -89,7 +93,8 @@ public sealed class SequenceCompilationTargets
         IReadOnlyDictionary<string, ChannelKind> channels,
         IEnumerable<string> axisIds,
         IEnumerable<string> cameraIds,
-        IEnumerable<string> sequenceIds)
+        IEnumerable<string> sequenceIds,
+        IEnumerable<string>? workpieceComponentIds = null)
     {
         ArgumentNullException.ThrowIfNull(channels);
         ArgumentNullException.ThrowIfNull(axisIds);
@@ -100,6 +105,9 @@ public sealed class SequenceCompilationTargets
         _axisIds = new HashSet<string>(axisIds, StringComparer.Ordinal);
         _cameraIds = new HashSet<string>(cameraIds, StringComparer.Ordinal);
         _sequenceIds = new HashSet<string>(sequenceIds, StringComparer.Ordinal);
+        _workpieceComponentIds = workpieceComponentIds is null
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : new HashSet<string>(workpieceComponentIds, StringComparer.Ordinal);
     }
 
     internal bool TryGetChannelKind(string id, out ChannelKind kind)
@@ -120,5 +128,10 @@ public sealed class SequenceCompilationTargets
     internal bool ContainsSequence(string id)
     {
         return _sequenceIds.Contains(id);
+    }
+
+    internal bool ContainsWorkpieceComponent(string id)
+    {
+        return _workpieceComponentIds.Contains(id);
     }
 }

@@ -156,6 +156,11 @@ public sealed class VirtualIoSequenceIntegrationTests
                 SimulationFaultKind.StuckDigitalInput,
                 "di.never"));
         Assert.True(cleared.IsAccepted, cleared.Detail);
+        var afterClear = engine.CurrentSnapshot;
+        Assert.Empty(afterClear.Faults);
+        Assert.Equal(SimulationRunMode.Paused, afterClear.RunMode);
+        Assert.Equal(SimulationControlOwner.EmbeddedSequence, afterClear.ControlOwner);
+        Assert.Equal(SequenceExecutionStatus.Faulted, Assert.Single(afterClear.Sequences).Status);
         var tickBeforeRetry = engine.CurrentSnapshot.TickIndex;
         var timeBeforeRetry = engine.CurrentSnapshot.SimulationTime;
         var retried = await engine.EnqueueCommandAsync(

@@ -4,6 +4,7 @@ using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Sequence.Compilation;
 using OpenVisionLab.Machine.Simulation.Axis;
 using OpenVisionLab.Machine.Simulation.Engine;
+using OpenVisionLab.TestSupport;
 using OpenVisionLab.MachineStudio.ViewModel;
 using OpenVisionLab.MachineStudio.ViewModel.Simulation;
 using Xunit;
@@ -214,6 +215,51 @@ public sealed class SimulationScenarioBatchViewModelTests
     }
 
     [Fact]
+    public async Task ReportExportRequiresACompleteResultAndLeavesBatchStateUnchanged()
+    {
+        OpenVisionLanguageService.Load();
+        using var workspace = new SimulationWorkspaceViewModel
+        {
+            ScenarioTargetId = "axis-1",
+            ScenarioDurationCycles = 3,
+            BatchRepetitionCount = 1
+        };
+        var project = new MachineProjectDocument { Name = "Batch report test" };
+        using var viewModel = CreateViewModel(
+            workspace,
+            project,
+            () => true,
+            () => false,
+            _ => { },
+            buildRuntime: CreateRuntime);
+
+        viewModel.RunCommand.Execute(null);
+        var batchTask = viewModel.BatchTask;
+        Assert.NotNull(batchTask);
+        await batchTask!.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(viewModel.CanExportReport);
+        var result = viewModel.LatestBatchResult;
+        Assert.NotNull(result);
+        var reportPath = Path.Combine(
+            TestStorage.RootPath,
+            "simulation-batch-report-view-model-tests",
+            Guid.NewGuid().ToString("N"),
+            "result.md");
+        Assert.True(viewModel.TryExportReport(reportPath));
+        Assert.True(File.Exists(reportPath));
+        Assert.Same(result, viewModel.LatestBatchResult);
+        Assert.Equal(result!.EvidenceHash, viewModel.LatestBatchResult!.EvidenceHash);
+        Assert.Contains(result.EvidenceHash, File.ReadAllText(reportPath), StringComparison.Ordinal);
+
+        viewModel.Reset();
+        var rejectedPath = Path.Combine(Path.GetDirectoryName(reportPath)!, "rejected.md");
+        Assert.False(viewModel.CanExportReport);
+        Assert.False(viewModel.TryExportReport(rejectedPath));
+        Assert.False(File.Exists(rejectedPath));
+    }
+
+    [Fact]
     public async Task BatchCancellationUsesTheUiDispatchBoundary()
     {
         OpenVisionLanguageService.Load();
@@ -281,9 +327,12 @@ public sealed class SimulationScenarioBatchViewModelTests
 
         Assert.True(viewModel.IsBatchRunning);
         viewModel.CancelCommand.Execute(null);
+        Assert.True(viewModel.IsBatchCancellationRequested);
+        Assert.False(viewModel.CancelCommand.CanExecute(null));
         await batchTask!.WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.True(viewModel.BatchWasCanceled);
+        Assert.False(viewModel.IsBatchCancellationRequested);
         Assert.False(viewModel.IsBatchRunning);
         Assert.Empty(outsideDispatch);
         Assert.False(propertyChangedOutsideDispatch);

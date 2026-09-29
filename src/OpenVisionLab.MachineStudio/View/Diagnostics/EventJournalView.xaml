@@ -3,22 +3,26 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:logging="clr-namespace:OpenVisionLab.Logging.Controls;assembly=OpenVisionLab.Logging.Controls"
+             xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
+    <UserControl.Resources>
+        <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </UserControl.Resources>
     <Border Background="{DynamicResource Surface.Panel}"
-            BorderBrush="{DynamicResource Border.Default}"
-            BorderThickness="0,1,0,0">
+            BorderBrush="{DynamicResource Border.Default}" BorderThickness="0,1,0,0">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <ToggleButton x:Name="EvidenceDrawerToggle"
                           Grid.Row="1"
+                          IsChecked="{Binding Navigation.IsEvidenceExpanded, Mode=TwoWay}"
                           Height="34"
                           Padding="10,0"
                           HorizontalContentAlignment="Stretch"
-                          AutomationProperties.Name="{loc:Loc Key=Shell.EvidenceDrawer}"
-                          ToolTip="{loc:Loc Key=Shell.EvidenceDrawerHint}">
+                          AutomationProperties.Name="{loc:Loc Key=Diagnostics.Toggle}"
+                          ToolTip="{loc:Loc Key=Diagnostics.Hint}">
                 <ToggleButton.Template>
                     <ControlTemplate TargetType="ToggleButton">
                         <Border x:Name="DrawerHeader"
@@ -81,7 +85,7 @@
                     <TextBlock Grid.Column="1"
                                VerticalAlignment="Center"
                                FontWeight="SemiBold"
-                               Text="{loc:Loc Key=Shell.Evidence}" />
+                               Text="{loc:Loc Key=Diagnostics.Title}" />
                     <Border Grid.Column="2"
                             Margin="8,0,0,0"
                             Padding="7,1"
@@ -98,21 +102,232 @@
                                Text="{loc:Loc Key=Shell.SimulationJournal}" />
                 </Grid>
             </ToggleButton>
-            <Border x:Name="EvidenceDrawerContent"
-                    Grid.Row="0"
-                    Height="270"
-                    BorderBrush="{DynamicResource Border.Subtle}"
-                    BorderThickness="0,1,0,0">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="Visibility" Value="Collapsed" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsChecked, ElementName=EvidenceDrawerToggle}" Value="True">
-                                <Setter Property="Visibility" Value="Visible" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
+            <TabControl x:Name="EvidenceTabs" Grid.Row="0"
+                        SelectedIndex="{Binding Navigation.SelectedEvidenceTabIndex, Mode=TwoWay}"
+                        Visibility="{Binding Navigation.IsEvidenceExpanded, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TabItem Header="{loc:Loc Key=Diagnostics.Timeline}">
+                    <Grid Margin="6">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <WrapPanel Margin="0,0,0,5">
+                            <TextBlock Margin="0,0,8,0" VerticalAlignment="Center"
+                                       Text="{Binding RuntimeDebugger.TimelineSummaryText}" />
+                            <TextBlock Margin="8,0,6,0" VerticalAlignment="Center"
+                                       Text="{loc:Loc Key=Debugger.TimelineFilterLabel}" />
+                            <ComboBox x:Name="DebuggerTimelineFilterComboBox" Width="170" Margin="0,0,8,0"
+                                      DisplayMemberPath="DisplayText"
+                                      AutomationProperties.Name="{loc:Loc Key=Debugger.TimelineFilterLabel}"
+                                      ItemsSource="{Binding RuntimeDebugger.TimelineFilters}"
+                                      SelectedItem="{Binding RuntimeDebugger.SelectedTimelineFilter, Mode=TwoWay}" />
+                            <TextBlock Margin="0,0,6,0" VerticalAlignment="Center"
+                                       Text="{loc:Loc Key=Debugger.TimelineSeverityFilterLabel}" />
+                            <ComboBox x:Name="DebuggerTimelineSeverityFilterComboBox" Width="150" Margin="0,0,8,0"
+                                      DisplayMemberPath="DisplayText"
+                                      AutomationProperties.Name="{loc:Loc Key=Debugger.TimelineSeverityFilterLabel}"
+                                      ItemsSource="{Binding RuntimeDebugger.TimelineSeverityFilters}"
+                                      SelectedItem="{Binding RuntimeDebugger.SelectedTimelineSeverityFilter, Mode=TwoWay}" />
+                            <Button Command="{Binding RuntimeDebugger.ClearTimelineCommand}"
+                                    Content="{loc:Loc Key=Debugger.ClearTimeline}"
+                                    Style="{StaticResource GlobalCommandButtonStyle}" />
+                        </WrapPanel>
+                        <ListBox x:Name="DebuggerTimelineList" Grid.Row="1"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ItemsSource="{Binding RuntimeDebugger.Timeline}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="4,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="185" />
+                                            <ColumnDefinition Width="130" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Style="{StaticResource TelemetryTextStyle}"
+                                                   Text="{Binding HeaderText}" TextWrapping="Wrap" />
+                                        <TextBlock Grid.Column="1" Margin="8,0" FontWeight="SemiBold"
+                                                   Text="{Binding Category}" TextWrapping="Wrap" />
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                                            <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                       Text="{Binding Code}" TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding Code}" />
+                                            <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                       Text="{Binding CommandIdText}" TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding CommandIdTooltip}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock x:Name="DebuggerTimelineEmptyTextBlock" Grid.Row="1" Margin="8"
+                                   VerticalAlignment="Top" Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{Binding RuntimeDebugger.TimelineEmptyText}" TextWrapping="Wrap"
+                                   Visibility="{Binding RuntimeDebugger.HasTimeline, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" />
+                    </Grid>
+                </TabItem>
+                <TabItem Header="{loc:Loc Key=Diagnostics.Alarms}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="6">
+                            <TextBlock Margin="0,0,0,5" Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Diagnostics.CurrentState}" TextWrapping="Wrap" />
+                            <Expander x:Name="DebuggerAlarmsExpander"
+                                      Margin="0,7,0,0"
+                                      Header="{loc:Loc Key=Debugger.AlarmsRecovery}"
+                                      IsExpanded="True">
+                                 <StackPanel Margin="0,5,0,0">
+                                     <TextBlock FontWeight="SemiBold"
+                                                Text="{Binding RuntimeDebugger.AlarmSummaryText}" />
+                                     <TextBlock Margin="0,2,0,0"
+                                                Foreground="{DynamicResource Text.Secondary}"
+                                                Text="{Binding RuntimeDebugger.AlarmAcknowledgementSummaryText}"
+                                                TextWrapping="Wrap" />
+                                     <ListBox x:Name="DebuggerAlarmList"
+                                              Margin="0,5,0,0"
+                                              MaxHeight="170"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             ItemsSource="{Binding RuntimeDebugger.Alarms}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="3,3">
+                                                    <TextBlock FontWeight="SemiBold"
+                                                               Text="{Binding Source}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding Source}" />
+                                                    <TextBlock Text="{Binding State}"
+                                                               TextWrapping="Wrap" />
+                                                     <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                                Text="{Binding RecoveryText}"
+                                                                TextWrapping="Wrap" />
+                                                     <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                                Text="{Binding LifecycleText}"
+                                                                TextWrapping="Wrap" />
+                                                     <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                                Text="{Binding OccurrenceText}"
+                                                                TextWrapping="Wrap" />
+                                                     <Button Margin="0,4,0,0"
+                                                             HorizontalAlignment="Left"
+                                                             Command="{Binding DataContext.RuntimeDebugger.AcknowledgeAlarmCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                             CommandParameter="{Binding}"
+                                                             Content="{Binding AcknowledgeActionText}"
+                                                             IsEnabled="{Binding CanAcknowledge}"
+                                                             Style="{StaticResource GlobalCommandButtonStyle}"
+                                                             AutomationProperties.Name="{Binding AcknowledgeActionText}" />
+                                                 </StackPanel>
+                                             </DataTemplate>
+                                         </ListBox.ItemTemplate>
+                                    </ListBox>
+                                     <TextBlock Margin="0,5,0,0"
+                                                Foreground="{DynamicResource Text.Secondary}"
+                                                Text="{loc:Loc Key=Debugger.AlarmRecoveryHint}"
+                                                TextWrapping="Wrap" />
+                                     <WrapPanel Margin="0,6,0,0">
+                                         <Button x:Name="AcknowledgeAllAlarmsButton"
+                                                 Margin="0,0,6,4"
+                                                 Command="{Binding RuntimeDebugger.AcknowledgeAllAlarmsCommand}"
+                                                 Content="{loc:Loc Key=Debugger.AcknowledgeAllAlarms}"
+                                                 Style="{StaticResource GlobalCommandButtonStyle}"
+                                                 AutomationProperties.Name="{loc:Loc Key=Debugger.AcknowledgeAllAlarms}" />
+                                         <Button Margin="0,0,6,4"
+                                                 Command="{Binding FaultManager.ClearAllCommand}"
+                                                 Content="{loc:Loc Key=Inspector.ClearAll}"
+                                                Style="{StaticResource GlobalCommandButtonStyle}" />
+                                        <Button Command="{Binding ResetCommand}"
+                                                Content="{loc:Loc Key=Shell.Reset}"
+                                                 Style="{StaticResource GlobalCommandButtonStyle}" />
+                                     </WrapPanel>
+                                     <Expander x:Name="DebuggerAlarmHistoryExpander"
+                                               Margin="0,6,0,0"
+                                               Header="{loc:Loc Key=Debugger.AlarmHistory}"
+                                               IsExpanded="False">
+                                         <StackPanel Margin="0,5,0,0">
+                                             <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                        Text="{Binding RuntimeDebugger.AlarmHistorySummaryText}" />
+                                             <TextBlock Margin="0,5,0,0"
+                                                        Foreground="{DynamicResource Text.Secondary}"
+                                                        Text="{loc:Loc Key=Debugger.AlarmHistoryFilterHint}"
+                                                        TextWrapping="Wrap" />
+                                             <StackPanel Margin="0,5,0,0"
+                                                         Orientation="Horizontal">
+                                                 <TextBlock VerticalAlignment="Center"
+                                                            Text="{loc:Loc Key=Debugger.AlarmHistoryFilter}" />
+                                                 <ComboBox x:Name="DebuggerAlarmHistoryFilterComboBox"
+                                                           Margin="7,0,0,0"
+                                                           MinWidth="150"
+                                                           ItemsSource="{Binding RuntimeDebugger.AlarmHistoryFilters}"
+                                                           DisplayMemberPath="DisplayText"
+                                                           SelectedItem="{Binding RuntimeDebugger.SelectedAlarmHistoryFilter, Mode=TwoWay}"
+                                                           AutomationProperties.AutomationId="DebuggerAlarmHistoryFilter"
+                                                           AutomationProperties.Name="{loc:Loc Key=Debugger.AlarmHistoryFilter}" />
+                                             </StackPanel>
+                                             <TextBlock x:Name="DebuggerAlarmHistoryEmptyTextBlock"
+                                                        Margin="0,5,0,0"
+                                                        Foreground="{DynamicResource Text.Secondary}"
+                                                        Text="{Binding RuntimeDebugger.AlarmHistoryEmptyText}"
+                                                        TextWrapping="Wrap"
+                                                        Visibility="{Binding RuntimeDebugger.HasAlarmHistoryEmptyState, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                             <ListBox x:Name="DebuggerAlarmHistoryList"
+                                                      Margin="0,5,0,0"
+                                                      MaxHeight="170"
+                                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                      ItemsSource="{Binding RuntimeDebugger.VisibleAlarmHistory}">
+                                                 <ListBox.ItemTemplate>
+                                                     <DataTemplate>
+                                                         <StackPanel Margin="3,3">
+                                                             <TextBlock FontWeight="SemiBold"
+                                                                        Text="{Binding Source}"
+                                                                        TextTrimming="CharacterEllipsis"
+                                                                        ToolTip="{Binding Source}" />
+                                                             <TextBlock Text="{Binding State}"
+                                                                        TextWrapping="Wrap" />
+                                                             <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                                        Text="{Binding LifecycleText}"
+                                                                        TextWrapping="Wrap" />
+                                                             <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                                        Text="{Binding OccurrenceText}"
+                                                                        TextWrapping="Wrap" />
+                                                             <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                                        Text="{Binding ClearedAtText}"
+                                                                        TextWrapping="Wrap" />
+                                                         </StackPanel>
+                                                     </DataTemplate>
+                                                 </ListBox.ItemTemplate>
+                                             </ListBox>
+                                         </StackPanel>
+                                     </Expander>
+                                 </StackPanel>
+                             </Expander>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem Header="{loc:Loc Key=Diagnostics.Io}">
+                    <Grid Margin="6">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Margin="0,0,0,5" Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{loc:Loc Key=Diagnostics.CurrentState}" TextWrapping="Wrap" />
+                        <DataGrid x:Name="EvidenceIoSignalGrid" Grid.Row="1"
+                                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                  CanUserReorderColumns="False" CanUserResizeRows="False" CanUserSortColumns="False"
+                                  HeadersVisibility="Column" IsReadOnly="True" SelectionMode="Single" SelectionUnit="FullRow"
+                                  ItemsSource="{Binding DigitalIo.Signals}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Width="*" Header="{loc:Loc Key=Inspector.Signal}">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap" ToolTip="{Binding Id}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Width="100" Binding="{Binding KindText}" Header="{loc:Loc Key=Inspector.Kind}" />
+                                <DataGridTextColumn Width="100" Binding="{Binding ValueText}" Header="{loc:Loc Key=Inspector.Value}" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+                <TabItem Header="{loc:Loc Key=Diagnostics.Logs}">
                 <Grid Margin="4">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="1.15*" />
@@ -178,7 +393,8 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
                 </Grid>
-            </Border>
+                </TabItem>
+            </TabControl>
         </Grid>
     </Border>
 </UserControl>

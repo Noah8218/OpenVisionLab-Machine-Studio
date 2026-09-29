@@ -1,0 +1,227 @@
+<UserControl x:Class="OpenVisionLab.MachineStudio.View.Simulation.SimulationIntegrationWorkspaceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
+             xmlns:inspection="clr-namespace:OpenVisionLab.MachineStudio.View.Mmi">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  CanContentScroll="False">
+        <StackPanel Margin="12">
+            <inspection:MmiOperatorLayoutView Margin="0,0,0,12" />
+            <Border Style="{StaticResource PanelSurfaceStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                               Text="{loc:Loc Key=Integration.ExchangeStatusCaption}" />
+                    <TextBlock Margin="0,3,0,10"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="{loc:Loc Key=Integration.CentralWorkspaceHint}"
+                               TextWrapping="Wrap" />
+                    <TextBlock x:Name="IntegrationWorkspaceStatusText"
+                               FontWeight="SemiBold"
+                               Text="{Binding Integration.StatusText}"
+                               TextWrapping="Wrap"
+                               ToolTip="{Binding Integration.StatusText}" />
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{loc:Loc Key=Integration.HandoffStatus}" />
+                        <TextBlock x:Name="IntegrationHandoffStatusText"
+                                   Grid.Column="2"
+                                   Text="{Binding Integration.HandoffStatusText}"
+                                   TextWrapping="Wrap"
+                                   ToolTip="{Binding Integration.HandoffStatusText}" />
+                        <TextBlock Grid.Row="1"
+                                   Margin="0,6,0,0"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{loc:Loc Key=Integration.AcknowledgementStatus}" />
+                        <TextBlock x:Name="IntegrationAcknowledgementStatusText"
+                                   Grid.Row="1"
+                                   Grid.Column="2"
+                                   Margin="0,6,0,0"
+                                   Text="{Binding Integration.AcknowledgementStatusText}"
+                                   TextWrapping="Wrap"
+                                   ToolTip="{Binding Integration.AcknowledgementStatusText}" />
+                        <TextBlock Grid.Row="2"
+                                   Margin="0,6,0,0"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{loc:Loc Key=Integration.ResultStatus}" />
+                        <TextBlock x:Name="IntegrationResultStatusText"
+                                   Grid.Row="2"
+                                   Grid.Column="2"
+                                   Margin="0,6,0,0"
+                                   Text="{Binding Integration.ResultStatusText}"
+                                   TextWrapping="Wrap"
+                                   ToolTip="{Binding Integration.ResultStatusText}" />
+                        <TextBlock Grid.Row="3"
+                                   Margin="0,6,0,0"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{loc:Loc Key=Integration.ProjectionStatus}" />
+                        <TextBlock x:Name="IntegrationProjectionStatusText"
+                                   Grid.Row="3"
+                                   Grid.Column="2"
+                                   Margin="0,6,0,0"
+                                   Text="{Binding Integration.ProjectionStatusText}"
+                                   TextWrapping="Wrap"
+                                   ToolTip="{Binding Integration.ProjectionStatusText}" />
+                        <TextBlock Grid.Row="4"
+                                   Margin="0,6,0,0"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{loc:Loc Key=Integration.LastTransaction}" />
+                        <TextBlock x:Name="IntegrationLastTransactionText"
+                                   Grid.Row="4"
+                                   Grid.Column="2"
+                                   Margin="0,6,0,0"
+                                   FontFamily="{StaticResource Typography.Telemetry}"
+                                   FontSize="9.5"
+                                   Text="{Binding Integration.LastTransactionText}"
+                                   TextWrapping="Wrap"
+                                   ToolTip="{Binding Integration.LastTransactionText}" />
+                    </Grid>
+                    <WrapPanel Margin="0,12,0,0">
+                        <Button x:Name="RefreshIntegrationResultsButton"
+                                Margin="0,0,7,4"
+                                Command="{Binding Integration.RefreshResultsCommand}"
+                                IsEnabled="{Binding Integration.CanRefreshResults}"
+                                Content="{loc:Loc Key=Integration.RefreshResults}"
+                                ToolTip="{loc:Loc Key=Integration.RefreshResultsTooltip}"
+                                AutomationProperties.AutomationId="CentralRefreshIntegrationResultsButton"
+                                AutomationProperties.Name="{loc:Loc Key=Integration.RefreshResults}" />
+                        <Button x:Name="ApplyIntegrationResultToSimulationButton"
+                                Margin="0,0,7,4"
+                                Command="{Binding Integration.ApplyResultToSimulationCommand}"
+                                IsEnabled="{Binding Integration.CanApplyResultToSimulation}"
+                                Style="{StaticResource PrimaryCommandButtonStyle}"
+                                Content="{loc:Loc Key=Integration.ApplyResultToSimulation}"
+                                ToolTip="{loc:Loc Key=Integration.ApplyResultToSimulationTooltip}"
+                                AutomationProperties.AutomationId="CentralApplyIntegrationResultButton"
+                                AutomationProperties.Name="{loc:Loc Key=Integration.ApplyResultToSimulation}" />
+                    </WrapPanel>
+                        <TextBlock x:Name="IntegrationSetupWorkflowStatusText"
+                                   Margin="0,7,0,0"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="{Binding Integration.SetupWorkflowStatusText}"
+                               TextWrapping="Wrap"
+                               ToolTip="{Binding Integration.SetupWorkflowStatusText}" />
+                </StackPanel>
+            </Border>
+
+            <Border Margin="0,12,0,0" Style="{StaticResource PanelSurfaceStyle}">
+                <StackPanel>
+                    <Expander x:Name="IntegrationTransactionHistoryExpander"
+                              Header="{loc:Loc Key=Integration.TransactionHistory}"
+                              AutomationProperties.AutomationId="CentralIntegrationTransactionHistoryExpander"
+                              AutomationProperties.Name="{loc:Loc Key=Integration.TransactionHistory}">
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Integration.TransactionHistoryHint}"
+                                       TextWrapping="Wrap" />
+                            <ComboBox x:Name="IntegrationTransactionHistoryFilter"
+                                      Margin="0,8,0,0"
+                                      ItemsSource="{Binding Integration.TransactionHistoryFilters}"
+                                      DisplayMemberPath="DisplayText"
+                                      SelectedItem="{Binding Integration.SelectedTransactionHistoryFilter, Mode=TwoWay}"
+                                      AutomationProperties.AutomationId="CentralIntegrationTransactionHistoryFilter"
+                                      AutomationProperties.Name="{loc:Loc Key=Integration.TransactionHistoryFilter}" />
+                            <TextBlock x:Name="IntegrationTransactionHistoryEmptyText"
+                                       Margin="0,6,0,0"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding Integration.TransactionHistoryEmptyText}"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding Integration.HasTransactionHistoryEmptyState, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <ListBox x:Name="IntegrationTransactionHistoryList"
+                                     Margin="0,6,0,0"
+                                     MaxHeight="220"
+                                     ItemsSource="{Binding Integration.VisibleTransactionHistoryRows}"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     AutomationProperties.AutomationId="CentralIntegrationTransactionHistoryList"
+                                     AutomationProperties.Name="{loc:Loc Key=Integration.TransactionHistory}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="3,3">
+                                            <TextBlock FontWeight="SemiBold"
+                                                       Text="{Binding ShortTransactionId}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding FullTransactionId}" />
+                                            <TextBlock Style="{StaticResource TelemetryTextStyle}"
+                                                       Text="{Binding Handoff.CreatedAtUtc}" />
+                                            <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                       Text="{Binding Handoff.Context.Modality}" />
+                                            <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                       Text="{Binding StatusText}"
+                                                       TextWrapping="Wrap"
+                                                       ToolTip="{Binding StatusText}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </StackPanel>
+                    </Expander>
+                    <Expander x:Name="IntegrationTransactionDiagnosticsExpander"
+                              Margin="0,8,0,0"
+                              Header="{loc:Loc Key=Integration.TransactionDiagnostics}"
+                              AutomationProperties.AutomationId="CentralIntegrationTransactionDiagnosticsExpander"
+                              AutomationProperties.Name="{loc:Loc Key=Integration.TransactionDiagnostics}">
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Integration.TransactionDiagnosticsFilterHint}"
+                                       TextWrapping="Wrap" />
+                            <ComboBox x:Name="IntegrationTransactionDiagnosticsFilter"
+                                      Margin="0,8,0,0"
+                                      ItemsSource="{Binding Integration.TransactionDiagnosticFilters}"
+                                      DisplayMemberPath="DisplayText"
+                                      SelectedItem="{Binding Integration.SelectedTransactionDiagnosticFilter, Mode=TwoWay}"
+                                      AutomationProperties.AutomationId="CentralIntegrationTransactionDiagnosticsFilter"
+                                      AutomationProperties.Name="{loc:Loc Key=Integration.TransactionDiagnosticsFilter}" />
+                            <TextBlock x:Name="IntegrationTransactionDiagnosticsReadErrorText"
+                                       Margin="0,6,0,0"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding Integration.TransactionDiagnosticReadError}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock x:Name="IntegrationTransactionDiagnosticsEmptyText"
+                                       Margin="0,6,0,0"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding Integration.TransactionDiagnosticsEmptyText}"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding Integration.HasTransactionDiagnosticsEmptyState, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <ListBox x:Name="IntegrationTransactionDiagnosticsList"
+                                     Margin="0,6,0,0"
+                                     MaxHeight="220"
+                                     ItemsSource="{Binding Integration.VisibleTransactionDiagnostics}"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     AutomationProperties.AutomationId="CentralIntegrationTransactionDiagnosticsList"
+                                     AutomationProperties.Name="{loc:Loc Key=Integration.TransactionDiagnostics}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="3,3">
+                                            <TextBlock FontWeight="SemiBold" Text="{Binding State}" />
+                                            <TextBlock Style="{StaticResource TelemetryTextStyle}"
+                                                       Text="{Binding TransactionId}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding TransactionId}" />
+                                            <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                                       Text="{Binding Detail}"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </StackPanel>
+                    </Expander>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

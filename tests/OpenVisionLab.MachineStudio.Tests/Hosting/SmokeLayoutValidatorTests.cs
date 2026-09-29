@@ -11,6 +11,47 @@ namespace OpenVisionLab.MachineStudio.Tests;
 
 public sealed class SmokeLayoutValidatorTests
 {
+    [Theory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    [InlineData(1.5)]
+    [InlineData(1.75)]
+    [InlineData(2.0)]
+    public async Task MeasuresWrappedCaptionAtItsArrangedDpi(double scale)
+    {
+        await RunOnStaAsync(() =>
+        {
+            var caption = new TextBlock
+            {
+                Text = "3D HeightMap 자동 입력 사용",
+                FontFamily = new FontFamily("Segoe UI Variable Text, Malgun Gothic, Segoe UI"),
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap,
+                UseLayoutRounding = true
+            };
+            VisualTreeHelper.SetRootDpi(caption, new DpiScale(scale, scale));
+            caption.Measure(new Size(260, double.PositiveInfinity));
+            caption.Arrange(new Rect(caption.DesiredSize));
+            var method = typeof(SmokeLayoutValidator).GetMethod(
+                "MeasureNaturalWrappedHeight", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.NotNull(method);
+            var measuredHeight = Assert.IsType<double>(method!.Invoke(null, [caption]));
+            Assert.True(measuredHeight <= caption.ActualHeight + 2,
+                $"DPI={scale}, arranged={caption.ActualWidth}x{caption.ActualHeight}, measuredHeight={measuredHeight}.");
+
+            caption.Width = 100;
+            caption.Height = 10;
+            caption.Measure(new Size(100, 10));
+            caption.Arrange(new Rect(0, 0, 100, 10));
+            measuredHeight = Assert.IsType<double>(method.Invoke(null, [caption]));
+            var availableHeight = Math.Min(caption.ActualHeight, caption.DesiredSize.Height);
+            Assert.InRange(availableHeight, 9, 11);
+            Assert.True(measuredHeight > availableHeight + 2,
+                $"DPI={scale}: genuine wrapped-height clipping must still be detected.");
+            return true;
+        });
+    }
+
     [Fact]
     public async Task ReportsVisibleWrappedTextThatExceedsItsArrangedHeight()
     {

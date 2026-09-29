@@ -4,7 +4,8 @@
              xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
              xmlns:behavior="clr-namespace:OpenVisionLab.MachineStudio.Behavior"
              xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
-             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
+             xmlns:project="clr-namespace:OpenVisionLab.MachineStudio.View.Project">
     <UserControl.Resources>
         <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <DataTemplate x:Key="LayoutComponentIconTemplate">
@@ -127,77 +128,163 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Style="{StaticResource PanelHeaderStyle}">
-                <TextBlock Style="{StaticResource PanelHeaderTextStyle}"
-                           Text="{Binding LeftPanelHeaderText}" />
+            <Border Grid.Row="0"
+                    Height="Auto"
+                    MinHeight="{StaticResource Density.PanelHeaderHeight}"
+                    Style="{StaticResource PanelHeaderStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding LeftPanelHeaderText}"
+                               TextWrapping="Wrap">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource PanelHeaderTextStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Navigation.IsEquipmentOutlineVisible}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Text="{loc:Loc Key=Workspace.Equipment}"
+                               TextWrapping="Wrap">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource PanelHeaderTextStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Navigation.IsEquipmentOutlineVisible}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Grid.Column="1"
+                             Margin="6,0,0,0"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource Text.Secondary}"
+                             Text="{Binding Layout.EquipmentOutlineCountText}"
+                             Visibility="{Binding Navigation.IsEquipmentOutlineVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    </TextBlock>
+                </Grid>
             </Border>
 
-            <Grid Grid.Row="1">
-                <Grid.Style>
-                    <Style TargetType="Grid">
-                        <Setter Property="Visibility" Value="Visible" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsRunMode}" Value="True">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Grid.Style>
+            <project:EquipmentOutlineView Grid.Row="2"
+                                           Visibility="{Binding Navigation.IsEquipmentOutlineVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+            <Grid Grid.Row="2">
+
                 <TabControl SelectedIndex="{Binding Navigation.SelectedLeftToolTabIndex, Mode=TwoWay}">
+                    <TabControl.Style>
+                        <Style TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsEquipmentOutlineVisible}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TabControl.Style>
                     <TabItem Header="{loc:Loc Key=Shell.Project}">
-                        <TreeView ItemsSource="{Binding ProjectTree.Roots}"
-                                  HorizontalContentAlignment="Stretch"
-                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                            <TreeView.Resources>
-                                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#20394B" />
-                                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#20394B" />
-                                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#F3F6F9" />
-                            </TreeView.Resources>
-                            <b:Interaction.Behaviors>
-                                <behavior:TreeViewSelectedItemBehavior SelectedItem="{Binding ProjectTree.SelectedNode, Mode=TwoWay}" />
-                            </b:Interaction.Behaviors>
-                            <TreeView.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <VirtualizingStackPanel HorizontalAlignment="Stretch"
-                                                             Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType={x:Type TreeView}}}" />
-                                </ItemsPanelTemplate>
-                            </TreeView.ItemsPanel>
-                            <TreeView.ItemContainerStyle>
-                                <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
-                                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
-                                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
-                                    <Setter Property="HorizontalAlignment" Value="Stretch" />
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                </Style>
-                            </TreeView.ItemContainerStyle>
-                            <TreeView.ItemTemplate>
-                                <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                                    <Grid Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType={x:Type TreeViewItem}}}">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Border Width="6"
-                                                Height="6"
-                                                Margin="2,0,7,0"
-                                                VerticalAlignment="Center"
-                                                Background="{DynamicResource State.Vision}"
-                                                CornerRadius="3" />
-                                        <TextBlock Grid.Column="1"
-                                                   VerticalAlignment="Center"
-                                                   Text="{Binding DisplayName}"
-                                                   TextWrapping="Wrap" />
-                                    </Grid>
-                                </HierarchicalDataTemplate>
-                            </TreeView.ItemTemplate>
-                        </TreeView>
+                        <Grid Margin="4,6">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Margin="2,0,2,4"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=ProjectTree.SearchLabel}" />
+                            <DockPanel Grid.Row="1" Margin="0,0,0,4" LastChildFill="True">
+                                <Button DockPanel.Dock="Right"
+                                        Height="30"
+                                        MinWidth="58"
+                                        Margin="5,0,0,0"
+                                        Padding="8,0"
+                                        Command="{Binding ProjectTree.ClearSearchCommand}"
+                                        Content="{loc:Loc Key=ProjectTree.ClearSearch}"
+                                        AutomationProperties.Name="{loc:Loc Key=ProjectTree.ClearSearch}" />
+                                <TextBox Height="30"
+                                         VerticalContentAlignment="Center"
+                                         Text="{Binding ProjectTree.SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="{loc:Loc Key=ProjectTree.SearchLabel}" />
+                            </DockPanel>
+                            <TextBlock Grid.Row="2"
+                                       Margin="2,0,2,5"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Visibility="{Binding ProjectTree.HasSearchMatches, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Run Text="{Binding ProjectTree.SearchResultCount, Mode=OneWay}" />
+                                <Run Text="{loc:Loc Key=ProjectTree.SearchResultsSuffix}" />
+                            </TextBlock>
+                            <TextBlock Grid.Row="2"
+                                       Margin="2,0,2,5"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=ProjectTree.SearchNoMatches}"
+                                       Visibility="{Binding ProjectTree.HasNoSearchMatches, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <TreeView Grid.Row="3"
+                                      ItemsSource="{Binding ProjectTree.Roots}"
+                                      HorizontalContentAlignment="Stretch"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <TreeView.Resources>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#20394B" />
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#20394B" />
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#F3F6F9" />
+                                </TreeView.Resources>
+                                <b:Interaction.Behaviors>
+                                    <behavior:TreeViewSelectedItemBehavior SelectedItem="{Binding ProjectTree.SelectedNode, Mode=TwoWay}" />
+                                </b:Interaction.Behaviors>
+                                <TreeView.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <VirtualizingStackPanel HorizontalAlignment="Stretch" />
+                                    </ItemsPanelTemplate>
+                                </TreeView.ItemsPanel>
+                                <TreeView.ItemContainerStyle>
+                                    <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
+                                        <Setter Property="AutomationProperties.Name" Value="{Binding DisplayName}" />
+                                        <Setter Property="Visibility" Value="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                                        <Setter Property="HorizontalAlignment" Value="Stretch" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    </Style>
+                                </TreeView.ItemContainerStyle>
+                                <TreeView.ItemTemplate>
+                                    <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="6"
+                                                    Height="6"
+                                                    Margin="2,0,7,0"
+                                                    VerticalAlignment="Center"
+                                                    Background="{DynamicResource State.Vision}"
+                                                    CornerRadius="3" />
+                                            <TextBlock Grid.Column="1"
+                                                       VerticalAlignment="Center"
+                                                       MaxWidth="95"
+                                                       Text="{Binding DisplayName}"
+                                                       TextWrapping="Wrap" />
+                                        </Grid>
+                                    </HierarchicalDataTemplate>
+                                </TreeView.ItemTemplate>
+                            </TreeView>
+                        </Grid>
                     </TabItem>
                     <TabItem Header="{loc:Loc Key=Shell.Library}">
                         <Grid Margin="4">
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                                 <RowDefinition Height="Auto" />
@@ -208,58 +295,151 @@
                                        Foreground="{DynamicResource Text.Secondary}"
                                        Text="{loc:Loc Key=Shell.LibraryPlacementHint}"
                                        TextWrapping="Wrap" />
-                            <ListBox Grid.Row="1"
-                                     ItemsSource="{Binding Layout.LibraryItems}"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
-                                        <Setter Property="Padding" Value="0" />
-                                    </Style>
-                                </ListBox.ItemContainerStyle>
-                                <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                        <Button Margin="1"
-                                                Padding="5,4"
-                                                MinHeight="44"
-                                                HorizontalContentAlignment="Stretch"
-                                                AutomationProperties.Name="{Binding Name}"
-                                                Command="{Binding DataContext.AddLayoutComponentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding Kind}"
-                                                ToolTip="{Binding Description}">
+                            <TextBlock Grid.Row="1"
+                                       Margin="4,0,4,3"
+                                       Style="{StaticResource SectionCaptionStyle}"
+                                       Text="{loc:Loc Key=Equipment.LibrarySearchLabel}" />
+                            <Grid Grid.Row="2" Margin="2,0,2,6">
+                                <TextBox Height="30"
+                                         Padding="8,0,34,0"
+                                         VerticalContentAlignment="Center"
+                                         Text="{Binding Layout.LibrarySearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="{loc:Loc Key=Equipment.LibrarySearchLabel}" />
+                                <Button Width="26"
+                                        MinWidth="26"
+                                        MinHeight="0"
+                                        Margin="0,2,3,2"
+                                        Padding="0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Stretch"
+                                        Background="Transparent"
+                                        BorderBrush="Transparent"
+                                        BorderThickness="1"
+                                        Foreground="{DynamicResource Text.Secondary}"
+                                        Command="{Binding Layout.ClearLibrarySearchCommand}"
+                                        ToolTip="{loc:Loc Key=Equipment.LibrarySearchClear}"
+                                        AutomationProperties.Name="{loc:Loc Key=Equipment.LibrarySearchClear}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Layout.IsLibrarySearchEmpty}" Value="False">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <TextBlock Text="×" FontSize="16" FontWeight="SemiBold"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Button>
+                            </Grid>
+                            <Grid Grid.Row="3">
+                                <ListBox ItemsSource="{Binding Layout.FilteredLibraryItems}"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.Style>
+                                        <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
+                                            <Style.Triggers>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding Navigation.IsEquipmentOutlineVisible}" Value="True" />
+                                                        <Condition Binding="{Binding Layout.IsUnitView}" Value="False" />
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="IsEnabled" Value="False" />
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ListBox.Style>
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                            <Setter Property="Padding" Value="0" />
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Margin="1"
+                                                    Padding="5,5"
+                                                    MinHeight="64"
+                                                    HorizontalContentAlignment="Stretch"
+                                                    AutomationProperties.Name="{Binding Name}"
+                                                    Command="{Binding DataContext.AddEquipmentLayoutComponentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding Kind}"
+                                                    ToolTip="{Binding Description}">
                                                 <b:Interaction.Behaviors>
                                                     <behavior:LibraryDragBehavior DragData="{Binding}" />
                                                 </b:Interaction.Behaviors>
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="40" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <ContentControl Width="34"
-                                                                Height="28"
-                                                                VerticalAlignment="Center"
-                                                                Focusable="False"
-                                                                IsHitTestVisible="False"
-                                                                Content="{Binding}"
-                                                                ContentTemplate="{StaticResource LayoutComponentIconTemplate}" />
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                    <TextBlock FontWeight="SemiBold"
-                                                               Text="{Binding Name}"
-                                                               TextWrapping="Wrap" />
-                                                    <TextBlock Margin="0,2,0,0"
-                                                               FontSize="10"
-                                                               Foreground="{DynamicResource Text.Secondary}"
-                                                               Text="{Binding Category}" />
-                                                </StackPanel>
-                                            </Grid>
-                                        </Button>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                            <TextBlock Grid.Row="2"
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="40" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <ContentControl Width="34"
+                                                                    Height="28"
+                                                                    VerticalAlignment="Top"
+                                                                    Focusable="False"
+                                                                    IsHitTestVisible="False"
+                                                                    Content="{Binding}"
+                                                                    ContentTemplate="{StaticResource LayoutComponentIconTemplate}" />
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <DockPanel LastChildFill="True">
+                                                            <TextBlock DockPanel.Dock="Right"
+                                                                       Margin="6,0,0,0"
+                                                                       FontSize="10"
+                                                                       Foreground="{DynamicResource Accent.Primary}"
+                                                                       Text="{Binding Category}" />
+                                                            <TextBlock FontWeight="SemiBold"
+                                                                       Text="{Binding Name}"
+                                                                       TextWrapping="Wrap" />
+                                                        </DockPanel>
+                                                        <TextBlock Margin="0,3,0,0"
+                                                                   FontSize="10"
+                                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                                   Text="{Binding Description}"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <TextBlock Margin="8"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{loc:Loc Key=Equipment.LibraryNoMatches}"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap"
+                                           Visibility="{Binding Layout.HasNoLibrarySearchResults, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <Button Panel.ZIndex="2"
+                                        MinHeight="64"
+                                        Margin="5"
+                                        Padding="8,6"
+                                        VerticalAlignment="Center"
+                                        Command="{Binding OpenStationUnitEditorCommand}"
+                                        AutomationProperties.Name="{loc:Loc Key=Equipment.StationUnitAddButton}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource PrimaryCommandButtonStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding Navigation.IsEquipmentOutlineVisible}" Value="True" />
+                                                        <Condition Binding="{Binding Layout.IsUnitView}" Value="False" />
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <TextBlock Text="{loc:Loc Key=Equipment.LibraryUnitRequired}"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap" />
+                                </Button>
+                            </Grid>
+                            <TextBlock Grid.Row="4"
                                        Margin="4,8,4,4"
                                        Style="{StaticResource SectionCaptionStyle}"
                                        Text="{loc:Loc Key=Left.PlacedComponents}" />
-                            <ListBox Grid.Row="3"
+                            <ListBox Grid.Row="5"
                                      ItemsSource="{Binding Layout.Items}"
                                      SelectionMode="Extended"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -289,13 +469,22 @@
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
-                            <Button Grid.Row="4"
+                            <Button Grid.Row="6"
                                     Margin="2,6,2,2"
                                     Command="{Binding DeleteLayoutComponentCommand}"
                                     Content="{loc:Loc Key=Left.RemoveSelected}" />
                         </Grid>
                     </TabItem>
                     <TabItem Header="{loc:Loc Key=Project.Diagnostics}">
+                        <TabItem.Style>
+                            <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Navigation.IsEquipmentOutlineVisible}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TabItem.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="4">
@@ -389,132 +578,23 @@
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
+                <TabItem Header="{loc:Loc Key=Workspace.Equipment}">
+                    <TabItem.Style>
+                        <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsSimulationWorkspace}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TabItem.Style>
+                    <project:EquipmentOutlineView />
+                </TabItem>
                 </TabControl>
             </Grid>
 
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                <ScrollViewer.Style>
-                    <Style TargetType="ScrollViewer">
-                        <Setter Property="Visibility" Value="Collapsed" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsRunMode}" Value="True">
-                                <Setter Property="Visibility" Value="Visible" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </ScrollViewer.Style>
-                <StackPanel Margin="4">
-                    <Border Style="{StaticResource InspectorCardStyle}">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Left.MachineState}" />
-                            <TextBlock FontSize="17" FontWeight="SemiBold" Text="{Binding StateText}" />
-                            <TextBlock Margin="0,5,0,0"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding SimulationStatusText}" />
-                        </StackPanel>
-                    </Border>
-                    <Border>
-                        <Border.Style>
-                            <Style TargetType="Border" BasedOn="{StaticResource InspectorCardStyle}">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding HasAutomaticRun}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Left.AutomaticSimulation}" />
-                            <TextBlock FontWeight="SemiBold"
-                                       Text="{Binding AutomaticRunStateText}"
-                                       TextWrapping="Wrap" />
-                            <Grid Margin="0,7,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Left.CompletedCycles}" />
-                                <TextBlock Grid.Column="1"
-                                           Style="{StaticResource TelemetryTextStyle}"
-                                           Text="{Binding CompletedCycleCountText}" />
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource InspectorCardStyle}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Left.ConfiguredAxes}" />
-                            <TextBlock Grid.Column="1"
-                                       Style="{StaticResource TelemetryTextStyle}"
-                                       Text="{Binding AxisCountText}" />
-                            <TextBlock Grid.Row="1"
-                                       Margin="0,7,0,0"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{loc:Loc Key=Left.LayoutComponents}" />
-                            <TextBlock Grid.Row="1"
-                                       Grid.Column="1"
-                                       Margin="0,7,0,0"
-                                       Style="{StaticResource TelemetryTextStyle}"
-                                       Text="{Binding LayoutComponentCountText}" />
-                            <TextBlock Grid.Row="2"
-                                       Margin="0,7,0,0"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{loc:Loc Key=Left.VirtualCameras}" />
-                            <TextBlock Grid.Row="2"
-                                       Grid.Column="1"
-                                       Margin="0,7,0,0"
-                                       Style="{StaticResource TelemetryTextStyle}"
-                                       Text="{Binding Camera.CameraCountText}" />
-                        </Grid>
-                    </Border>
-                    <Border Style="{StaticResource InspectorCardStyle}">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Left.EmbeddedSequence}" />
-                            <TextBlock FontSize="14"
-                                       FontWeight="SemiBold"
-                                       Text="{Binding CurrentSequenceName}"
-                                       TextWrapping="Wrap" />
-                            <Grid Margin="0,7,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Left.State}" />
-                                <TextBlock Grid.Column="1"
-                                           HorizontalAlignment="Right"
-                                           Style="{StaticResource TelemetryTextStyle}"
-                                           Text="{Binding CurrentSequenceStateText}" />
-                            </Grid>
-                            <TextBlock Margin="0,7,0,0"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{loc:Loc Key=Left.CurrentStep}" />
-                            <TextBlock Margin="0,2,0,0"
-                                       Text="{Binding CurrentSequenceStepText}"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource InspectorCardStyle}">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Left.ControlOwner}" />
-                            <TextBlock Text="{Binding ControlOwnerText}" />
-                            <TextBlock Margin="0,4,0,0"
-                                       FontSize="10.5"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding ControlOwnerHelpText}"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
+
         </Grid>
     </Border>
 </UserControl>

@@ -29,9 +29,33 @@ public sealed class MachineProjectRuntimeComponentCompilerTests
             frame => Assert.IsType<MachineFrameRuntimeConfiguration>(frame),
             stage => Assert.Equal("axis.x", Assert.IsType<LinearStageRuntimeConfiguration>(stage).AxisId),
             conveyor => Assert.Equal(0.6, Assert.IsType<ConveyorRuntimeConfiguration>(conveyor).TravelPerTick, precision: 10),
-            workpiece => Assert.Equal("conveyor", Assert.IsType<WorkpieceRuntimeConfiguration>(workpiece).ConveyorComponentId),
+            workpiece =>
+            {
+                var item = Assert.IsType<WorkpieceRuntimeConfiguration>(workpiece);
+                Assert.Equal("conveyor", item.ConveyorComponentId);
+                Assert.True(item.InitiallyPresent);
+            },
             sensor => Assert.Equal(2, Assert.IsType<DigitalSensorRuntimeConfiguration>(sensor).OnDelayTicks),
             cylinder => Assert.Equal(60, Assert.IsType<PneumaticCylinderRuntimeConfiguration>(cylinder).Stroke));
+    }
+
+    [Fact]
+    public void Compile_WorkpieceExplicitlyAuthoredEmpty_MapsToRuntimeOccupancy()
+    {
+        var devices = Devices();
+        devices["device.workpiece"].Workpiece!.InitiallyPresent = false;
+        var errors = new List<MachineProjectRuntimeCompilationError>();
+
+        IReadOnlyList<LayoutComponentRuntimeConfiguration> result = new MachineProjectRuntimeComponentCompiler(
+            new FixedStepDelayConverter(TimeSpan.FromMilliseconds(5))).Compile(
+                CreateLayout(),
+                Axes(),
+                devices,
+                errors);
+
+        Assert.Empty(errors);
+        Assert.False(Assert.IsType<WorkpieceRuntimeConfiguration>(
+            Assert.Single(result, item => item.Id == "workpiece")).InitiallyPresent);
     }
 
     [Fact]

@@ -14,6 +14,8 @@ internal sealed class SmokeNativeInput : IDisposable
     private const uint MouseEventLeftDown = 0x0002;
     private const uint MouseEventLeftUp = 0x0004;
     private const uint KeyEventKeyUp = 0x0002;
+    private const uint KeyEventExtended = 0x0001;
+    private const uint MapVirtualKeyToScanCode = 0;
     private const uint GetAncestorRoot = 2;
 
     private bool _pointerHeld;
@@ -45,7 +47,14 @@ internal sealed class SmokeNativeInput : IDisposable
         var point = element.PointToScreen(new Point(
             Math.Max(1, element.ActualWidth / 2),
             Math.Max(1, element.ActualHeight / 2)));
-        SetCursorPosition((int)Math.Round(point.X), (int)Math.Round(point.Y));
+        var targetX = (int)Math.Round(point.X);
+        var targetY = (int)Math.Round(point.Y);
+        var current = GetCursorPosition();
+        if (current.X == targetX && current.Y == targetY)
+        {
+            SetCursorPosition(targetX + 1, targetY);
+        }
+        SetCursorPosition(targetX, targetY);
         Mouse.Synchronize();
     }
 
@@ -74,8 +83,10 @@ internal sealed class SmokeNativeInput : IDisposable
 
     internal void SendKey(byte virtualKey)
     {
-        keybd_event(virtualKey, 0, 0, UIntPtr.Zero);
-        keybd_event(virtualKey, 0, KeyEventKeyUp, UIntPtr.Zero);
+        var scanCode = (byte)MapVirtualKey(virtualKey, MapVirtualKeyToScanCode);
+        var extended = virtualKey is >= 0x21 and <= 0x28 ? KeyEventExtended : 0;
+        keybd_event(virtualKey, scanCode, extended, UIntPtr.Zero);
+        keybd_event(virtualKey, scanCode, extended | KeyEventKeyUp, UIntPtr.Zero);
     }
 
     internal void ReleasePointer()
@@ -145,4 +156,7 @@ internal sealed class SmokeNativeInput : IDisposable
         byte scanCode,
         uint flags,
         UIntPtr extraInfo);
+
+    [DllImport("user32.dll")]
+    private static extern uint MapVirtualKey(uint code, uint mapType);
 }

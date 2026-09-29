@@ -59,6 +59,33 @@ public sealed class VirtualCameraInspectionWorkflowTests
         Assert.Equal("presence-check", command.RecipeId);
     }
 
+    [Fact]
+    public async Task ExternalResultTriggerRequiresNoLocalInspectionEvidence()
+    {
+        using var project = new TemporaryProject();
+        await project.WriteAsync("input.raw", [0x01, 0x02]);
+        var workflow = new VirtualCameraInspectionWorkflow();
+        var request = CreateRequest(
+            project.ProjectPath,
+            PlaceholderInspectionDecision.Pass,
+            acquisitionOrdinal: 0,
+            sourceRelativePath: "input.raw",
+            width: 2,
+            height: 1);
+        var frame = await workflow.AcquireFrameAsync(request);
+
+        var command = workflow.CreateTriggerCommand(
+            frame,
+            inspectionResult: null,
+            projectId: "project",
+            runtimeGeneration: 7,
+            waitForExternalResult: true);
+
+        Assert.True(command.WaitForExternalResult);
+        Assert.Null(command.InspectionEvidence);
+        Assert.Throws<ArgumentNullException>(() => workflow.CreateTriggerCommand(frame, inspectionResult: null));
+    }
+
     private static VirtualCameraInspectionRequest CreateRequest(
         string projectPath,
         PlaceholderInspectionDecision decision,

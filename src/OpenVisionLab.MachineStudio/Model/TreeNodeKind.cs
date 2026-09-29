@@ -14,5 +14,8 @@ public enum TreeNodeKind
     Channel,
     Sequences,
     Sequence,
-    Step
+    Step,
+    Stations,
+    Station,
+    Unit
 }

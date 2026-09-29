@@ -310,7 +310,9 @@ public sealed record VirtualCameraAcquisitionResult(
     PlaceholderInspectionDecision Decision,
     VirtualCameraFrameEvidence? FrameEvidence = null,
     VirtualCameraInspectionEvidence? InspectionEvidence = null,
-    VirtualCameraExternalResultEvidence? ExternalResultEvidence = null);
+    VirtualCameraExternalResultEvidence? ExternalResultEvidence = null,
+    string? WorkpieceComponentId = null,
+    string? WorkpieceInstanceId = null);
 
 public sealed record VirtualCameraSnapshot(
     string Id,

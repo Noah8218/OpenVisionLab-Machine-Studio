@@ -208,6 +208,26 @@ internal sealed class LayoutSelectionEditingWorkflow
         };
     }
 
+    internal bool MoveSelectionBy(
+        IEnumerable<LayoutItem> selectedItems,
+        double deltaX,
+        double deltaY,
+        bool isEditable)
+    {
+        ArgumentNullException.ThrowIfNull(selectedItems);
+        if (!isEditable || !double.IsFinite(deltaX) || !double.IsFinite(deltaY))
+        {
+            return false;
+        }
+
+        if (Math.Abs(deltaX) < 0.000001d && Math.Abs(deltaY) < 0.000001d)
+        {
+            return false;
+        }
+
+        return MoveSelection(selectedItems, deltaX, deltaY);
+    }
+
     internal bool AlignSelection(
         IEnumerable<LayoutItem> selectedItems,
         LayoutItem? primary,

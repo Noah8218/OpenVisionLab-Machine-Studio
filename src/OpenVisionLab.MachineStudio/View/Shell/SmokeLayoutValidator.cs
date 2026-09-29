@@ -8,6 +8,7 @@ using System.Windows.Media;
 using OpenVisionLab.MachineStudio.View.Scene;
 using OpenVisionLab.MachineStudio.View.Project;
 using OpenVisionLab.MachineStudio.View.Sequence;
+using OpenVisionLab.MachineStudio.View.Simulation;
 
 namespace OpenVisionLab.MachineStudio.View.Shell;
 
@@ -95,12 +96,21 @@ internal static class SmokeLayoutValidator
         var sceneViewport = EnumerateVisualDescendants(window)
             .OfType<MachineSceneViewport>()
             .FirstOrDefault(viewport => viewport.IsVisible);
+        var overviewVisible = EnumerateVisualDescendants(window)
+            .OfType<ScrollViewer>()
+            .Any(view => view.Name == "LargeOverviewScrollViewer" && view.IsVisible);
         var sequenceEditor = EnumerateVisualDescendants(window)
             .OfType<SequenceEditorView>()
             .FirstOrDefault(editor => editor.IsVisible);
         var connectionWorkbench = EnumerateVisualDescendants(window)
             .OfType<RecipeConnectionWorkbenchView>()
             .FirstOrDefault(workbench => workbench.IsVisible);
+        var resultsVisible = EnumerateVisualDescendants(window).OfType<SceneDocumentView>()
+            .Any(document => document.ResultsWorkspacePanel.IsVisible);
+        var testsVisible = EnumerateVisualDescendants(window).OfType<SimulationTestWorkspaceView>()
+            .Any(view => view.IsVisible);
+        var integrationVisible = EnumerateVisualDescendants(window).OfType<SimulationIntegrationWorkspaceView>()
+            .Any(view => view.IsVisible);
         var failures = new List<string>();
         var expectedDpi = 96.0 * requestedScalePercent / 100.0;
 
@@ -119,7 +129,8 @@ internal static class SmokeLayoutValidator
                 "The scene renderer did not rebuild FormattedText for the observed DPI.");
         }
 
-        if (sceneViewport is null && sequenceEditor is null && connectionWorkbench is null)
+        if (sceneViewport is null && !overviewVisible && sequenceEditor is null && connectionWorkbench is null && !resultsVisible
+            && !testsVisible && !integrationVisible)
         {
             failures.Add("No supported document surface was visible during layout validation.");
         }
@@ -168,11 +179,13 @@ internal static class SmokeLayoutValidator
                 : "SyntheticWmDpiChanged",
             ActiveDocumentSurface = sceneViewport is not null
                 ? "Layout"
+                : overviewVisible
+                    ? "EquipmentOverview"
                 : sequenceEditor is not null
                     ? "Sequence"
                     : connectionWorkbench is not null
                     ? "Connections"
-                    : "Simulation",
+                    : resultsVisible ? "Results" : testsVisible ? "Tests" : integrationVisible ? "Integration" : "Simulation",
             SceneTextPixelsPerDip = sceneViewport?.LastFormattedTextPixelsPerDip ?? 0,
             PixelWidth = checked((int)Math.Round(regions.WindowWidth * dpi.DpiScaleX)),
             PixelHeight = checked((int)Math.Round(regions.WindowHeight * dpi.DpiScaleY)),
@@ -265,6 +278,10 @@ internal static class SmokeLayoutValidator
 
     private static double MeasureNaturalWrappedHeight(TextBlock source)
     {
+        var dpi = VisualTreeHelper.GetDpi(source);
+        // ActualWidth can round down by half a physical pixel. Re-measuring that
+        // rounded width without the lost fraction can invent another text line.
+        var roundingAllowance = source.UseLayoutRounding ? 0.5 / dpi.DpiScaleX : 0;
         var measured = new TextBlock
         {
             Text = source.Text,
@@ -278,8 +295,9 @@ internal static class SmokeLayoutValidator
             TextDecorations = source.TextDecorations,
             TextWrapping = source.TextWrapping,
             LineHeight = source.LineHeight,
-            Width = Math.Max(1.0, source.ActualWidth)
+            Width = Math.Max(1.0, source.ActualWidth + roundingAllowance)
         };
+        VisualTreeHelper.SetRootDpi(measured, dpi);
         measured.Measure(new Size(measured.Width, double.PositiveInfinity));
         return measured.DesiredSize.Height;
     }
@@ -294,7 +312,8 @@ internal static class SmokeLayoutValidator
                 scrollBar.ActualWidth > 1.0 &&
                 scrollBar.ActualHeight > 1.0 &&
                 scrollBar.Maximum > scrollBar.Minimum)
-            .Select(Describe)
+            .Select(scrollBar => $"{Describe(scrollBar)} in {scrollBar.TemplatedParent} / "
+                + $"{((scrollBar.TemplatedParent as FrameworkElement)?.TemplatedParent is FrameworkElement owner ? Describe(owner) : "unknown")}")
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 

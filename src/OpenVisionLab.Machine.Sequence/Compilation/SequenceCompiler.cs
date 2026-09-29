@@ -131,6 +131,19 @@ public sealed class SequenceCompiler
     {
         var name = string.IsNullOrWhiteSpace(source.Name) ? source.Id : source.Name;
 
+        if (!string.IsNullOrWhiteSpace(source.WorkpieceComponentId)
+            && actionName is not (nameof(SequenceStepAction.TriggerCamera)
+                or nameof(SequenceStepAction.FeedWorkpiece)
+                or nameof(SequenceStepAction.EjectWorkpiece)))
+        {
+            AddError(
+                errors,
+                SequenceCompilationErrorCode.UnexpectedWorkpieceComponentId,
+                source.Id,
+                "workpieceComponentId is only valid for TriggerCamera, FeedWorkpiece, or EjectWorkpiece.");
+            return null;
+        }
+
         return actionName switch
         {
             "WaitSignal" => CompileWaitSignal(source, name, nextStepId, errorStepId, targets, errors),
@@ -139,6 +152,8 @@ public sealed class SequenceCompiler
             nameof(SequenceStepAction.MoveAxis) => CompileMoveAxis(source, name, nextStepId, errorStepId, targets, errors),
             "WaitAxisDone" => CompileWaitAxisDone(source, name, nextStepId, errorStepId, targets, errors),
             nameof(SequenceStepAction.TriggerCamera) => CompileTriggerCamera(source, name, nextStepId, errorStepId, targets, errors),
+            nameof(SequenceStepAction.FeedWorkpiece) => CompileWorkpieceOperation(source, name, SequenceStepAction.FeedWorkpiece, nextStepId, errorStepId, targets, errors),
+            nameof(SequenceStepAction.EjectWorkpiece) => CompileWorkpieceOperation(source, name, SequenceStepAction.EjectWorkpiece, nextStepId, errorStepId, targets, errors),
             "WaitVisionResult" => CompileWaitVisionResult(source, name, nextStepId, errorStepId, failureStepId, targets, errors),
             nameof(SequenceStepAction.CallSubsequence) => CompileCallSubsequence(source, name, nextStepId, errorStepId, targets, errors),
             nameof(SequenceStepAction.Wait) => CompileLegacyWait(source, name, nextStepId, errorStepId, targets, errors),
@@ -295,6 +310,9 @@ public sealed class SequenceCompiler
     {
         var cameraId = RequireTarget(source, errors);
         var recipeId = source.Parameter?.Trim();
+        var workpieceComponentId = string.IsNullOrWhiteSpace(source.WorkpieceComponentId)
+            ? null
+            : source.WorkpieceComponentId;
         if (string.IsNullOrWhiteSpace(recipeId))
         {
             AddError(errors, SequenceCompilationErrorCode.RecipeIdRequired, source.Id, "TriggerCamera requires a recipe id parameter.");
@@ -306,10 +324,66 @@ public sealed class SequenceCompiler
         {
             ValidateCamera(source.Id, cameraId, targets, errors);
         }
+        if (workpieceComponentId is not null)
+        {
+            ValidateWorkpieceComponent(source.Id, workpieceComponentId, targets, errors);
+        }
 
         return cameraId is not null && recipeId is not null && source.TimeoutMs == 0
-            ? new TriggerCameraStep(source.Id, name, cameraId, recipeId, nextStepId, errorStepId)
+            ? new TriggerCameraStep(
+                source.Id,
+                name,
+                cameraId,
+                recipeId,
+                nextStepId,
+                errorStepId,
+                workpieceComponentId)
             : null;
+    }
+
+    private static CompiledSequenceStep? CompileWorkpieceOperation(
+        SequenceStepDefinition source,
+        string name,
+        SequenceStepAction action,
+        string? nextStepId,
+        string? errorStepId,
+        SequenceCompilationTargets? targets,
+        List<SequenceCompilationError> errors)
+    {
+        string? workpieceComponentId = string.IsNullOrWhiteSpace(source.WorkpieceComponentId)
+            ? null
+            : source.WorkpieceComponentId.Trim();
+        if (workpieceComponentId is null)
+        {
+            AddError(
+                errors,
+                SequenceCompilationErrorCode.WorkpieceComponentIdRequired,
+                source.Id,
+                $"{action} requires a workpieceComponentId.");
+        }
+        else
+        {
+            ValidateWorkpieceComponent(source.Id, workpieceComponentId, targets, errors);
+        }
+
+        if (!string.IsNullOrWhiteSpace(source.TargetId))
+        {
+            AddError(errors, SequenceCompilationErrorCode.UnexpectedTargetId, source.Id, $"{action} does not accept targetId.");
+        }
+        if (!string.IsNullOrWhiteSpace(source.Parameter))
+        {
+            AddError(errors, SequenceCompilationErrorCode.UnexpectedParameter, source.Id, $"{action} does not accept a parameter.");
+        }
+        ValidateNoTimeout(source, errors);
+
+        return workpieceComponentId is not null
+            && string.IsNullOrWhiteSpace(source.TargetId)
+            && string.IsNullOrWhiteSpace(source.Parameter)
+            && source.TimeoutMs == 0
+                ? action == SequenceStepAction.FeedWorkpiece
+                    ? new FeedWorkpieceStep(source.Id, name, workpieceComponentId, nextStepId, errorStepId)
+                    : new EjectWorkpieceStep(source.Id, name, workpieceComponentId, nextStepId, errorStepId)
+                : null;
     }
 
     private static CompiledSequenceStep? CompileWaitVisionResult(
@@ -553,6 +627,22 @@ public sealed class SequenceCompiler
         if (targets is not null && !targets.ContainsCamera(cameraId))
         {
             AddError(errors, SequenceCompilationErrorCode.UnknownCamera, stepId, $"Camera '{cameraId}' is not declared by the project.");
+        }
+    }
+
+    private static void ValidateWorkpieceComponent(
+        string stepId,
+        string workpieceComponentId,
+        SequenceCompilationTargets? targets,
+        List<SequenceCompilationError> errors)
+    {
+        if (targets is not null && !targets.ContainsWorkpieceComponent(workpieceComponentId))
+        {
+            AddError(
+                errors,
+                SequenceCompilationErrorCode.UnknownWorkpieceComponent,
+                stepId,
+                $"Workpiece component '{workpieceComponentId}' is not declared by the active layout.");
         }
     }
 

@@ -22,6 +22,63 @@ public sealed class DirectExeSmokeArgumentParserTests
     }
 
     [Fact]
+    public void TopViewSmokeOptionUsesTheExistingSceneViewCommand()
+    {
+        Assert.True(DirectExeSmokeArgumentParser.ParseSmokeOptions(new[] { "--smoke-top-view" }).UseTopView);
+        Assert.False(DirectExeSmokeArgumentParser.ParseSmokeOptions(Array.Empty<string>()).UseTopView);
+    }
+
+    [Fact]
+    public void LibrarySearchSmokeRequiresTheLibraryTabAndRunLayout()
+    {
+        var args = new[]
+        {
+            "--smoke-run-layout",
+            "--smoke-left-tool-tab", "Library",
+            "--smoke-library-search-text", "camera"
+        };
+        Assert.Equal("camera", DirectExeSmokeArgumentParser.ParseSmokeOptions(args).LibrarySearchText);
+        DirectExeSmokeArgumentParser.ValidateSmokeArguments(args);
+
+        var exception = Assert.Throws<ArgumentException>(() =>
+            DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+                new[] { "--smoke-library-search-text", "camera" }));
+        Assert.Contains("--smoke-run-layout", exception.Message);
+        Assert.Contains("Library tab or entry state 'tab'", exception.Message);
+
+        var entryStateArgs = new[]
+        {
+            "--smoke-run-layout",
+            "--smoke-library-entry-state", "tab",
+            "--smoke-library-search-text", "camera"
+        };
+        var options = DirectExeSmokeArgumentParser.ParseSmokeOptions(entryStateArgs);
+        Assert.Equal("tab", options.LibraryEntryState);
+        Assert.Equal("camera", options.LibrarySearchText);
+        DirectExeSmokeArgumentParser.ValidateSmokeArguments(entryStateArgs);
+
+        var equipmentEntryArgs = new[]
+        {
+            "--smoke-project", "fixture.ovmachine",
+            "--smoke-library-entry-state", "equipment-tab",
+            "--smoke-library-search-text", "camera"
+        };
+        var equipmentOptions = DirectExeSmokeArgumentParser.ParseSmokeOptions(equipmentEntryArgs);
+        Assert.Equal("equipment-tab", equipmentOptions.LibraryEntryState);
+        Assert.Equal("camera", equipmentOptions.LibrarySearchText);
+        DirectExeSmokeArgumentParser.ValidateSmokeArguments(equipmentEntryArgs);
+
+        var equipmentDialogArgs = new[]
+        {
+            "--smoke-project", "fixture.ovmachine",
+            "--smoke-library-entry-state", "equipment-dialog",
+            "--smoke-library-search-text", "camera"
+        };
+        Assert.Equal("equipment-dialog", DirectExeSmokeArgumentParser.ParseSmokeOptions(equipmentDialogArgs).LibraryEntryState);
+        DirectExeSmokeArgumentParser.ValidateSmokeArguments(equipmentDialogArgs);
+    }
+
+    [Fact]
     public void LookupIsCaseInsensitiveAndRequiresAFollowingValue()
     {
         var args = new[]
@@ -95,6 +152,32 @@ public sealed class DirectExeSmokeArgumentParserTests
     }
 
     [Fact]
+    public void TopCommandPressedCaptureRequiresStateScreenshotAndSavedFixtureForSave()
+    {
+        var screenshotException = Assert.Throws<ArgumentException>(() =>
+            DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+                new[] { "--smoke-command-state", "undo-pressed" }));
+        Assert.Contains("--smoke-command-state-screenshot", screenshotException.Message);
+
+        var projectException = Assert.Throws<ArgumentException>(() =>
+            DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+                new[]
+                {
+                    "--smoke-command-state", "save-pressed",
+                    "--smoke-command-state-screenshot", "pressed.png"
+                }));
+        Assert.Contains("--smoke-project", projectException.Message);
+
+        DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+            new[]
+            {
+                "--smoke-command-state", "save-pressed",
+                "--smoke-command-state-screenshot", "pressed.png",
+                "--smoke-project", "fixture.ovmachine"
+            });
+    }
+
+    [Fact]
     public void CameraFirstUseDerivationPreservesRequestedAndAppliedStates()
     {
         Assert.False(DirectExeSmokeArgumentParser.IsCameraFirstUseRequested(Array.Empty<string>()));
@@ -113,6 +196,16 @@ public sealed class DirectExeSmokeArgumentParserTests
             DirectExeSmokeArgumentParser.ValidateSmokeArguments(
                 new[] { "--smoke-unified-evidence-state", "normal" }));
         Assert.Contains("--smoke-test-scenario-batch", evidenceException.Message);
+
+        var reportException = Assert.Throws<ArgumentException>(() =>
+            DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+                new[] { "--smoke-scenario-report", "report.md" }));
+        Assert.Contains("--smoke-test-scenario-batch", reportException.Message);
+
+        var reportStateException = Assert.Throws<ArgumentException>(() =>
+            DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+                new[] { "--smoke-scenario-report-state", "hover" }));
+        Assert.Contains("--smoke-scenario-report", reportStateException.Message);
 
         var axisException = Assert.Throws<ArgumentException>(() =>
             DirectExeSmokeArgumentParser.ValidateSmokeArguments(
@@ -146,6 +239,37 @@ public sealed class DirectExeSmokeArgumentParserTests
             DirectExeSmokeArgumentParser.ValidateSmokeArguments(
                 new[] { "--smoke-analog-authoring-save", "analog.ovmachine" }));
         Assert.Contains("save-reload", authoringException.Message);
+
+        var diagnosticsException = Assert.Throws<ArgumentException>(() =>
+            DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+                new[] { "--smoke-project-diagnostics-report", "diagnostics.json" }));
+        Assert.Contains("--smoke-project", diagnosticsException.Message);
+
+        DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+            new[]
+            {
+                "--smoke-project", "project.ovmachine",
+                "--smoke-project-diagnostics-report", "diagnostics.json",
+                "--smoke-project-diagnostics-screenshot", "diagnostics.png"
+            });
+
+        var supportScreenshotException = Assert.Throws<ArgumentException>(() =>
+            DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+                new[] { "--smoke-support-diagnostics-screenshot", "support.png" }));
+        Assert.Contains("--smoke-support-diagnostics-report", supportScreenshotException.Message);
+
+        var supportExportException = Assert.Throws<ArgumentException>(() =>
+            DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+                new[] { "--smoke-support-diagnostics-report", "support-report.json" }));
+        Assert.Contains("--smoke-support-diagnostics-export", supportExportException.Message);
+
+        DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+            new[]
+            {
+                "--smoke-support-diagnostics-report", "support.json",
+                "--smoke-support-diagnostics-export", "support-bundle.json",
+                "--smoke-support-diagnostics-screenshot", "support.png"
+            });
     }
 
     [Fact]
@@ -162,6 +286,7 @@ public sealed class DirectExeSmokeArgumentParserTests
                 "--smoke-dpi", "150",
                 "--smoke-language", "en",
                 "--smoke-project", "project.ovmachine",
+                "--smoke-equipment-outline-search", "r19-no-match",
                 "--smoke-layout-select", "layout-1",
                 "--smoke-layout-select-many", "layout-1,layout-2",
                 "--smoke-layout-align", "HorizontalCenter",
@@ -171,8 +296,17 @@ public sealed class DirectExeSmokeArgumentParserTests
                 "--smoke-run-layout",
                 "--smoke-start-simulation",
                 "--smoke-camera-first-use-state", "keyboard-space",
+                "--smoke-mmi-operator-state", "interaction",
+                "--smoke-mmi-operator-report", "mmi.json",
+                "--smoke-project-diagnostics-report", "diagnostics.json",
+                "--smoke-project-diagnostics-screenshot", "diagnostics.png",
+                "--smoke-support-diagnostics-report", "support.json",
+                "--smoke-support-diagnostics-export", "support-bundle.json",
+                "--smoke-support-diagnostics-screenshot", "support.png",
                 "--smoke-test-scenario-settings-state", "valid",
                 "--smoke-test-scenario-batch",
+                "--smoke-scenario-report", "report.md",
+                "--smoke-scenario-report-state", "pressed",
                 "--smoke-unified-evidence-state", "replay",
                 "--smoke-batch-persistence-verify",
                 "--smoke-cylinder-fault", "cylinder-1"
@@ -187,6 +321,12 @@ public sealed class DirectExeSmokeArgumentParserTests
         Assert.Equal(150, options.DpiScalePercent);
         Assert.Equal("en", options.SmokeLanguage);
         Assert.Equal("project.ovmachine", options.ProjectPath);
+        Assert.Equal("r19-no-match", options.EquipmentOutlineSearchText);
+        Assert.Equal("diagnostics.json", options.ProjectDiagnosticsReportPath);
+        Assert.Equal("diagnostics.png", options.ProjectDiagnosticsScreenshotPath);
+        Assert.Equal("support.json", options.SupportDiagnosticsReportPath);
+        Assert.Equal("support-bundle.json", options.SupportDiagnosticsExportPath);
+        Assert.Equal("support.png", options.SupportDiagnosticsScreenshotPath);
         Assert.Equal("layout-1", options.LayoutSelectId);
         Assert.Equal("layout-1,layout-2", options.LayoutSelectMany);
         Assert.Equal("HorizontalCenter", options.LayoutAlignment);
@@ -197,9 +337,13 @@ public sealed class DirectExeSmokeArgumentParserTests
         Assert.True(options.UseRunLayout);
         Assert.True(options.StartSimulation);
         Assert.True(options.CameraFirstUseRequested);
+        Assert.Equal("interaction", options.MmiOperatorState);
+        Assert.Equal("mmi.json", options.MmiOperatorReportPath);
         Assert.Equal("valid", options.TestScenarioSettingsState);
         Assert.True(options.ShowTestScenarioSettings);
         Assert.True(options.TestScenarioBatch);
+        Assert.Equal("report.md", options.ScenarioReportPath);
+        Assert.Equal("pressed", options.ScenarioReportState);
         Assert.Equal("replay", options.UnifiedCommissioningEvidenceState);
         Assert.True(options.VerifyBatchPersistence);
         Assert.Equal("cylinder-1", options.CylinderFaultTargetId);
@@ -218,9 +362,50 @@ public sealed class DirectExeSmokeArgumentParserTests
         Assert.Equal(100, options.DpiScalePercent);
         Assert.Equal("normal", options.CommandTraceState);
         Assert.Equal("normal", options.ScenarioEvidenceExchangeState);
+        Assert.Null(options.ScenarioReportPath);
+        Assert.Equal("normal", options.ScenarioReportState);
         Assert.Equal("normal", options.UnifiedCommissioningEvidenceState);
         Assert.False(options.CommandTraceStateSpecified);
         Assert.False(options.CameraFirstUseRequested);
+        Assert.Null(options.MmiOperatorState);
+        Assert.Null(options.MmiOperatorReportPath);
         Assert.False(options.IsSmokeRun);
+    }
+
+    [Fact]
+    public void ValidationRequiresRunLayoutAndReportForMmiOperatorInteraction()
+    {
+        var runLayoutException = Assert.Throws<ArgumentException>(() =>
+            DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+                new[] { "--smoke-mmi-operator-state", "interaction", "--smoke-mmi-operator-report", "mmi.json" }));
+        Assert.Contains("--smoke-run-layout", runLayoutException.Message);
+
+        var reportException = Assert.Throws<ArgumentException>(() =>
+            DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+                new[] { "--smoke-run-layout", "--smoke-mmi-operator-state", "interaction" }));
+        Assert.Contains("--smoke-mmi-operator-report", reportException.Message);
+
+        var stateException = Assert.Throws<ArgumentException>(() =>
+            DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+                new[] { "--smoke-run-layout", "--smoke-mmi-operator-state", "focus", "--smoke-mmi-operator-report", "mmi.json" }));
+        Assert.Contains("Expected interaction", stateException.Message);
+
+        DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+            new[]
+            {
+                "--smoke-run-layout",
+                "--smoke-mmi-operator-state", "interaction",
+                "--smoke-mmi-operator-report", "mmi.json"
+            });
+    }
+
+    [Fact]
+    public void EquipmentOutlineSearchSmokeRequiresRunLayout()
+    {
+        var exception = Assert.Throws<ArgumentException>(() =>
+            DirectExeSmokeArgumentParser.ValidateSmokeArguments(
+                new[] { "--smoke-equipment-outline-search", "no-match" }));
+
+        Assert.Contains("--smoke-run-layout", exception.Message);
     }
 }

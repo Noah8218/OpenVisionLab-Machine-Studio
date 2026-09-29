@@ -1,4 +1,4 @@
-﻿OpenVisionLab Machine Studio
+OpenVisionLab Machine Studio
 Copyright (c) OpenVisionLab contributors
 
 This project distributes WPF-UI 4.3.0, WPF-UI.Abstractions 4.3.0, and
@@ -9,3 +9,7 @@ third-party notices are also included in published application output.
 Self-contained Windows packages also distribute Microsoft .NET and Windows
 Desktop runtime files. Their licenses and notices are included under the
 package's THIRD-PARTY-NOTICES directory.
+
+The repository also includes pinned OpenVisionLab Integration Contracts and
+TCP transport packages (MIT), Copyright (c) 2026 Noah Choi. Their exact versions,
+SHA-256 files, licenses and notices accompany the packages under third_party.

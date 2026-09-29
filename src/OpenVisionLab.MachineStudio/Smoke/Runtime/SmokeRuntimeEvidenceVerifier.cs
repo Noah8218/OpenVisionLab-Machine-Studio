@@ -487,6 +487,205 @@ internal static class SmokeRuntimeEvidenceVerifier
             "no execution, acknowledgement, or sidecar persistence.");
     }
 
+    public static async Task VerifyScenarioBatchReportAsync(
+        ShellWindow window,
+        MainViewModel viewModel,
+        string reportPath,
+        string state,
+        string? projectPath,
+        SmokeUiInteraction interaction)
+    {
+        var normalizedState = state.ToLowerInvariant();
+        var sectionAnchor = interaction.FindTextBlock(
+            window,
+            candidate => string.Equals(
+                candidate.Name,
+                "RepeatValidationSectionAnchor",
+                StringComparison.Ordinal))
+            ?? throw new InvalidOperationException("Repeat validation section was not available.");
+        sectionAnchor.BringIntoView();
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
+        var reportButton = interaction.FindButton(
+            window,
+            candidate => ReferenceEquals(candidate.Command, viewModel.ExportSimulationReportCommand))
+            ?? throw new InvalidOperationException("Simulation result report button was not available.");
+        reportButton.BringIntoView();
+        reportButton.UpdateLayout();
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+
+        async Task WaitForAsync(Func<bool> condition, string failureMessage)
+        {
+            for (var attempt = 0; attempt < 120 && !condition(); attempt++)
+            {
+                await Task.Delay(25);
+            }
+
+            AssertSmoke(condition(), failureMessage);
+        }
+
+        async Task MovePointerToButtonAsync()
+        {
+            interaction.ActivateWindow();
+            reportButton.BringIntoView();
+            reportButton.UpdateLayout();
+            for (var attempt = 0; attempt < 20 && !reportButton.IsMouseOver; attempt++)
+            {
+                interaction.MovePointerToCenter(reportButton);
+                interaction.MouseEvent(MouseEventMove, 1, 0, 0, UIntPtr.Zero);
+                await Task.Delay(50);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            }
+
+            var pointerOwnership = interaction.CheckPointerOwnership(window);
+            AssertSmoke(pointerOwnership.IsOwned, "Simulation result report pointer was not owned by Machine Studio.");
+            AssertSmoke(reportButton.IsMouseOver, "Simulation result report button did not enter hover state.");
+        }
+
+        if (!reportButton.IsVisible)
+        {
+            throw new InvalidOperationException("Simulation result report button was not visible.");
+        }
+
+        switch (normalizedState)
+        {
+            case "normal":
+                AssertSmoke(
+                    reportButton.IsEnabled && viewModel.CanExportSimulationReport,
+                    "Simulation result report button was not enabled for a completed batch.");
+                break;
+            case "focus":
+                window.Activate();
+                reportButton.Focus();
+                Keyboard.Focus(reportButton);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                AssertSmoke(reportButton.IsKeyboardFocused, "Simulation result report button did not receive focus.");
+                break;
+            case "hover":
+                await MovePointerToButtonAsync();
+                interaction.SetCursorPosition(0, 0);
+                Mouse.Synchronize();
+                await Task.Delay(50);
+                AssertSmoke(!reportButton.IsMouseOver, "Simulation result report button did not recover after mouse leave.");
+                break;
+            case "pressed":
+                window.Activate();
+                reportButton.Focus();
+                await MovePointerToButtonAsync();
+                interaction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
+                interaction.MarkSmokePointerHeld();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                AssertSmoke(reportButton.IsPressed, "Simulation result report button did not enter pointer-down state.");
+                var outsidePoint = window.PointToScreen(new Point(8, 8));
+                interaction.SetCursorPosition((int)Math.Round(outsidePoint.X), (int)Math.Round(outsidePoint.Y));
+                Mouse.Synchronize();
+                interaction.ReleaseSmokePointer();
+                Mouse.Capture(null);
+                break;
+            case "disabled":
+                AssertSmoke(viewModel.RunScenarioBatchCommand.CanExecute(null), "Batch was unavailable for report disabled-state smoke.");
+                viewModel.SimulationWorkspace.BatchRepetitionCount = 3;
+                viewModel.SimulationWorkspace.ScenarioDurationCycles = 100_000;
+                viewModel.RunScenarioBatchCommand.Execute(null);
+                await WaitForAsync(() => viewModel.IsBatchRunning, "Batch did not enter report disabled-state smoke.");
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                AssertSmoke(!reportButton.IsEnabled, "Simulation result report button remained enabled while batch was running.");
+                viewModel.CancelScenarioBatchCommand.Execute(null);
+                await WaitForAsync(() => !viewModel.IsBatchRunning, "Report disabled-state batch did not cancel.");
+                reportButton.BringIntoView();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                viewModel.SimulationWorkspace.BatchRepetitionCount = 2;
+                viewModel.SimulationWorkspace.ScenarioDurationCycles = 1200;
+                await WaitForAsync(
+                    () => viewModel.RunScenarioBatchCommand.CanExecute(null),
+                    "Batch was unavailable while restoring report disabled-state smoke.");
+                viewModel.RunScenarioBatchCommand.Execute(null);
+                await WaitForAsync(
+                    () => !viewModel.IsBatchRunning
+                          && viewModel.LatestBatchResult is { IsComplete: true, IsSuccess: true, CompletedRuns: 2 },
+                    "Report disabled-state smoke did not restore the deterministic batch result.");
+                Console.WriteLine("Simulation result report visual state passed: disabled during batch.");
+                return;
+            default:
+                throw new ArgumentException(
+                    $"Unsupported --smoke-scenario-report-state '{state}'. "
+                    + "Expected normal, focus, hover, pressed, or disabled.");
+        }
+
+        if (!normalizedState.Equals("normal", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"Simulation result report visual state passed: {state}.");
+            return;
+        }
+
+        var fullReportPath = Path.GetFullPath(reportPath);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullReportPath)!);
+        var beforeTick = viewModel.SceneSnapshots.Latest?.TickIndex ?? -1;
+        var beforeDirty = viewModel.HasUnsavedChanges;
+        var beforeBatch = viewModel.LatestBatchResult
+            ?? throw new InvalidOperationException("No completed batch evidence was available for report export.");
+        var beforeBaseline = viewModel.HasAcceptedBatchBaseline;
+        var projectBytes = string.IsNullOrWhiteSpace(projectPath) || !File.Exists(projectPath)
+            ? null
+            : File.ReadAllBytes(projectPath);
+        var resultSidecarPath = string.IsNullOrWhiteSpace(projectPath)
+            ? null
+            : $"{Path.GetFullPath(projectPath)}.batch-result.json";
+        var baselineSidecarPath = string.IsNullOrWhiteSpace(projectPath)
+            ? null
+            : $"{Path.GetFullPath(projectPath)}.batch-baseline.json";
+        var resultSidecarBytes = resultSidecarPath is not null && File.Exists(resultSidecarPath)
+            ? File.ReadAllBytes(resultSidecarPath)
+            : null;
+        var baselineSidecarBytes = baselineSidecarPath is not null && File.Exists(baselineSidecarPath)
+            ? File.ReadAllBytes(baselineSidecarPath)
+            : null;
+
+        viewModel.ExportSimulationReportCommand.Execute(fullReportPath);
+        AssertSmoke(File.Exists(fullReportPath), "Simulation result report export did not create its file.");
+        var firstReportBytes = File.ReadAllBytes(fullReportPath);
+        AssertSmoke(
+            firstReportBytes.Length < 3
+            || firstReportBytes[0] != 0xEF
+            || firstReportBytes[1] != 0xBB
+            || firstReportBytes[2] != 0xBF,
+            "Simulation result report unexpectedly contained a UTF-8 BOM.");
+        var report = File.ReadAllText(fullReportPath);
+        AssertSmoke(
+            report.Contains("# OpenVisionLab Machine Studio Simulation Result", StringComparison.Ordinal)
+            && report.Contains(beforeBatch.EvidenceHash, StringComparison.Ordinal)
+            && report.Contains(beforeBatch.ReferenceEvidenceHash, StringComparison.Ordinal)
+            && report.Contains("## Assertion outcomes", StringComparison.Ordinal),
+            "Simulation result report did not contain the validated batch summary.");
+        AssertSmoke(!report.Contains("RuntimeDebugger", StringComparison.Ordinal), "Simulation result report contained debugger session state.");
+
+        viewModel.ExportSimulationReportCommand.Execute(fullReportPath);
+        AssertSmoke(
+            firstReportBytes.SequenceEqual(File.ReadAllBytes(fullReportPath)),
+            "Repeated simulation result report export was not byte-identical.");
+        AssertSmoke(!viewModel.IsRunning, "Simulation result report export changed runtime execution.");
+        AssertSmoke(viewModel.SceneSnapshots.Latest?.TickIndex == beforeTick, "Simulation result report export changed runtime tick state.");
+        AssertSmoke(viewModel.HasUnsavedChanges == beforeDirty, "Simulation result report export changed project dirty state.");
+        AssertSmoke(ReferenceEquals(viewModel.LatestBatchResult, beforeBatch), "Simulation result report export replaced batch evidence.");
+        AssertSmoke(viewModel.HasAcceptedBatchBaseline == beforeBaseline, "Simulation result report export changed accepted baseline state.");
+        if (projectBytes is not null)
+        {
+            AssertSmoke(projectBytes.SequenceEqual(File.ReadAllBytes(projectPath!)), "Simulation result report export changed project JSON.");
+        }
+        if (resultSidecarBytes is not null)
+        {
+            AssertSmoke(resultSidecarBytes.SequenceEqual(File.ReadAllBytes(resultSidecarPath!)), "Simulation result report export changed result sidecar JSON.");
+        }
+        if (baselineSidecarBytes is not null)
+        {
+            AssertSmoke(baselineSidecarBytes.SequenceEqual(File.ReadAllBytes(baselineSidecarPath!)), "Simulation result report export changed baseline sidecar JSON.");
+        }
+
+        Console.WriteLine(
+            $"Simulation result report smoke passed: deterministic Markdown export, "
+            + $"hash {beforeBatch.EvidenceHash[..8]}, no runtime or project mutation.");
+    }
+
     public static async Task VerifyUnifiedCommissioningEvidenceAsync(
         ShellWindow window,
         MainViewModel viewModel,

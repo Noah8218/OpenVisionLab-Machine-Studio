@@ -2,6 +2,8 @@ using OpenVisionLab.Machine.Core.Axes;
 using OpenVisionLab.Machine.Core.Channels;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Core.Devices;
+using OpenVisionLab.Machine.Core.Layouts;
+using OpenVisionLab.Machine.Core.Sequences;
 using OpenVisionLab.Machine.Simulation.Compilation;
 using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Engine;
@@ -313,6 +315,156 @@ public sealed class MachineProjectRuntimeCompilerTests
             MachineProjectRuntimeCompilationErrorCode.LayoutValidationFailed,
             "stage-1",
             "AxisBindingNotFound");
+    }
+
+    [Fact]
+    public void Compile_OneInputOwner_AllowsMultipleSequenceReaders()
+    {
+        MachineProjectDocument project = LoadSample();
+        SequenceStepDefinition[] readers = project.Sequences[0].Steps
+            .Where(step => step.Action == SequenceStepAction.WaitSignal)
+            .Take(2)
+            .ToArray();
+        Assert.Equal(2, readers.Length);
+
+        readers[1].TargetId = readers[0].TargetId;
+
+        MachineProjectRuntimeCompilationResult result = Compile(project);
+
+        Assert.True(result.IsSuccess, ErrorSummary(result));
+        Assert.Empty(result.Errors);
+    }
+
+    [Fact]
+    public void Compile_DuplicateSensorWriters_ReturnsChannelAndOwnerIds()
+    {
+        MachineProjectDocument project = LoadSample();
+        project.Devices.Add(new DeviceDefinition
+        {
+            Id = "device.sensor-duplicate",
+            Name = "Duplicate Station Sensor",
+            Kind = DeviceKind.Sensor,
+            Sensor = new DigitalSensorDefinition
+            {
+                OutputChannelId = "di.station-present",
+                TargetComponentId = "workpiece-1",
+                OnDelayMilliseconds = 10,
+                OffDelayMilliseconds = 10
+            }
+        });
+        project.Layouts[0].Components.Add(new LayoutComponentDefinition
+        {
+            Id = "sensor-duplicate",
+            Name = "Duplicate Station Sensor",
+            Kind = LayoutComponentKind.DigitalSensor,
+            BehaviorBindingId = "device.sensor-duplicate",
+            Transform = new Transform2D { X = 330, Y = 250 },
+            Size = new Size2D { Width = 18, Height = 70 }
+        });
+
+        MachineProjectRuntimeCompilationResult result = Compile(project);
+
+        Assert.False(result.IsSuccess);
+        MachineProjectRuntimeCompilationError error = Assert.Single(
+            result.Errors,
+            candidate => candidate.Code == MachineProjectRuntimeCompilationErrorCode.LayoutRuntimeInvalid);
+        Assert.Equal("main-cell", error.TargetId);
+        Assert.Contains("di.station-present", error.Message, StringComparison.Ordinal);
+        Assert.Contains("sensor-1", error.Message, StringComparison.Ordinal);
+        Assert.Contains("sensor-duplicate", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Compile_UnreferencedDuplicateDeviceId_IsRejectedWithStableTarget()
+    {
+        MachineProjectDocument project = LoadSample();
+        project.Devices.Add(new DeviceDefinition
+        {
+            Id = "device.unused",
+            Name = "Unused Light A",
+            Kind = DeviceKind.Light
+        });
+        project.Devices.Add(new DeviceDefinition
+        {
+            Id = "device.unused",
+            Name = "Unused Light B",
+            Kind = DeviceKind.Light
+        });
+
+        AssertStableError(
+            project,
+            MachineProjectRuntimeCompilationErrorCode.DuplicateDeviceId,
+            "device.unused",
+            "Device id 'device.unused' is duplicated");
+    }
+
+    [Fact]
+    public void Compile_SensorTargetInAnotherLayout_IsRejectedByLayoutValidation()
+    {
+        MachineProjectDocument project = LoadSample();
+        project.Layouts.Add(new MachineLayoutDefinition
+        {
+            Id = "other-layout",
+            Name = "Other Layout",
+            Components =
+            {
+                new LayoutComponentDefinition
+                {
+                    Id = "external-target",
+                    Name = "External Target",
+                    Kind = LayoutComponentKind.MachineFrame,
+                    Transform = new Transform2D { X = 0, Y = 0 },
+                    Size = new Size2D { Width = 100, Height = 100 }
+                }
+            }
+        });
+        project.Devices.Single(device => device.Id == "device.sensor-1")
+            .Sensor!.TargetComponentId = "external-target";
+
+        AssertStableError(
+            project,
+            MachineProjectRuntimeCompilationErrorCode.LayoutValidationFailed,
+            "sensor-1",
+            "SensorTargetComponentMustBeInSameLayout");
+    }
+
+    [Fact]
+    public void Compile_SensorBoundToWrongDeviceKind_IsRejectedWithBindingTarget()
+    {
+        MachineProjectDocument project = LoadSample();
+        project.Layouts[0].Components.Single(component => component.Id == "sensor-1")
+            .BehaviorBindingId = "device.conveyor-1";
+
+        AssertStableError(
+            project,
+            MachineProjectRuntimeCompilationErrorCode.LayoutValidationFailed,
+            "sensor-1",
+            "SensorDeviceBindingInvalid");
+    }
+
+    [Fact]
+    public void Compile_DuplicateAxisId_IsRejectedWithStableTarget()
+    {
+        MachineProjectDocument project = LoadSample();
+        project.Axes.Add(new VirtualAxisDefinition
+        {
+            Id = "x",
+            Name = "Duplicate X",
+            Kind = AxisKind.Linear,
+            HomePosition = 0,
+            SoftLimitMin = 0,
+            SoftLimitMax = 300,
+            MaxVelocity = 180,
+            MaxAcceleration = 600,
+            MaxDeceleration = 600,
+            FollowingErrorLimit = 0.05
+        });
+
+        AssertStableError(
+            project,
+            MachineProjectRuntimeCompilationErrorCode.DuplicateAxisId,
+            "x",
+            "Axis id 'x' is duplicated");
     }
 
     [Fact]

@@ -15,7 +15,9 @@ public enum SequenceStepAction
     SetSignal,
     WaitAxisDone,
     Complete,
-    WaitVisionResult
+    WaitVisionResult,
+    FeedWorkpiece,
+    EjectWorkpiece
 }
 
 public sealed class SequenceStepDefinition
@@ -34,6 +36,9 @@ public sealed class SequenceStepDefinition
 
     [JsonPropertyName("parameter")]
     public string Parameter { get; set; } = string.Empty;
+
+    [JsonPropertyName("workpieceComponentId")]
+    public string? WorkpieceComponentId { get; set; }
 
     [JsonPropertyName("timeoutMs")]
     public int TimeoutMs { get; set; }

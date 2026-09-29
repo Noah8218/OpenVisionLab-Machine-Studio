@@ -345,6 +345,136 @@ public sealed class DeterministicConditionScenarioTests
         Assert.False(Assert.Single(engine.CurrentSnapshot.Signals, signal => signal.Id == "di.sensor").Value);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task StuckInputFaultSchedule_MatchesIndependentHoldTickOracle(int holdTicks)
+    {
+        using var engine = await CreateSensorEngineAsync();
+        var schedule = new DeterministicFaultRecoverySchedule(
+            SimulationFaultKind.StuckDigitalInput,
+            "di.sensor",
+            InjectTick: 2,
+            HoldTicks: holdTicks,
+            ForcedValue: true);
+        var profile = new DeterministicConditionScenarioProfile(
+            DeterministicConditionScenarioProfile.CurrentSchemaVersion,
+            $"stuck-input-hold-{holdTicks}",
+            "Stuck input hold boundary",
+            "Independent tick oracle fixture.",
+            "x",
+            42,
+            DurationTicks: 12,
+            FaultRecovery: schedule);
+
+        Assert.True((await engine.EnqueueCommandAsync(new StartConditionScenarioCommand(profile))).IsAccepted);
+
+        // A Step starts at scenario tick 0 and publishes engine tick 1. The
+        // scheduler must therefore inject at InjectTick + 1 and clear at
+        // InjectTick + HoldTicks + 1, with no same-tick clear.
+        var expectedInjectionEngineTick = schedule.InjectTick + 1;
+        var expectedClearEngineTick = schedule.InjectTick + schedule.HoldTicks + 1;
+        var faultActiveByEngineTick = new Dictionary<long, bool>();
+        for (var step = 0; step < expectedClearEngineTick; step++)
+        {
+            Assert.True((await engine.EnqueueCommandAsync(new StepCommand())).IsAccepted);
+            faultActiveByEngineTick[engine.CurrentSnapshot.TickIndex] = engine.CurrentSnapshot.Faults.Any(
+                fault => fault.Kind == SimulationFaultKind.StuckDigitalInput
+                    && fault.TargetId == schedule.TargetId);
+        }
+
+        Assert.All(
+            faultActiveByEngineTick.Where(item => item.Key < expectedInjectionEngineTick),
+            item => Assert.False(item.Value));
+        for (var tick = expectedInjectionEngineTick; tick < expectedClearEngineTick; tick++)
+        {
+            Assert.True(faultActiveByEngineTick[tick]);
+        }
+        Assert.False(faultActiveByEngineTick[expectedClearEngineTick]);
+
+        await engine.StopAsync();
+        var events = await ReadAllEventsAsync(engine);
+        var injected = Assert.Single(events.Where(item => item.Code == "FaultInjected"));
+        var cleared = Assert.Single(events.Where(item => item.Code == "FaultCleared"));
+        Assert.Equal(expectedInjectionEngineTick, injected.TickIndex);
+        Assert.Equal(expectedClearEngineTick, cleared.TickIndex);
+        Assert.Equal(schedule.HoldTicks, cleared.TickIndex - injected.TickIndex);
+        Assert.True(injected.EventIndex < cleared.EventIndex);
+    }
+
+    [Fact]
+    public void FaultRecoveryValidation_RejectsZeroNegativeAndOutOfRangeSchedules()
+    {
+        var zeroHold = CreateFaultProfile(injectTick: 1, holdTicks: 0, durationTicks: 8);
+        var negativeHold = CreateFaultProfile(injectTick: 1, holdTicks: -1, durationTicks: 8);
+        var negativeInjection = CreateFaultProfile(injectTick: -1, holdTicks: 1, durationTicks: 8);
+        var clearsAtDuration = CreateFaultProfile(injectTick: 6, holdTicks: 2, durationTicks: 8);
+        var overflowingInjection = CreateFaultProfile(long.MaxValue, holdTicks: 1, durationTicks: 8);
+
+        Assert.Contains(
+            DeterministicConditionScenarioProfile.Validate(zeroHold),
+            error => error.Contains("HoldTicks must be at least 1", StringComparison.Ordinal));
+        Assert.Contains(
+            DeterministicConditionScenarioProfile.Validate(negativeHold),
+            error => error.Contains("HoldTicks must be at least 1", StringComparison.Ordinal));
+        Assert.Contains(
+            DeterministicConditionScenarioProfile.Validate(negativeInjection),
+            error => error.Contains("InjectTick must be non-negative", StringComparison.Ordinal));
+        Assert.Contains(
+            DeterministicConditionScenarioProfile.Validate(clearsAtDuration),
+            error => error.Contains("must clear before the scenario duration ends", StringComparison.Ordinal));
+        Assert.Contains(
+            DeterministicConditionScenarioProfile.Validate(overflowingInjection),
+            error => error.Contains("must clear before the scenario duration ends", StringComparison.Ordinal));
+
+        static DeterministicConditionScenarioProfile CreateFaultProfile(
+            long injectTick,
+            int holdTicks,
+            long durationTicks) =>
+            new(
+                DeterministicConditionScenarioProfile.CurrentSchemaVersion,
+                "fault-tick-validation",
+                "Fault tick validation",
+                "Fault tick validation fixture.",
+                "x",
+                42,
+                durationTicks,
+                FaultRecovery: new DeterministicFaultRecoverySchedule(
+                    SimulationFaultKind.StuckDigitalInput,
+                    "di.sensor",
+                    injectTick,
+                    holdTicks,
+                    ForcedValue: true));
+    }
+
+    [Fact]
+    public async Task StartScenario_WithZeroHoldFaultSchedule_IsRejectedBeforeStepping()
+    {
+        using var engine = await CreateSensorEngineAsync();
+        var profile = new DeterministicConditionScenarioProfile(
+            DeterministicConditionScenarioProfile.CurrentSchemaVersion,
+            "zero-hold-rejected",
+            "Zero hold rejected",
+            "Unsupported zero-hold fixture.",
+            "x",
+            42,
+            DurationTicks: 8,
+            FaultRecovery: new DeterministicFaultRecoverySchedule(
+                SimulationFaultKind.StuckDigitalInput,
+                "di.sensor",
+                InjectTick: 1,
+                HoldTicks: 0,
+                ForcedValue: true));
+
+        var result = await engine.EnqueueCommandAsync(new StartConditionScenarioCommand(profile));
+
+        Assert.False(result.IsAccepted);
+        Assert.Equal(SimulationCommandErrorCode.ConditionScenarioInvalid, result.ErrorCode);
+        Assert.False(engine.CurrentSnapshot.ConditionScenario.IsConfigured);
+        Assert.Equal(0, engine.CurrentSnapshot.TickIndex);
+        await engine.StopAsync();
+    }
+
     [Fact]
     public async Task CylinderFaultSchedule_PauseStepResetRemainEngineOwned()
     {
@@ -543,6 +673,36 @@ public sealed class DeterministicConditionScenarioTests
                                 new LayoutRuntimeTransform(0, 0),
                                 new LayoutRuntimeSize(10, 10))
                         }))));
+        Assert.True(configured.IsAccepted, configured.Detail);
+        return engine;
+    }
+
+    private static async Task<FixedStepSimulationEngine> CreateSensorEngineAsync()
+    {
+        var engine = new FixedStepSimulationEngine(
+            new SimulationSettings { FixedStep = TimeSpan.FromMilliseconds(5) });
+        await engine.StartAsync();
+        var configured = await engine.EnqueueCommandAsync(
+            new ConfigureRuntimeCommand(
+                new SimulationRuntimeConfiguration(
+                    new[]
+                    {
+                        new OpenVisionLab.Machine.Simulation.Axis.AxisConfiguration
+                        {
+                            Id = "x",
+                            Name = "X"
+                        }
+                    },
+                    new[]
+                    {
+                        new OpenVisionLab.Machine.Core.Channels.ChannelDefinition
+                        {
+                            Id = "di.sensor",
+                            Name = "Sensor",
+                            Kind = OpenVisionLab.Machine.Core.Channels.ChannelKind.DigitalInput
+                        }
+                    },
+                    Array.Empty<OpenVisionLab.Machine.Sequence.Compilation.CompiledSequence>())));
         Assert.True(configured.IsAccepted, configured.Detail);
         return engine;
     }

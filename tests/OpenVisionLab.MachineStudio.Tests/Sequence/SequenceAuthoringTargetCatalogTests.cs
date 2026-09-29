@@ -21,12 +21,13 @@ public sealed class SequenceAuthoringTargetCatalogTests
         SequenceAuthoringTargetCatalogSnapshot result = catalog.Build(project);
 
         Assert.Equal(
-            new[] { "di.ready", "do.run", "axis-1", "camera-1", "parent", "child" },
+            new[] { "di.ready", "do.run", "axis-1", "camera-1", "workpiece-1", "parent", "child" },
             result.AuthoringTargets.Select(target => target.Id));
         Assert.Equal("Ready · di.ready", result.AuthoringTargets[0].Name);
         Assert.Equal("12.5", result.AuthoringTargets[2].DefaultParameter);
         Assert.Equal("camera-1", result.AuthoringTargets[3].Id);
-        Assert.Equal(SequenceAuthoringTargetKind.Subsequence, result.AuthoringTargets[4].Kind);
+        Assert.Equal(SequenceAuthoringTargetKind.Workpiece, result.AuthoringTargets[4].Kind);
+        Assert.Equal(SequenceAuthoringTargetKind.Subsequence, result.AuthoringTargets[5].Kind);
     }
 
     [Fact]
@@ -43,6 +44,21 @@ public sealed class SequenceAuthoringTargetCatalogTests
         Assert.Equal(new[] { "Stopped", "ForwardRunning", "ReverseRunning" },
             result.ExpectedStateTargets.Single(target => target.Id == "conveyor-1").States);
         Assert.DoesNotContain(result.ExpectedStateTargets, target => target.Id == "inactive-sensor");
+    }
+
+    [Fact]
+    public void Build_ListsOnlyActiveLayoutWorkpiecesAndKeepsAnExplicitClearChoice()
+    {
+        SequenceAuthoringTargetCatalogSnapshot result = new SequenceAuthoringTargetCatalog().Build(CreateProject());
+
+        Assert.Collection(
+            result.WorkpieceTargets,
+            target => Assert.Equal(string.Empty, target.Id),
+            target =>
+            {
+                Assert.Equal("workpiece-1", target.Id);
+                Assert.Equal(SequenceAuthoringTargetKind.Workpiece, target.Kind);
+            });
     }
 
     [Fact]
@@ -94,6 +110,7 @@ public sealed class SequenceAuthoringTargetCatalogTests
                     Action = SequenceStepAction.TriggerCamera,
                     TargetId = "camera-1",
                     Parameter = "default",
+                    WorkpieceComponentId = "workpiece-1",
                     NextStepId = "call"
                 },
                 new SequenceStepDefinition
@@ -114,6 +131,9 @@ public sealed class SequenceAuthoringTargetCatalogTests
         SequenceCompilationResult compilation = new SequenceCompiler().Compile(sequence, targets);
 
         Assert.True(compilation.IsSuccess, string.Join(" | ", compilation.Errors.Select(error => error.Message)));
+        Assert.Equal(
+            "workpiece-1",
+            Assert.IsType<TriggerCameraStep>(compilation.Sequence!.Steps[2]).WorkpieceComponentId);
     }
 
     private static MachineProjectDocument CreateProject() =>
@@ -137,6 +157,13 @@ public sealed class SequenceAuthoringTargetCatalogTests
             Devices =
             [
                 new DeviceDefinition { Id = "camera-1", Name = "Top Camera", Kind = DeviceKind.Camera },
+                new DeviceDefinition
+                {
+                    Id = "workpiece-device",
+                    Name = "Wafer",
+                    Kind = DeviceKind.Workpiece,
+                    Workpiece = new WorkpieceDefinition { Type = "Wafer", ConveyorComponentId = "conveyor-1" }
+                },
                 new DeviceDefinition { Id = "light-1", Name = "Light", Kind = DeviceKind.Light }
             ],
             Sequences =
@@ -186,7 +213,8 @@ public sealed class SequenceAuthoringTargetCatalogTests
                         {
                             Id = "workpiece-1",
                             Name = "Wafer",
-                            Kind = LayoutComponentKind.Workpiece
+                            Kind = LayoutComponentKind.Workpiece,
+                            BehaviorBindingId = "workpiece-device"
                         }
                     ]
                 }

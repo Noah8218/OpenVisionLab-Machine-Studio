@@ -76,6 +76,14 @@ public sealed class ProjectDocumentStore
 
         doc.Simulation ??= new SimulationDefinition();
         doc.Simulation.TestScenarioAssertions ??= new List<TestScenarioAssertionDefinition>();
+        doc.Stations ??= new List<MachineStationDefinition>();
+        foreach (MachineStationDefinition? station in doc.Stations)
+        {
+            if (station is not null)
+            {
+                station.Units ??= new List<MachineUnitDefinition>();
+            }
+        }
         doc.Layouts ??= new List<Layouts.MachineLayoutDefinition>();
         doc.Axes ??= new List<Axes.VirtualAxisDefinition>();
         if (doc.MultiAxisCommissioningRecipe is not null)

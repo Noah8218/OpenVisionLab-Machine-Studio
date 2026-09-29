@@ -52,15 +52,6 @@
                         <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.Open}" />
                     </StackPanel>
                 </Button>
-                <Button Command="{Binding SaveProjectCommand}"
-                        AutomationProperties.Name="{loc:Loc Key=Shell.Save}"
-                        Style="{StaticResource QuietCommandButtonStyle}"
-                        ToolTip="{loc:Loc Key=Shell.SaveTooltip}">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Save24" Foreground="{DynamicResource Accent.Primary}" />
-                        <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.Save}" />
-                    </StackPanel>
-                </Button>
             </StackPanel>
 
             <Border Grid.Column="1"
@@ -72,7 +63,9 @@
                     BorderThickness="1"
                     CornerRadius="5">
                 <StackPanel Orientation="Horizontal">
-                    <RadioButton Content="{loc:Loc Key=Shell.Design}"
+                    <RadioButton Content="{loc:Loc Key=Workspace.EndAndEdit}"
+                                 AutomationProperties.Name="{loc:Loc Key=Workspace.EndAndEdit}"
+                                 ToolTip="{loc:Loc Key=Workspace.EndAndEditHint}"
                                  GroupName="WorkspaceMode"
                                  IsChecked="{Binding IsDesignMode, Mode=TwoWay}"
                                  Style="{StaticResource WorkspaceModeRadioStyle}" />
@@ -115,6 +108,17 @@
                         <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.Pause}" />
                     </StackPanel>
                 </Button>
+                <Button x:Name="SemanticSequenceStepButton"
+                        Command="{Binding RuntimeDebugger.SemanticStepCommand}"
+                        AutomationProperties.Name="{loc:Loc Key=Debugger.NextSequenceStep}"
+                        Style="{StaticResource PrimaryCommandButtonStyle}"
+                        ToolTipService.ShowOnDisabled="True"
+                        ToolTip="{loc:Loc Key=Debugger.NextSequenceStepTooltip}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Next24" />
+                        <TextBlock Margin="6,0,0,0" Text="{loc:Loc Key=Debugger.NextSequenceStep}" />
+                    </StackPanel>
+                </Button>
                 <Button Command="{Binding AbortSequenceCommand}"
                         AutomationProperties.Name="{loc:Loc Key=Shell.AbortSequence}"
                         MinWidth="76"
@@ -135,15 +139,6 @@
                         <ui:SymbolIcon Symbol="ArrowSync24" Foreground="{DynamicResource State.Warning}" />
                         <TextBlock Style="{StaticResource CompactCommandLabelStyle}"
                                    Text="{loc:Loc Key=Shell.RetrySequence}" />
-                    </StackPanel>
-                </Button>
-                <Button Command="{Binding StepCommand}"
-                        AutomationProperties.Name="{loc:Loc Key=Shell.Step}"
-                        Style="{StaticResource QuietCommandButtonStyle}"
-                        ToolTip="{loc:Loc Key=Shell.StepTooltip}">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Next24" Foreground="{DynamicResource Text.Secondary}" />
-                        <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.Step}" />
                     </StackPanel>
                 </Button>
                 <Button Command="{Binding ResetCommand}"

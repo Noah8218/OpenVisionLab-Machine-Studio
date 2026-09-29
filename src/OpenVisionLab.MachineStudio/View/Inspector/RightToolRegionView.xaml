@@ -15,25 +15,162 @@
             <Setter Property="Margin" Value="0,7,0,3" />
             <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
         </Style>
+        <Style x:Key="EquipmentInspectorTabButtonStyle" TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Margin" Value="2,0" />
+            <Setter Property="Padding" Value="4,0" />
+        </Style>
     </UserControl.Resources>
     <Border Style="{StaticResource PanelSurfaceStyle}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Style="{StaticResource PanelHeaderStyle}">
-                <TextBlock Style="{StaticResource PanelHeaderTextStyle}"
-                           Text="{Binding RightPanelHeaderText}" />
+            <Border Grid.Row="0">
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource PanelHeaderStyle}">
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" />
+                                    <Condition Binding="{Binding Layout.HasSelection}" Value="True" />
+                                    <Condition Binding="{Binding IsRunMode}" Value="False" />
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Height" Value="Auto" />
+                                <Setter Property="MinHeight" Value="48" />
+                                <Setter Property="Padding" Value="12,6" />
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <TextBlock Text="{Binding RightPanelHeaderText}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource PanelHeaderTextStyle}">
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" />
+                                            <Condition Binding="{Binding Layout.HasSelection}" Value="True" />
+                                            <Condition Binding="{Binding IsRunMode}" Value="False" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Grid DataContext="{Binding Layout.SelectedComponentEditor}">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                            <Condition Binding="{Binding DataContext.Layout.HasSelection, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                            <Condition Binding="{Binding DataContext.IsRunMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock FontWeight="SemiBold" Text="{Binding PaneTitle}" TextWrapping="Wrap" />
+                            <TextBlock Foreground="{DynamicResource Text.Secondary}" FontSize="11" Text="{Binding Id}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Width="30" Height="30" Margin="8,0,0,0"
+                                VerticalAlignment="Center" Content="×"
+                                AutomationProperties.Name="{loc:Loc Key=Shell.CloseProperties}"
+                                Command="{Binding DataContext.Navigation.ToggleInspectorCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                    </Grid>
+                </Grid>
             </Border>
 
-            <ScrollViewer x:Name="DesignInspectorScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <Border Grid.Row="1" Padding="8,8" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" />
+                                    <Condition Binding="{Binding Layout.HasSelection}" Value="True" />
+                                    <Condition Binding="{Binding IsRunMode}" Value="False" />
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible" />
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <UniformGrid Columns="3">
+                    <Button Command="{Binding OpenEquipmentPropertiesCommand}"
+                            Content="{loc:Loc Key=Equipment.PlacementTab}"
+                            AutomationProperties.Name="{loc:Loc Key=Equipment.PlacementTab}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource EquipmentInspectorTabButtonStyle}">
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsEquipmentDriveTabOpen}" Value="False" />
+                                            <Condition Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="False" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Background" Value="{DynamicResource Accent.Soft}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Command="{Binding OpenEquipmentDriveTabCommand}"
+                            Content="{loc:Loc Key=Equipment.DriveTab}"
+                            AutomationProperties.Name="{loc:Loc Key=Equipment.DriveTab}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource EquipmentInspectorTabButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsEquipmentDriveTabOpen}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource Accent.Soft}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Command="{Binding OpenEquipmentSinglePartCheckCommand}"
+                            Content="{loc:Loc Key=Equipment.SinglePartCheck}"
+                            AutomationProperties.Name="{loc:Loc Key=Equipment.SinglePartCheck}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource EquipmentInspectorTabButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource Accent.Soft}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </UniformGrid>
+            </Border>
+
+            <ScrollViewer x:Name="DesignInspectorScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto">
                 <ScrollViewer.Style>
                     <Style TargetType="ScrollViewer">
                         <Setter Property="Visibility" Value="Visible" />
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsRunMode}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="True">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
                         </Style.Triggers>
@@ -310,6 +447,390 @@
                         </StackPanel>
                     </Border>
 
+                    <Border Visibility="{Binding Layout.HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource InspectorCardStyle}">
+                                <Setter Property="IsEnabled" Value="True" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                                        <Setter Property="Margin" Value="0" />
+                                        <Setter Property="Padding" Value="14" />
+                                        <Setter Property="Background" Value="Transparent" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsDryRunPlaybackActive}" Value="True">
+                                        <Setter Property="IsEnabled" Value="False" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel DataContext="{Binding Layout.SelectedComponentEditor}">
+                            <TextBlock Text="{loc:Loc Key=Inspector.AuthoredProperties}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource SectionCaptionStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <Grid Margin="0,0,0,6">
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock FontSize="14" FontWeight="SemiBold" Text="{Binding KindText}" />
+                                <TextBlock Grid.Column="1" Margin="8,0,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{Binding Id}" />
+                            </Grid>
+
+                            <StackPanel>
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsEquipmentDriveTabOpen, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Name}" />
+                            <TextBox x:Name="ComponentNameTextBox"
+                                     Height="30"
+                                      Text="{Binding DraftName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      ToolTip="{Binding DraftName}" />
+                            <StackPanel Margin="0,5,0,0"
+                                        Visibility="{Binding HasUnitAssignmentOptions, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Unit}" />
+                                <ComboBox AutomationProperties.Name="{loc:Loc Key=Properties.Unit}"
+                                          ItemsSource="{Binding UnitOptions}"
+                                          DisplayMemberPath="DisplayName"
+                                          SelectedValuePath="Id"
+                                          SelectedValue="{Binding UnitId, Mode=TwoWay}" />
+                            </StackPanel>
+                            <Grid Margin="0,6,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Equipment.CoordinateX}" />
+                                    <TextBox Height="30" Text="{Binding DraftXText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Equipment.CoordinateHeightY}" />
+                                    <TextBox Height="30" Text="{Binding DraftBaseElevationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Equipment.CoordinateDepthZ}" />
+                            <TextBox Height="30" Text="{Binding DraftDepthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Equipment.PlacementDraftHint}"
+                                       TextWrapping="Wrap" />
+                            <Border Margin="0,6,0,0"
+                                    Padding="8,6"
+                                    Background="{DynamicResource Surface.Panel}"
+                                    CornerRadius="4">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                                    <Condition Binding="{Binding HasValidationErrors}" Value="False" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock x:Name="PropertyValidationMessage"
+                                           Text="{Binding ValidationMessage}"
+                                           TextWrapping="Wrap">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource State.Running}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasValidationErrors}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Border>
+
+                            <TextBlock Margin="0,10,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Inspector.LayoutTransform}" />
+                            <TextBlock x:Name="AspectRatioHintText"
+                                       Margin="0,0,0,4"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Inspector.AspectRatioHint}"
+                                       TextWrapping="Wrap" />
+                            <StackPanel>
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Rotation}" />
+                                <ui:NumberBox Minimum="-360" Maximum="360" SmallChange="1" Value="{Binding RotationDegrees, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Width}" />
+                                <ui:NumberBox Minimum="1" Maximum="10000" SmallChange="1" Value="{Binding Width, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Depth}" />
+                                <ui:NumberBox Minimum="1" Maximum="10000" SmallChange="1" Value="{Binding Height, Mode=TwoWay}" />
+                            </StackPanel>
+                            <Grid Margin="0,0,0,8">
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <StackPanel x:Name="EquipmentDraftRotationField" Grid.Row="0" Grid.Column="0" Margin="0,0,0,8">
+                                    <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Rotation}" />
+                                    <TextBox Height="30" x:Name="EquipmentDraftRotationTextBox"
+                                             AutomationProperties.Name="{loc:Loc Key=Properties.Rotation}"
+                                             AutomationProperties.AutomationId="EquipmentDraftRotation"
+                                             Text="{Binding DraftRotationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,8">
+                                    <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Width}" />
+                                    <TextBox Height="30" x:Name="EquipmentDraftWidthTextBox"
+                                             AutomationProperties.Name="{loc:Loc Key=Properties.Width}"
+                                             AutomationProperties.AutomationId="EquipmentDraftWidth"
+                                             Text="{Binding DraftFootprintWidthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,8">
+                                    <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Depth}" />
+                                    <TextBox Height="30" x:Name="EquipmentDraftDepthTextBox"
+                                             AutomationProperties.Name="{loc:Loc Key=Properties.Depth}"
+                                             AutomationProperties.AutomationId="EquipmentDraftDepth"
+                                             Text="{Binding DraftFootprintDepthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel x:Name="EquipmentDraftVerticalEnvelopeField" Grid.Row="1" Grid.Column="2" Margin="0,0,0,8">
+                                    <TextBlock Margin="0,0,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Inspector.VerticalEnvelope}" />
+                                    <TextBlock x:Name="EquipmentDraftVerticalEnvelopeHint" Margin="0,0,0,4" Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{loc:Loc Key=Inspector.VerticalEnvelopeHint}" TextWrapping="Wrap" />
+                                    <StackPanel x:Name="EquipmentDraftVerticalHeightField">
+                                        <TextBlock x:Name="EquipmentDraftVerticalHeightLabel" Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.VerticalHeight}" />
+                                        <TextBox Height="30" x:Name="EquipmentDraftVerticalHeightTextBox"
+                                                 AutomationProperties.Name="{loc:Loc Key=Properties.VerticalHeight}"
+                                                 AutomationProperties.AutomationId="EquipmentDraftVerticalHeight"
+                                                 Text="{Binding DraftVerticalHeightText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="EquipmentDraftVerticalEnvelopeEstimated" Margin="0,4,0,0" Foreground="{DynamicResource State.Warning}"
+                                               Text="{loc:Loc Key=Inspector.VerticalEnvelopeEstimated}" TextWrapping="Wrap"
+                                               Visibility="{Binding IsVerticalEnvelopeEstimated, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel>
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Inspector.VerticalEnvelope}" />
+                                <TextBlock Margin="0,0,0,4" Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{loc:Loc Key=Inspector.VerticalEnvelopeHint}" TextWrapping="Wrap" />
+                            <StackPanel>
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.VerticalHeight}" />
+                                <ui:NumberBox Minimum="1" Maximum="10000" SmallChange="1" Value="{Binding VerticalHeight, Mode=TwoWay}" />
+                                <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource State.Warning}"
+                                           Text="{loc:Loc Key=Inspector.VerticalEnvelopeEstimated}" TextWrapping="Wrap"
+                                           Visibility="{Binding IsVerticalEnvelopeEstimated, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            </StackPanel>
+                            <StackPanel>
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.VerticalHeight}" />
+                                <TextBox Height="30" AutomationProperties.Name="{loc:Loc Key=Properties.VerticalHeight}"
+                                         Text="{Binding DraftVerticalHeightText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource State.Warning}"
+                                           Text="{loc:Loc Key=Inspector.VerticalEnvelopeEstimated}" TextWrapping="Wrap"
+                                           Visibility="{Binding IsVerticalEnvelopeEstimated, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            </StackPanel>
+                            </StackPanel>
+
+                            <UniformGrid Margin="0,8,0,0" Columns="4" DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                <Button Command="{Binding NudgeLayoutComponentCommand}" CommandParameter="Left" Content="←" ToolTip="Move left by one grid step" />
+                                <Button Command="{Binding NudgeLayoutComponentCommand}" CommandParameter="Up" Content="↑" ToolTip="Move up by one grid step" />
+                                <Button Command="{Binding NudgeLayoutComponentCommand}" CommandParameter="Down" Content="↓" ToolTip="Move down by one grid step" />
+                                <Button x:Name="NudgeRightButton" Command="{Binding NudgeLayoutComponentCommand}" CommandParameter="Right" Content="→" ToolTip="Move right by one grid step" />
+                            </UniformGrid>
+                            </StackPanel>
+
+                            <StackPanel>
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsEquipmentDriveTabOpen, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{loc:Loc Key=Equipment.DriveTabHint}"
+                                           TextWrapping="Wrap">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowAxisDriveProperties}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                            <StackPanel Visibility="{Binding ShowAxisDriveProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Equipment.AxisDriveDraftHint}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Axis.TravelSetup}" />
+                                <TextBlock Foreground="{DynamicResource Text.Secondary}" Text="{Binding AxisUnit}" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="10" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Grid.Column="0">
+                                        <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.SoftLimitMin}" />
+                                        <TextBox x:Name="ComponentAxisMinTextBox" Height="30" Text="{Binding DraftAxisMinText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="0" Grid.Column="2">
+                                        <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.SoftLimitMax}" />
+                                        <TextBox Height="30" Text="{Binding DraftAxisMaxText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.Column="0">
+                                        <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.HomePosition}" />
+                                        <TextBox Height="30" Text="{Binding DraftAxisHomeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.Column="2">
+                                        <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.MaxVelocity}" />
+                                        <TextBox Height="30" Text="{Binding DraftAxisSpeedText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Visibility="{Binding HasBehaviorBinding, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Simulation}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Behavior}" />
+                                <ComboBox x:Name="BehaviorBindingComboBox"
+                                          ItemsSource="{Binding BehaviorBindingOptions}"
+                                          DisplayMemberPath="DisplayName"
+                                          SelectedValuePath="Id"
+                                          SelectedValue="{Binding BehaviorBindingId, Mode=TwoWay}" />
+                            </StackPanel>
+
+                            <StackPanel Visibility="{Binding ShowSensorProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Sensor}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.OutputChannel}" />
+                                <ComboBox ItemsSource="{Binding DigitalInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding SensorOutputChannelId, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.TargetComponent}" />
+                                <ComboBox ItemsSource="{Binding TargetComponentOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding SensorTargetComponentId, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.OnDelay}" />
+                                <ui:NumberBox Minimum="0" Maximum="600000" SmallChange="1" Value="{Binding SensorOnDelayMilliseconds, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.OffDelay}" />
+                                <ui:NumberBox Minimum="0" Maximum="600000" SmallChange="1" Value="{Binding SensorOffDelayMilliseconds, Mode=TwoWay}" />
+                            </StackPanel>
+
+                            <StackPanel x:Name="CylinderPropertiesSection" Visibility="{Binding ShowCylinderProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Cylinder}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ExtendCommand}" />
+                                <ComboBox ItemsSource="{Binding DigitalOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding CylinderExtendCommandChannelId, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ExtendedSensor}" />
+                                <ComboBox ItemsSource="{Binding DigitalInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding CylinderExtendedSensorChannelId, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.RetractedSensor}" />
+                                <ComboBox ItemsSource="{Binding DigitalInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding CylinderRetractedSensorChannelId, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ExtendDuration}" />
+                                <ui:NumberBox Minimum="1" Maximum="600000" SmallChange="1" Value="{Binding CylinderExtendDurationMilliseconds, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.RetractDuration}" />
+                                <ui:NumberBox Minimum="1" Maximum="600000" SmallChange="1" Value="{Binding CylinderRetractDurationMilliseconds, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ExtendedSensorDelay}" />
+                                <ui:NumberBox Minimum="0" Maximum="600000" SmallChange="1" Value="{Binding CylinderExtendedSensorDelayMilliseconds, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.RetractedSensorDelay}" />
+                                <ui:NumberBox Minimum="0" Maximum="600000" SmallChange="1" Value="{Binding CylinderRetractedSensorDelayMilliseconds, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Stroke}" />
+                                <ui:NumberBox Minimum="0.001" Maximum="100000" SmallChange="1" Value="{Binding CylinderStroke, Mode=TwoWay}" />
+                            </StackPanel>
+
+                            <StackPanel Visibility="{Binding ShowConveyorProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Conveyor}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.RunCommand}" />
+                                <ComboBox ItemsSource="{Binding DigitalOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding ConveyorRunCommandChannelId, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ReverseCommand}" />
+                                <ComboBox ItemsSource="{Binding DigitalOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding ConveyorReverseCommandChannelId, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Speed}" />
+                                <ui:NumberBox Minimum="0.001" Maximum="100000" SmallChange="1" Value="{Binding ConveyorSpeedUnitsPerSecond, Mode=TwoWay}" />
+                            </StackPanel>
+
+                            <StackPanel Visibility="{Binding ShowWorkpieceProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Workpiece}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Type}" />
+                                <TextBox Height="30" Text="{Binding WorkpieceType, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Conveyor}" />
+                                <ComboBox ItemsSource="{Binding ConveyorComponentOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding WorkpieceConveyorComponentId, Mode=TwoWay}" />
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.InspectionState}" />
+                                <ComboBox ItemsSource="{Binding InspectionStateOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding WorkpieceInspectionStateId, Mode=TwoWay}" />
+                            </StackPanel>
+                            </StackPanel>
+
+                        </StackPanel>
+                    </Border>
                     <Border x:Name="LayerOrderPanel"
                             Style="{StaticResource InspectorCardStyle}"
                             Visibility="{Binding Layout.HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -404,145 +925,91 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Visibility="{Binding Layout.HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <Border.Style>
-                            <Style TargetType="Border" BasedOn="{StaticResource InspectorCardStyle}">
-                                <Setter Property="IsEnabled" Value="True" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsDryRunPlaybackActive}" Value="True">
-                                        <Setter Property="IsEnabled" Value="False" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <StackPanel DataContext="{Binding Layout.SelectedComponentEditor}">
-                            <TextBlock Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Inspector.AuthoredProperties}" />
-                            <Grid Margin="0,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock FontSize="14" FontWeight="SemiBold" Text="{Binding KindText}" />
-                                <TextBlock Grid.Column="1" Margin="8,0,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{Binding Id}" />
-                            </Grid>
-
-                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Name}" />
-                            <TextBox x:Name="ComponentNameTextBox"
-                                     Height="30"
-                                     Text="{Binding Name, Mode=TwoWay}"
-                                     ToolTip="{Binding Name}" />
-                            <Border Margin="0,6,0,0"
-                                    Padding="8,6"
-                                    Background="{DynamicResource Surface.Panel}"
-                                    CornerRadius="4">
-                                <TextBlock x:Name="PropertyValidationMessage"
-                                           Text="{Binding ValidationMessage}"
-                                           TextWrapping="Wrap">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="{DynamicResource State.Running}" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasValidationErrors}" Value="True">
-                                                    <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Border>
-
-                            <TextBlock Margin="0,10,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Inspector.LayoutTransform}" />
-                            <TextBlock x:Name="AspectRatioHintText"
-                                       Margin="0,0,0,4"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{loc:Loc Key=Inspector.AspectRatioHint}"
-                                       TextWrapping="Wrap" />
-                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.X}" />
-                            <ui:NumberBox Minimum="-10000" Maximum="10000" SmallChange="10" Value="{Binding X, Mode=TwoWay}" />
-                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Y}" />
-                            <ui:NumberBox Minimum="-10000" Maximum="10000" SmallChange="10" Value="{Binding Y, Mode=TwoWay}" />
-                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Rotation}" />
-                            <ui:NumberBox Minimum="-360" Maximum="360" SmallChange="1" Value="{Binding RotationDegrees, Mode=TwoWay}" />
-                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Width}" />
-                            <ui:NumberBox Minimum="1" Maximum="10000" SmallChange="1" Value="{Binding Width, Mode=TwoWay}" />
-                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Height}" />
-                            <ui:NumberBox Minimum="1" Maximum="10000" SmallChange="1" Value="{Binding Height, Mode=TwoWay}" />
-                            <UniformGrid Margin="0,8,0,0" Columns="4" DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
-                                <Button Command="{Binding NudgeLayoutComponentCommand}" CommandParameter="Left" Content="←" ToolTip="Move left by one grid step" />
-                                <Button Command="{Binding NudgeLayoutComponentCommand}" CommandParameter="Up" Content="↑" ToolTip="Move up by one grid step" />
-                                <Button Command="{Binding NudgeLayoutComponentCommand}" CommandParameter="Down" Content="↓" ToolTip="Move down by one grid step" />
-                                <Button x:Name="NudgeRightButton" Command="{Binding NudgeLayoutComponentCommand}" CommandParameter="Right" Content="→" ToolTip="Move right by one grid step" />
-                            </UniformGrid>
-
-                            <StackPanel Visibility="{Binding HasBehaviorBinding, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Simulation}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Behavior}" />
-                                <ComboBox x:Name="BehaviorBindingComboBox"
-                                          ItemsSource="{Binding BehaviorBindingOptions}"
-                                          DisplayMemberPath="DisplayName"
-                                          SelectedValuePath="Id"
-                                          SelectedValue="{Binding BehaviorBindingId, Mode=TwoWay}" />
-                            </StackPanel>
-
-                            <StackPanel Visibility="{Binding ShowSensorProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Sensor}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.OutputChannel}" />
-                                <ComboBox ItemsSource="{Binding DigitalInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding SensorOutputChannelId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.TargetComponent}" />
-                                <ComboBox ItemsSource="{Binding TargetComponentOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding SensorTargetComponentId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.OnDelay}" />
-                                <ui:NumberBox Minimum="0" Maximum="600000" SmallChange="1" Value="{Binding SensorOnDelayMilliseconds, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.OffDelay}" />
-                                <ui:NumberBox Minimum="0" Maximum="600000" SmallChange="1" Value="{Binding SensorOffDelayMilliseconds, Mode=TwoWay}" />
-                            </StackPanel>
-
-                            <StackPanel x:Name="CylinderPropertiesSection" Visibility="{Binding ShowCylinderProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Cylinder}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ExtendCommand}" />
-                                <ComboBox ItemsSource="{Binding DigitalOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding CylinderExtendCommandChannelId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ExtendedSensor}" />
-                                <ComboBox ItemsSource="{Binding DigitalInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding CylinderExtendedSensorChannelId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.RetractedSensor}" />
-                                <ComboBox ItemsSource="{Binding DigitalInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding CylinderRetractedSensorChannelId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ExtendDuration}" />
-                                <ui:NumberBox Minimum="1" Maximum="600000" SmallChange="1" Value="{Binding CylinderExtendDurationMilliseconds, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.RetractDuration}" />
-                                <ui:NumberBox Minimum="1" Maximum="600000" SmallChange="1" Value="{Binding CylinderRetractDurationMilliseconds, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ExtendedSensorDelay}" />
-                                <ui:NumberBox Minimum="0" Maximum="600000" SmallChange="1" Value="{Binding CylinderExtendedSensorDelayMilliseconds, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.RetractedSensorDelay}" />
-                                <ui:NumberBox Minimum="0" Maximum="600000" SmallChange="1" Value="{Binding CylinderRetractedSensorDelayMilliseconds, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Stroke}" />
-                                <ui:NumberBox Minimum="0.001" Maximum="100000" SmallChange="1" Value="{Binding CylinderStroke, Mode=TwoWay}" />
-                            </StackPanel>
-
-                            <StackPanel Visibility="{Binding ShowConveyorProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Conveyor}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.RunCommand}" />
-                                <ComboBox ItemsSource="{Binding DigitalOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding ConveyorRunCommandChannelId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ReverseCommand}" />
-                                <ComboBox ItemsSource="{Binding DigitalOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding ConveyorReverseCommandChannelId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Speed}" />
-                                <ui:NumberBox Minimum="0.001" Maximum="100000" SmallChange="1" Value="{Binding ConveyorSpeedUnitsPerSecond, Mode=TwoWay}" />
-                            </StackPanel>
-
-                            <StackPanel Visibility="{Binding ShowWorkpieceProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Workpiece}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Type}" />
-                                <TextBox Height="30" Text="{Binding WorkpieceType, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Conveyor}" />
-                                <ComboBox ItemsSource="{Binding ConveyorComponentOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding WorkpieceConveyorComponentId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.InspectionState}" />
-                                <ComboBox ItemsSource="{Binding InspectionStateOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding WorkpieceInspectionStateId, Mode=TwoWay}" />
-                            </StackPanel>
-
-                        </StackPanel>
-                    </Border>
                 </StackPanel>
             </ScrollViewer>
+            <Border Grid.Row="3"
+                    Padding="12,9"
+                    BorderThickness="0,1,0,0"
+                    BorderBrush="{DynamicResource Border.Subtle}"
+                    Background="{DynamicResource Surface.Panel}"
+                    DataContext="{Binding Layout.SelectedComponentEditor}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding DataContext.Layout.HasSelection, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                    <Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                    <Condition Binding="{Binding DataContext.IsRunMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False" />
+                                    <Condition Binding="{Binding DataContext.IsEquipmentSinglePartCheckOpen, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False" />
+                                    <Condition Binding="{Binding DataContext.IsEquipmentDriveTabOpen, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False" />
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible" />
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <StackPanel>
+                    <TextBlock Foreground="{DynamicResource State.Warning}"
+                               Text="{Binding PlacementDraftError}"
+                               TextWrapping="Wrap" />
+                    <Grid Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0"
+                                Command="{Binding DiscardPlacementDraftCommand}"
+                                Content="{loc:Loc Key=Equipment.PlacementDraftDiscard}" />
+                        <Button Grid.Column="2"
+                                Command="{Binding ApplyPlacementDraftCommand}"
+                                Content="{loc:Loc Key=Equipment.PlacementDraftApply}"
+                                Style="{StaticResource PrimaryCommandButtonStyle}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="3"
+                    Padding="12,9"
+                    BorderThickness="0,1,0,0"
+                    BorderBrush="{DynamicResource Border.Subtle}"
+                    Background="{DynamicResource Surface.Panel}"
+                    DataContext="{Binding Layout.SelectedComponentEditor}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding DataContext.Layout.HasSelection, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                    <Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                    <Condition Binding="{Binding DataContext.IsRunMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False" />
+                                    <Condition Binding="{Binding DataContext.IsEquipmentDriveTabOpen, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                    <Condition Binding="{Binding ShowAxisDriveProperties}" Value="True" />
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible" />
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <StackPanel>
+                    <TextBlock Foreground="{DynamicResource State.Warning}" Text="{Binding AxisDriveDraftError}" TextWrapping="Wrap" />
+                    <Grid Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Command="{Binding DiscardAxisDriveDraftCommand}" Content="{loc:Loc Key=Equipment.PlacementDraftDiscard}" />
+                        <Button Grid.Column="2" Command="{Binding ApplyAxisDriveDraftCommand}" Content="{loc:Loc Key=Equipment.PlacementDraftApply}" Style="{StaticResource PrimaryCommandButtonStyle}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
 
             <ScrollViewer x:Name="RunInspectorScrollViewer"
-                          Grid.Row="1"
+                          Grid.Row="2"
                           VerticalScrollBarVisibility="Auto">
                 <ScrollViewer.Style>
                     <Style TargetType="ScrollViewer">
@@ -551,10 +1018,24 @@
                             <DataTrigger Binding="{Binding IsRunMode}" Value="True">
                                 <Setter Property="Visibility" Value="Visible" />
                             </DataTrigger>
+                            <DataTrigger Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </ScrollViewer.Style>
                 <StackPanel Margin="4">
+                    <StackPanel>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
                     <Border x:Name="RuntimeDebuggerPanel"
                             Style="{StaticResource InspectorCardStyle}">
                         <StackPanel>
@@ -572,7 +1053,7 @@
                             <TextBlock Margin="0,2,0,0"
                                        Style="{StaticResource TelemetryTextStyle}"
                                        Text="{Binding RuntimeDebugger.CurrentStepText}"
-                                       TextTrimming="CharacterEllipsis"
+                                       TextWrapping="Wrap"
                                        ToolTip="{Binding RuntimeDebugger.CurrentStepText}" />
                             <Border Margin="0,7,0,0"
                                     Padding="8,5"
@@ -584,14 +1065,6 @@
                                            Text="{Binding RuntimeDebugger.PauseReasonText}"
                                            TextWrapping="Wrap" />
                             </Border>
-                            <Button x:Name="SemanticSequenceStepButton"
-                                    Margin="0,8,0,0"
-                                    HorizontalAlignment="Stretch"
-                                    Command="{Binding RuntimeDebugger.SemanticStepCommand}"
-                                    Content="{loc:Loc Key=Debugger.NextSequenceStep}"
-                                    Style="{StaticResource PrimaryCommandButtonStyle}"
-                                    ToolTip="{loc:Loc Key=Debugger.NextSequenceStepTooltip}"
-                                    AutomationProperties.Name="{loc:Loc Key=Debugger.NextSequenceStep}" />
                             <TextBlock Margin="0,5,0,0"
                                        Foreground="{DynamicResource Text.Secondary}"
                                        Text="{Binding RuntimeDebugger.OperationStatusText}"
@@ -687,221 +1160,6 @@
                                 </StackPanel>
                             </Expander>
 
-                            <Expander x:Name="DebuggerTimelineExpander"
-                                      Margin="0,7,0,0"
-                                      Header="{loc:Loc Key=Debugger.Timeline}">
-                                <StackPanel Margin="0,5,0,0">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource Text.Secondary}"
-                                                   Text="{Binding RuntimeDebugger.TimelineSummaryText}" />
-                                        <Button Grid.Column="1"
-                                                Margin="8,0,0,0"
-                                                Command="{Binding RuntimeDebugger.ClearTimelineCommand}"
-                                                Content="{loc:Loc Key=Debugger.ClearTimeline}"
-                                                Style="{StaticResource GlobalCommandButtonStyle}" />
-                                    </Grid>
-                                    <Grid Margin="0,5,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource Text.Secondary}"
-                                                   Text="{loc:Loc Key=Debugger.TimelineFilterLabel}"
-                                                   TextWrapping="Wrap" />
-                                        <ComboBox x:Name="DebuggerTimelineFilterComboBox"
-                                                  Grid.Column="1"
-                                                  Margin="8,0,0,0"
-                                                  HorizontalAlignment="Stretch"
-                                                  AutomationProperties.Name="{loc:Loc Key=Debugger.TimelineFilterLabel}"
-                                                  DisplayMemberPath="DisplayText"
-                                                  ItemsSource="{Binding RuntimeDebugger.TimelineFilters}"
-                                                  SelectedItem="{Binding RuntimeDebugger.SelectedTimelineFilter, Mode=TwoWay}" />
-                                    </Grid>
-                                    <Grid Margin="0,5,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource Text.Secondary}"
-                                                   Text="{loc:Loc Key=Debugger.TimelineSeverityFilterLabel}"
-                                                   TextWrapping="Wrap" />
-                                        <ComboBox x:Name="DebuggerTimelineSeverityFilterComboBox"
-                                                  Grid.Column="1"
-                                                  Margin="8,0,0,0"
-                                                  HorizontalAlignment="Stretch"
-                                                  AutomationProperties.Name="{loc:Loc Key=Debugger.TimelineSeverityFilterLabel}"
-                                                  DisplayMemberPath="DisplayText"
-                                                  ItemsSource="{Binding RuntimeDebugger.TimelineSeverityFilters}"
-                                                  SelectedItem="{Binding RuntimeDebugger.SelectedTimelineSeverityFilter, Mode=TwoWay}" />
-                                    </Grid>
-                                    <TextBlock x:Name="DebuggerTimelineEmptyTextBlock"
-                                               Margin="3,8,3,3"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{Binding RuntimeDebugger.TimelineEmptyText}"
-                                               TextWrapping="Wrap"
-                                               Visibility="{Binding RuntimeDebugger.HasTimeline, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" />
-                                    <ListBox x:Name="DebuggerTimelineList"
-                                             Margin="0,5,0,0"
-                                             MaxHeight="220"
-                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                             ItemsSource="{Binding RuntimeDebugger.Timeline}">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <StackPanel Margin="3,3">
-                                                    <TextBlock Style="{StaticResource TelemetryTextStyle}"
-                                                               Text="{Binding HeaderText}" />
-                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                               Text="{Binding CommandIdText}"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               ToolTip="{Binding CommandIdTooltip}" />
-                                                    <TextBlock FontWeight="SemiBold"
-                                                               Text="{Binding Category}" />
-                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                               Text="{Binding Code}"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               ToolTip="{Binding Code}" />
-                                                    <TextBlock Text="{Binding Message}"
-                                                               TextWrapping="Wrap" />
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
-                                </StackPanel>
-                            </Expander>
-
-                            <Expander x:Name="DebuggerAlarmsExpander"
-                                      Margin="0,7,0,0"
-                                      Header="{loc:Loc Key=Debugger.AlarmsRecovery}"
-                                      IsExpanded="True">
-                                 <StackPanel Margin="0,5,0,0">
-                                     <TextBlock FontWeight="SemiBold"
-                                                Text="{Binding RuntimeDebugger.AlarmSummaryText}" />
-                                     <TextBlock Margin="0,2,0,0"
-                                                Foreground="{DynamicResource Text.Secondary}"
-                                                Text="{Binding RuntimeDebugger.AlarmAcknowledgementSummaryText}"
-                                                TextWrapping="Wrap" />
-                                     <ListBox x:Name="DebuggerAlarmList"
-                                              Margin="0,5,0,0"
-                                              MaxHeight="170"
-                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                             ItemsSource="{Binding RuntimeDebugger.Alarms}">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <StackPanel Margin="3,3">
-                                                    <TextBlock FontWeight="SemiBold"
-                                                               Text="{Binding Source}"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               ToolTip="{Binding Source}" />
-                                                    <TextBlock Text="{Binding State}"
-                                                               TextWrapping="Wrap" />
-                                                     <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                                Text="{Binding RecoveryText}"
-                                                                TextWrapping="Wrap" />
-                                                     <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                                Text="{Binding LifecycleText}"
-                                                                TextWrapping="Wrap" />
-                                                     <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                                Text="{Binding OccurrenceText}"
-                                                                TextWrapping="Wrap" />
-                                                     <Button Margin="0,4,0,0"
-                                                             HorizontalAlignment="Left"
-                                                             Command="{Binding DataContext.RuntimeDebugger.AcknowledgeAlarmCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                             CommandParameter="{Binding}"
-                                                             Content="{Binding AcknowledgeActionText}"
-                                                             IsEnabled="{Binding CanAcknowledge}"
-                                                             Style="{StaticResource GlobalCommandButtonStyle}"
-                                                             AutomationProperties.Name="{Binding AcknowledgeActionText}" />
-                                                 </StackPanel>
-                                             </DataTemplate>
-                                         </ListBox.ItemTemplate>
-                                    </ListBox>
-                                     <TextBlock Margin="0,5,0,0"
-                                                Foreground="{DynamicResource Text.Secondary}"
-                                                Text="{loc:Loc Key=Debugger.AlarmRecoveryHint}"
-                                                TextWrapping="Wrap" />
-                                     <WrapPanel Margin="0,6,0,0">
-                                         <Button x:Name="AcknowledgeAllAlarmsButton"
-                                                 Margin="0,0,6,4"
-                                                 Command="{Binding RuntimeDebugger.AcknowledgeAllAlarmsCommand}"
-                                                 Content="{loc:Loc Key=Debugger.AcknowledgeAllAlarms}"
-                                                 Style="{StaticResource GlobalCommandButtonStyle}"
-                                                 AutomationProperties.Name="{loc:Loc Key=Debugger.AcknowledgeAllAlarms}" />
-                                         <Button Margin="0,0,6,4"
-                                                 Command="{Binding FaultManager.ClearAllCommand}"
-                                                 Content="{loc:Loc Key=Inspector.ClearAll}"
-                                                Style="{StaticResource GlobalCommandButtonStyle}" />
-                                        <Button Command="{Binding ResetCommand}"
-                                                Content="{loc:Loc Key=Shell.Reset}"
-                                                 Style="{StaticResource GlobalCommandButtonStyle}" />
-                                     </WrapPanel>
-                                     <Expander x:Name="DebuggerAlarmHistoryExpander"
-                                               Margin="0,6,0,0"
-                                               Header="{loc:Loc Key=Debugger.AlarmHistory}"
-                                               IsExpanded="False">
-                                         <StackPanel Margin="0,5,0,0">
-                                             <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                        Text="{Binding RuntimeDebugger.AlarmHistorySummaryText}" />
-                                             <TextBlock Margin="0,5,0,0"
-                                                        Foreground="{DynamicResource Text.Secondary}"
-                                                        Text="{loc:Loc Key=Debugger.AlarmHistoryFilterHint}"
-                                                        TextWrapping="Wrap" />
-                                             <StackPanel Margin="0,5,0,0"
-                                                         Orientation="Horizontal">
-                                                 <TextBlock VerticalAlignment="Center"
-                                                            Text="{loc:Loc Key=Debugger.AlarmHistoryFilter}" />
-                                                 <ComboBox x:Name="DebuggerAlarmHistoryFilterComboBox"
-                                                           Margin="7,0,0,0"
-                                                           MinWidth="150"
-                                                           ItemsSource="{Binding RuntimeDebugger.AlarmHistoryFilters}"
-                                                           DisplayMemberPath="DisplayText"
-                                                           SelectedItem="{Binding RuntimeDebugger.SelectedAlarmHistoryFilter, Mode=TwoWay}"
-                                                           AutomationProperties.AutomationId="DebuggerAlarmHistoryFilter"
-                                                           AutomationProperties.Name="{loc:Loc Key=Debugger.AlarmHistoryFilter}" />
-                                             </StackPanel>
-                                             <TextBlock x:Name="DebuggerAlarmHistoryEmptyTextBlock"
-                                                        Margin="0,5,0,0"
-                                                        Foreground="{DynamicResource Text.Secondary}"
-                                                        Text="{Binding RuntimeDebugger.AlarmHistoryEmptyText}"
-                                                        TextWrapping="Wrap"
-                                                        Visibility="{Binding RuntimeDebugger.HasAlarmHistoryEmptyState, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                             <ListBox x:Name="DebuggerAlarmHistoryList"
-                                                      Margin="0,5,0,0"
-                                                      MaxHeight="170"
-                                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                                      ItemsSource="{Binding RuntimeDebugger.VisibleAlarmHistory}">
-                                                 <ListBox.ItemTemplate>
-                                                     <DataTemplate>
-                                                         <StackPanel Margin="3,3">
-                                                             <TextBlock FontWeight="SemiBold"
-                                                                        Text="{Binding Source}"
-                                                                        TextTrimming="CharacterEllipsis"
-                                                                        ToolTip="{Binding Source}" />
-                                                             <TextBlock Text="{Binding State}"
-                                                                        TextWrapping="Wrap" />
-                                                             <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                                        Text="{Binding LifecycleText}"
-                                                                        TextWrapping="Wrap" />
-                                                             <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                                        Text="{Binding OccurrenceText}"
-                                                                        TextWrapping="Wrap" />
-                                                             <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                                        Text="{Binding ClearedAtText}"
-                                                                        TextWrapping="Wrap" />
-                                                         </StackPanel>
-                                                     </DataTemplate>
-                                                 </ListBox.ItemTemplate>
-                                             </ListBox>
-                                         </StackPanel>
-                                     </Expander>
-                                 </StackPanel>
-                             </Expander>
                         </StackPanel>
                     </Border>
                     <Border x:Name="SimulationCommandTracePanel"
@@ -1082,439 +1340,6 @@
                             <Border Margin="0,10,0,8"
                                     BorderBrush="{DynamicResource Border.Subtle}"
                                     BorderThickness="0,1,0,0" />
-                            <TextBlock Style="{StaticResource SectionCaptionStyle}"
-                                       Text="{loc:Loc Key=Axis.RecipeHistory}" />
-                            <TextBlock Margin="0,2,0,5"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding CommissioningHistoryStatusText}" />
-                            <ListBox x:Name="CommissioningResultHistoryList"
-                                     Height="76"
-                                     ItemsSource="{Binding CommissioningResultHistoryEntries}"
-                                     SelectedItem="{Binding SelectedCommissioningHistoryEntry, Mode=TwoWay}">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Margin="4,2">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock FontWeight="SemiBold"
-                                                       Text="{Binding Sequence, StringFormat=#{0}}" />
-                                            <TextBlock Grid.Column="1"
-                                                       Margin="8,0,0,0"
-                                                       Foreground="{DynamicResource Text.Secondary}"
-                                                       Text="{Binding CompletedRuns, StringFormat={}{0}x}" />
-                                            <TextBlock Grid.Column="2"
-                                                       Margin="8,0,0,0"
-                                                       HorizontalAlignment="Right"
-                                                       Style="{StaticResource TelemetryTextStyle}"
-                                                       Text="{Binding ShortEvidenceHash}" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                            <TextBlock Margin="0,5,0,0"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding CommissioningBaselineStatusText}"
-                                       TextWrapping="Wrap" />
-                            <WrapPanel Margin="0,7,0,0">
-                                <Button x:Name="AcceptCommissioningBaselineButton"
-                                        Margin="0,0,6,4"
-                                        Command="{Binding AcceptCommissioningBaselineCommand}"
-                                        Content="{loc:Loc Key=Axis.RecipeAcceptBaseline}"
-                                        Style="{StaticResource GlobalCommandButtonStyle}"
-                                        AutomationProperties.Name="{loc:Loc Key=Axis.RecipeAcceptBaseline}" />
-                                <Button Margin="0,0,6,4"
-                                        Command="{Binding ClearCommissioningBaselineCommand}"
-                                        Content="{loc:Loc Key=Axis.RecipeClearBaseline}"
-                                        Style="{StaticResource GlobalCommandButtonStyle}" />
-                                <Button x:Name="NavigateCommissioningMismatchButton"
-                                        Margin="0,0,6,4"
-                                        Command="{Binding NavigateToCommissioningMismatchCommand}"
-                                        Content="{loc:Loc Key=Axis.RecipeGoToMismatch}"
-                                        Style="{StaticResource GlobalCommandButtonStyle}" />
-                            </WrapPanel>
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource InspectorCardStyle}">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource SectionCaptionStyle}"
-                                       Text="{loc:Loc Key=Simulation.TestScenario}" />
-                            <TextBlock Margin="0,2,0,8"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{loc:Loc Key=Simulation.TestScenarioHint}"
-                                       TextWrapping="Wrap" />
-                            <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{loc:Loc Key=Simulation.ScenarioProfile}" />
-                            <ComboBox Margin="0,4,0,0"
-                                      IsEnabled="{Binding IsScenarioConfigurationEnabled}"
-                                      ItemsSource="{Binding SimulationWorkspace.ScenarioProfiles}"
-                                      SelectedItem="{Binding SimulationWorkspace.SelectedScenarioProfile, Mode=TwoWay}">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Name}" />
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                            <TextBlock Margin="0,8,0,3"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{loc:Loc Key=Simulation.RuntimeTarget}" />
-                            <ComboBox ItemsSource="{Binding ConditionScenarioTargets}"
-                                      IsEnabled="{Binding IsScenarioConfigurationEnabled}"
-                                      DisplayMemberPath="Name"
-                                      SelectedValuePath="Id"
-                                      SelectedValue="{Binding SimulationWorkspace.ScenarioTargetId, Mode=TwoWay}" />
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="8" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Simulation.Seed}" />
-                                    <TextBox Margin="0,3,0,0"
-                                             IsEnabled="{Binding IsScenarioConfigurationEnabled}"
-                                             Text="{Binding SimulationWorkspace.ScenarioSeed, UpdateSourceTrigger=PropertyChanged}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Simulation.DurationTicks}" />
-                                    <TextBox Margin="0,3,0,0"
-                                             IsEnabled="{Binding IsScenarioConfigurationEnabled}"
-                                             Text="{Binding SimulationWorkspace.ScenarioDurationCycles, UpdateSourceTrigger=PropertyChanged}" />
-                                </StackPanel>
-                            </Grid>
-                            <Border Margin="0,12,0,0"
-                                    Padding="10"
-                                    Background="{DynamicResource Surface.Root}"
-                                    BorderBrush="{DynamicResource Border.Subtle}"
-                                    BorderThickness="1"
-                                    CornerRadius="4">
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource SectionCaptionStyle}"
-                                               Text="{loc:Loc Key=Simulation.ScheduledFaultRecovery}" />
-                                    <TextBlock Margin="0,2,0,8"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Simulation.ScheduledFaultRecoveryHint}"
-                                               TextWrapping="Wrap" />
-                                    <CheckBox x:Name="ScheduledFaultEnabledCheckBox"
-                                              IsEnabled="{Binding IsScenarioConfigurationEnabled}"
-                                              IsChecked="{Binding SimulationWorkspace.IsScheduledFaultEnabled, Mode=TwoWay}"
-                                              Content="{loc:Loc Key=Simulation.EnableScheduledFault}"
-                                              AutomationProperties.Name="{loc:Loc Key=Simulation.EnableScheduledFault}" />
-                                    <StackPanel Margin="0,8,0,0"
-                                                IsEnabled="{Binding SimulationWorkspace.IsScheduledFaultEnabled}">
-                                        <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                   Text="{loc:Loc Key=Simulation.FaultKind}" />
-                                        <ComboBox x:Name="ScheduledFaultKindComboBox"
-                                                  Margin="0,3,0,0"
-                                                  ItemsSource="{Binding SimulationWorkspace.AvailableScheduledFaultKinds}"
-                                                  DisplayMemberPath="Name"
-                                                  SelectedValuePath="Kind"
-                                                  SelectedValue="{Binding SimulationWorkspace.ScheduledFaultKind, Mode=TwoWay}" />
-                                        <TextBlock Margin="0,8,0,0"
-                                                   Foreground="{DynamicResource Text.Secondary}"
-                                                   Text="{loc:Loc Key=Simulation.FaultTarget}" />
-                                        <ComboBox x:Name="ScheduledFaultTargetComboBox"
-                                                  Margin="0,3,0,0"
-                                                  ItemsSource="{Binding ScheduledFaultTargets}"
-                                                  DisplayMemberPath="Name"
-                                                  SelectedValuePath="Id"
-                                                  SelectedValue="{Binding SimulationWorkspace.ScheduledFaultTargetId, Mode=TwoWay}" />
-                                        <CheckBox x:Name="ScheduledFaultForcedValueCheckBox"
-                                                  Margin="0,8,0,0"
-                                                  IsChecked="{Binding SimulationWorkspace.ScheduledFaultForcedValue, Mode=TwoWay}"
-                                                  Content="{loc:Loc Key=Simulation.StuckInputForceOn}"
-                                                  AutomationProperties.Name="{loc:Loc Key=Simulation.StuckInputForceOn}"
-                                                  Visibility="{Binding SimulationWorkspace.RequiresScheduledFaultValue, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                        <Grid Margin="0,8,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="8" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel>
-                                                <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                           Text="{loc:Loc Key=Simulation.FaultInjectTick}" />
-                                                <TextBox x:Name="ScheduledFaultInjectTickTextBox"
-                                                         Margin="0,3,0,0"
-                                                         Text="{Binding SimulationWorkspace.ScheduledFaultInjectTick, UpdateSourceTrigger=PropertyChanged}" />
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="2">
-                                                <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                           Text="{loc:Loc Key=Simulation.FaultHoldTicks}" />
-                                                <TextBox x:Name="ScheduledFaultHoldTicksTextBox"
-                                                         Margin="0,3,0,0"
-                                                         Text="{Binding SimulationWorkspace.ScheduledFaultHoldTicks, UpdateSourceTrigger=PropertyChanged}" />
-                                            </StackPanel>
-                                        </Grid>
-                                        <CheckBox x:Name="RestartSequenceAfterFaultCheckBox"
-                                                  Margin="0,8,0,0"
-                                                  IsChecked="{Binding SimulationWorkspace.RestartSequenceAfterFault, Mode=TwoWay}"
-                                                  Content="{loc:Loc Key=Simulation.RestartSequence}"
-                                                  AutomationProperties.Name="{loc:Loc Key=Simulation.RestartSequence}" />
-                                        <TextBlock Margin="0,8,0,3"
-                                                   Foreground="{DynamicResource Text.Secondary}"
-                                                   Text="{loc:Loc Key=Simulation.RecoverySequence}" />
-                                        <ComboBox x:Name="RecoverySequenceComboBox"
-                                                  ItemsSource="{Binding RecoverySequences}"
-                                                  DisplayMemberPath="Name"
-                                                  SelectedValuePath="Id"
-                                                  SelectedValue="{Binding SimulationWorkspace.RecoverySequenceId, Mode=TwoWay}"
-                                                  IsEnabled="{Binding SimulationWorkspace.RestartSequenceAfterFault}" />
-                                    </StackPanel>
-                                    <TextBlock Margin="0,8,0,0"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{Binding SimulationWorkspace.ScheduledFaultSummary}"
-                                               TextWrapping="Wrap" />
-                                    <TextBlock x:Name="ScheduledFaultValidationText"
-                                               Margin="0,5,0,0"
-                                               Foreground="{DynamicResource State.Fault}"
-                                               Text="{loc:Loc Key=Simulation.FaultScheduleInvalid}"
-                                               TextWrapping="Wrap"
-                                               Visibility="{Binding SimulationWorkspace.IsScheduledFaultConfigurationValid, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" />
-                                </StackPanel>
-                            </Border>
-                            <Border Margin="0,12,0,0"
-                                    Padding="10"
-                                    IsEnabled="{Binding IsScenarioConfigurationEnabled}"
-                                    Background="{DynamicResource Surface.Root}"
-                                    BorderBrush="{DynamicResource Border.Subtle}"
-                                    BorderThickness="1"
-                                    CornerRadius="4">
-                                <StackPanel>
-                                    <TextBlock x:Name="ScenarioAssertionsSectionAnchor"
-                                               Style="{StaticResource SectionCaptionStyle}"
-                                               Text="{loc:Loc Key=Simulation.AcceptanceCriteria}" />
-                                    <TextBlock Margin="0,2,0,8"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Simulation.AcceptanceCriteriaHint}"
-                                               TextWrapping="Wrap" />
-                                    <CheckBox x:Name="AutomaticCycleAssertionCheckBox"
-                                              IsChecked="{Binding SimulationWorkspace.RequireAutomaticCycleCompleted, Mode=TwoWay}"
-                                              Content="{loc:Loc Key=Simulation.RequireAutomaticCycleCompleted}"
-                                              AutomationProperties.Name="{loc:Loc Key=Simulation.RequireAutomaticCycleCompleted}" />
-                                    <Grid Margin="22,6,0,8"
-                                          IsEnabled="{Binding SimulationWorkspace.RequireAutomaticCycleCompleted}">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="82" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource Text.Secondary}"
-                                                   Text="{loc:Loc Key=Simulation.MinimumCompletedCycles}" />
-                                        <TextBox x:Name="MinimumCompletedCyclesTextBox"
-                                                 Grid.Column="1"
-                                                 Text="{Binding SimulationWorkspace.MinimumCompletedCycles, UpdateSourceTrigger=PropertyChanged}"
-                                                 AutomationProperties.Name="{loc:Loc Key=Simulation.MinimumCompletedCycles}" />
-                                    </Grid>
-                                    <CheckBox x:Name="NoActiveFaultsAssertionCheckBox"
-                                              Margin="0,0,0,8"
-                                              IsChecked="{Binding SimulationWorkspace.RequireNoActiveFaults, Mode=TwoWay}"
-                                              Content="{loc:Loc Key=Simulation.RequireNoActiveFaults}"
-                                              AutomationProperties.Name="{loc:Loc Key=Simulation.RequireNoActiveFaults}" />
-                                    <CheckBox x:Name="FinalEquipmentStateAssertionCheckBox"
-                                              IsChecked="{Binding SimulationWorkspace.RequireFinalEquipmentState, Mode=TwoWay}"
-                                              Content="{loc:Loc Key=Simulation.RequireFinalEquipmentState}"
-                                              AutomationProperties.Name="{loc:Loc Key=Simulation.RequireFinalEquipmentState}" />
-                                    <StackPanel Margin="22,6,0,0"
-                                                IsEnabled="{Binding SimulationWorkspace.RequireFinalEquipmentState}">
-                                        <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                   Text="{loc:Loc Key=Simulation.AssertionTarget}" />
-                                        <ComboBox x:Name="FinalEquipmentTargetComboBox"
-                                                  Margin="0,3,0,0"
-                                                  ItemsSource="{Binding ConditionScenarioTargets}"
-                                                  DisplayMemberPath="Name"
-                                                  SelectedValuePath="Id"
-                                                  SelectedValue="{Binding SimulationWorkspace.FinalEquipmentTargetId, Mode=TwoWay}"
-                                                  AutomationProperties.Name="{loc:Loc Key=Simulation.AssertionTarget}" />
-                                        <TextBlock Margin="0,8,0,0"
-                                                   Foreground="{DynamicResource Text.Secondary}"
-                                                   Text="{loc:Loc Key=Simulation.ExpectedFinalState}" />
-                                        <TextBox x:Name="FinalEquipmentExpectedStateTextBox"
-                                                 Margin="0,3,0,0"
-                                                 Text="{Binding SimulationWorkspace.FinalEquipmentExpectedState, UpdateSourceTrigger=PropertyChanged}"
-                                                 AutomationProperties.Name="{loc:Loc Key=Simulation.ExpectedFinalState}" />
-                                        <TextBlock Margin="0,3,0,0"
-                                                   Foreground="{DynamicResource Text.Secondary}"
-                                                   Text="{loc:Loc Key=Simulation.ExpectedFinalStateHint}"
-                                                   TextWrapping="Wrap" />
-                                    </StackPanel>
-                                    <TextBlock Margin="0,8,0,0"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{Binding SimulationWorkspace.AssertionSummary}" />
-                                    <TextBlock x:Name="ScenarioAssertionValidationText"
-                                               Margin="0,5,0,0"
-                                               Foreground="{DynamicResource State.Fault}"
-                                               Text="{loc:Loc Key=Simulation.AssertionConfigurationInvalid}"
-                                               TextWrapping="Wrap"
-                                               Visibility="{Binding SimulationWorkspace.IsAssertionConfigurationValid, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" />
-                                </StackPanel>
-                            </Border>
-                            <WrapPanel Margin="0,10,0,0">
-                                <Button Margin="0,0,6,4"
-                                        Content="{loc:Loc Key=Simulation.StartScenario}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
-                                        Command="{Binding StartTestScenarioCommand}" />
-                                <Button Margin="0,0,6,4"
-                                        Content="{loc:Loc Key=Simulation.StopScenario}"
-                                        Style="{StaticResource GlobalCommandButtonStyle}"
-                                        Command="{Binding StopTestScenarioCommand}" />
-                                <Button Margin="0,0,6,4"
-                                        Content="{loc:Loc Key=Simulation.ReplayScenario}"
-                                        Style="{StaticResource GlobalCommandButtonStyle}"
-                                        Command="{Binding ReplayTestScenarioCommand}" />
-                            </WrapPanel>
-                            <TextBlock Margin="0,9,0,0"
-                                       FontWeight="SemiBold"
-                                       Text="{Binding ConditionScenarioStateText}" />
-                            <TextBlock Margin="0,3,0,0"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding ConditionScenarioProgressText}" />
-                            <TextBlock Margin="0,3,0,0"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding ConditionScenarioHealthText}" />
-                            <Border Margin="0,12,0,10"
-                                    BorderBrush="{DynamicResource Border.Subtle}"
-                                    BorderThickness="0,1,0,0" />
-                            <TextBlock x:Name="RepeatValidationSectionAnchor"
-                                       Style="{StaticResource SectionCaptionStyle}"
-                                       Text="{loc:Loc Key=Simulation.RepeatValidation}" />
-                            <TextBlock Margin="0,0,0,8"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{loc:Loc Key=Simulation.RepeatValidationHint}"
-                                       TextWrapping="Wrap" />
-                            <Grid>
-                                <Grid.Style>
-                                    <Style TargetType="Grid">
-                                        <Setter Property="IsEnabled" Value="True" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsBatchRunning}" Value="True">
-                                                <Setter Property="IsEnabled" Value="False" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Grid.Style>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="82" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock VerticalAlignment="Center"
-                                           Foreground="{DynamicResource Text.Secondary}"
-                                           Text="{loc:Loc Key=Simulation.RepetitionCount}" />
-                                <TextBox Grid.Column="1"
-                                         Text="{Binding SimulationWorkspace.BatchRepetitionCount, UpdateSourceTrigger=PropertyChanged}" />
-                            </Grid>
-                            <WrapPanel Margin="0,10,0,0">
-                                <Button Margin="0,0,6,4"
-                                        Content="{loc:Loc Key=Simulation.RunBatch}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
-                                        Command="{Binding RunScenarioBatchCommand}" />
-                                <Button Margin="0,0,6,4"
-                                        Content="{loc:Loc Key=Simulation.CancelBatch}"
-                                        Style="{StaticResource GlobalCommandButtonStyle}"
-                                        Command="{Binding CancelScenarioBatchCommand}" />
-                            </WrapPanel>
-                            <TextBlock x:Name="ScenarioBatchStatusText"
-                                       Margin="0,7,0,0"
-                                       FontWeight="SemiBold"
-                                       Text="{Binding BatchStatusText}"
-                                       TextWrapping="Wrap" />
-                            <TextBlock Margin="0,3,0,0"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding BatchResultText}"
-                                       TextWrapping="Wrap" />
-                            <TextBlock Margin="0,3,0,0"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding BatchBaselineText}"
-                                       TextWrapping="Wrap" />
-                            <TextBlock Margin="0,3,0,0"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding BatchArtifactStatusText}"
-                                       TextWrapping="Wrap" />
-                            <TextBlock Margin="0,7,0,0"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{loc:Loc Key=Simulation.EvidenceExchangeHint}"
-                                       TextWrapping="Wrap" />
-                            <TextBlock Margin="0,4,0,0"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{loc:Loc Key=Simulation.ResultReportHint}"
-                                       TextWrapping="Wrap" />
-                            <WrapPanel Margin="0,8,0,0">
-                                <Button Margin="0,0,6,4"
-                                        Content="{loc:Loc Key=Simulation.ExportEvidence}"
-                                        Style="{StaticResource GlobalCommandButtonStyle}"
-                                        Command="{Binding ExportSimulationEvidenceCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Simulation.ExportEvidence}" />
-                                <Button Margin="0,0,6,4"
-                                        Content="{loc:Loc Key=Simulation.ExportReport}"
-                                        Style="{StaticResource GlobalCommandButtonStyle}"
-                                        Command="{Binding ExportSimulationReportCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Simulation.ExportReport}" />
-                                <Button Margin="0,0,6,4"
-                                        Content="{loc:Loc Key=Simulation.ImportEvidence}"
-                                        Style="{StaticResource GlobalCommandButtonStyle}"
-                                        Command="{Binding ImportSimulationEvidenceCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Simulation.ImportEvidence}" />
-                            </WrapPanel>
-                            <Border x:Name="ScenarioAssertionOutcomesPanel"
-                                    Margin="0,9,0,0"
-                                    Padding="9,7"
-                                    Background="{DynamicResource Surface.Root}"
-                                    BorderBrush="{DynamicResource Border.Subtle}"
-                                    BorderThickness="1"
-                                    CornerRadius="4"
-                                    Visibility="{Binding HasBatchAssertionOutcomes, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource SectionCaptionStyle}"
-                                               Text="{loc:Loc Key=Simulation.AssertionOutcomes}" />
-                                    <ItemsControl Margin="0,4,0,0"
-                                                  ItemsSource="{Binding BatchAssertionOutcomes}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Grid Margin="0,3">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="44" />
-                                                        <ColumnDefinition Width="*" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock FontWeight="SemiBold"
-                                                               Text="{Binding StatusText}">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock">
-                                                                <Setter Property="Foreground" Value="{DynamicResource State.Success}" />
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsPassed}" Value="False">
-                                                                        <Setter Property="Foreground" Value="{DynamicResource State.Fault}" />
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                    </TextBlock>
-                                                    <TextBlock Grid.Column="1"
-                                                               Text="{Binding Summary}"
-                                                               TextWrapping="Wrap" />
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </Border>
-                            <WrapPanel Margin="0,8,0,0">
-                                <Button Margin="0,0,6,4"
-                                        Content="{loc:Loc Key=Simulation.AcceptBaseline}"
-                                        Style="{StaticResource GlobalCommandButtonStyle}"
-                                        Command="{Binding AcceptBatchBaselineCommand}" />
-                                <Button Margin="0,0,6,4"
-                                        Content="{loc:Loc Key=Simulation.ClearBaseline}"
-                                        Style="{StaticResource GlobalCommandButtonStyle}"
-                                        Command="{Binding ClearBatchBaselineCommand}" />
-                                <Button Margin="0,0,6,4"
-                                        Content="{loc:Loc Key=Simulation.GoToMismatch}"
-                                        Style="{StaticResource GlobalCommandButtonStyle}"
-                                        Command="{Binding NavigateToBatchMismatchCommand}" />
-                            </WrapPanel>
                         </StackPanel>
                     </Border>
                     <Border>
@@ -1535,6 +1360,7 @@
                                        TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
+                    </StackPanel>
                     <Border x:Name="SelectedEquipmentRuntimeCard">
                         <Border.Style>
                             <Style TargetType="Border" BasedOn="{StaticResource InspectorCardStyle}">
@@ -2092,31 +1918,26 @@
                                        Foreground="{DynamicResource Text.Secondary}"
                                        Text="{loc:Loc Key=Integration.Hint}"
                                        TextWrapping="Wrap" />
-                            <TextBlock x:Name="IntegrationSetupWorkflowStatusTextBlock"
-                                       Margin="0,0,0,8"
-                                       FontSize="10"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding Integration.SetupWorkflowStatusText}"
-                                       ToolTip="{Binding Integration.SetupWorkflowStatusText}"
-                                       TextWrapping="Wrap" />
                             <Expander x:Name="MmiRecipeManagerExpander"
                                       Margin="0,0,0,8"
                                       IsExpanded="True"
-                                      Header="{loc:Loc Key=Integration.MmiRecipeManager}"
+                                      Header="{loc:Loc Key=Integration.InspectionRecipeManager}"
                                       AutomationProperties.AutomationId="MmiRecipeManagerExpander"
-                                      AutomationProperties.Name="{loc:Loc Key=Integration.MmiRecipeManager}">
+                                      AutomationProperties.Name="{loc:Loc Key=Integration.InspectionRecipeManager}">
                                 <StackPanel Margin="0,7,0,0">
                                     <TextBlock FontSize="10"
                                                Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Integration.MmiRecipeManagerHint}"
+                                               Text="{loc:Loc Key=Integration.InspectionRecipeManagerHint}"
                                                TextWrapping="Wrap" />
                                     <ListBox x:Name="MmiRecipeList"
                                              Margin="0,7,0,0"
                                              Height="140"
+                                             HorizontalContentAlignment="Stretch"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                              ItemsSource="{Binding Integration.Setup.RecipeCatalogItems}"
                                              SelectedItem="{Binding Integration.Setup.SelectedRecipe, Mode=TwoWay}"
                                              AutomationProperties.AutomationId="MmiRecipeList"
-                                             AutomationProperties.Name="{loc:Loc Key=Integration.MmiRecipeManager}">
+                                             AutomationProperties.Name="{loc:Loc Key=Integration.InspectionRecipeManager}">
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
                                                 <Grid Margin="2,3">
@@ -2163,7 +1984,7 @@
                                         <Button x:Name="AddMmiRecipeButton"
                                                 Command="{Binding Integration.Setup.AddRecipeCommand}"
                                                 Content="{loc:Loc Key=Integration.MmiRecipeAdd}"
-                                                ToolTip="{loc:Loc Key=Integration.MmiRecipeAddTooltip}"
+                                                ToolTip="{loc:Loc Key=Integration.InspectionRecipeAddTooltip}"
                                                 AutomationProperties.AutomationId="AddMmiRecipeButton"
                                                 AutomationProperties.Name="{loc:Loc Key=Integration.MmiRecipeAdd}" />
                                         <Button x:Name="RemoveMmiRecipeButton"
@@ -2171,7 +1992,7 @@
                                                 Command="{Binding Integration.Setup.RemoveRecipeCommand}"
                                                 CommandParameter="{Binding Integration.Setup.SelectedRecipe}"
                                                 Content="{loc:Loc Key=Integration.MmiRecipeRemove}"
-                                                ToolTip="{loc:Loc Key=Integration.MmiRecipeRemoveTooltip}"
+                                                ToolTip="{loc:Loc Key=Integration.InspectionRecipeRemoveTooltip}"
                                                 AutomationProperties.AutomationId="RemoveMmiRecipeButton"
                                                 AutomationProperties.Name="{loc:Loc Key=Integration.MmiRecipeRemove}" />
                                     </Grid>
@@ -2660,247 +2481,18 @@
                                         Command="{Binding Integration.Setup.ResetSetupCommand}"
                                         Content="{loc:Loc Key=Integration.ResetSetup}"
                                         ToolTip="{loc:Loc Key=Integration.ResetSetupTooltip}"
-                                        AutomationProperties.AutomationId="ResetIntegrationSetupButton"
-                                        AutomationProperties.Name="{loc:Loc Key=Integration.ResetSetup}" />
+                                         AutomationProperties.AutomationId="ResetIntegrationSetupButton"
+                                         AutomationProperties.Name="{loc:Loc Key=Integration.ResetSetup}" />
                             </Grid>
-                            <Grid Margin="0,9,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="7" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Button x:Name="PublishTwoDImageHandoffButton"
-                                        Command="{Binding Integration.PublishTwoDImageHandoffCommand}"
-                                        IsEnabled="{Binding Integration.CanPublishTwoDImageHandoff}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
-                                        Content="{loc:Loc Key=Integration.PublishTwoDShort}"
-                                        ToolTip="{loc:Loc Key=Integration.PublishTwoDTooltip}"
-                                        AutomationProperties.AutomationId="PublishTwoDImageHandoffButton"
-                                        AutomationProperties.Name="{loc:Loc Key=Integration.PublishTwoD}" />
-                                <Button x:Name="RefreshIntegrationResultsButton"
-                                        Grid.Column="2"
-                                        Command="{Binding Integration.RefreshResultsCommand}"
-                                        IsEnabled="{Binding Integration.CanRefreshResults}"
-                                        Content="{loc:Loc Key=Integration.RefreshResults}"
-                                        ToolTip="{loc:Loc Key=Integration.RefreshResultsTooltip}"
-                                        AutomationProperties.AutomationId="RefreshIntegrationResultsButton"
-                                         AutomationProperties.Name="{loc:Loc Key=Integration.RefreshResults}" />
-                            </Grid>
-                            <Button x:Name="ApplyIntegrationResultToSimulationButton"
-                                    Margin="0,7,0,0"
-                                    Height="48"
-                                    HorizontalContentAlignment="Stretch"
-                                    VerticalContentAlignment="Center"
-                                    Command="{Binding Integration.ApplyResultToSimulationCommand}"
-                                    IsEnabled="{Binding Integration.CanApplyResultToSimulation}"
+                            <Button x:Name="PublishTwoDImageHandoffButton"
+                                    Margin="0,9,0,0"
+                                    Command="{Binding Integration.PublishTwoDImageHandoffCommand}"
+                                    IsEnabled="{Binding Integration.CanPublishTwoDImageHandoff}"
                                     Style="{StaticResource PrimaryCommandButtonStyle}"
-                                    ToolTip="{loc:Loc Key=Integration.ApplyResultToSimulationTooltip}"
-                                    AutomationProperties.AutomationId="ApplyIntegrationResultToSimulationButton"
-                                    AutomationProperties.Name="{loc:Loc Key=Integration.ApplyResultToSimulation}">
-                                <TextBlock HorizontalAlignment="Stretch"
-                                           Text="{loc:Loc Key=Integration.ApplyResultToSimulation}"
-                                           TextAlignment="Center"
-                                           TextWrapping="Wrap" />
-                            </Button>
-                            <Grid Margin="0,10,0,0">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="8" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                           Text="{loc:Loc Key=Integration.HandoffStatus}" />
-                                <TextBlock Grid.Column="2"
-                                           Text="{Binding Integration.HandoffStatusText}"
-                                           TextWrapping="Wrap"
-                                           ToolTip="{Binding Integration.HandoffStatusText}" />
-                                <TextBlock Grid.Row="1"
-                                           Margin="0,5,0,0"
-                                           Foreground="{DynamicResource Text.Secondary}"
-                                           Text="{loc:Loc Key=Integration.AcknowledgementStatus}" />
-                                <TextBlock Grid.Row="1"
-                                           Grid.Column="2"
-                                           Margin="0,5,0,0"
-                                           Text="{Binding Integration.AcknowledgementStatusText}"
-                                           TextWrapping="Wrap"
-                                           ToolTip="{Binding Integration.AcknowledgementStatusText}" />
-                                <TextBlock Grid.Row="2"
-                                           Margin="0,5,0,0"
-                                           Foreground="{DynamicResource Text.Secondary}"
-                                           Text="{loc:Loc Key=Integration.ResultStatus}" />
-                                <TextBlock x:Name="MachineIntegrationResultStatusTextBlock"
-                                           Grid.Row="2"
-                                           Grid.Column="2"
-                                           Margin="0,5,0,0"
-                                           Text="{Binding Integration.ResultStatusText}"
-                                           TextWrapping="Wrap"
-                                           ToolTip="{Binding Integration.ResultStatusText}" />
-                                <TextBlock Grid.Row="3"
-                                           Margin="0,5,0,0"
-                                           Foreground="{DynamicResource Text.Secondary}"
-                                           Text="{loc:Loc Key=Integration.ProjectionStatus}" />
-                                <TextBlock Grid.Row="3"
-                                           Grid.Column="2"
-                                           Margin="0,5,0,0"
-                                           Text="{Binding Integration.ProjectionStatusText}"
-                                           TextWrapping="Wrap"
-                                           ToolTip="{Binding Integration.ProjectionStatusText}" />
-                                <TextBlock Grid.Row="4"
-                                           Margin="0,5,0,0"
-                                           Foreground="{DynamicResource Text.Secondary}"
-                                           Text="{loc:Loc Key=Integration.LastTransaction}" />
-                                <TextBlock Grid.Row="4"
-                                           Grid.Column="2"
-                                           Margin="0,5,0,0"
-                                           FontFamily="{StaticResource Typography.Telemetry}"
-                                           FontSize="9.5"
-                                           Text="{Binding Integration.LastTransactionText}"
-                                           TextWrapping="Wrap"
-                                           ToolTip="{Binding Integration.LastTransactionText}" />
-                            </Grid>
-                            <TextBlock Margin="0,9,0,0"
-                                       FontSize="10"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{loc:Loc Key=Integration.ThreeDReadOnlyHint}"
-                                       TextWrapping="Wrap" />
-                            <TextBlock x:Name="MachineIntegrationStatusTextBlock"
-                                       Margin="0,7,0,0"
-                                       Text="{Binding Integration.StatusText}"
-                                       TextWrapping="Wrap"
-                                       ToolTip="{Binding Integration.StatusText}" />
-                            <Expander x:Name="MachineIntegrationTransactionHistoryExpander"
-                                      Margin="0,7,0,0"
-                                      Header="{loc:Loc Key=Integration.TransactionHistory}"
-                                      IsExpanded="False"
-                                      AutomationProperties.AutomationId="MachineIntegrationTransactionHistoryExpander"
-                                      AutomationProperties.Name="{loc:Loc Key=Integration.TransactionHistory}">
-                                <StackPanel Margin="0,5,0,0">
-                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Integration.TransactionHistoryHint}"
-                                               TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,5,0,0"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Integration.TransactionHistoryFilterHint}"
-                                               TextWrapping="Wrap" />
-                                    <StackPanel Margin="0,5,0,0"
-                                                Orientation="Horizontal">
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Text="{loc:Loc Key=Integration.TransactionHistoryFilter}" />
-                                        <ComboBox x:Name="MachineIntegrationTransactionHistoryFilter"
-                                                  Margin="7,0,0,0"
-                                                  MinWidth="150"
-                                                  ItemsSource="{Binding Integration.TransactionHistoryFilters}"
-                                                  DisplayMemberPath="DisplayText"
-                                                  SelectedItem="{Binding Integration.SelectedTransactionHistoryFilter, Mode=TwoWay}"
-                                                  AutomationProperties.AutomationId="MachineIntegrationTransactionHistoryFilter"
-                                                  AutomationProperties.Name="{loc:Loc Key=Integration.TransactionHistoryFilter}" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="MachineIntegrationTransactionHistoryEmptyText"
-                                               Margin="0,5,0,0"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{Binding Integration.TransactionHistoryEmptyText}"
-                                               TextWrapping="Wrap"
-                                               Visibility="{Binding Integration.HasTransactionHistoryEmptyState, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                    <ListBox x:Name="MachineIntegrationTransactionHistoryList"
-                                             Margin="0,5,0,0"
-                                             MaxHeight="180"
-                                             ItemsSource="{Binding Integration.VisibleTransactionHistoryRows}"
-                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                             AutomationProperties.AutomationId="MachineIntegrationTransactionHistoryList"
-                                             AutomationProperties.Name="{loc:Loc Key=Integration.TransactionHistory}">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <StackPanel Margin="3,3">
-                                                    <TextBlock FontWeight="SemiBold"
-                                                               Text="{Binding ShortTransactionId}"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               ToolTip="{Binding FullTransactionId}" />
-                                                    <TextBlock Style="{StaticResource TelemetryTextStyle}"
-                                                               Text="{Binding Handoff.CreatedAtUtc}" />
-                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                               Text="{Binding Handoff.Context.Modality}" />
-                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                               Text="{Binding Handoff.Context.InputKind}" />
-                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                               Text="{Binding StatusText}"
-                                                               TextWrapping="Wrap"
-                                                               ToolTip="{Binding StatusText}" />
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
-                                </StackPanel>
-                            </Expander>
-                            <Expander x:Name="MachineIntegrationTransactionDiagnosticsExpander"
-                                      Margin="0,7,0,0"
-                                      Header="{loc:Loc Key=Integration.TransactionDiagnostics}"
-                                      IsExpanded="False"
-                                      AutomationProperties.AutomationId="MachineIntegrationTransactionDiagnosticsExpander"
-                                      AutomationProperties.Name="{loc:Loc Key=Integration.TransactionDiagnostics}">
-                                <StackPanel Margin="0,5,0,0">
-                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Integration.TransactionDiagnosticsFilterHint}"
-                                               TextWrapping="Wrap" />
-                                    <StackPanel Margin="0,5,0,0"
-                                                Orientation="Horizontal">
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Text="{loc:Loc Key=Integration.TransactionDiagnosticsFilter}" />
-                                        <ComboBox x:Name="MachineIntegrationTransactionDiagnosticsFilter"
-                                                  Margin="7,0,0,0"
-                                                  MinWidth="150"
-                                                  ItemsSource="{Binding Integration.TransactionDiagnosticFilters}"
-                                                  DisplayMemberPath="DisplayText"
-                                                  SelectedItem="{Binding Integration.SelectedTransactionDiagnosticFilter, Mode=TwoWay}"
-                                                  AutomationProperties.AutomationId="MachineIntegrationTransactionDiagnosticsFilter"
-                                                  AutomationProperties.Name="{loc:Loc Key=Integration.TransactionDiagnosticsFilter}" />
-                                    </StackPanel>
-                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{Binding Integration.TransactionDiagnosticReadError}"
-                                               TextWrapping="Wrap" />
-                                    <TextBlock x:Name="MachineIntegrationTransactionDiagnosticsEmptyText"
-                                               Margin="0,5,0,0"
-                                               Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{Binding Integration.TransactionDiagnosticsEmptyText}"
-                                               TextWrapping="Wrap"
-                                               Visibility="{Binding Integration.HasTransactionDiagnosticsEmptyState, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                    <ListBox x:Name="MachineIntegrationTransactionDiagnosticsList"
-                                             Margin="0,5,0,0"
-                                             MaxHeight="180"
-                                             ItemsSource="{Binding Integration.VisibleTransactionDiagnostics}"
-                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                             AutomationProperties.AutomationId="MachineIntegrationTransactionDiagnosticsList"
-                                             AutomationProperties.Name="{loc:Loc Key=Integration.TransactionDiagnostics}">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <StackPanel Margin="3,3">
-                                                    <TextBlock FontWeight="SemiBold"
-                                                               Text="{Binding State}" />
-                                                    <TextBlock Style="{StaticResource TelemetryTextStyle}"
-                                                               Text="{Binding TransactionId}"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               ToolTip="{Binding TransactionId}" />
-                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                               Text="{Binding Detail}"
-                                                               TextWrapping="Wrap" />
-                                                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                                               Text="{Binding DirectoryPath}"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               ToolTip="{Binding DirectoryPath}" />
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
-                                </StackPanel>
-                            </Expander>
+                                    Content="{loc:Loc Key=Integration.PublishTwoDShort}"
+                                    ToolTip="{loc:Loc Key=Integration.PublishTwoDTooltip}"
+                                    AutomationProperties.AutomationId="PublishTwoDImageHandoffButton"
+                                    AutomationProperties.Name="{loc:Loc Key=Integration.PublishTwoD}" />
                         </StackPanel>
                     </Border>
                     <Border>

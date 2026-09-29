@@ -67,14 +67,18 @@ internal static class MachineIntegrationExeSmokeCameraScenario
             () => GetCurrentCamera(viewModel)?.State is
                 VirtualCameraState.Exposing
                 or VirtualCameraState.Transferring
+                or VirtualCameraState.AwaitingExternalResult
                 or VirtualCameraState.FrameReady,
             TimeSpan.FromSeconds(30),
             "Machine camera did not accept the trigger.");
 
+        var expectedState = viewModel.Integration.Setup.WaitForExternalResult
+            ? VirtualCameraState.AwaitingExternalResult
+            : VirtualCameraState.FrameReady;
         await WaitForAsync(
             () =>
             {
-                if (GetCurrentCamera(viewModel)?.State == VirtualCameraState.FrameReady)
+                if (GetCurrentCamera(viewModel)?.State == expectedState)
                 {
                     return true;
                 }
@@ -87,7 +91,7 @@ internal static class MachineIntegrationExeSmokeCameraScenario
                 return false;
             },
             TimeSpan.FromSeconds(30),
-            "Machine camera did not reach FrameReady after deterministic steps.");
+            $"Machine camera did not reach {expectedState} after deterministic steps.");
     }
 
     public static VirtualCameraSnapshot? GetCurrentCamera(MainViewModel viewModel)

@@ -21,4 +21,8 @@ public sealed class WorkpieceDefinition
 
     [JsonPropertyName("inspectionState")]
     public WorkpieceInspectionState InspectionState { get; set; } = WorkpieceInspectionState.Pending;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("initiallyPresent")]
+    public bool? InitiallyPresent { get; set; }
 }

@@ -122,6 +122,53 @@ public sealed class MachineIntegrationTcpFailureRecoveryTests
     }
 
     [Fact]
+    public async Task DifferentPayloadForExistingTransaction_IsRejectedWithoutOverwritingPublishedBytes()
+    {
+        using var fixture = new TcpFixture();
+        var transactionId = fixture.CreatePublishedTransaction();
+        await using var receiver = new MachineIntegrationTcpExchange(
+            fixture.RemoteRoot,
+            fixture.SharedKey);
+        var endpoint = await receiver.StartListeningAsync(IPAddress.Loopback, 0);
+        await using var sender = new MachineIntegrationTcpExchange(
+            fixture.SourceRoot,
+            fixture.SharedKey);
+
+        await sender.PushTransactionAsync(ToEndpoint(endpoint), transactionId);
+
+        var relativeArtifactPath = Path.Combine(
+            IntegrationTransactionLayout.ArtifactsDirectoryName,
+            "inspection.png");
+        var sourceArtifactPath = Path.Combine(
+            fixture.SourceRoot,
+            IntegrationTransactionLayout.TransactionsDirectoryName,
+            transactionId.ToString("D"),
+            relativeArtifactPath);
+        var remoteArtifactPath = Path.Combine(
+            fixture.RemoteRoot,
+            IntegrationTransactionLayout.TransactionsDirectoryName,
+            transactionId.ToString("D"),
+            relativeArtifactPath);
+        var publishedBytes = await File.ReadAllBytesAsync(remoteArtifactPath);
+        var changedBytes = publishedBytes.ToArray();
+        changedBytes[^1] ^= 0x01;
+        await File.WriteAllBytesAsync(sourceArtifactPath, changedBytes);
+
+        var exception = await Assert.ThrowsAsync<TcpIntegrationTransportException>(() =>
+            sender.PushTransactionAsync(ToEndpoint(endpoint), transactionId));
+
+        Assert.Equal("immutableConflict", exception.Code);
+        Assert.Equal(publishedBytes, await File.ReadAllBytesAsync(remoteArtifactPath));
+        var transactionsRoot = Path.Combine(
+            fixture.RemoteRoot,
+            IntegrationTransactionLayout.TransactionsDirectoryName);
+        Assert.Empty(Directory.EnumerateDirectories(transactionsRoot, "*.tcp-staging"));
+        var transaction = Assert.Single(receiver.DiscoverTransactions());
+        Assert.False(transaction.HasAcknowledgement);
+        Assert.False(transaction.HasResult);
+    }
+
+    [Fact]
     public async Task StopAndStart_RestartsMachineListenerWithoutImplicitTransactionAction()
     {
         using var fixture = new TcpFixture();

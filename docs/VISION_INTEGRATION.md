@@ -16,7 +16,7 @@ Virtual Camera trigger
   -> VisionRunResult
 ```
 
-The Main Layout Run manual-acquisition path now bridges the runtime camera and
+The manual-acquisition path bridges the runtime camera and
 the project image source without performing file I/O inside the fixed-step
 engine tick:
 
@@ -127,14 +127,16 @@ judgment, and metrics through the existing ordered Event Journal path.
 
 ## Verification
 
-The current verification totals and artifact paths are maintained in
-the current release notes. The focused evidence-package
-tests prove canonical repeat equality, first context mismatch classification,
-atomic save/load, hash tamper rejection, and correlated event recording.
+Use the matching tests in `tests/OpenVisionLab.Machine.Vision.Tests`,
+`tests/OpenVisionLab.Machine.Infrastructure.Tests`, and the Camera tests in
+`tests/OpenVisionLab.MachineStudio.Tests` when changing this contract.
+Evidence-package checks cover canonical repeat equality, context mismatch
+classification, atomic save/load, hash tamper rejection and event correlation.
+These checks do not establish complete desktop UI or external peer acceptance.
 
 ## Current manual commissioning surface
 
-The existing Main Layout Run camera card exposes selected camera and authored
+The selected-camera commissioning surface exposes selected camera and authored
 recipe, immutable state, exact remaining exposure/transfer ticks, decision,
 acquisition ID, project source, and full content SHA-256. `Start manual`,
 `Pause`, `Trigger`, `Step`, and `Reset` reuse the simulation command queue and

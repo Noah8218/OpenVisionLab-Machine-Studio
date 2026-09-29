@@ -13,10 +13,12 @@ public sealed class SequenceStepEditorItem : ViewModelBase
     private readonly IReadOnlyList<SequenceStepAction> _availableActions;
     private readonly SequenceStepTemplateCatalog _templateCatalog;
     private readonly IReadOnlyList<SequenceAuthoringTarget> _authoringTargets;
+    private IReadOnlyList<SequenceAuthoringTarget> _workpieceTargets;
     private readonly IReadOnlyList<SequenceExpectedStateTarget> _expectedStateTargets;
     private readonly bool _isTerminal;
     private IReadOnlyList<SequenceCompilationError> _validationErrors = Array.Empty<SequenceCompilationError>();
     private string _validationText = "Valid";
+    private bool _isExecuting;
 
     public SequenceStepEditorItem(
         SequenceStepDefinition definition,
@@ -25,6 +27,7 @@ public sealed class SequenceStepEditorItem : ViewModelBase
         IReadOnlyList<SequenceStepAction> nonTerminalActions,
         SequenceStepTemplateCatalog templateCatalog,
         IReadOnlyList<SequenceAuthoringTarget> authoringTargets,
+        IReadOnlyList<SequenceAuthoringTarget> workpieceTargets,
         IReadOnlyList<SequenceExpectedStateTarget> expectedStateTargets)
     {
         _definition = definition ?? throw new ArgumentNullException(nameof(definition));
@@ -32,6 +35,7 @@ public sealed class SequenceStepEditorItem : ViewModelBase
         ArgumentNullException.ThrowIfNull(nonTerminalActions);
         _templateCatalog = templateCatalog ?? throw new ArgumentNullException(nameof(templateCatalog));
         _authoringTargets = authoringTargets ?? throw new ArgumentNullException(nameof(authoringTargets));
+        _workpieceTargets = workpieceTargets ?? throw new ArgumentNullException(nameof(workpieceTargets));
         _expectedStateTargets = expectedStateTargets ?? throw new ArgumentNullException(nameof(expectedStateTargets));
         Order = order;
         _isTerminal = definition.Action is SequenceStepAction.Complete or SequenceStepAction.None;
@@ -52,6 +56,19 @@ public sealed class SequenceStepEditorItem : ViewModelBase
 
     public int Order { get; }
     public string Id => _definition.Id;
+    public string TransitionSummary => Action is SequenceStepAction.Complete
+        ? OpenVisionLanguageService.T("Sequence.Complete", "완료", "Complete")
+        : string.Join("  |  ", new[]
+        {
+            FormatTransition("Sequence.Next", NextStepId),
+            FormatTransition("Sequence.Error", ErrorStepId),
+            FormatTransition("Sequence.Failure", FailureStepId)
+        }.Where(transition => transition.Length != 0));
+    public bool IsExecuting
+    {
+        get => _isExecuting;
+        internal set => SetProperty(ref _isExecuting, value);
+    }
     public string DisplayName => OpenVisionLanguageService.TUserText(
         "sequence",
         $"{_sequenceId}.step.{Id}.name",
@@ -59,10 +76,17 @@ public sealed class SequenceStepEditorItem : ViewModelBase
     public bool IsTerminal => _isTerminal;
     public IReadOnlyList<SequenceStepAction> AvailableActions => _availableActions;
     public IReadOnlyList<SequenceAuthoringTarget> AvailableTargets =>
-        _templateCatalog.GetTargets(_definition.Action, _authoringTargets);
+        _definition.Action is SequenceStepAction.FeedWorkpiece or SequenceStepAction.EjectWorkpiece
+            ? Array.Empty<SequenceAuthoringTarget>()
+            : _templateCatalog.GetTargets(_definition.Action, _authoringTargets);
+    public IReadOnlyList<SequenceAuthoringTarget> AvailableWorkpieceTargets => _workpieceTargets;
     public IReadOnlyList<string> AvailableParameterOptions =>
         _templateCatalog.GetParameterOptions(_definition.Action);
     public bool HasTargetOptions => AvailableTargets.Count != 0;
+    public bool UsesWorkpieceAsTarget => _definition.Action is
+        SequenceStepAction.FeedWorkpiece or SequenceStepAction.EjectWorkpiece;
+    public bool HasWorkpieceTargetOptions => _definition.Action is
+        SequenceStepAction.TriggerCamera or SequenceStepAction.FeedWorkpiece or SequenceStepAction.EjectWorkpiece;
     public bool UsesParameterChoices => AvailableParameterOptions.Count != 0;
     public bool IsParameterEditable => !_isTerminal;
     public bool IsTimeoutEditable => !_isTerminal;
@@ -127,6 +151,9 @@ public sealed class SequenceStepEditorItem : ViewModelBase
                 _authoringTargets);
             OnPropertyChanged();
             OnPropertyChanged(nameof(AvailableTargets));
+            OnPropertyChanged(nameof(AvailableWorkpieceTargets));
+            OnPropertyChanged(nameof(HasWorkpieceTargetOptions));
+            OnPropertyChanged(nameof(UsesWorkpieceAsTarget));
             OnPropertyChanged(nameof(AvailableParameterOptions));
             OnPropertyChanged(nameof(HasTargetOptions));
             OnPropertyChanged(nameof(UsesParameterChoices));
@@ -172,6 +199,15 @@ public sealed class SequenceStepEditorItem : ViewModelBase
     {
         get => _definition.Parameter;
         set => SetString(_definition.Parameter, value, current => _definition.Parameter = current);
+    }
+
+    public string WorkpieceComponentId
+    {
+        get => _definition.WorkpieceComponentId ?? string.Empty;
+        set => SetNullable(
+            _definition.WorkpieceComponentId,
+            value,
+            current => _definition.WorkpieceComponentId = current);
     }
 
     public int TimeoutMs
@@ -255,7 +291,20 @@ public sealed class SequenceStepEditorItem : ViewModelBase
     {
         OnPropertyChanged(nameof(DisplayName));
         OnPropertyChanged(nameof(Action));
+        OnPropertyChanged(nameof(TransitionSummary));
         OnPropertyChanged(nameof(AvailableActions));
+        _workpieceTargets = _workpieceTargets
+            .Select(target => string.IsNullOrEmpty(target.Id)
+                ? target with
+                {
+                    Name = OpenVisionLanguageService.T(
+                        "Sequence.NoWorkpieceAssociation",
+                        "작업물 연결 안 함",
+                        "No workpiece association")
+                }
+                : target)
+            .ToArray();
+        OnPropertyChanged(nameof(AvailableWorkpieceTargets));
         RefreshValidationText();
     }
 
@@ -313,17 +362,28 @@ public sealed class SequenceStepEditorItem : ViewModelBase
 
         apply(normalized);
         OnPropertyChanged(propertyName);
+        if (propertyName is nameof(NextStepId) or nameof(ErrorStepId) or nameof(FailureStepId))
+        {
+            OnPropertyChanged(nameof(TransitionSummary));
+        }
         DefinitionChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    private static string FormatTransition(string labelKey, string? targetId) =>
+        string.IsNullOrWhiteSpace(targetId)
+            ? string.Empty
+            : $"{OpenVisionLanguageService.T(labelKey)} → {targetId}";
 
     private void NotifyAllEditableFields()
     {
         OnPropertyChanged(nameof(TargetId));
         OnPropertyChanged(nameof(Parameter));
+        OnPropertyChanged(nameof(WorkpieceComponentId));
         OnPropertyChanged(nameof(TimeoutMs));
         OnPropertyChanged(nameof(NextStepId));
         OnPropertyChanged(nameof(ErrorStepId));
         OnPropertyChanged(nameof(FailureStepId));
+        OnPropertyChanged(nameof(TransitionSummary));
         OnPropertyChanged(nameof(HasExpectedState));
         OnPropertyChanged(nameof(ExpectedTargetId));
         OnPropertyChanged(nameof(ExpectedState));

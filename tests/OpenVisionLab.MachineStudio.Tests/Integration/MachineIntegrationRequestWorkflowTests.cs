@@ -18,6 +18,11 @@ public sealed class MachineIntegrationRequestWorkflowTests
         "2.0.0",
         new string('2', 40),
         IntegrationSourceState.Clean);
+    private static readonly IntegrationApplicationIdentity ThreeDConsumer = new(
+        IntegrationApplicationIds.ThreeDStudio,
+        "0.2.0-dev",
+        new string('3', 40),
+        IntegrationSourceState.Clean);
 
     [Fact]
     public async Task TryCreateBuildsEligibleTwoDRequestFromCurrentCameraContext()
@@ -50,6 +55,157 @@ public sealed class MachineIntegrationRequestWorkflowTests
         Assert.Equal(
             Path.Combine(fixture.Root, "assets", "input.raw"),
             request.InspectionSourcePath);
+    }
+
+    [Fact]
+    public async Task TryCreateAcceptsTransferredFrameAwaitingExternalResult()
+    {
+        using var fixture = new TemporaryProject();
+        byte[] content = [0x11, 0x22, 0x33];
+        await fixture.WriteAsync("assets/input.raw", content);
+        var frame = new VirtualCameraFrameEvidence(
+            "frame-1",
+            "assets/input.raw",
+            Convert.ToHexString(SHA256.HashData(content)),
+            content.LongLength,
+            3,
+            1,
+            "Mono8");
+        var context = CreateContext(fixture, frame);
+        context = context with
+        {
+            CurrentCamera = context.CurrentCamera! with
+            {
+                State = VirtualCameraState.AwaitingExternalResult,
+                Result = null
+            }
+        };
+
+        var request = new MachineIntegrationRequestWorkflow().TryCreate(
+            context,
+            fixture.RecipePath,
+            Producer,
+            Consumer);
+
+        Assert.NotNull(request);
+        Assert.Equal("acquisition-1", request!.AcquisitionId);
+        Assert.Equal(frame.FrameId, request.FrameId);
+        Assert.Equal(
+            Path.Combine(fixture.Root, "assets", "input.raw"),
+            request.InspectionSourcePath);
+    }
+
+    [Fact]
+    public async Task TryCreateUsesExpectedSequenceForAutomaticTwoDRequestWhenTriggersOverlap()
+    {
+        using var fixture = new TemporaryProject();
+        byte[] content = [0x11, 0x22, 0x33];
+        await fixture.WriteAsync("assets/input.raw", content);
+        var frame = new VirtualCameraFrameEvidence(
+            "frame-1",
+            "assets/input.raw",
+            Convert.ToHexString(SHA256.HashData(content)),
+            content.LongLength,
+            3,
+            1,
+            "Mono8");
+        var context = CreateContext(fixture, frame) with
+        {
+            Sequences =
+            [
+                new SequenceDefinition
+                {
+                    Id = "manual-sequence",
+                    Steps =
+                    [new SequenceStepDefinition
+                    {
+                        Id = "manual-inspect",
+                        Action = SequenceStepAction.TriggerCamera,
+                        TargetId = "camera-virtual",
+                        Parameter = "recipe-a"
+                    }]
+                },
+                new SequenceDefinition
+                {
+                    Id = "automatic-sequence",
+                    Steps =
+                    [new SequenceStepDefinition
+                    {
+                        Id = "automatic-inspect",
+                        Action = SequenceStepAction.TriggerCamera,
+                        TargetId = "camera-virtual",
+                        Parameter = "recipe-a"
+                    }]
+                }
+            ],
+            ExpectedSequenceId = "automatic-sequence"
+        };
+
+        var request = new MachineIntegrationRequestWorkflow().TryCreate(
+            context,
+            fixture.RecipePath,
+            Producer,
+            Consumer);
+
+        Assert.NotNull(request);
+        Assert.Equal("automatic-sequence", request!.SequenceId);
+        Assert.Equal("automatic-inspect", request.StepId);
+    }
+
+    [Fact]
+    public async Task TryCreateBuildsThreeDHeightMapRequestFromBoundSequenceAndSavedEvidence()
+    {
+        using var fixture = new TemporaryProject();
+        byte[] sourceBytes = [0x01, 0x02, 0x03, 0x04];
+        await fixture.WriteAsync("assets/input.c3d", sourceBytes);
+        string recipeJson = "{\"recipeType\":\"c3d-warpage\",\"step\":{\"frameId\":\"frame.c3d-grid-index\"}}";
+        await File.WriteAllTextAsync(fixture.ThreeDRecipePath, recipeJson);
+        var sourceEvidence = new MachineIntegrationArtifactEvidence(
+            Convert.ToHexString(SHA256.HashData(sourceBytes)),
+            sourceBytes.LongLength);
+        var recipeBytes = await File.ReadAllBytesAsync(fixture.ThreeDRecipePath);
+        var recipeEvidence = new MachineIntegrationArtifactEvidence(
+            Convert.ToHexString(SHA256.HashData(recipeBytes)),
+            recipeBytes.LongLength);
+        var frame = new VirtualCameraFrameEvidence(
+            "height-frame-1",
+            "assets/input.c3d",
+            sourceEvidence.ContentSha256,
+            sourceEvidence.ContentLength,
+            2,
+            2,
+            "C3D-HeightMap");
+        var context = CreateContext(fixture, frame) with
+        {
+            HeightMapSource = new MachineIntegrationHeightMapSourceDefinition(
+                "assets/input.c3d",
+                2,
+                2,
+                "C3D-HeightMap",
+                "mm",
+                "frame.c3d-grid-index",
+                sourceEvidence),
+            InspectionRecipeEvidence = recipeEvidence,
+            ExpectedSequenceId = "sequence-001",
+            ExpectedStepId = "inspect-1",
+            ExpectedDeviceId = "camera-virtual"
+        };
+
+        var request = new MachineIntegrationRequestWorkflow().TryCreate(
+            context,
+            fixture.ThreeDRecipePath,
+            Producer,
+            ThreeDConsumer);
+
+        Assert.NotNull(request);
+        Assert.Equal(IntegrationInspectionModality.ThreeD, request!.Modality);
+        Assert.Equal(IntegrationInspectionInputKind.HeightMap, request.InputKind);
+        Assert.Equal("mm", request.Unit);
+        Assert.Equal("frame.c3d-grid-index", request.FrameId);
+        Assert.Equal(
+            "assets/input.c3d",
+            Path.GetRelativePath(fixture.Root, request.InspectionSourcePath).Replace('\\', '/'));
+        Assert.Null(request.ProjectionProfile);
     }
 
     [Fact]
@@ -179,6 +335,8 @@ public sealed class MachineIntegrationRequestWorkflowTests
             Directory.CreateDirectory(Root);
             ProjectPath = Path.Combine(Root, "machine.ovmachine");
             RecipePath = Path.Combine(Root, "recipe.json");
+            ThreeDRecipePath = Path.Combine(Root, "recipes", "heightmap.c3d.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(ThreeDRecipePath)!);
             File.WriteAllText(RecipePath, "{}");
         }
 
@@ -187,6 +345,8 @@ public sealed class MachineIntegrationRequestWorkflowTests
         public string ProjectPath { get; }
 
         public string RecipePath { get; }
+
+        public string ThreeDRecipePath { get; }
 
         public async Task WriteAsync(string relativePath, byte[] content)
         {

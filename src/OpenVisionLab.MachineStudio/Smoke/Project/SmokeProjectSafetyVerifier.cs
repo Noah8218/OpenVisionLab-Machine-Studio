@@ -126,14 +126,29 @@ internal static class SmokeProjectSafetyVerifier
             input.ActivateWindow(window);
             fileMenu.Focus();
             await Task.Delay(50);
+            var keyboardOwnership = input.CheckPointerOwnership(window);
+            if (!keyboardOwnership.IsOwned)
+            {
+                throw new InvalidOperationException(keyboardOwnership.Diagnostic);
+            }
             input.SendKey(0x28); // Down opens the File menu through WPF keyboard handling.
             await Task.Delay(50);
+            keyboardOwnership = input.CheckPointerOwnership(window);
+            if (!keyboardOwnership.IsOwned)
+            {
+                throw new InvalidOperationException(keyboardOwnership.Diagnostic);
+            }
             input.SendKey(0x26); // Up wraps from the first item to Exit.
             await Task.Delay(50);
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             checks["keyboard-menu-focus-visible"] = fileMenu.IsKeyboardFocusWithin && exitItem.IsHighlighted;
             capture.SetPopupContent((fileMenu.Template.FindName("PART_Popup", fileMenu) as System.Windows.Controls.Primitives.Popup)?.Child as FrameworkElement);
             capture.Capture(window, reportPath + ".keyboard-focus.png");
+            keyboardOwnership = input.CheckPointerOwnership(window);
+            if (!keyboardOwnership.IsOwned)
+            {
+                throw new InvalidOperationException(keyboardOwnership.Diagnostic);
+            }
             input.SendKey(VirtualKeyReturn);
             for (var attempt = 0; attempt < 200 && (promptCount < 2 || !vm.ExitCommand.CanExecute(null)); attempt++)
             {
@@ -182,6 +197,7 @@ internal static class SmokeProjectSafetyVerifier
         Func<DependencyObject, Func<TextBlock, bool>, TextBlock?> findText,
         Func<DependencyObject, Func<Button, bool>, Button?> findButton,
         Action<Window> activateWindow,
+        Func<Window, (bool IsOwned, string Diagnostic)> checkPointerOwnership,
         Action<FrameworkElement> movePointerToCenter,
         Action<uint, uint, uint, uint, UIntPtr> mouseEvent,
         Action markSmokePointerHeld,
@@ -195,6 +211,7 @@ internal static class SmokeProjectSafetyVerifier
     {
         var checks = new Dictionary<string, bool>(StringComparer.Ordinal);
         var failures = new List<string>();
+        var monitor = captureMonitorEvidence(window);
         void Check(string name, bool passed)
         {
             checks[name] = passed;
@@ -204,6 +221,25 @@ internal static class SmokeProjectSafetyVerifier
             }
         }
 
+        async Task<(bool IsOwned, string Diagnostic)> FocusPointerOn(Window target, FrameworkElement element)
+        {
+            var deadline = Environment.TickCount64 + 2000;
+            (bool IsOwned, string Diagnostic) ownership;
+            do
+            {
+                activateWindow(target);
+                movePointerToCenter(element);
+                await Task.Delay(50);
+                await target.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                ownership = checkPointerOwnership(target);
+            }
+            while (!ownership.IsOwned && Environment.TickCount64 < deadline);
+
+            return ownership;
+        }
+
+        Check("smoke-window-contained-on-test-monitor",
+            monitor.WindowIntersectsMonitor && monitor.WindowContainedByMonitor);
         vm.IsDesignMode = true;
         var fullSavePath = Path.GetFullPath(savePath!);
         Directory.CreateDirectory(Path.GetDirectoryName(fullSavePath)!);
@@ -372,35 +408,44 @@ internal static class SmokeProjectSafetyVerifier
                 okButton is { IsVisible: true, IsEnabled: true, IsDefault: true });
             if (okButton is not null)
             {
-                activateWindow(dialog);
-                for (var attempt = 0; attempt < 10 && !dialog.IsActive; attempt++)
-                {
-                    await Task.Delay(25);
-                    activateWindow(dialog);
-                }
                 okButton.Focus();
-                movePointerToCenter(okButton);
-                await Task.Delay(100);
-                await dialog.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                Check("open-failure-dialog-ok-hover", okButton.IsMouseOver);
-                mouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
-                markSmokePointerHeld();
-                await Task.Delay(150);
-                await dialog.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                Check("open-failure-dialog-ok-pointer-down", okButton.IsPressed);
+                var pointerOwnership = await FocusPointerOn(dialog, okButton);
+                Console.WriteLine($"Open-failure dialog pointer: {pointerOwnership.Diagnostic}");
+                Check("open-failure-dialog-pointer-owned", pointerOwnership.IsOwned);
+                Check("open-failure-dialog-ok-hover", pointerOwnership.IsOwned && okButton.IsMouseOver);
+                if (pointerOwnership.IsOwned)
+                {
+                    mouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
+                    markSmokePointerHeld();
+                    await Task.Delay(150);
+                    await dialog.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                    Check("open-failure-dialog-ok-pointer-down", okButton.IsPressed);
+                }
+                else
+                {
+                    Check("open-failure-dialog-ok-pointer-down", false);
+                }
                 captureWindow(dialog, projectOpenFailureDialogScreenshotPath);
                 dialog.Close();
-                var releasePoint = window.PointToScreen(new Point(
-                    Math.Max(8, window.ActualWidth / 2),
-                    Math.Max(8, window.ActualHeight - 8)));
-                setCursorPosition(
-                    (int)Math.Round(releasePoint.X),
-                    (int)Math.Round(releasePoint.Y));
-                synchronizeMouse();
-                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                releaseSmokePointer();
-                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                Check("open-failure-dialog-ok-pointer-release", !okButton.IsPressed);
+                if (pointerOwnership.IsOwned)
+                {
+                    var releasePoint = window.PointToScreen(new Point(
+                        Math.Max(8, window.ActualWidth / 2),
+                        Math.Max(8, window.ActualHeight - 8)));
+                    setCursorPosition(
+                        (int)Math.Round(releasePoint.X),
+                        (int)Math.Round(releasePoint.Y));
+                    synchronizeMouse();
+                    await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                    releaseSmokePointer();
+                    await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                    Check("open-failure-dialog-ok-pointer-release", !okButton.IsPressed);
+                }
+                else
+                {
+                    Check("open-failure-dialog-ok-pointer-release", false);
+                    releaseSmokePointer();
+                }
             }
 
             if (dialog.IsVisible)
@@ -408,7 +453,7 @@ internal static class SmokeProjectSafetyVerifier
                 dialog.Close();
             }
 
-            (bool InputSent, bool TargetFound, bool? DialogResult, WpfMessageDialogResult Result)
+            (bool InputSent, bool TargetFound, bool WindowOwned, bool? DialogResult, WpfMessageDialogResult Result)
                 ExerciseModalKey(byte virtualKey, bool focusDefaultButton)
             {
                 var modalDialog = new WpfMessageDialogWindow(openFailureOptions)
@@ -418,6 +463,7 @@ internal static class SmokeProjectSafetyVerifier
                 };
                 var inputSent = false;
                 var targetFound = !focusDefaultButton;
+                var windowOwned = false;
                 var timeout = new DispatcherTimer
                 {
                     Interval = TimeSpan.FromSeconds(3)
@@ -430,55 +476,74 @@ internal static class SmokeProjectSafetyVerifier
                         modalDialog.Close();
                     }
                 };
-                modalDialog.ContentRendered += (_, _) =>
+                modalDialog.ContentRendered += async (_, _) =>
                 {
-                    modalDialog.Dispatcher.BeginInvoke(
-                        DispatcherPriority.ApplicationIdle,
-                        () =>
+                    try
+                    {
+                        applyDpi(
+                            modalDialog,
+                            dpiScalePercent,
+                            (int)Math.Ceiling(modalDialog.ActualWidth),
+                            (int)Math.Ceiling(modalDialog.ActualHeight));
+                        Button? targetButton = null;
+                        if (focusDefaultButton)
                         {
-                            applyDpi(
+                            targetButton = findButton(
                                 modalDialog,
-                                dpiScalePercent,
-                                (int)Math.Ceiling(modalDialog.ActualWidth),
-                                (int)Math.Ceiling(modalDialog.ActualHeight));
-                            activateWindow(modalDialog);
-                            if (focusDefaultButton)
+                                button => button.IsDefault && button.IsVisible && button.IsEnabled);
+                            targetFound = targetButton?.Focus() == true;
+                            if (targetButton is not null)
                             {
-                                var defaultButton = findButton(
-                                    modalDialog,
-                                    button => button.IsDefault && button.IsVisible && button.IsEnabled);
-                                targetFound = defaultButton?.Focus() == true;
-                                if (defaultButton is not null)
-                                {
-                                    Keyboard.Focus(defaultButton);
-                                }
+                                Keyboard.Focus(targetButton);
                             }
+                        }
 
-                            modalDialog.Dispatcher.BeginInvoke(
-                                DispatcherPriority.ApplicationIdle,
-                                () =>
-                                {
-                                    activateWindow(modalDialog);
-                                    inputSent = true;
-                                    sendKey(virtualKey);
-                                });
-                        });
+                        if (focusDefaultButton && !targetFound)
+                        {
+                            modalDialog.Close();
+                            return;
+                        }
+
+                        FrameworkElement pointerTarget = targetButton is null ? modalDialog : targetButton;
+                        var ownership = await FocusPointerOn(modalDialog, pointerTarget);
+                        windowOwned = ownership.IsOwned;
+                        if (windowOwned && modalDialog.IsVisible)
+                        {
+                            sendKey(virtualKey);
+                            inputSent = true;
+                        }
+                        else if (modalDialog.IsVisible)
+                        {
+                            Console.WriteLine($"Modal key input skipped: {ownership.Diagnostic}");
+                            modalDialog.Close();
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        Console.WriteLine($"Modal key smoke failed safely: {exception.Message}");
+                        if (modalDialog.IsVisible)
+                        {
+                            modalDialog.Close();
+                        }
+                    }
                 };
                 timeout.Start();
                 var modalResult = modalDialog.ShowDialog();
                 timeout.Stop();
-                return (inputSent, targetFound, modalResult, modalDialog.Result);
+                return (inputSent, targetFound, windowOwned, modalResult, modalDialog.Result);
             }
 
             var enterResult = ExerciseModalKey(VirtualKeyReturn, focusDefaultButton: true);
             Check("open-failure-dialog-enter-acknowledges",
                 enterResult.InputSent
                 && enterResult.TargetFound
+                && enterResult.WindowOwned
                 && enterResult.DialogResult == true
                 && enterResult.Result == WpfMessageDialogResult.OK);
             var escapeResult = ExerciseModalKey(VirtualKeyEscape, focusDefaultButton: false);
             Check("open-failure-dialog-escape-dismisses",
                 escapeResult.InputSent
+                && escapeResult.WindowOwned
                 && escapeResult.DialogResult == true
                 && escapeResult.Result == WpfMessageDialogResult.Cancel);
         }
@@ -502,7 +567,6 @@ internal static class SmokeProjectSafetyVerifier
                 if (DateTime.UtcNow >= defaultPresenterDeadline)
                 {
                     defaultPresenterTimer.Stop();
-                    sendKey(VirtualKeyEscape);
                 }
                 return;
             }
@@ -565,16 +629,26 @@ internal static class SmokeProjectSafetyVerifier
             Check("dialog-save-button-visible", saveButton is { IsVisible: true });
             if (saveButton is not null)
             {
-                activateWindow(dialog);
                 saveButton.Focus();
-                movePointerToCenter(saveButton);
-                await dialog.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                mouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
-                markSmokePointerHeld();
-                await dialog.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                Check("dialog-save-button-pointer-down", saveButton.IsPressed);
+                var pointerOwnership = await FocusPointerOn(dialog, saveButton);
+                Console.WriteLine($"Unsaved-project dialog pointer: {pointerOwnership.Diagnostic}");
+                Check("unsaved-project-dialog-pointer-owned", pointerOwnership.IsOwned);
+                if (pointerOwnership.IsOwned)
+                {
+                    mouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
+                    markSmokePointerHeld();
+                    await dialog.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                    Check("dialog-save-button-pointer-down", saveButton.IsPressed);
+                }
+                else
+                {
+                    Check("dialog-save-button-pointer-down", false);
+                }
                 captureWindow(dialog, unsavedDialogScreenshotPath);
-                releaseSmokePointer();
+                if (pointerOwnership.IsOwned)
+                {
+                    releaseSmokePointer();
+                }
             }
 
             if (dialog.IsVisible)
@@ -587,7 +661,8 @@ internal static class SmokeProjectSafetyVerifier
         return new SmokeProjectSafetyReport
         {
             Checks = checks,
-            Failures = failures
+            Failures = failures,
+            Monitor = monitor
         };
 
     }

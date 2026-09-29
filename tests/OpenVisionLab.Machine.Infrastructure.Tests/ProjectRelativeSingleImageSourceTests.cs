@@ -52,6 +52,31 @@ public sealed class ProjectRelativeSingleImageSourceTests
     }
 
     [Fact]
+    public async Task MatchesContentHash_RechecksCurrentProjectAsset()
+    {
+        using var project = new TemporaryProject();
+        var original = new byte[] { 0x01, 0x02, 0x03 };
+        await project.WriteAsync("input.raw", original);
+        var source = new ProjectRelativeSingleImageSource(project.Root, "input.raw", 3, 1, "Mono8");
+        var expectedHash = Convert.ToHexString(SHA256.HashData(original));
+
+        Assert.True(source.MatchesContentHash(expectedHash));
+
+        await project.WriteAsync("input.raw", [0x01, 0x02, 0x04]);
+
+        Assert.False(source.MatchesContentHash(expectedHash));
+    }
+
+    [Fact]
+    public void MatchesContentHash_WhenFileIsMissing_PropagatesSourceFailure()
+    {
+        using var project = new TemporaryProject();
+        var source = new ProjectRelativeSingleImageSource(project.Root, "input.raw", 1, 1, "Mono8");
+
+        Assert.Throws<FileNotFoundException>(() => source.MatchesContentHash(new string('A', 64)));
+    }
+
+    [Fact]
     public async Task AcquireAsync_PreservesTheExactAcquisitionContext()
     {
         using var project = new TemporaryProject();

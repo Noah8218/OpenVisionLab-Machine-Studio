@@ -47,6 +47,21 @@
              Link="Samples\AutomaticTransferCell.ovmachine">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\..\samples\WaferEFEMVisionCell\WaferEFEMVisionCell.ovmachine"
+             Link="Samples\WaferEFEMVisionCell.ovmachine">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\samples\R19InspectionFlow\R19InspectionFlow.ovmachine"
+             Link="Samples\R19InspectionFlow.ovmachine">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\samples\LargeLayoutExploration\LargeLayoutExploration.ovmachine"
+             Link="Samples\LargeLayoutExploration.ovmachine">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
     <Content Include="..\..\samples\SemiconductorRecipes\*.ovmachine"
              Link="Samples\SemiconductorRecipes\%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

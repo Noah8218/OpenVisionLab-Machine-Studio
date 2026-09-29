@@ -43,6 +43,21 @@ public sealed class MachineIntegrationPathReadinessPolicyTests
     }
 
     [Fact]
+    public void C3dRecipeIsNotEligibleForTwoDHandOff()
+    {
+        using var fixture = new TestRoot();
+        Directory.CreateDirectory(fixture.ExchangeRoot);
+        File.WriteAllText(fixture.RecipePath, "{\"recipeType\":\"c3d-thickness\"}");
+        var policy = new MachineIntegrationPathReadinessPolicy();
+
+        var readiness = policy.Evaluate(fixture.ExchangeRoot, fixture.RecipePath);
+
+        Assert.True(readiness.IsInspectionRecipeAvailable);
+        Assert.False(readiness.IsInspectionRecipeSupportedByTwoD);
+        Assert.False(readiness.CanPublishHandoff);
+    }
+
+    [Fact]
     public void NormalizeFullPathPreservesEmptyInputAsEmpty()
     {
         using var fixture = new TestRoot();

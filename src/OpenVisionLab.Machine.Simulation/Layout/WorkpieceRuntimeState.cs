@@ -6,11 +6,14 @@ internal sealed class WorkpieceRuntimeState : LayoutComponentRuntimeState
         : base(configuration)
     {
         WorkpieceConfiguration = configuration;
+        IsPresent = configuration.InitiallyPresent;
     }
 
     public WorkpieceRuntimeConfiguration WorkpieceConfiguration { get; }
+    public bool IsPresent { get; private set; }
     public double CarrierPosition { get; private set; }
     public string? TransferOwnerId { get; private set; }
+    public string? WorkpieceInstanceId { get; private set; }
     public WaferHandlerOwnershipState? TransferOwnershipState { get; private set; }
     private bool IsOnAuthoredCarrier =>
         TransferOwnershipState is null
@@ -19,7 +22,7 @@ internal sealed class WorkpieceRuntimeState : LayoutComponentRuntimeState
 
     public void Tick(ConveyorRuntimeState conveyor)
     {
-        if (!IsOnAuthoredCarrier)
+        if (!IsPresent || !IsOnAuthoredCarrier)
         {
             return;
         }
@@ -80,9 +83,54 @@ internal sealed class WorkpieceRuntimeState : LayoutComponentRuntimeState
         TransferOwnershipState = ownershipState;
     }
 
+    public void AssignWorkpieceInstanceId(string workpieceInstanceId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(workpieceInstanceId);
+        if (!IsPresent)
+        {
+            throw new InvalidOperationException($"Workpiece '{Configuration.Id}' is not present.");
+        }
+        if (WorkpieceInstanceId is not null)
+        {
+            throw new InvalidOperationException(
+                $"Workpiece '{Configuration.Id}' already has instance id '{WorkpieceInstanceId}'.");
+        }
+
+        WorkpieceInstanceId = workpieceInstanceId;
+    }
+
+    public bool TryFeed(string workpieceInstanceId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(workpieceInstanceId);
+        if (IsPresent || TransferOwnerId is not null || WorkpieceInstanceId is not null)
+        {
+            return false;
+        }
+
+        base.Reset();
+        IsPresent = true;
+        TransferOwnershipState = null;
+        WorkpieceInstanceId = workpieceInstanceId;
+        return true;
+    }
+
+    public bool TryEject()
+    {
+        if (!IsPresent || TransferOwnerId is not null)
+        {
+            return false;
+        }
+
+        IsPresent = false;
+        WorkpieceInstanceId = null;
+        return true;
+    }
+
     public override void Reset()
     {
         base.Reset();
+        IsPresent = WorkpieceConfiguration.InitiallyPresent;
+        WorkpieceInstanceId = null;
         TransferOwnershipState = TransferOwnerId is null
             ? null
             : WaferHandlerOwnershipState.Source;
@@ -109,5 +157,7 @@ internal sealed class WorkpieceRuntimeState : LayoutComponentRuntimeState
             WorkpieceType: WorkpieceConfiguration.Type,
             InspectionState: WorkpieceConfiguration.InspectionState,
             TransferOwnerId: TransferOwnerId,
-            TransferOwnershipState: TransferOwnershipState);
+            TransferOwnershipState: TransferOwnershipState,
+            WorkpieceInstanceId: WorkpieceInstanceId,
+            IsWorkpiecePresent: IsPresent);
 }

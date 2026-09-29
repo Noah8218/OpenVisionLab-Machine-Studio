@@ -1,11 +1,14 @@
 using System;
+using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using OpenVisionLab;
+using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.MachineStudio.View.Shell;
 using OpenVisionLab.MachineStudio.ViewModel;
 using static OpenVisionLab.MachineStudio.SmokeVisualTreeQuery;
@@ -20,7 +23,9 @@ internal static class SmokeGlobalCommandStateVerifier
         ShellWindow window,
         MainViewModel viewModel,
         string state,
-        SmokeUiInteraction uiInteraction)
+        SmokeUiInteraction uiInteraction,
+        SmokeWindowCapture? windowCapture = null,
+        string? screenshotPath = null)
     {
         if (state.Equals("abort", StringComparison.OrdinalIgnoreCase))
         {
@@ -215,6 +220,19 @@ internal static class SmokeGlobalCommandStateVerifier
             return;
         }
 
+        var topCommandState = state.ToLowerInvariant();
+        if (topCommandState is "undo-pressed" or "redo-pressed" or "save-pressed")
+        {
+            await ApplyTopCommandPressedAsync(
+                window,
+                viewModel,
+                topCommandState,
+                uiInteraction,
+                windowCapture ?? throw new InvalidOperationException("Top-command state requires the window capture owner."),
+                screenshotPath);
+            return;
+        }
+
         var expectedName = OpenVisionLanguageService.T("Shell.SimulationOn");
         var button = FindVisualDescendant<Button>(
             window,
@@ -268,5 +286,92 @@ internal static class SmokeGlobalCommandStateVerifier
             throw new InvalidOperationException("Simulation ON command did not enter the pointer-down state.");
         }
         Console.WriteLine($"Global command visual state applied: {state}");
+    }
+
+    private static async Task ApplyTopCommandPressedAsync(
+        ShellWindow window,
+        MainViewModel viewModel,
+        string state,
+        SmokeUiInteraction uiInteraction,
+        SmokeWindowCapture windowCapture,
+        string? screenshotPath)
+    {
+        if (string.IsNullOrWhiteSpace(screenshotPath))
+        {
+            throw new ArgumentException("--smoke-command-state-screenshot is required for top-command pressed states.");
+        }
+
+        var buttonName = state switch
+        {
+            "undo-pressed" => "TopUndoButton",
+            "redo-pressed" => "TopRedoButton",
+            _ => "TopSaveButton"
+        };
+        if (state == "undo-pressed" && !viewModel.UndoLayoutEditCommand.CanExecute(null))
+        {
+            if (!viewModel.TryAddLayoutComponent(LayoutComponentKind.DigitalSensor))
+                throw new InvalidOperationException("A digital sensor fixture could not be added for Undo state.");
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        }
+        else if (state == "redo-pressed" && !viewModel.RedoLayoutEditCommand.CanExecute(null))
+        {
+            if (!viewModel.TryAddLayoutComponent(LayoutComponentKind.DigitalSensor)
+                || !viewModel.UndoLayoutEditCommand.CanExecute(null))
+                throw new InvalidOperationException("A layout history fixture could not be prepared for Redo state.");
+            viewModel.UndoLayoutEditCommand.Execute(null);
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        }
+
+        var button = FindVisualDescendant<Button>(window, candidate => candidate.Name == buttonName)
+            ?? throw new InvalidOperationException($"Top command '{buttonName}' was not available.");
+        if (!button.IsVisible || !button.IsEnabled || button.Command?.CanExecute(button.CommandParameter) != true)
+            throw new InvalidOperationException($"Top command '{buttonName}' was not enabled for its pressed-state check.");
+
+        var saveHash = state == "save-pressed"
+            ? SHA256.HashData(File.ReadAllBytes(viewModel.CurrentProjectPath
+                ?? throw new InvalidOperationException("Save pressed-state verification requires a saved smoke project.")))
+            : null;
+        try
+        {
+            await SmokeButtonPointerState.FocusAsync(
+                window,
+                button,
+                uiInteraction,
+                $"Top command '{buttonName}' did not receive keyboard focus.");
+            await SmokeButtonPointerState.HoverThenPressAsync(
+                window,
+                button,
+                uiInteraction,
+                () => $"Top command '{buttonName}' did not enter hover state.",
+                $"Top command '{buttonName}' did not enter the pointer-down state.");
+
+            windowCapture.Capture(window, screenshotPath);
+            var outsidePoint = window.PointToScreen(new Point(8, 8));
+            uiInteraction.SetCursorPosition((int)Math.Round(outsidePoint.X), (int)Math.Round(outsidePoint.Y));
+            Mouse.Capture(null);
+            Mouse.Synchronize();
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Input);
+            if (button.IsPressed)
+                throw new InvalidOperationException($"Top command '{buttonName}' stayed pressed after the pointer left it.");
+        }
+        finally
+        {
+            var outsidePoint = window.PointToScreen(new Point(8, 8));
+            uiInteraction.SetCursorPosition((int)Math.Round(outsidePoint.X), (int)Math.Round(outsidePoint.Y));
+            Mouse.Synchronize();
+            uiInteraction.ReleaseSmokePointer();
+        }
+
+        await Task.Delay(250);
+        if (button.Command?.CanExecute(button.CommandParameter) != true)
+            throw new InvalidOperationException($"Top command '{buttonName}' ran after its pressed-state capture.");
+        if (saveHash is not null)
+        {
+            var currentPath = viewModel.CurrentProjectPath!;
+            if (!SHA256.HashData(File.ReadAllBytes(currentPath)).SequenceEqual(saveHash))
+                throw new InvalidOperationException("Save executed when the smoke pointer was released outside its button.");
+        }
+
+        Console.WriteLine($"Top command pointer-down captured and released without activation: {buttonName}.");
     }
 }

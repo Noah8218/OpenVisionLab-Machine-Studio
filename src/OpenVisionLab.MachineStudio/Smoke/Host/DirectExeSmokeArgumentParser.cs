@@ -48,8 +48,10 @@ internal static class DirectExeSmokeArgumentParser
             DpiScalePercent = ParseDpiScalePercent(GetArgumentValue(args, "--smoke-dpi")),
             SmokeLanguage = GetArgumentValue(args, "--smoke-language"),
             ProjectPath = GetArgumentValue(args, "--smoke-project"),
+            EquipmentOutlineSearchText = GetArgumentValue(args, "--smoke-equipment-outline-search"),
             SelectPath = GetArgumentValue(args, "--smoke-select"),
             LayoutSelectId = GetArgumentValue(args, "--smoke-layout-select"),
+            UseTopView = HasArgument(args, "--smoke-top-view"),
             LayoutSelectMany = GetArgumentValue(args, "--smoke-layout-select-many"),
             LayoutAlignment = GetArgumentValue(args, "--smoke-layout-align"),
             LayoutAlignmentReportPath = GetArgumentValue(args, "--smoke-layout-alignment-report"),
@@ -74,6 +76,8 @@ internal static class DirectExeSmokeArgumentParser
             IntegrationPanelState = GetArgumentValue(args, "--smoke-integration-panel-state"),
             IntegrationExchangeRoot = GetArgumentValue(args, "--smoke-integration-exchange-root"),
             IntegrationPanelReportPath = GetArgumentValue(args, "--smoke-integration-panel-report"),
+            MmiOperatorState = GetArgumentValue(args, "--smoke-mmi-operator-state"),
+            MmiOperatorReportPath = GetArgumentValue(args, "--smoke-mmi-operator-report"),
             EditCameraImageSource = HasArgument(args, "--smoke-camera-source-edit"),
             AxisCommissioningReportPath = GetArgumentValue(args, "--smoke-axis-commissioning-report"),
             AxisCommissioningState = GetArgumentValue(args, "--smoke-axis-commissioning-state"),
@@ -92,6 +96,7 @@ internal static class DirectExeSmokeArgumentParser
             EditMenuState = GetArgumentValue(args, "--smoke-edit-menu-state"),
             DirectSceneGestureState = GetArgumentValue(args, "--smoke-direct-scene-gesture-state"),
             GlobalCommandState = GetArgumentValue(args, "--smoke-command-state"),
+            GlobalCommandStateScreenshotPath = GetArgumentValue(args, "--smoke-command-state-screenshot"),
             StartupChoiceState = GetArgumentValue(args, "--smoke-startup-choice-state"),
             RecipeGalleryState = GetArgumentValue(args, "--smoke-recipe-gallery-state"),
             RecipeGalleryCopyPath = GetArgumentValue(args, "--smoke-recipe-gallery-copy"),
@@ -114,12 +119,19 @@ internal static class DirectExeSmokeArgumentParser
             CameraFirstUseState = GetArgumentValue(args, "--smoke-camera-first-use-state"),
             ProjectSafetyReportPath = GetArgumentValue(args, "--smoke-project-safety-report"),
             ProjectSafetySavePath = GetArgumentValue(args, "--smoke-project-safety-save"),
+            ProjectDiagnosticsReportPath = GetArgumentValue(args, "--smoke-project-diagnostics-report"),
+            ProjectDiagnosticsScreenshotPath = GetArgumentValue(args, "--smoke-project-diagnostics-screenshot"),
+            SupportDiagnosticsReportPath = GetArgumentValue(args, "--smoke-support-diagnostics-report"),
+            SupportDiagnosticsExportPath = GetArgumentValue(args, "--smoke-support-diagnostics-export"),
+            SupportDiagnosticsScreenshotPath = GetArgumentValue(args, "--smoke-support-diagnostics-screenshot"),
             UnsavedDialogScreenshotPath = GetArgumentValue(args, "--smoke-unsaved-dialog-screenshot"),
             ProjectOpenFailureDialogScreenshotPath = GetArgumentValue(
                 args,
                 "--smoke-project-open-failure-dialog-screenshot"),
             EvidenceDrawerState = GetArgumentValue(args, "--smoke-evidence-state"),
             LeftToolTab = GetArgumentValue(args, "--smoke-left-tool-tab"),
+            LibraryEntryState = GetArgumentValue(args, "--smoke-library-entry-state"),
+            LibrarySearchText = GetArgumentValue(args, "--smoke-library-search-text"),
             LibraryCardState = GetArgumentValue(args, "--smoke-library-card-state"),
             LibraryDefaultAddKind = GetArgumentValue(args, "--smoke-library-default-add"),
             DocumentTab = GetArgumentValue(args, "--smoke-document-tab"),
@@ -140,9 +152,13 @@ internal static class DirectExeSmokeArgumentParser
                     GetArgumentValue(args, "--smoke-test-scenario-settings-state")),
             TestScenarioBatch = HasArgument(args, "--smoke-test-scenario-batch"),
             ScenarioEvidenceExchangePath = GetArgumentValue(args, "--smoke-scenario-evidence-exchange"),
+            ScenarioReportPath = GetArgumentValue(args, "--smoke-scenario-report"),
             ScenarioEvidenceExchangeState = GetArgumentValue(
                 args,
                 "--smoke-scenario-evidence-state") ?? "normal",
+            ScenarioReportState = GetArgumentValue(
+                args,
+                "--smoke-scenario-report-state") ?? "normal",
             UnifiedCommissioningEvidencePath = GetArgumentValue(
                 args,
                 "--smoke-unified-commissioning-evidence"),
@@ -234,10 +250,43 @@ internal static class DirectExeSmokeArgumentParser
     public static void ValidateSmokeArguments(IReadOnlyList<string> args)
     {
         var commandTracePath = GetArgumentValue(args, "--smoke-command-trace");
+        var globalCommandState = GetArgumentValue(args, "--smoke-command-state");
+        var globalCommandStateScreenshotPath = GetArgumentValue(args, "--smoke-command-state-screenshot");
         var commandTraceState = GetArgumentValue(args, "--smoke-command-trace-state") ?? "normal";
         var useRunLayout = HasArgument(args, "--smoke-run-layout");
+        var equipmentOutlineSearchText = GetArgumentValue(args, "--smoke-equipment-outline-search");
+        if (!string.IsNullOrWhiteSpace(equipmentOutlineSearchText) && !useRunLayout)
+        {
+            throw new ArgumentException(
+                "Equipment outline search smoke requires --smoke-run-layout.");
+        }
+        var libraryEntryState = GetArgumentValue(args, "--smoke-library-entry-state");
+        var hasSimulationLibraryEntry = useRunLayout
+            && libraryEntryState?.Equals("tab", StringComparison.OrdinalIgnoreCase) == true;
+        var hasEquipmentLibraryEntry = !useRunLayout
+            && (libraryEntryState?.Equals("equipment-tab", StringComparison.OrdinalIgnoreCase) == true
+                || libraryEntryState?.Equals("equipment-dialog", StringComparison.OrdinalIgnoreCase) == true);
+        if (libraryEntryState is not null && !hasSimulationLibraryEntry && !hasEquipmentLibraryEntry)
+        {
+            throw new ArgumentException(
+                "Library entry state smoke requires --smoke-run-layout with state 'tab' or no run-layout mode with state 'equipment-tab' or 'equipment-dialog'.");
+        }
+        var librarySearchText = GetArgumentValue(args, "--smoke-library-search-text");
+        var hasLibrarySearchEntry = hasSimulationLibraryEntry
+            || hasEquipmentLibraryEntry
+            || (useRunLayout && string.Equals(
+                GetArgumentValue(args, "--smoke-left-tool-tab"),
+                "Library",
+                StringComparison.OrdinalIgnoreCase));
+        if (librarySearchText is not null && !hasLibrarySearchEntry)
+        {
+            throw new ArgumentException(
+                "Library search smoke requires --smoke-run-layout with the Library tab or entry state 'tab', or entry state 'equipment-tab' or 'equipment-dialog'.");
+        }
         var unifiedCommissioningEvidencePath = GetArgumentValue(args, "--smoke-unified-commissioning-evidence");
         var testScenarioBatch = HasArgument(args, "--smoke-test-scenario-batch");
+        var scenarioReportPath = GetArgumentValue(args, "--smoke-scenario-report");
+        var scenarioReportState = GetArgumentValue(args, "--smoke-scenario-report-state") ?? "normal";
         var roundTripSavePath = GetArgumentValue(args, "--smoke-roundtrip-save");
         var roundTripReportPath = GetArgumentValue(args, "--smoke-roundtrip-report");
         var verifyRoundTrip = HasArgument(args, "--smoke-roundtrip-verify");
@@ -258,12 +307,33 @@ internal static class DirectExeSmokeArgumentParser
         var cameraFirstUseState = GetArgumentValue(args, "--smoke-camera-first-use-state");
         var projectSafetyReportPath = GetArgumentValue(args, "--smoke-project-safety-report");
         var projectSafetySavePath = GetArgumentValue(args, "--smoke-project-safety-save");
+        var projectDiagnosticsReportPath = GetArgumentValue(args, "--smoke-project-diagnostics-report");
+        var projectDiagnosticsScreenshotPath = GetArgumentValue(args, "--smoke-project-diagnostics-screenshot");
+        var supportDiagnosticsReportPath = GetArgumentValue(args, "--smoke-support-diagnostics-report");
+        var supportDiagnosticsExportPath = GetArgumentValue(args, "--smoke-support-diagnostics-export");
+        var supportDiagnosticsScreenshotPath = GetArgumentValue(args, "--smoke-support-diagnostics-screenshot");
         var analogIoAuthoringState = GetArgumentValue(args, "--smoke-analog-authoring-state");
         var analogIoAuthoringReportPath = GetArgumentValue(args, "--smoke-analog-authoring-report");
         var analogIoAuthoringSavePath = GetArgumentValue(args, "--smoke-analog-authoring-save");
         var projectOpenFailureDialogScreenshotPath = GetArgumentValue(
             args,
             "--smoke-project-open-failure-dialog-screenshot");
+        var mmiOperatorState = GetArgumentValue(args, "--smoke-mmi-operator-state");
+        var mmiOperatorReportPath = GetArgumentValue(args, "--smoke-mmi-operator-report");
+
+        var capturesTopCommandPressed = globalCommandState is not null
+            && new[] { "undo-pressed", "redo-pressed", "save-pressed" }
+                .Contains(globalCommandState, StringComparer.OrdinalIgnoreCase);
+        if (capturesTopCommandPressed != !string.IsNullOrWhiteSpace(globalCommandStateScreenshotPath))
+        {
+            throw new ArgumentException(
+                "The top-command pressed states require --smoke-command-state-screenshot, and that path is only valid for those states.");
+        }
+        if (string.Equals(globalCommandState, "save-pressed", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(GetArgumentValue(args, "--smoke-project")))
+        {
+            throw new ArgumentException("--smoke-project is required with save-pressed command-state capture.");
+        }
 
         if ((!string.IsNullOrWhiteSpace(commandTracePath)
                 || HasArgument(args, "--smoke-command-trace-state"))
@@ -287,6 +357,27 @@ internal static class DirectExeSmokeArgumentParser
         {
             throw new ArgumentException(
                 "Unified commissioning evidence smoke requires --smoke-test-scenario-batch.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(scenarioReportPath) && !testScenarioBatch)
+        {
+            throw new ArgumentException(
+                "--smoke-scenario-report requires --smoke-test-scenario-batch.");
+        }
+
+        if (HasArgument(args, "--smoke-scenario-report-state")
+            && string.IsNullOrWhiteSpace(scenarioReportPath))
+        {
+            throw new ArgumentException(
+                "--smoke-scenario-report-state requires --smoke-scenario-report.");
+        }
+
+        var normalizedScenarioReportState = scenarioReportState.ToLowerInvariant();
+        if (normalizedScenarioReportState is not ("normal" or "focus" or "hover" or "pressed" or "disabled"))
+        {
+            throw new ArgumentException(
+                $"Unsupported --smoke-scenario-report-state '{scenarioReportState}'. "
+                + "Expected normal, focus, hover, pressed, or disabled.");
         }
 
         if (!string.IsNullOrWhiteSpace(roundTripSavePath) && verifyRoundTrip)
@@ -370,6 +461,45 @@ internal static class DirectExeSmokeArgumentParser
                 "--smoke-project-safety-save is required with --smoke-project-safety-report.");
         }
 
+        if (!string.IsNullOrWhiteSpace(projectDiagnosticsReportPath)
+            && string.IsNullOrWhiteSpace(GetArgumentValue(args, "--smoke-project")))
+        {
+            throw new ArgumentException(
+                "--smoke-project is required with --smoke-project-diagnostics-report.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(projectDiagnosticsScreenshotPath)
+            && string.IsNullOrWhiteSpace(projectDiagnosticsReportPath))
+        {
+            throw new ArgumentException(
+                "--smoke-project-diagnostics-report is required with "
+                + "--smoke-project-diagnostics-screenshot.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(supportDiagnosticsScreenshotPath)
+            && string.IsNullOrWhiteSpace(supportDiagnosticsReportPath))
+        {
+            throw new ArgumentException(
+                "--smoke-support-diagnostics-report is required with "
+                + "--smoke-support-diagnostics-screenshot.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(supportDiagnosticsReportPath)
+            && string.IsNullOrWhiteSpace(supportDiagnosticsExportPath))
+        {
+            throw new ArgumentException(
+                "--smoke-support-diagnostics-export is required with "
+                + "--smoke-support-diagnostics-report.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(supportDiagnosticsExportPath)
+            && string.IsNullOrWhiteSpace(supportDiagnosticsReportPath))
+        {
+            throw new ArgumentException(
+                "--smoke-support-diagnostics-report is required with "
+                + "--smoke-support-diagnostics-export.");
+        }
+
         if (!string.IsNullOrWhiteSpace(analogIoAuthoringState)
             && string.IsNullOrWhiteSpace(analogIoAuthoringReportPath))
         {
@@ -390,6 +520,34 @@ internal static class DirectExeSmokeArgumentParser
             throw new ArgumentException(
                 "--smoke-project-safety-report is required with "
                 + "--smoke-project-open-failure-dialog-screenshot.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(mmiOperatorState) && !useRunLayout)
+        {
+            throw new ArgumentException(
+                "Machine Studio inspection interaction smoke requires --smoke-run-layout.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(mmiOperatorState)
+            && string.IsNullOrWhiteSpace(mmiOperatorReportPath))
+        {
+            throw new ArgumentException(
+                "--smoke-mmi-operator-report is required with --smoke-mmi-operator-state.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(mmiOperatorReportPath)
+            && string.IsNullOrWhiteSpace(mmiOperatorState))
+        {
+            throw new ArgumentException(
+                "--smoke-mmi-operator-state is required with --smoke-mmi-operator-report.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(mmiOperatorState)
+            && !string.Equals(mmiOperatorState, "interaction", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                $"Unsupported --smoke-mmi-operator-state '{mmiOperatorState}'. "
+                + "Expected interaction.");
         }
 
         if (!string.IsNullOrWhiteSpace(roundTripReportPath)

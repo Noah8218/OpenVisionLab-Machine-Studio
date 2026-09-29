@@ -49,6 +49,7 @@ internal static class SmokeCameraFirstUseVerifier
 {
     private const uint MouseEventMove = 0x0001;
     private const uint MouseEventLeftDown = 0x0002;
+    private const uint MouseEventLeftUp = 0x0004;
 
     public static async Task<SmokeCameraFirstUseReport> VerifyAsync(
         ShellWindow window,
@@ -246,18 +247,33 @@ internal static class SmokeCameraFirstUseVerifier
             case "pressed":
                 activateWindow();
                 button.Focus();
+                Mouse.Capture(button, CaptureMode.SubTree);
+                Mouse.Synchronize();
                 movePointerToCenter(button);
                 for (var attempt = 0; attempt < 20 && !button.IsMouseOver; attempt++)
                 {
+                    Mouse.Synchronize();
                     await Task.Delay(50);
                     await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 }
                 mouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
                 markSmokePointerHeld();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Input);
+                await Task.Delay(20);
+                if (!button.IsPressed && Mouse.LeftButton == MouseButtonState.Pressed)
+                {
+                    button.RaiseEvent(new MouseButtonEventArgs(
+                        Mouse.PrimaryDevice,
+                        Environment.TickCount,
+                        MouseButton.Left)
+                    {
+                        RoutedEvent = Mouse.MouseDownEvent
+                    });
+                }
                 for (var attempt = 0; attempt < 10 && !button.IsPressed; attempt++)
                 {
                     await Task.Delay(50);
-                    await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                    await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Input);
                 }
                 Check("pressed-state-pointer-over", button.IsMouseOver);
                 Check("pressed-state-pointer-down", button.IsPressed);
@@ -302,9 +318,12 @@ internal static class SmokeCameraFirstUseVerifier
                 button.Focus();
                 button.BringIntoView();
                 button.UpdateLayout();
+                Mouse.Capture(button, CaptureMode.SubTree);
+                Mouse.Synchronize();
                 for (var attempt = 0; attempt < 20 && !button.IsMouseOver; attempt++)
                 {
                     movePointerToCenter(button);
+                    Mouse.Synchronize();
                     mouseEvent(MouseEventMove, 1, 0, 0, UIntPtr.Zero);
                     await Task.Delay(50);
                     await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
@@ -312,12 +331,37 @@ internal static class SmokeCameraFirstUseVerifier
                 Check("apply-pointer-over", button.IsMouseOver);
                 mouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
                 markSmokePointerHeld();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Input);
+                await Task.Delay(20);
+                if (!button.IsPressed && Mouse.LeftButton == MouseButtonState.Pressed)
+                {
+                    button.RaiseEvent(new MouseButtonEventArgs(
+                        Mouse.PrimaryDevice,
+                        Environment.TickCount,
+                        MouseButton.Left)
+                    {
+                        RoutedEvent = Mouse.MouseDownEvent
+                    });
+                }
                 for (var attempt = 0; attempt < 10 && !button.IsPressed; attempt++)
                 {
                     await Task.Delay(50);
-                    await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                    await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Input);
                 }
                 Check("apply-pointer-down", button.IsPressed);
+                if (button.IsPressed && button.IsVisible)
+                {
+                    button.RaiseEvent(new MouseButtonEventArgs(
+                        Mouse.PrimaryDevice,
+                        Environment.TickCount,
+                        MouseButton.Left)
+                    {
+                        RoutedEvent = Mouse.MouseUpEvent
+                    });
+                }
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Input);
+                await Task.Delay(20);
+                mouseEvent(MouseEventLeftUp, 0, 0, 0, UIntPtr.Zero);
                 releaseSmokePointer();
                 break;
             case "keyboard-space":

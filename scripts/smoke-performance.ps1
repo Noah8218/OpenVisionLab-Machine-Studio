@@ -51,7 +51,10 @@ param(
     [string]$ProcessPriority = 'High',
 
     [Parameter(Mandatory = $false)]
-    [long]$ProcessorAffinityMask = 0
+    [long]$ProcessorAffinityMask = 0,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$PreflightOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -60,6 +63,80 @@ $project = Join-Path $repoRoot 'src\OpenVisionLab.MachineStudio\OpenVisionLab.Ma
 $meanRegressionLimitMultiplier = 1.25
 $p95RegressionLimitMultiplier = 1.4
 $maxJitterRatio = 0.15
+$preflightCpuSampleMilliseconds = 1000
+$maxCompetingProcessCpuCoreRatio = 0.5
+
+function Get-SmokeResolutionPlan
+{
+    param(
+        [Parameter(Mandatory = $true)] [string[]]$RequestedResolutions,
+        [Parameter(Mandatory = $true)] [int[]]$RequestedDpiScales
+    )
+
+    Add-Type -AssemblyName System.Windows.Forms
+    $screens = @([System.Windows.Forms.Screen]::AllScreens)
+    if ($screens.Count -eq 0)
+    {
+        throw 'Performance smoke requires an available Windows display.'
+    }
+
+    $monitor = $screens |
+        Sort-Object { $_.Bounds.Left }, { $_.WorkingArea.Width * $_.WorkingArea.Height } |
+        Select-Object -First 1
+    $bounds = $monitor.Bounds
+    $supportedCases = [System.Collections.Generic.List[object]]::new()
+    $skippedCases = [System.Collections.Generic.List[object]]::new()
+
+    foreach ($resolution in $RequestedResolutions)
+    {
+        if ($resolution -notmatch '^(?<width>[1-9]\d*)x(?<height>[1-9]\d*)$')
+        {
+            throw "Invalid smoke resolution '$resolution'. Expected WIDTHxHEIGHT."
+        }
+
+        $logicalWidth = [int]$Matches.width
+        $logicalHeight = [int]$Matches.height
+        foreach ($dpi in $RequestedDpiScales)
+        {
+            if ($dpi -lt 100 -or $dpi -gt 200)
+            {
+                throw "Unsupported DPI scale $dpi. Expected 100 through 200."
+            }
+
+            $requiredWidth = [int][Math]::Round($logicalWidth * $dpi / 100.0)
+            $requiredHeight = [int][Math]::Round($logicalHeight * $dpi / 100.0)
+            if ($requiredWidth -gt $bounds.Width -or $requiredHeight -gt $bounds.Height)
+            {
+                $skippedCases.Add([pscustomobject]@{
+                        resolution = $resolution
+                        dpi = $dpi
+                        requiredPixelSize = "${requiredWidth}x${requiredHeight}"
+                        availableMonitorBounds = "$($bounds.Width)x$($bounds.Height)"
+                        reason = 'The selected test monitor cannot host the requested physical window size.'
+                    })
+                continue
+            }
+
+            $supportedCases.Add([pscustomobject]@{ resolution = $resolution; dpi = $dpi })
+        }
+    }
+
+    if ($supportedCases.Count -eq 0)
+    {
+        throw 'The requested performance smoke matrix contains no cases that fit the selected monitor.'
+    }
+
+    return [pscustomobject]@{
+        monitor = [pscustomobject]@{
+            deviceName = $monitor.DeviceName
+            isPrimary = $monitor.Primary
+            bounds = "$($bounds.Left),$($bounds.Top),$($bounds.Width),$($bounds.Height)"
+            workingArea = "$($monitor.WorkingArea.Left),$($monitor.WorkingArea.Top),$($monitor.WorkingArea.Width),$($monitor.WorkingArea.Height)"
+        }
+        supportedCases = @($supportedCases.ToArray())
+        skippedCases = @($skippedCases.ToArray())
+    }
+}
 
 if ([string]::IsNullOrWhiteSpace($ProjectPath))
 {
@@ -91,6 +168,10 @@ $OutputDirectory = [System.IO.Path]::GetFullPath($OutputDirectory)
 $BaselinePath = [System.IO.Path]::GetFullPath($BaselinePath)
 $ExecutablePath = [System.IO.Path]::GetFullPath($ExecutablePath)
 
+if ($ExecutionMode -eq 'DirectExe' -and -not (Test-Path -LiteralPath $ExecutablePath -PathType Leaf))
+{
+    throw "Direct EXE path does not exist: $ExecutablePath. Build the project or pass -ExecutablePath."
+}
 if (-not (Test-Path -LiteralPath $ProjectPath))
 {
     throw "Smoke project path does not exist: $ProjectPath"
@@ -115,12 +196,30 @@ if ($ProcessorAffinityMask -lt 0)
 {
     throw "ProcessorAffinityMask must be zero or greater."
 }
-New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
-$resolvedBaselineDirectory = [System.IO.Path]::GetDirectoryName([System.IO.Path]::GetFullPath($BaselinePath))
-if (-not [string]::IsNullOrWhiteSpace($resolvedBaselineDirectory))
+if ($CreateBaseline -and $Runs -lt 2)
 {
-    New-Item -ItemType Directory -Path $resolvedBaselineDirectory -Force | Out-Null
+    throw "Baseline creation requires at least two measured runs."
 }
+if ($CreateBaseline -and
+    $ExecutionMode -eq 'DirectExe' -and
+    $ProcessorAffinityMask -gt 0 -and
+    (($ProcessorAffinityMask -band ($ProcessorAffinityMask - 1)) -eq 0))
+{
+    throw "DirectExe baseline creation cannot pin the multi-threaded WPF process to one logical CPU. Use ProcessorAffinityMask 0 or a validated multi-CPU mask."
+}
+if (-not $PreflightOnly)
+{
+    $script:SmokeResolutionPlan = Get-SmokeResolutionPlan -RequestedResolutions $Resolutions -RequestedDpiScales $DpiScales
+    foreach ($skippedCase in $script:SmokeResolutionPlan.skippedCases)
+    {
+        Write-Warning "Skipped $($skippedCase.resolution) at $($skippedCase.dpi)% DPI: requires $($skippedCase.requiredPixelSize) pixels; selected monitor bounds are $($skippedCase.availableMonitorBounds)."
+    }
+    if ($CreateBaseline -and $script:SmokeResolutionPlan.skippedCases.Count -gt 0)
+    {
+        throw 'Baseline creation requires the full requested resolution/DPI matrix to fit the selected monitor. Choose a supported matrix explicitly.'
+    }
+}
+New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 
 function Get-Mean
 {
@@ -186,7 +285,7 @@ function Get-SmokeEnvironment
 {
     return [ordered]@{
         machineName = $env:COMPUTERNAME
-        osDescription = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription
+        osDescription = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription.Trim()
         osArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
         processArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture
         processorCount = [Environment]::ProcessorCount
@@ -195,7 +294,203 @@ function Get-SmokeEnvironment
         configuration = $Configuration
         processPriority = $ProcessPriority
         processorAffinityMask = $ProcessorAffinityMask
+        testMonitorKey = "$($script:SmokeResolutionPlan.monitor.deviceName)|$($script:SmokeResolutionPlan.monitor.bounds)|$($script:SmokeResolutionPlan.monitor.workingArea)"
+        requestedMatrixKey = "resolutions=$($Resolutions -join ',');dpi=$($DpiScales -join ',')"
         createdAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
+    }
+}
+
+function Get-PerformanceSmokePreflight
+{
+    param(
+        [Parameter(Mandatory = $false)] [string]$ReportPath = ''
+    )
+
+    $processes = @(Get-CimInstance Win32_Process -ErrorAction Stop)
+    $processLookup = @{}
+    foreach ($process in $processes)
+    {
+        $processLookup[[int]$process.ProcessId] = $process
+    }
+
+    $ignoredProcessIds = @{}
+    $ancestorProcessId = [int]$PID
+    for ($depth = 0; $depth -lt 32 -and $ancestorProcessId -gt 0; $depth++)
+    {
+        if (-not $processLookup.ContainsKey($ancestorProcessId) -or $ignoredProcessIds.ContainsKey($ancestorProcessId))
+        {
+            break
+        }
+
+        $ignoredProcessIds[$ancestorProcessId] = $true
+        $ancestorProcessId = [int]$processLookup[$ancestorProcessId].ParentProcessId
+    }
+
+    $competingProcessesById = @{}
+
+    foreach ($process in $processes)
+    {
+        if ($ignoredProcessIds.ContainsKey([int]$process.ProcessId))
+        {
+            continue
+        }
+
+        $processName = [string]$process.Name
+        $commandLine = [string]$process.CommandLine
+        $nameStem = [System.IO.Path]::GetFileNameWithoutExtension($processName)
+        $isKnownBuildOrTestProcess = $nameStem -match '^(MSBuild|testhost|vstest\.console)$'
+        $isKnownStudioProcess = $nameStem -match '^OpenVisionLab\.(LabelingStudio|MachineStudio)$'
+        $isDotnetProcess = $nameStem -eq 'dotnet'
+        $isDotnetBuildOrTestProcess = $isDotnetProcess -and $commandLine -match '(?i)(?:^|\s)(?:build|test|run)(?:\s|$)'
+        $isDotnetAutomationProcess = $isDotnetProcess -and $commandLine -match '(?i)(?:LabelingApplication\.Tests\.dll|OpenVisionLab\.(LabelingStudio|MachineStudio)\.Tests\.dll)'
+        $isKnownAutomationCommand = $isDotnetBuildOrTestProcess -or $isDotnetAutomationProcess
+
+        if ($isKnownBuildOrTestProcess -or $isKnownStudioProcess -or $isKnownAutomationCommand)
+        {
+            $competingProcessesById[[int]$process.ProcessId] = [pscustomobject]@{
+                processId = [int]$process.ProcessId
+                parentProcessId = [int]$process.ParentProcessId
+                name = $processName
+                commandLine = $commandLine
+                creationDate = [string]$process.CreationDate
+                classifications = @('known-process')
+                sampledCpuCoreRatio = $null
+            }
+        }
+    }
+
+    $cpuStartSamples = @{}
+    foreach ($runtimeProcess in @(Get-Process -ErrorAction SilentlyContinue))
+    {
+        $runtimeProcessId = [int]$runtimeProcess.Id
+        if ($runtimeProcessId -le 0 -or $ignoredProcessIds.ContainsKey($runtimeProcessId))
+        {
+            continue
+        }
+
+        try
+        {
+            $cpuStartSamples[$runtimeProcessId] = [pscustomobject]@{
+                startTimeUtcTicks = $runtimeProcess.StartTime.ToUniversalTime().Ticks
+                totalProcessorMilliseconds = $runtimeProcess.TotalProcessorTime.TotalMilliseconds
+            }
+        }
+        catch
+        {
+            continue
+        }
+    }
+
+    $cpuSampleTimer = [System.Diagnostics.Stopwatch]::StartNew()
+    Start-Sleep -Milliseconds $preflightCpuSampleMilliseconds
+    $cpuSampleTimer.Stop()
+    $cpuSampleElapsedMilliseconds = [Math]::Max($cpuSampleTimer.Elapsed.TotalMilliseconds, 1)
+
+    foreach ($runtimeProcess in @(Get-Process -ErrorAction SilentlyContinue))
+    {
+        $runtimeProcessId = [int]$runtimeProcess.Id
+        if (-not $cpuStartSamples.ContainsKey($runtimeProcessId) -or -not $processLookup.ContainsKey($runtimeProcessId))
+        {
+            continue
+        }
+
+        try
+        {
+            $startSample = $cpuStartSamples[$runtimeProcessId]
+            if ($runtimeProcess.StartTime.ToUniversalTime().Ticks -ne $startSample.startTimeUtcTicks)
+            {
+                continue
+            }
+
+            $cpuDeltaMilliseconds = $runtimeProcess.TotalProcessorTime.TotalMilliseconds - $startSample.totalProcessorMilliseconds
+            $sampledCpuCoreRatio = [Math]::Round([Math]::Max($cpuDeltaMilliseconds, 0) / $cpuSampleElapsedMilliseconds, 3)
+        }
+        catch
+        {
+            continue
+        }
+
+        if ($sampledCpuCoreRatio -lt $maxCompetingProcessCpuCoreRatio)
+        {
+            continue
+        }
+
+        if ($competingProcessesById.ContainsKey($runtimeProcessId))
+        {
+            $competingProcess = $competingProcessesById[$runtimeProcessId]
+            $competingProcess.classifications = @($competingProcess.classifications) + 'sustained-cpu'
+            $competingProcess.sampledCpuCoreRatio = $sampledCpuCoreRatio
+            continue
+        }
+
+        $process = $processLookup[$runtimeProcessId]
+        $competingProcessesById[$runtimeProcessId] = [pscustomobject]@{
+            processId = $runtimeProcessId
+            parentProcessId = [int]$process.ParentProcessId
+            name = [string]$process.Name
+            commandLine = [string]$process.CommandLine
+            creationDate = [string]$process.CreationDate
+            classifications = @('sustained-cpu')
+            sampledCpuCoreRatio = $sampledCpuCoreRatio
+        }
+    }
+
+    $competingProcesses = @($competingProcessesById.Values | Sort-Object processId)
+
+    $operatingSystem = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
+    $lastBootUpTime = $null
+    if ($operatingSystem.LastBootUpTime)
+    {
+        if ($operatingSystem.LastBootUpTime -is [DateTime])
+        {
+            $lastBootUpTime = ([DateTime]$operatingSystem.LastBootUpTime).ToUniversalTime().ToString('O')
+        }
+        else
+        {
+            $lastBootUpTime = ([Management.ManagementDateTimeConverter]::ToDateTime([string]$operatingSystem.LastBootUpTime)).ToUniversalTime().ToString('O')
+        }
+    }
+
+    $status = if ($competingProcesses.Count -eq 0) { 'ready' } else { 'blocked' }
+    $blockers = @($competingProcesses | ForEach-Object {
+            $classification = @($_.classifications) -join ','
+            $cpuRatio = if ($null -eq $_.sampledCpuCoreRatio) { '' } else { " CpuCoreRatio=$($_.sampledCpuCoreRatio)" }
+            "PID=$($_.processId) Classifications=$classification$cpuRatio Name=$($_.name) CommandLine=$($_.commandLine)"
+        })
+    $report = [ordered]@{
+        schema = '1.0'
+        artifactType = 'performance-smoke-preflight'
+        capturedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
+        status = $status
+        executionMode = $ExecutionMode
+        configuration = $Configuration
+        projectPath = $ProjectPath
+        executablePath = $ExecutablePath
+        baselinePath = $BaselinePath
+        lastBootUpTimeUtc = $lastBootUpTime
+        cpuLoadPolicy = [ordered]@{
+            sampleDurationMilliseconds = $preflightCpuSampleMilliseconds
+            actualSampleDurationMilliseconds = [Math]::Round($cpuSampleElapsedMilliseconds, 3)
+            maxProcessCpuCoreRatio = $maxCompetingProcessCpuCoreRatio
+            ratioDefinition = 'process CPU milliseconds divided by sample wall-clock milliseconds; 1.0 equals one logical core'
+        }
+        ignoredProcessIds = @($ignoredProcessIds.Keys | Sort-Object)
+        competingProcesses = @($competingProcesses)
+        blockers = $blockers
+    }
+    $preflightPath = if ([string]::IsNullOrWhiteSpace($ReportPath))
+    {
+        Join-Path $OutputDirectory 'smoke-performance-preflight.json'
+    }
+    else
+    {
+        [System.IO.Path]::GetFullPath($ReportPath)
+    }
+    $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $preflightPath -Encoding UTF8
+
+    return [pscustomobject]@{
+        ReportPath = $preflightPath
+        Report = $report
     }
 }
 
@@ -311,6 +606,43 @@ function Test-Threshold
     }
 }
 
+function Get-BaselineCandidateJitterFailures
+{
+    param(
+        [Parameter(Mandatory = $true)] [object[]]$RunSummaries
+    )
+
+    $failures = [System.Collections.Generic.List[object]]::new()
+    foreach ($entry in $RunSummaries)
+    {
+        $caseJitters = [ordered]@{
+            startupToIdleMs = [double]$entry.runsSummary.startupToIdleMs.jitter
+            navigationMeanMs = [double]$entry.runsSummary.navigationMeanMs.jitter
+            navigationP95Ms = [double]$entry.runsSummary.navigationP95Ms.jitter
+            steadyMeanMs = [double]$entry.runsSummary.steadyInteractionMeanMs.jitter
+            steadyP95Ms = [double]$entry.runsSummary.steadyInteractionP95Ms.jitter
+        }
+
+        foreach ($name in $caseJitters.Keys)
+        {
+            $actualJitter = $caseJitters[$name]
+            if ($actualJitter -gt $maxJitterRatio)
+            {
+                $failures.Add([pscustomobject]@{
+                    Resolution = $entry.resolution
+                    Dpi = $entry.dpi
+                    Metric = $name
+                    Actual = $actualJitter
+                    Limit = $maxJitterRatio
+                    Reason = 'BASELINE_CANDIDATE_JITTER_INVALID'
+                })
+            }
+        }
+    }
+
+    return @($failures)
+}
+
 function Invoke-SmokePerfRun
 {
     param(
@@ -333,6 +665,14 @@ function Invoke-SmokePerfRun
         }
 
         $reportPath = Join-Path $OutputDirectory ("smoke-perf-${runId}.json")
+        $runPreflightPath = Join-Path $OutputDirectory ("smoke-perf-${runId}-preflight.json")
+        $runPreflight = Get-PerformanceSmokePreflight -ReportPath $runPreflightPath
+        if ($runPreflight.Report.status -eq 'blocked')
+        {
+            [Console]::Error.WriteLine("Performance smoke run preflight blocked before $runId. See $($runPreflight.ReportPath)")
+            exit 2
+        }
+
         $dotnetArgs = @(
             '--smoke-project', $ProjectPath,
             '--smoke-size', $Resolution,
@@ -431,6 +771,7 @@ function Invoke-SmokePerfRun
         }
 
         $runSamples.Add([pscustomobject]@{
+            preflightReportPath = $runPreflight.ReportPath
             startupToIdleMs = [double]$payload.startupToIdleMs
             navigationMeanMs = [double]$payload.navigationMeanMs
             navigationP95Ms = [double]$payload.navigationP95Ms
@@ -439,7 +780,15 @@ function Invoke-SmokePerfRun
             requestedSize = [string]$payload.requestedSize
             requestedScalePercent = [int]$payload.requestedScalePercent
             navigationTimingsMs = @($payload.navigationTimingsMs)
+            navigationSelectionTimingsMs = @($payload.navigationSelectionTimingsMs)
+            navigationDispatcherTimingsMs = @($payload.navigationDispatcherTimingsMs)
             steadyInteractionTimingsMs = @($payload.steadyInteractionTimingsMs)
+            steadyModeMutationTimingsMs = @($payload.steadyModeMutationTimingsMs)
+            steadyDispatcherTimingsMs = @($payload.steadyDispatcherTimingsMs)
+            steadyDesignModeMutationTimingsMs = @($payload.steadyDesignModeMutationTimingsMs)
+            steadyDesignModeDispatcherTimingsMs = @($payload.steadyDesignModeDispatcherTimingsMs)
+            steadyRunModeMutationTimingsMs = @($payload.steadyRunModeMutationTimingsMs)
+            steadyRunModeDispatcherTimingsMs = @($payload.steadyRunModeDispatcherTimingsMs)
         })
     }
 
@@ -511,13 +860,10 @@ function Invoke-SmokePerfSuite
 
     $runSummaries = [System.Collections.Generic.List[object]]::new()
 
-    foreach ($resolution in $Resolutions)
+    foreach ($matrixCase in $script:SmokeResolutionPlan.supportedCases)
     {
-        foreach ($dpi in $DpiScales)
-        {
-            $case = Invoke-SmokePerfRun -Resolution $resolution -Dpi $dpi -RunCount $RunCount -RunTag $RunTag
-            $null = $runSummaries.Add($case)
-        }
+        $case = Invoke-SmokePerfRun -Resolution $matrixCase.resolution -Dpi $matrixCase.dpi -RunCount $RunCount -RunTag $RunTag
+        $null = $runSummaries.Add($case)
     }
 
     return ,$runSummaries
@@ -558,7 +904,9 @@ function Evaluate-SmokePerf
             @{ Name = 'executionMode'; Current = $RunEnvironment.executionMode; Baseline = $baselineEnvironment.executionMode; },
             @{ Name = 'configuration'; Current = $RunEnvironment.configuration; Baseline = $baselineEnvironment.configuration; },
             @{ Name = 'processPriority'; Current = $RunEnvironment.processPriority; Baseline = $baselineEnvironment.processPriority; },
-            @{ Name = 'processorAffinityMask'; Current = [long]$RunEnvironment.processorAffinityMask; Baseline = [long]$baselineEnvironment.processorAffinityMask; }
+            @{ Name = 'processorAffinityMask'; Current = [long]$RunEnvironment.processorAffinityMask; Baseline = [long]$baselineEnvironment.processorAffinityMask; },
+            @{ Name = 'testMonitorKey'; Current = $RunEnvironment.testMonitorKey; Baseline = $baselineEnvironment.testMonitorKey; },
+            @{ Name = 'requestedMatrixKey'; Current = $RunEnvironment.requestedMatrixKey; Baseline = $baselineEnvironment.requestedMatrixKey; }
         )
 
         foreach ($mismatch in $environmentMismatches)
@@ -636,7 +984,7 @@ function Evaluate-SmokePerf
         {
             $actualJitter = $caseJitters[$name][1]
             $baselineJitter = $caseJitters[$name][0]
-            if ($baselineJitter -gt $maxJitterRatio -or $actualJitter -gt $maxJitterRatio)
+            if ($baselineJitter -gt $maxJitterRatio)
             {
                 $isBaselineInvalid = $true
                 $failures.Add([pscustomobject]@{
@@ -646,7 +994,20 @@ function Evaluate-SmokePerf
                     Actual = $actualJitter
                     Baseline = $baselineJitter
                     Limit = $maxJitterRatio
-                    Reason = 'BASELINE_OR_CURRENT_JITTER_INVALID'
+                    Reason = 'BASELINE_JITTER_INVALID'
+                })
+            }
+
+            if ($actualJitter -gt $maxJitterRatio)
+            {
+                $failures.Add([pscustomobject]@{
+                    Resolution = $entry.resolution
+                    Dpi = $entry.dpi
+                    Metric = $name
+                    Actual = $actualJitter
+                    Baseline = $baselineJitter
+                    Limit = $maxJitterRatio
+                    Reason = 'CURRENT_JITTER_INVALID'
                 })
             }
         }
@@ -705,6 +1066,24 @@ function Evaluate-SmokePerf
     }
 }
 
+$preflight = Get-PerformanceSmokePreflight
+if ($preflight.Report.status -eq 'blocked')
+{
+    [Console]::Error.WriteLine("Performance smoke preflight blocked by competing process(es). See $($preflight.ReportPath)")
+    exit 2
+}
+if ($PreflightOnly)
+{
+    Write-Host "Performance smoke preflight passed. Report: $($preflight.ReportPath)"
+    exit 0
+}
+
+$resolvedBaselineDirectory = [System.IO.Path]::GetDirectoryName([System.IO.Path]::GetFullPath($BaselinePath))
+if (-not [string]::IsNullOrWhiteSpace($resolvedBaselineDirectory))
+{
+    New-Item -ItemType Directory -Path $resolvedBaselineDirectory -Force | Out-Null
+}
+
 $runEnvironment = Get-SmokeEnvironment
 $script:UseNoBuild = $false
 if ($SkipBuild)
@@ -723,11 +1102,6 @@ else
 
     $script:UseNoBuild = $true
 }
-if ($ExecutionMode -eq 'DirectExe' -and -not (Test-Path -LiteralPath $ExecutablePath))
-{
-    throw "Direct EXE path does not exist: $ExecutablePath. Build the project or pass -ExecutablePath."
-}
-
 $runSummaries = Invoke-SmokePerfSuite -RunCount $Runs
 $existingBaseline = if (Test-Path -LiteralPath $BaselinePath)
 {
@@ -738,6 +1112,20 @@ $existingBaseline = if (Test-Path -LiteralPath $BaselinePath)
 
 if ($CreateBaseline)
 {
+    $baselineCandidateJitterFailures = @(Get-BaselineCandidateJitterFailures -RunSummaries $runSummaries)
+    if ($baselineCandidateJitterFailures.Count -gt 0)
+    {
+        $rejectionPath = Join-Path $OutputDirectory 'smoke-performance-baseline-rejection.json'
+        [ordered]@{
+            schema = '1.0'
+            capturedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
+            status = 'rejected'
+            maxJitterRatio = $maxJitterRatio
+            failures = $baselineCandidateJitterFailures
+        } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $rejectionPath -Encoding UTF8
+        throw "Baseline candidate is unstable. No baseline was written. See: $rejectionPath"
+    }
+
     $baselinePayload = [ordered]@{
         schema = '1.0'
         capturedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
@@ -750,8 +1138,12 @@ if ($CreateBaseline)
         runs = $Runs
         samples = $Samples
         recheckRuns = $RecheckRuns
+        testMonitor = $script:SmokeResolutionPlan.monitor
         resolutions = $Resolutions
         dpiScales = $DpiScales
+        executedResolutionDpiCases = @($script:SmokeResolutionPlan.supportedCases)
+        skippedResolutionDpiCases = @($script:SmokeResolutionPlan.skippedCases)
+        fullMatrixExecuted = ($script:SmokeResolutionPlan.skippedCases.Count -eq 0)
         cases = [ordered]@{}
     }
 
@@ -796,8 +1188,12 @@ $summaryPayload = [ordered]@{
     runs = $Runs
     samples = $Samples
     recheckRuns = $RecheckRuns
+    testMonitor = $script:SmokeResolutionPlan.monitor
     resolutions = $Resolutions
     dpiScales = $DpiScales
+    executedResolutionDpiCases = @($script:SmokeResolutionPlan.supportedCases)
+    skippedResolutionDpiCases = @($script:SmokeResolutionPlan.skippedCases)
+    fullMatrixExecuted = ($script:SmokeResolutionPlan.skippedCases.Count -eq 0)
     summary = [ordered]@{
         caseCount = $runSummaries.Count
         baselineInvalid = $finalBaselineInvalid

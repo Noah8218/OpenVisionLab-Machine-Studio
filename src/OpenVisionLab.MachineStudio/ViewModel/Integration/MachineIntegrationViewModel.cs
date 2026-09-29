@@ -569,7 +569,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
                 : L("ResultPending", "Result 파일이 있지만 전체 순서를 아직 검증하지 못했습니다.", "A Result file exists, but the complete sequence is not validated yet.");
 
     /// <summary>
-    /// States which decision source the MMI is configured to use. This is
+    /// States which decision source Machine Studio is configured to use. This is
     /// intentionally independent from the last observed Result so a stale
     /// result cannot make a new external-inspection cycle look like local
     /// simulation.

@@ -281,6 +281,22 @@ internal static class SmokeSequenceStateVerifier
             {
                 throw new InvalidOperationException("Invalid sequence input produced no validation state.");
             }
+
+            var issueList = FindVisualDescendant<ListBox>(editor, candidate =>
+                    string.Equals(candidate.Name, "SequenceValidationIssuesListBox", StringComparison.Ordinal))
+                ?? throw new InvalidOperationException("The typed sequence validation issue list was unavailable.");
+            issueList.SelectedIndex = 0;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            var issue = viewModel.SequenceEditor.SelectedValidationIssue
+                ?? throw new InvalidOperationException("Selecting the validation issue did not update the ViewModel.");
+            if (!string.Equals(issue.StepId, step.Id, StringComparison.Ordinal)
+                || !string.Equals(viewModel.SequenceEditor.SelectedStep?.Id, step.Id, StringComparison.Ordinal)
+                || string.IsNullOrWhiteSpace(issue.PropertyName)
+                || string.IsNullOrWhiteSpace(issue.LocationText))
+            {
+                throw new InvalidOperationException(
+                    "Selecting a sequence validation issue did not navigate to its step and property context.");
+            }
         }
         else if (state.StartsWith("checkpoint", StringComparison.OrdinalIgnoreCase))
         {

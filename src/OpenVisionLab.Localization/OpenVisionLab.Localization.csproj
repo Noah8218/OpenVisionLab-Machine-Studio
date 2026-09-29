@@ -12,4 +12,8 @@
     <EmbeddedResource Include="Resources\LocalizationCatalog.tsv" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenVisionLab.Machine.Core.Tests" />
+  </ItemGroup>
+
 </Project>

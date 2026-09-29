@@ -43,4 +43,41 @@ public sealed class DeterministicSimulationCommandTraceStoreTests
         Assert.Equal(0, store.Count);
         Assert.Empty(store.Snapshot());
     }
+
+    [Fact]
+    public void Capture_StopsAtCapacityAndMarksTheTraceIncompleteUntilClear()
+    {
+        var store = new DeterministicSimulationCommandTraceStore(capacity: 2);
+
+        Assert.True(Capture(store));
+        Assert.True(Capture(store));
+        Assert.False(Capture(store));
+
+        Assert.Equal(2, store.Count);
+        Assert.Equal(1, store.DroppedEntryCount);
+        Assert.False(store.IsComplete);
+        Assert.Throws<InvalidOperationException>(() => store.CreatePackage(TimeSpan.FromMilliseconds(5)));
+
+        store.Clear();
+
+        Assert.Equal(0, store.Count);
+        Assert.Equal(0, store.DroppedEntryCount);
+        Assert.True(store.IsComplete);
+        Assert.True(Capture(store));
+        Assert.Equal(1, store.Snapshot().Single().Sequence);
+
+        static bool Capture(DeterministicSimulationCommandTraceStore store)
+        {
+            var command = new StepCommand();
+            return store.Capture(
+                command,
+                new SimulationCommandResult(
+                    command.CommandId,
+                    true,
+                    0,
+                    TimeSpan.Zero,
+                    SimulationCommandErrorCode.None,
+                    "accepted"));
+        }
+    }
 }

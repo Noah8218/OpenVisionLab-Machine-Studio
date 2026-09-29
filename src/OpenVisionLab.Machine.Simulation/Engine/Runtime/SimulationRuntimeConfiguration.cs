@@ -313,7 +313,8 @@ public sealed class SimulationRuntimeConfiguration
                 workpiece.ConveyorComponentId,
                 workpiece.InspectionState,
                 transform,
-                size),
+                size,
+                workpiece.InitiallyPresent),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(source),
                 source.Kind,

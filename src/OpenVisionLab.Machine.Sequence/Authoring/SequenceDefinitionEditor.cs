@@ -191,7 +191,13 @@ public sealed class SequenceDefinitionEditor
         IReadOnlyList<SequenceAuthoringTarget> targets = templateCatalog.GetTargets(
             definition.Action,
             authoringTargets);
-        if (targets.Count == 0)
+        bool usesWorkpieceTarget = definition.Action is
+            SequenceStepAction.FeedWorkpiece or SequenceStepAction.EjectWorkpiece;
+        if (usesWorkpieceTarget)
+        {
+            definition.TargetId = string.Empty;
+        }
+        else if (targets.Count == 0)
         {
             definition.TargetId = string.Empty;
         }
@@ -225,9 +231,18 @@ public sealed class SequenceDefinitionEditor
             definition.Parameter = "default";
         }
 
+        if (definition.Action is not (SequenceStepAction.TriggerCamera
+            or SequenceStepAction.FeedWorkpiece
+            or SequenceStepAction.EjectWorkpiece))
+        {
+            definition.WorkpieceComponentId = null;
+        }
+
         if (definition.Action is SequenceStepAction.SetSignal
             or SequenceStepAction.MoveAxis
             or SequenceStepAction.TriggerCamera
+            or SequenceStepAction.FeedWorkpiece
+            or SequenceStepAction.EjectWorkpiece
             or SequenceStepAction.CallSubsequence)
         {
             definition.TimeoutMs = 0;
@@ -235,6 +250,8 @@ public sealed class SequenceDefinitionEditor
 
         if (definition.Action is SequenceStepAction.WaitAxisDone
             or SequenceStepAction.WaitVisionResult
+            or SequenceStepAction.FeedWorkpiece
+            or SequenceStepAction.EjectWorkpiece
             or SequenceStepAction.CallSubsequence)
         {
             definition.Parameter = string.Empty;

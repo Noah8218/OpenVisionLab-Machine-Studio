@@ -177,6 +177,117 @@ public sealed class SequenceCompilerTests
     }
 
     [Fact]
+    public void Compile_CameraWorkpieceAssociationIsTypedAndValidated()
+    {
+        SequenceDefinition validDefinition = CreateCameraVisionCycle();
+        validDefinition.Steps[0].WorkpieceComponentId = "piece-1";
+        SequenceDefinition unknownDefinition = CreateCameraVisionCycle();
+        unknownDefinition.Steps[0].WorkpieceComponentId = "missing-piece";
+        var invalidAction = new SequenceDefinition
+        {
+            Id = "invalid-action",
+            Steps =
+            [
+                new SequenceStepDefinition
+                {
+                    Id = "complete",
+                    Action = SequenceStepAction.Complete,
+                    WorkpieceComponentId = "piece-1"
+                }
+            ]
+        };
+
+        SequenceCompilationResult valid = new SequenceCompiler().Compile(validDefinition, WorkpieceCameraTargets());
+        SequenceCompilationResult unknown = new SequenceCompiler().Compile(
+            unknownDefinition,
+            WorkpieceCameraTargets());
+        SequenceCompilationResult wrongAction = new SequenceCompiler().Compile(
+            invalidAction,
+            WorkpieceCameraTargets());
+
+        Assert.True(valid.IsSuccess);
+        Assert.Equal("piece-1", Assert.IsType<TriggerCameraStep>(valid.Sequence!.Steps[0]).WorkpieceComponentId);
+        Assert.Contains(unknown.Errors, error => error.Code == SequenceCompilationErrorCode.UnknownWorkpieceComponent);
+        Assert.Contains(wrongAction.Errors, error => error.Code == SequenceCompilationErrorCode.UnexpectedWorkpieceComponentId);
+    }
+
+    [Fact]
+    public void Compile_FeedAndEjectRequireKnownWorkpieceComponents()
+    {
+        var validDefinition = new SequenceDefinition
+        {
+            Id = "feed-eject",
+            Steps =
+            {
+                new SequenceStepDefinition
+                {
+                    Id = "feed",
+                    Action = SequenceStepAction.FeedWorkpiece,
+                    WorkpieceComponentId = "piece-1",
+                    NextStepId = "eject"
+                },
+                new SequenceStepDefinition
+                {
+                    Id = "eject",
+                    Action = SequenceStepAction.EjectWorkpiece,
+                    WorkpieceComponentId = "piece-1",
+                    NextStepId = "complete"
+                },
+                Step("complete", SequenceStepAction.Complete, string.Empty, string.Empty)
+            }
+        };
+        var missingTarget = new SequenceDefinition
+        {
+            Id = "missing-target",
+            Steps = { new SequenceStepDefinition { Id = "feed", Action = SequenceStepAction.FeedWorkpiece } }
+        };
+        var unknownTarget = new SequenceDefinition
+        {
+            Id = "unknown-target",
+            Steps =
+            {
+                new SequenceStepDefinition
+                {
+                    Id = "eject",
+                    Action = SequenceStepAction.EjectWorkpiece,
+                    WorkpieceComponentId = "missing-piece"
+                }
+            }
+        };
+        var invalidArguments = new SequenceDefinition
+        {
+            Id = "invalid-arguments",
+            Steps =
+            {
+                new SequenceStepDefinition
+                {
+                    Id = "feed",
+                    Action = SequenceStepAction.FeedWorkpiece,
+                    WorkpieceComponentId = "piece-1",
+                    TargetId = "camera-1",
+                    Parameter = "ignored",
+                    TimeoutMs = 1
+                }
+            }
+        };
+
+        var compiler = new SequenceCompiler();
+        SequenceCompilationResult valid = compiler.Compile(validDefinition, WorkpieceCameraTargets());
+        SequenceCompilationResult missing = compiler.Compile(missingTarget, WorkpieceCameraTargets());
+        SequenceCompilationResult unknown = compiler.Compile(unknownTarget, WorkpieceCameraTargets());
+        SequenceCompilationResult invalid = compiler.Compile(invalidArguments, WorkpieceCameraTargets());
+
+        Assert.True(valid.IsSuccess);
+        Assert.IsType<FeedWorkpieceStep>(valid.Sequence!.Steps[0]);
+        Assert.IsType<EjectWorkpieceStep>(valid.Sequence.Steps[1]);
+        Assert.Contains(missing.Errors, error => error.Code == SequenceCompilationErrorCode.WorkpieceComponentIdRequired);
+        Assert.Contains(unknown.Errors, error => error.Code == SequenceCompilationErrorCode.UnknownWorkpieceComponent);
+        Assert.Contains(invalid.Errors, error => error.Code == SequenceCompilationErrorCode.UnexpectedTargetId);
+        Assert.Contains(invalid.Errors, error => error.Code == SequenceCompilationErrorCode.UnexpectedParameter);
+        Assert.Contains(invalid.Errors, error => error.Code == SequenceCompilationErrorCode.InvalidTimeout);
+    }
+
+    [Fact]
     public void Compile_InvalidCameraVisionContracts_ReturnTypedErrors()
     {
         var invalidTrigger = new SequenceDefinition
@@ -316,6 +427,14 @@ public sealed class SequenceCompilerTests
             new Dictionary<string, ChannelKind>(StringComparer.Ordinal),
             Array.Empty<string>(),
             new[] { "cam1" });
+
+    private static SequenceCompilationTargets WorkpieceCameraTargets() =>
+        new(
+            new Dictionary<string, ChannelKind>(StringComparer.Ordinal),
+            Array.Empty<string>(),
+            new[] { "cam1" },
+            Array.Empty<string>(),
+            new[] { "piece-1" });
 
     internal static SequenceStepDefinition Step(
         string id,

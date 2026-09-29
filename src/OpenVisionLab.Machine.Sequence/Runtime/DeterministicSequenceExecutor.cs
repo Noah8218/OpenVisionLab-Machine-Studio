@@ -127,6 +127,8 @@ public sealed class DeterministicSequenceExecutor
             MoveAxisStep moveAxis => TickMoveAxis(moveAxis, context),
             WaitAxisDoneStep waitAxis => TickWaitAxisDone(waitAxis, context),
             TriggerCameraStep triggerCamera => TickTriggerCamera(triggerCamera, context),
+            FeedWorkpieceStep feedWorkpiece => TickFeedWorkpiece(feedWorkpiece, context),
+            EjectWorkpieceStep ejectWorkpiece => TickEjectWorkpiece(ejectWorkpiece, context),
             WaitVisionResultStep waitVision => TickWaitVisionResult(waitVision, context),
             CallSubsequenceStep callSubsequence => TickCallSubsequence(callSubsequence),
             CompleteStep => Complete(),
@@ -239,7 +241,12 @@ public sealed class DeterministicSequenceExecutor
     {
         var frame = CurrentFrame!;
         frame.CameraAcquisitionIds.Remove(step.CameraId);
-        var trigger = context.TriggerCamera(step.CameraId, step.RecipeId);
+        var trigger = context.TriggerCamera(
+            step.CameraId,
+            step.RecipeId,
+            step.WorkpieceComponentId,
+            frame.Sequence.Id,
+            step.Id);
         if (!trigger.IsSuccess || string.IsNullOrWhiteSpace(trigger.AcquisitionId))
         {
             return RouteOrFault(
@@ -249,6 +256,22 @@ public sealed class DeterministicSequenceExecutor
 
         frame.CameraAcquisitionIds[step.CameraId] = trigger.AcquisitionId;
         return Advance(step);
+    }
+
+    private SequenceExecutionResult TickFeedWorkpiece(FeedWorkpieceStep step, ISequenceRuntimeContext context)
+    {
+        var feed = context.FeedWorkpiece(step.WorkpieceComponentId);
+        return feed.IsSuccess
+            ? Advance(step)
+            : RouteOrFault(step, Error(SequenceExecutionErrorCode.WorkpieceOperationFailed, "Workpiece feed failed.", feed.Error));
+    }
+
+    private SequenceExecutionResult TickEjectWorkpiece(EjectWorkpieceStep step, ISequenceRuntimeContext context)
+    {
+        var eject = context.EjectWorkpiece(step.WorkpieceComponentId);
+        return eject.IsSuccess
+            ? Advance(step)
+            : RouteOrFault(step, Error(SequenceExecutionErrorCode.WorkpieceOperationFailed, "Workpiece ejection failed.", eject.Error));
     }
 
     private SequenceExecutionResult TickWaitVisionResult(

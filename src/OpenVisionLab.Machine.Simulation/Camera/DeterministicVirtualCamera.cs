@@ -12,6 +12,8 @@ public sealed class DeterministicVirtualCamera
     private long _acquisitionOrdinal;
     private string? _currentAcquisitionId;
     private string? _currentRecipeId;
+    private string? _currentWorkpieceComponentId;
+    private string? _currentWorkpieceInstanceId;
     private int _exposureTicksRemaining;
     private int _transferTicksRemaining;
     private VirtualCameraAcquisitionResult? _result;
@@ -42,7 +44,9 @@ public sealed class DeterministicVirtualCamera
         string? recipeId,
         VirtualCameraFrameEvidence? frameEvidence = null,
         VirtualCameraInspectionEvidence? inspectionEvidence = null,
-        bool waitForExternalResult = false)
+        bool waitForExternalResult = false,
+        string? workpieceComponentId = null,
+        string? workpieceInstanceId = null)
     {
         if (string.IsNullOrWhiteSpace(recipeId))
         {
@@ -99,6 +103,8 @@ public sealed class DeterministicVirtualCamera
         _acquisitionOrdinal = nextOrdinal;
         _currentAcquisitionId = nextAcquisitionId;
         _currentRecipeId = recipeId;
+        _currentWorkpieceComponentId = workpieceComponentId;
+        _currentWorkpieceInstanceId = workpieceInstanceId;
         _exposureTicksRemaining = _configuration.ExposureTicks;
         _transferTicksRemaining = 0;
         _result = null;
@@ -153,7 +159,9 @@ public sealed class DeterministicVirtualCamera
                         _acquisitionOrdinal,
                         _inspectionEvidence?.Decision ?? _configuration.PlaceholderDecision,
                         _frameEvidence,
-                        _inspectionEvidence);
+                        _inspectionEvidence,
+                        WorkpieceComponentId: _currentWorkpieceComponentId,
+                        WorkpieceInstanceId: _currentWorkpieceInstanceId);
                     _state = VirtualCameraState.FrameReady;
                     transition = VirtualCameraTickTransition.FrameReady;
                     completedAcquisition = _result;
@@ -226,7 +234,9 @@ public sealed class DeterministicVirtualCamera
             _acquisitionOrdinal,
             decision,
             _frameEvidence,
-            ExternalResultEvidence: evidence);
+            ExternalResultEvidence: evidence,
+            WorkpieceComponentId: _currentWorkpieceComponentId,
+            WorkpieceInstanceId: _currentWorkpieceInstanceId);
         _state = VirtualCameraState.FrameReady;
         return VirtualCameraExternalResultAdmissionResult.Applied(terminalFailure: false);
     }
@@ -245,6 +255,8 @@ public sealed class DeterministicVirtualCamera
         _inspectionEvidence = null;
         _externalResultEvidence = null;
         _waitForExternalResult = false;
+        _currentWorkpieceComponentId = null;
+        _currentWorkpieceInstanceId = null;
         return CaptureSnapshot();
     }
 
@@ -254,6 +266,8 @@ public sealed class DeterministicVirtualCamera
         _acquisitionOrdinal = 0;
         _currentAcquisitionId = null;
         _currentRecipeId = null;
+        _currentWorkpieceComponentId = null;
+        _currentWorkpieceInstanceId = null;
         _exposureTicksRemaining = 0;
         _transferTicksRemaining = 0;
         _result = null;

@@ -28,6 +28,24 @@ internal sealed class LayoutSelectionCommandWorkflow
         }
     }
 
+    internal bool MoveBy(double deltaX, double deltaY)
+    {
+        if (!_layout.MoveSelectionBy(deltaX, deltaY))
+        {
+            return false;
+        }
+
+        _setStatus(string.Format(
+            CultureInfo.CurrentCulture,
+            OpenVisionLanguageService.T(
+                "Status.LayoutSelectionMoved",
+                "선택 장비를 X {0:+0.###;-0.###;0} mm, Z {1:+0.###;-0.###;0} mm 이동했습니다.",
+                "Moved selected components by X {0:+0.###;-0.###;0} mm and Z {1:+0.###;-0.###;0} mm."),
+            deltaX,
+            deltaY));
+        return true;
+    }
+
     internal void Align(object? parameter)
     {
         if (parameter is not string value

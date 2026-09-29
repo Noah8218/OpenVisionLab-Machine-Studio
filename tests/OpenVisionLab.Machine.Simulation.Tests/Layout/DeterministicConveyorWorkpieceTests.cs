@@ -67,6 +67,85 @@ public sealed class DeterministicConveyorWorkpieceTests
         Assert.True(hub.ReadDigitalSignal("di.sensor").Value);
     }
 
+    [Theory]
+    [InlineData(true, true, -39d, -39d)]
+    [InlineData(true, false, -39d, -40d)]
+    [InlineData(false, true, -40d, -39d)]
+    [InlineData(false, false, -40d, -40d)]
+    public void Tick_TwoIndependentStationsMoveOnlyTheirRunningWorkpieces(
+        bool firstConveyorRunning,
+        bool secondConveyorRunning,
+        double expectedFirstX,
+        double expectedSecondX)
+    {
+        var channels = new[]
+        {
+            Channel("do.conveyor.first.run", ChannelKind.DigitalOutput),
+            Channel("do.conveyor.first.reverse", ChannelKind.DigitalOutput),
+            Channel("do.conveyor.second.run", ChannelKind.DigitalOutput),
+            Channel("do.conveyor.second.reverse", ChannelKind.DigitalOutput)
+        };
+        SignalHubCreationResult creation = DeterministicSignalHub.Create(channels);
+        Assert.True(creation.IsAccepted);
+        DeterministicSignalHub hub = creation.Hub!;
+        var layout = new DeterministicMachineLayout(
+            new MachineLayoutRuntimeConfiguration(
+                "main",
+                "Main",
+                new LayoutComponentRuntimeConfiguration[]
+                {
+                    new ConveyorRuntimeConfiguration(
+                        "conveyor-first",
+                        "First station conveyor",
+                        "do.conveyor.first.run",
+                        "do.conveyor.first.reverse",
+                        10,
+                        0.1,
+                        new LayoutRuntimeTransform(0, 0, 0),
+                        new LayoutRuntimeSize(100, 40)),
+                    new WorkpieceRuntimeConfiguration(
+                        "workpiece-first",
+                        "First station workpiece",
+                        "Test Part",
+                        "conveyor-first",
+                        WorkpieceInspectionState.Pending,
+                        new LayoutRuntimeTransform(-40, 0, 0),
+                        new LayoutRuntimeSize(20, 20)),
+                    new ConveyorRuntimeConfiguration(
+                        "conveyor-second",
+                        "Second station conveyor",
+                        "do.conveyor.second.run",
+                        "do.conveyor.second.reverse",
+                        10,
+                        0.1,
+                        new LayoutRuntimeTransform(0, 100, 0),
+                        new LayoutRuntimeSize(100, 40)),
+                    new WorkpieceRuntimeConfiguration(
+                        "workpiece-second",
+                        "Second station workpiece",
+                        "Test Part",
+                        "conveyor-second",
+                        WorkpieceInspectionState.Pending,
+                        new LayoutRuntimeTransform(-40, 100, 0),
+                        new LayoutRuntimeSize(20, 20))
+                }),
+            hub);
+        layout.Reset();
+        Assert.True(hub.SetDigitalOutput(
+            "do.conveyor.first.run",
+            firstConveyorRunning,
+            SignalWriteOwner.EmbeddedSequence).IsAccepted);
+        Assert.True(hub.SetDigitalOutput(
+            "do.conveyor.second.run",
+            secondConveyorRunning,
+            SignalWriteOwner.EmbeddedSequence).IsAccepted);
+
+        MachineLayoutTickResult tick = layout.Tick(EmptyAxes());
+
+        AssertWorkpiece(tick.Components, "workpiece-first", expectedFirstX, 0);
+        AssertWorkpiece(tick.Components, "workpiece-second", expectedSecondX, 100);
+    }
+
     [Fact]
     public void Configuration_WorkpieceOutsideConveyor_IsRejected()
     {
@@ -340,8 +419,15 @@ public sealed class DeterministicConveyorWorkpieceTests
         IEnumerable<LayoutComponentSnapshot> snapshots,
         double expectedX,
         double expectedY)
+        => AssertWorkpiece(snapshots, "workpiece-1", expectedX, expectedY);
+
+    private static void AssertWorkpiece(
+        IEnumerable<LayoutComponentSnapshot> snapshots,
+        string workpieceId,
+        double expectedX,
+        double expectedY)
     {
-        LayoutComponentSnapshot workpiece = Component(snapshots, "workpiece-1");
+        LayoutComponentSnapshot workpiece = Component(snapshots, workpieceId);
         Assert.Equal(expectedX, workpiece.X, precision: 10);
         Assert.Equal(expectedY, workpiece.Y, precision: 10);
         Assert.Equal(expectedX, workpiece.CarrierPosition!.Value, precision: 10);

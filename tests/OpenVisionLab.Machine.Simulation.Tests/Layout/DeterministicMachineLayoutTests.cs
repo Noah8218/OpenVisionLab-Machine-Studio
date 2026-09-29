@@ -134,6 +134,72 @@ public sealed class DeterministicMachineLayoutTests
     }
 
     [Fact]
+    public void Tick_ShortPulseIsSuppressedUntilThreeConsecutiveSamples()
+    {
+        foreach (int pulseTicks in new[] { 1, 2, 3 })
+        {
+            var hub = CreateHub("di.sensor");
+            var runtime = new DeterministicMachineLayout(
+                CreateLayout(
+                    Stage("stage", "axis-x", 0, 0, 2, 2),
+                    Sensor("sensor", "di.sensor", "stage", 3, 1, 5, 0, 2, 2)),
+                hub);
+
+            for (var tick = 0; tick < pulseTicks; tick++)
+            {
+                MachineLayoutTickResult result = runtime.Tick(Axes(Axis("axis-x", 4)));
+                LayoutComponentSnapshot sensor = SensorSnapshot(result);
+                bool expectedLogicalValue = pulseTicks == 3 && tick == 2;
+
+                Assert.Equal(expectedLogicalValue, sensor.IsDetected);
+                Assert.Equal(expectedLogicalValue, hub.ReadDigitalSignal("di.sensor").Value);
+                Assert.Equal(
+                    expectedLogicalValue ? 0 : tick + 1,
+                    sensor.PendingTransitionTicks);
+            }
+
+            MachineLayoutTickResult released = runtime.Tick(Axes(Axis("axis-x", 0)));
+            Assert.False(SensorSnapshot(released).IsDetected);
+            Assert.False(hub.ReadDigitalSignal("di.sensor").Value);
+        }
+    }
+
+    [Fact]
+    public void Tick_ForcedValueDuringRawChangeSeparatesLogicalNominalAndEffectiveValues()
+    {
+        var hub = CreateHub("di.sensor");
+        var runtime = new DeterministicMachineLayout(
+            CreateLayout(
+                Stage("stage", "axis-x", 0, 0, 2, 2),
+                Sensor("sensor", "di.sensor", "stage", 2, 2, 5, 0, 2, 2)),
+            hub);
+
+        MachineLayoutTickResult pending = runtime.Tick(Axes(Axis("axis-x", 4)));
+        Assert.False(SensorSnapshot(pending).IsDetected);
+        Assert.False(hub.ReadDigitalSignal("di.sensor").Value);
+
+        DigitalInputOverrideResult forced = hub.SetDigitalInputOverride("di.sensor", true);
+        Assert.True(forced.IsAccepted);
+
+        MachineLayoutTickResult released = runtime.Tick(Axes(Axis("axis-x", 0)));
+        DigitalSignalSnapshot signal = hub.CaptureSnapshot().Signals.Single();
+
+        Assert.False(SensorSnapshot(released).IsDetected);
+        Assert.True(signal.Value);
+        Assert.False(signal.NominalValue);
+        Assert.True(signal.OverrideValue);
+
+        DigitalInputOverrideResult cleared = hub.SetDigitalInputOverride("di.sensor", null);
+        Assert.True(cleared.IsAccepted);
+        Assert.False(hub.ReadDigitalSignal("di.sensor").Value);
+
+        hub.Reset();
+        runtime.Reset();
+        Assert.False(runtime.CaptureSnapshots().Single(component => component.Id == "sensor").IsDetected);
+        Assert.False(hub.ReadDigitalSignal("di.sensor").Value);
+    }
+
+    [Fact]
     public void Tick_UsesSimulationComponentOwnershipWhileOutputsRemainSequenceOwned()
     {
         var hub = DeterministicSignalHub.Create(new[]

@@ -23,6 +23,7 @@ public enum SequenceExecutionErrorCode
     SequenceWatchdogTimedOut,
     SubsequenceDepthExceeded,
     CameraTriggerFailed,
+    WorkpieceOperationFailed,
     VisionResultNotTriggered,
     VisionResultReadFailed,
     VisionResultFaulted,

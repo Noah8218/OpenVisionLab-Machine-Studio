@@ -135,8 +135,8 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
     internal Task PauseAsync(CancellationToken cancellationToken = default) =>
         ExecuteSerializedAsync(PauseCoreAsync, cancellationToken);
 
-    internal Task<bool> PauseForDesignModeAsync(CancellationToken cancellationToken = default) =>
-        ExecuteSerializedResultAsync(PauseForDesignModeCoreAsync, cancellationToken);
+    internal Task<bool> ResetForDesignModeAsync(CancellationToken cancellationToken = default) =>
+        IsBusy ? Task.FromResult(false) : ExecuteSerializedResultAsync(ResetForDesignModeCoreAsync, cancellationToken);
 
     internal Task AbortSequenceAsync(CancellationToken cancellationToken = default) =>
         ExecuteSerializedAsync(AbortSequenceCoreAsync, cancellationToken);
@@ -167,7 +167,6 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             return;
         }
 
-        _setDesignMode(false);
         var state = _getState();
         if (state.HasAutomaticRun)
         {
@@ -216,6 +215,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
                 return;
             }
 
+            _setDesignMode(false);
             _setRunning(true);
             _setStatus("Automatic simulation running");
             _log("Simulation", $"Simulation ON requested · {ShortCommandId(automaticCommand)}");
@@ -227,6 +227,11 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
                 cancellationToken))
         {
             return;
+        }
+
+        if (state.HasEmbeddedSequence)
+        {
+            _setDesignMode(false);
         }
 
         await DispatchPlayAsync(
@@ -255,6 +260,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             return;
         }
 
+        _setDesignMode(false);
         _setRunning(true);
         _setStatus(acceptedStatus);
         _log("Simulation", $"{acceptedLogPrefix} · {ShortCommandId(command)}");
@@ -286,22 +292,22 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
         _log("Simulation", $"Pause requested · {ShortCommandId(command)}");
     }
 
-    private async Task<bool> PauseForDesignModeCoreAsync(CancellationToken cancellationToken)
+    private async Task<bool> ResetForDesignModeCoreAsync(CancellationToken cancellationToken)
     {
         var state = _getState();
-        if (!state.IsRunning)
+        if (!state.IsRunMode)
         {
             return true;
         }
 
-        if (!SimulationRunControlAdmissionPolicy.CanPause(state))
+        if (state.IsApplyingProject || state.IsValidationBusy)
         {
-            _log("Simulation", "Design mode pause rejected by the current run-control state.");
+            _log("Simulation", "Design mode reset rejected by the current run-control state.");
             return false;
         }
 
         var operationGeneration = Volatile.Read(ref _operationGeneration);
-        var command = new PauseCommand();
+        var command = new ResetCommand();
         var result = await _engine.EnqueueCommandAsync(command, cancellationToken);
         if (!IsOperationCurrent(operationGeneration))
         {
@@ -310,13 +316,15 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
 
         if (!result.IsAccepted)
         {
-            _log("Simulation", $"Design mode pause rejected · {result.ErrorCode}: {result.Detail}");
+            _log("Simulation", $"Design mode reset rejected · {result.ErrorCode}: {result.Detail}");
             return false;
         }
 
         _setRunning(false);
-        _setStatus("Simulation paused before entering Design mode");
-        _log("Simulation", $"Design mode pause requested · {ShortCommandId(command)}");
+        _cancelVisionCapture();
+        _applySnapshot(_engine.CurrentSnapshot);
+        _setStatus("Simulation ended and reset before entering Design mode");
+        _log("Simulation", $"Design mode reset requested · {ShortCommandId(command)}");
         return true;
     }
 
@@ -351,6 +359,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             return;
         }
 
+        _setRunning(false);
         _applySnapshot(_engine.CurrentSnapshot);
         _setStatus(OpenVisionLanguageService.T(
             "Shell.SequenceAbortedStatus",

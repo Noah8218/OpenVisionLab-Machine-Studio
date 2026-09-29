@@ -361,6 +361,7 @@
                             </Style>
                         </TextBlock.Style>
                     </TextBlock>
+
                     <TextBlock x:Name="RecipeReadinessComparisonText"
                                Grid.Row="4"
                                Margin="0,5,0,0"

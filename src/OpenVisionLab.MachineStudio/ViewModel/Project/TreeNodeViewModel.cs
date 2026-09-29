@@ -8,6 +8,7 @@ public sealed class TreeNodeViewModel : ViewModelBase
     private readonly TreeNode _node;
     private bool _isSelected;
     private bool _isExpanded = true;
+    private bool _isVisible = true;
 
     public TreeNodeViewModel(TreeNode node, TreeNodeViewModel? parent)
     {
@@ -37,6 +38,12 @@ public sealed class TreeNodeViewModel : ViewModelBase
     {
         get => _isExpanded;
         set => SetProperty(ref _isExpanded, value);
+    }
+
+    public bool IsVisible
+    {
+        get => _isVisible;
+        internal set => SetProperty(ref _isVisible, value);
     }
 
 }

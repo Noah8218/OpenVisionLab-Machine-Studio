@@ -260,6 +260,78 @@ public sealed class SimulationRuntimeLoopTests
             presentedEvents.Select(item => item.EventIndex));
     }
 
+    [Fact]
+    public async Task SlowCanonicalConsumerCannotPromoteAnOverflowToCompleteEvidence()
+    {
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings
+            {
+                FixedStep = TimeSpan.FromMilliseconds(1),
+                TimeScale = 1,
+                EventBufferCapacity = 1,
+                CanonicalEventJournalCapacity = 2
+            });
+        var initialRuntimeApplied = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstCanonicalEventSeen = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCanonicalConsumer = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var journalCompleted = new TaskCompletionSource<SimulationEventJournalSnapshot>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var canonicalEvents = new List<SimulationEvent>();
+        var canonicalCallbackCount = 0;
+        var unhandledExceptions = new List<Exception>();
+        using var loop = new SimulationRuntimeLoop(
+            engine,
+            static action =>
+            {
+                action();
+                return Task.CompletedTask;
+            },
+            _ => { },
+            _ => { },
+            () => initialRuntimeApplied.TrySetResult(true),
+            _ => { },
+            _ => { },
+            _ => { },
+            unhandledExceptions.Add,
+            runtimeEvent =>
+            {
+                canonicalEvents.Add(runtimeEvent);
+                if (Interlocked.Increment(ref canonicalCallbackCount) == 1)
+                {
+                    firstCanonicalEventSeen.TrySetResult(true);
+                    releaseCanonicalConsumer.Task.GetAwaiter().GetResult();
+                }
+            },
+            journal => journalCompleted.TrySetResult(journal));
+
+        loop.Start(new SimulationRuntimeConfiguration([], [], []), "project-a");
+        await initialRuntimeApplied.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await firstCanonicalEventSeen.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var results = await Task.WhenAll(
+            Enumerable.Range(0, 8)
+                .Select(_ => engine.EnqueueCommandAsync(new StepCommand())));
+        Assert.All(results, result => Assert.True(result.IsAccepted, result.Detail));
+
+        releaseCanonicalConsumer.TrySetResult(true);
+        await engine.StopAsync();
+        await loop.RuntimeTask.WaitAsync(TimeSpan.FromSeconds(2));
+        var journal = await journalCompleted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.False(journal.IsComplete);
+        Assert.Equal(2, journal.Capacity);
+        Assert.Equal(2, journal.StoredEventCount);
+        Assert.True(journal.TotalEventCount > journal.StoredEventCount);
+        Assert.Equal(3, journal.FirstMissingEventIndex);
+        Assert.Equal(journal.StoredEventCount, canonicalEvents.Count);
+        Assert.Equal([1L, 2L], canonicalEvents.Select(item => item.EventIndex));
+        Assert.True(loop.CanonicalEventConsumption.IsCompleted);
+        Assert.Empty(unhandledExceptions);
+    }
+
     private static async Task WaitForAsync(Func<bool> condition)
     {
         var timeout = DateTime.UtcNow.AddSeconds(5);

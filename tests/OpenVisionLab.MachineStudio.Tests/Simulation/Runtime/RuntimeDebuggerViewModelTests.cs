@@ -15,6 +15,38 @@ namespace OpenVisionLab.MachineStudio.Tests;
 public sealed class RuntimeDebuggerViewModelTests
 {
     [Fact]
+    public async Task SemanticStep_UsesActiveSequence_RejectsDuplicatesAndRunning_ThenRecovers()
+    {
+        OpenVisionLanguageService.Load();
+        var commands = new List<SimulationCommand>();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var viewModel = new RuntimeDebuggerViewModel(async command =>
+        {
+            commands.Add(command);
+            await gate.Task;
+            return Accepted(command);
+        });
+        viewModel.LoadProject(CreateProject(), resetSession: true);
+        viewModel.SetEnabled(true, invalidateCommands: true);
+        Assert.False(viewModel.SemanticStepCommand.CanExecute(null));
+        viewModel.ApplySnapshot(CreateSnapshot());
+        Assert.True(viewModel.SemanticStepCommand.CanExecute(null));
+        viewModel.SemanticStepCommand.Execute(null);
+        await WaitUntilAsync(() => commands.Count == 1);
+        Assert.False(viewModel.SemanticStepCommand.CanExecute(null));
+        viewModel.SemanticStepCommand.Execute(null);
+        Assert.Equal("cycle", Assert.IsType<StepSequenceCommand>(Assert.Single(commands)).SequenceId);
+        gate.SetResult();
+        await WaitUntilAsync(() => !viewModel.IsOperationPending);
+        viewModel.ApplySnapshot(CreateSnapshot(runMode: SimulationRunMode.RealTime));
+        Assert.False(viewModel.SemanticStepCommand.CanExecute(null));
+        viewModel.ApplySnapshot(CreateSnapshot());
+        Assert.True(viewModel.SemanticStepCommand.CanExecute(null));
+        viewModel.SetEnabled(false, invalidateCommands: true);
+        Assert.False(viewModel.SemanticStepCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task Commands_UseSelectedRuntimeTargets_AndPreventRepeatedExecution()
     {
         OpenVisionLanguageService.Load();
@@ -248,6 +280,42 @@ public sealed class RuntimeDebuggerViewModelTests
         Assert.Equal(
             OpenVisionLanguageService.T("Debugger.RecoveryRetry"),
             alarm.RecoveryText);
+    }
+
+    [Fact]
+    public void Snapshot_ProjectsRecoveredWorkpieceFailureAndClearsItAfterReset()
+    {
+        OpenVisionLanguageService.Load();
+        using var viewModel = new RuntimeDebuggerViewModel(command => Task.FromResult(Accepted(command)));
+        viewModel.LoadProject(CreateProject(), resetSession: true);
+        viewModel.SetEnabled(true, invalidateCommands: true);
+        var recoveredSequence = new SequenceExecutionSnapshot(
+            "cycle",
+            SequenceExecutionStatus.Completed,
+            "complete",
+            2,
+            TimeSpan.FromMilliseconds(25),
+            TimeSpan.FromMilliseconds(25),
+            5,
+            new SequenceExecutionError(
+                SequenceExecutionErrorCode.WorkpieceOperationFailed,
+                "cycle",
+                "feed-a-again",
+                "The target workpiece position is occupied."),
+            TimeSpan.FromSeconds(10));
+
+        viewModel.ApplySnapshot(CreateSnapshot(sequence: recoveredSequence));
+
+        var alarm = Assert.Single(viewModel.Alarms);
+        Assert.Equal("Main cycle", alarm.Source);
+        Assert.Contains(nameof(SequenceExecutionErrorCode.WorkpieceOperationFailed), alarm.State, StringComparison.Ordinal);
+        Assert.Equal(OpenVisionLanguageService.T("Debugger.RecoveryReset"), alarm.RecoveryText);
+
+        viewModel.ApplySnapshot(CreateSnapshot(sequence: recoveredSequence with { LastError = null }));
+
+        Assert.Empty(viewModel.Alarms);
+        Assert.False(alarm.IsActive);
+        Assert.Same(alarm, Assert.Single(viewModel.AlarmHistory));
     }
 
     [Fact]
@@ -781,10 +849,11 @@ public sealed class RuntimeDebuggerViewModelTests
         SequenceDebugSnapshot? debug = null,
         IEnumerable<SimulationFaultSnapshot>? faults = null,
         SequenceExecutionSnapshot? sequence = null,
-        string axisName = "Axis X") => new(
+        string axisName = "Axis X",
+        SimulationRunMode runMode = SimulationRunMode.Paused) => new(
         TimeSpan.FromMilliseconds(25),
         5,
-        SimulationRunMode.Paused,
+        runMode,
         SimulationControlOwner.EmbeddedSequence,
         1,
         [new OpenVisionLab.Machine.Simulation.Axis.AxisSnapshot("axis-x", axisName, OpenVisionLab.Machine.Simulation.Axis.AxisState.Idle, 12.5, 0)],

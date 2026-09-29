@@ -15,6 +15,7 @@ public sealed class LayoutAuthoringWorkspace : IDisposable
     private readonly Func<bool> _isSceneEditable;
     private readonly Func<bool> _isApplyingProject;
     private readonly Func<bool> _canExecuteSessionCommand;
+    private readonly Func<bool> _resolvePendingPlacementDraft;
     private readonly LayoutAuthoringHistoryViewModel _history;
     private readonly LayoutAuthoringMutationWorkflow _mutations;
     private readonly LayoutSelectionCommandWorkflow _selectionCommands;
@@ -33,6 +34,7 @@ public sealed class LayoutAuthoringWorkspace : IDisposable
     internal LayoutAuthoringWorkspace(
         MachineLayoutViewModel layout,
         Func<MachineProjectDocument> projectProvider,
+        Func<string?> selectedUnitIdProvider,
         Func<bool> isSceneEditable,
         Func<bool> isApplyingProject,
         Func<bool> canExecuteSessionCommand,
@@ -42,12 +44,15 @@ public sealed class LayoutAuthoringWorkspace : IDisposable
         Action notifyHostCommandsChanged,
         Action<string> setStatusMessage,
         Action<string, string> log,
-        Action onDefinitionChanged)
+        Action onDefinitionChanged,
+        Func<IReadOnlyList<LayoutComponentDefinition>, IReadOnlyList<LayoutComponentRemovalImpact>, bool> confirmRemoval,
+        Func<bool>? resolvePendingPlacementDraft = null)
     {
         _layout = layout ?? throw new ArgumentNullException(nameof(layout));
         _isSceneEditable = isSceneEditable ?? throw new ArgumentNullException(nameof(isSceneEditable));
         _isApplyingProject = isApplyingProject ?? throw new ArgumentNullException(nameof(isApplyingProject));
         _canExecuteSessionCommand = canExecuteSessionCommand ?? throw new ArgumentNullException(nameof(canExecuteSessionCommand));
+        _resolvePendingPlacementDraft = resolvePendingPlacementDraft ?? (() => true);
         _history = new LayoutAuthoringHistoryViewModel(
             layout,
             projectProvider,
@@ -59,19 +64,22 @@ public sealed class LayoutAuthoringWorkspace : IDisposable
             notifyHostCommandsChanged,
             setStatusMessage,
             log,
-            onDefinitionChanged);
+            onDefinitionChanged,
+            _resolvePendingPlacementDraft);
         _mutations = new LayoutAuthoringMutationWorkflow(
             layout,
             new LayoutComponentAuthoringService(),
             _history,
             projectProvider,
+            selectedUnitIdProvider,
             isSceneEditable,
             isApplyingProject,
             markProjectChanged,
             updateRunToolAvailability,
             refreshDefinitionPresentation,
             setStatusMessage,
-            log);
+            log,
+            confirmRemoval);
         _selectionCommands = new LayoutSelectionCommandWorkflow(layout, setStatusMessage);
         _sceneInteraction = new SceneViewportInteractionWorkflow(layout, _mutations.TryAdd);
     }
@@ -82,7 +90,7 @@ public sealed class LayoutAuthoringWorkspace : IDisposable
     public ICommand DeleteLayoutComponentCommand => _deleteLayoutComponentCommand ??=
         CreateCommand(
             _ => _mutations.TryRemoveSelected(),
-            _ => CanEdit && _layout.SelectionCount == 1 && _layout.SelectedItem?.Component is not null);
+            _ => CanEdit && _layout.HasSelection && _layout.SelectedItems.All(item => item.Component is not null));
 
     public ICommand SceneSelectionRequestedCommand => _sceneSelectionRequestedCommand ??=
         CreateCommand(_sceneInteraction.HandleSelection);
@@ -123,7 +131,10 @@ public sealed class LayoutAuthoringWorkspace : IDisposable
     private bool CanEdit => _isSceneEditable() && !_isApplyingProject();
 
     public bool TryAddComponent(LayoutComponentKind kind, double? worldX = null, double? worldY = null) =>
-        _mutations.TryAdd(kind, worldX, worldY);
+        _resolvePendingPlacementDraft() && _mutations.TryAdd(kind, worldX, worldY);
+
+    public bool TryMoveSelectionBy(double deltaX, double deltaY) =>
+        _canExecuteSessionCommand() && CanEdit && _resolvePendingPlacementDraft() && _selectionCommands.MoveBy(deltaX, deltaY);
 
     public void Reset()
     {
@@ -150,7 +161,7 @@ public sealed class LayoutAuthoringWorkspace : IDisposable
     }
 
     private RelayCommand CreateCommand(Action<object?> execute, Predicate<object?>? canExecute = null) => new(
-        execute,
+        parameter => { if (_resolvePendingPlacementDraft()) execute(parameter); },
         parameter => _canExecuteSessionCommand() && (canExecute?.Invoke(parameter) ?? true),
         useCommandManagerRequery: false);
 

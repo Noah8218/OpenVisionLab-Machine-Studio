@@ -1,6 +1,7 @@
 using Microsoft.Xaml.Behaviors;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using OpenVisionLab.MachineStudio.ViewModel;
 
 namespace OpenVisionLab.MachineStudio.Behavior;
@@ -37,6 +38,16 @@ public sealed class TreeViewSelectedItemBehavior : Behavior<TreeView>
         if (e.NewValue is TreeNodeViewModel node)
         {
             SelectedItem = node;
+            BindingOperations.GetBindingExpression(this, SelectedItemProperty)?.UpdateTarget();
+            if (!ReferenceEquals(SelectedItem, node))
+            {
+                node.IsSelected = false;
+                if (SelectedItem is { } retained)
+                {
+                    var container = FindTreeViewItem(AssociatedObject, retained);
+                    if (container is not null) container.IsSelected = true;
+                }
+            }
         }
     }
 

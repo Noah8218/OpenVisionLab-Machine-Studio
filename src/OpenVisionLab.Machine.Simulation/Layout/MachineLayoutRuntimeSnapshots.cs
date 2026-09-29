@@ -30,7 +30,9 @@ public sealed record LayoutComponentSnapshot(
     WorkpieceInspectionState? InspectionState = null,
     string? SensorOutputChannelId = null,
     string? TransferOwnerId = null,
-    WaferHandlerOwnershipState? TransferOwnershipState = null);
+    WaferHandlerOwnershipState? TransferOwnershipState = null,
+    string? WorkpieceInstanceId = null,
+    bool? IsWorkpiecePresent = null);
 
 public enum ConveyorDirection
 {

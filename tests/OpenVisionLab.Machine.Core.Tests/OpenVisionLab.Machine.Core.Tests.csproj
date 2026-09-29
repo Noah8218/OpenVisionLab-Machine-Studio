@@ -32,6 +32,9 @@
     <None Include="..\..\samples\AutomaticTransferCell\AutomaticTransferCell.ovmachine" Link="AutomaticTransferCell.ovmachine">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="..\..\samples\LargeLayoutExploration\LargeLayoutExploration.ovmachine" Link="LargeLayoutExploration.ovmachine">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -14,6 +14,7 @@ internal sealed class MachineProjectRuntimeSequenceCompiler
         IReadOnlyDictionary<string, ChannelKind> channelKinds,
         IEnumerable<AxisConfiguration> axes,
         IEnumerable<VirtualCameraConfiguration> cameras,
+        IEnumerable<string> workpieceComponentIds,
         ICollection<MachineProjectRuntimeCompilationError> errors)
     {
         var definitionList = definitions.ToArray();
@@ -23,7 +24,8 @@ internal sealed class MachineProjectRuntimeSequenceCompiler
             cameras.Select(camera => camera.Id),
             definitionList
                 .Where(definition => definition is not null)
-                .Select(definition => definition.Id));
+                .Select(definition => definition.Id),
+            workpieceComponentIds);
         var compiler = new SequenceCompiler();
         var compiled = new List<CompiledSequence>();
         var ids = new HashSet<string>(StringComparer.Ordinal);

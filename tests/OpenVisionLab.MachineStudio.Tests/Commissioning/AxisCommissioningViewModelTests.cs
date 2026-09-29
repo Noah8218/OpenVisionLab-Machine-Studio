@@ -66,6 +66,43 @@ public sealed class AxisCommissioningViewModelTests
     }
 
     [Fact]
+    public void ModeOnlyProjectionRefreshRaisesOnlyAxisCommandGates()
+    {
+        var viewModel = new AxisCommissioningViewModel(
+            (command, _) => Task.FromResult(CreateAcceptedResult(command)),
+            _ => { });
+        var projection = new AxisCommissioningProjection(
+            new AxisSnapshot("axis.x", "X Axis", AxisState.Idle, 12.5, 0),
+            new VirtualAxisDefinition
+            {
+                Id = "axis.x",
+                SoftLimitMin = 0,
+                SoftLimitMax = 100,
+                MaxVelocity = 50
+            },
+            HasSelectedAxisStage: true,
+            IsRunMode: true,
+            IsApplyingProject: false,
+            IsValidationBusy: false,
+            RuntimeDefinitionDirty: false,
+            IsRunning: true,
+            ControlOwner: SimulationControlOwner.Manual,
+            AutomaticRunActive: false,
+            SequenceRunActive: false);
+
+        viewModel.ApplyProjection(projection, invalidateCommands: false);
+        var changedProperties = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        viewModel.ApplyProjection(projection with { IsRunMode = false }, invalidateCommands: false);
+
+        Assert.Contains(nameof(AxisCommissioningViewModel.CanMoveAxisAbsolute), changedProperties);
+        Assert.Contains(nameof(AxisCommissioningViewModel.CanJogAxis), changedProperties);
+        Assert.DoesNotContain(nameof(AxisCommissioningViewModel.CurrentAxisName), changedProperties);
+        Assert.DoesNotContain(nameof(AxisCommissioningViewModel.AxisTargetPositionValidationText), changedProperties);
+    }
+
+    [Fact]
     public void ProjectionGatesCommandsWithoutChangingRuntimeState()
     {
         var dispatchCount = 0;

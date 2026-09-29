@@ -160,6 +160,7 @@ internal sealed class LayoutComponentClipboard
             LayoutComponentKind.PneumaticCylinder => "cylinder",
             LayoutComponentKind.Conveyor => "conveyor",
             LayoutComponentKind.Workpiece => "workpiece",
+            LayoutComponentKind.Camera => "camera",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
         var id = $"{prefix}-{NextOrdinal(prefix, usedIds)}";

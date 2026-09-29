@@ -6,3 +6,10 @@ internal enum UnsavedProjectDecision
     Discard,
     Cancel
 }
+
+internal enum PlacementDraftDecision
+{
+    Apply,
+    Discard,
+    Cancel
+}

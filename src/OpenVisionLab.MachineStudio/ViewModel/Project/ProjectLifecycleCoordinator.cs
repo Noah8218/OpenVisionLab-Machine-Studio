@@ -29,6 +29,8 @@ internal sealed record ProjectSaveLifecycleResult(
 /// </summary>
 internal sealed class ProjectLifecycleCoordinator
 {
+    internal const int NewProjectNameMaxLength = 60;
+
     private readonly ProjectDocumentStore _projectStore = new();
     private readonly ProjectDocumentFileStore _projectFileStore;
     private readonly ProjectDocumentSession _projectSession;
@@ -45,6 +47,7 @@ internal sealed class ProjectLifecycleCoordinator
     private readonly Func<string, string?> _selectProjectSaveAsPath;
     private readonly Func<string, string?> _selectRecipeCopyDestination;
     private readonly string? _startupSamplePath;
+    private readonly string? _largeLayoutSamplePath;
 
     internal ProjectLifecycleCoordinator(
         MachineProjectDocument initialProject,
@@ -63,7 +66,8 @@ internal sealed class ProjectLifecycleCoordinator
         Action<Exception> handleProjectSaveFailure,
         Func<string, string?> selectProjectSaveAsPath,
         Func<string, string?> selectRecipeCopyDestination,
-        Func<string> getRecipeOverwriteRejectedMessage)
+        Func<string> getRecipeOverwriteRejectedMessage,
+        string? largeLayoutSamplePath = null)
     {
         _applyProject = applyProject ?? throw new ArgumentNullException(nameof(applyProject));
         _onTransitionCompleted = onTransitionCompleted
@@ -77,6 +81,7 @@ internal sealed class ProjectLifecycleCoordinator
         _selectRecipeCopyDestination = selectRecipeCopyDestination
             ?? throw new ArgumentNullException(nameof(selectRecipeCopyDestination));
         _startupSamplePath = NormalizePath(startupSamplePath);
+        _largeLayoutSamplePath = NormalizePath(largeLayoutSamplePath);
         _projectFileStore = new(_projectStore);
         _projectSession = new(
             _projectStore,
@@ -127,6 +132,8 @@ internal sealed class ProjectLifecycleCoordinator
 
     internal bool HasStartupSample => _startupSamplePath is not null;
 
+    internal bool HasLargeLayoutSample => _largeLayoutSamplePath is not null;
+
     internal string SerializeForEvidence() => _projectSession.SerializeForEvidence();
 
     internal void ReplaceProject(MachineProjectDocument project) => _projectSession.ReplaceProject(project);
@@ -146,10 +153,29 @@ internal sealed class ProjectLifecycleCoordinator
         _operationGate.RunAsync(() => _projectOpenWorkflow.OpenAsync(path, replaceCurrent: true));
 
     internal Task<bool> CreateNewProjectAsync() =>
-        _operationGate.RunAsync(CreateNewProjectCoreAsync);
+        _operationGate.RunAsync(() => CreateNewProjectCoreAsync("Untitled"));
+
+    internal Task<bool> CreateNewProjectAsync(string? name)
+    {
+        if (!TryNormalizeNewProjectName(name, out var normalizedName))
+        {
+            return Task.FromResult(false);
+        }
+
+        return _operationGate.RunAsync(() => CreateNewProjectCoreAsync(normalizedName));
+    }
+
+    internal static bool TryNormalizeNewProjectName(string? candidate, out string normalizedName)
+    {
+        normalizedName = candidate?.Trim() ?? string.Empty;
+        return normalizedName.Length is > 0 and <= NewProjectNameMaxLength;
+    }
 
     internal Task OpenBundledSampleAsync() =>
-        _operationGate.RunAsync(OpenBundledSampleCoreAsync);
+        _operationGate.RunAsync(() => OpenBundledSampleCoreAsync(_startupSamplePath));
+
+    internal Task OpenLargeLayoutSampleAsync() =>
+        _operationGate.RunAsync(() => OpenBundledSampleCoreAsync(_largeLayoutSamplePath));
 
     internal Task SaveProjectAsync(string path) =>
         _projectSaveParticipant.TrackSaveAsync(
@@ -219,10 +245,10 @@ internal sealed class ProjectLifecycleCoordinator
         return await ApplyOpenedProjectAsync(recoveredProject);
     }
 
-    private async Task<bool> CreateNewProjectCoreAsync()
+    private async Task<bool> CreateNewProjectCoreAsync(string name)
     {
         if (!await ResolveUnsavedChangesCoreAsync()
-            || !await _applyProject(new MachineProjectDocument { Name = "Untitled" }))
+            || !await _applyProject(new MachineProjectDocument { Name = name }))
         {
             return false;
         }
@@ -235,14 +261,14 @@ internal sealed class ProjectLifecycleCoordinator
         return true;
     }
 
-    private async Task OpenBundledSampleCoreAsync()
+    private async Task OpenBundledSampleCoreAsync(string? samplePath)
     {
-        if (_startupSamplePath is null)
+        if (samplePath is null)
         {
             return;
         }
 
-        var loadResult = await _projectFileStore.LoadWithProvenanceAsync(_startupSamplePath);
+        var loadResult = await _projectFileStore.LoadWithProvenanceAsync(samplePath);
         if (!await _applyProject(loadResult.Document))
         {
             return;

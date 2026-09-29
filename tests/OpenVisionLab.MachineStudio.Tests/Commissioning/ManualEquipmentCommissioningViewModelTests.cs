@@ -36,6 +36,30 @@ public sealed class ManualEquipmentCommissioningViewModelTests
     }
 
     [Fact]
+    public void ModeOnlyProjectionRefreshRaisesOnlyManualCommandGates()
+    {
+        var projection = CreateProjection(LayoutComponentKind.Conveyor, "conveyor-1");
+        using var engine = new RecordingSimulationEngine();
+        using var workspace = new ManualEquipmentCommissioningViewModel(
+            new EquipmentCommandDispatcher(engine, _ => { }, (_, _) => { }),
+            _ => projection,
+            () => LayoutComponentKind.Conveyor,
+            () => { },
+            _ => { });
+
+        workspace.ApplyProjection(projection, invalidateCommands: false);
+        var changedProperties = new List<string?>();
+        workspace.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        workspace.ApplyProjection(projection with { IsRunMode = false }, invalidateCommands: false);
+
+        Assert.Contains(nameof(ManualEquipmentCommissioningViewModel.CanStartManualEquipmentControl), changedProperties);
+        Assert.Contains(nameof(ManualEquipmentCommissioningViewModel.CanRunConveyorForward), changedProperties);
+        Assert.DoesNotContain(nameof(ManualEquipmentCommissioningViewModel.HasSelectedManualEquipment), changedProperties);
+        Assert.DoesNotContain(nameof(ManualEquipmentCommissioningViewModel.ConveyorCommissioningHintText), changedProperties);
+    }
+
+    [Fact]
     public void SessionCloseAndDisposeGateEveryManualCommand()
     {
         var projection = CreateProjection(LayoutComponentKind.DigitalSensor, "sensor-1");

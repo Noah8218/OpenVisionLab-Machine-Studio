@@ -19,6 +19,14 @@ public sealed class LayoutComponentDefinition
     [JsonPropertyName("size")]
     public Size2D Size { get; set; } = new();
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("unitId")]
+    public string? UnitId { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("verticalEnvelope")]
+    public LayoutVerticalEnvelope? VerticalEnvelope { get; set; }
+
     [JsonPropertyName("zIndex")]
     public int ZIndex { get; set; }
 

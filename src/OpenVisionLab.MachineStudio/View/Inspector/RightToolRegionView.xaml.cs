@@ -32,7 +32,6 @@ public partial class RightToolRegionView : UserControl
 
     public TextBox IntegrationTcpListenAddressTextBoxControl => IntegrationTcpListenAddressTextBox;
 
-    public TextBlock IntegrationSetupWorkflowStatusTextBlockControl => IntegrationSetupWorkflowStatusTextBlock;
     public TextBox IntegrationTcpListenPortTextBoxControl => IntegrationTcpListenPortTextBox;
     public TextBox IntegrationTcpPeerHostTextBoxControl => IntegrationTcpPeerHostTextBox;
     public TextBox IntegrationTcpPeerPortTextBoxControl => IntegrationTcpPeerPortTextBox;
@@ -49,13 +48,4 @@ public partial class RightToolRegionView : UserControl
     public ListBox MmiRecipeListControl => MmiRecipeList;
     public Button AddMmiRecipeButtonControl => AddMmiRecipeButton;
     public Button RemoveMmiRecipeButtonControl => RemoveMmiRecipeButton;
-    public Button ApplyIntegrationResultToSimulationButtonControl => ApplyIntegrationResultToSimulationButton;
-    public Expander MachineIntegrationTransactionHistoryExpanderControl => MachineIntegrationTransactionHistoryExpander;
-    public ComboBox MachineIntegrationTransactionHistoryFilterControl => MachineIntegrationTransactionHistoryFilter;
-    public TextBlock MachineIntegrationTransactionHistoryEmptyTextBlockControl => MachineIntegrationTransactionHistoryEmptyText;
-    public ListBox MachineIntegrationTransactionHistoryListControl => MachineIntegrationTransactionHistoryList;
-    public Expander MachineIntegrationTransactionDiagnosticsExpanderControl => MachineIntegrationTransactionDiagnosticsExpander;
-    public ComboBox MachineIntegrationTransactionDiagnosticsFilterControl => MachineIntegrationTransactionDiagnosticsFilter;
-    public TextBlock MachineIntegrationTransactionDiagnosticsEmptyTextBlockControl => MachineIntegrationTransactionDiagnosticsEmptyText;
-    public ListBox MachineIntegrationTransactionDiagnosticsListControl => MachineIntegrationTransactionDiagnosticsList;
 }

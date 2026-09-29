@@ -99,4 +99,36 @@ public sealed class SequenceStepNormalizationTests
         Assert.Equal(0, step.TimeoutMs);
         Assert.Null(step.FailureStepId);
     }
+
+    [Fact]
+    public void NormalizeStep_WorkpieceActionsKeepTheirExplicitTargetAndClearDeviceFields()
+    {
+        SequenceAuthoringTarget[] targets =
+        [
+            new("workpiece-1", "Wafer position", SequenceAuthoringTargetKind.Workpiece),
+            new("axis-1", "Transfer axis", SequenceAuthoringTargetKind.Axis)
+        ];
+        var step = new SequenceStepDefinition
+        {
+            Action = SequenceStepAction.FeedWorkpiece,
+            TargetId = "axis-1",
+            WorkpieceComponentId = "workpiece-1",
+            Parameter = "stale",
+            TimeoutMs = 100,
+            FailureStepId = "failed"
+        };
+
+        SequenceDefinitionEditor.NormalizeStep(step, new SequenceStepTemplateCatalog(), targets);
+
+        Assert.Equal(string.Empty, step.TargetId);
+        Assert.Equal("workpiece-1", step.WorkpieceComponentId);
+        Assert.Equal(string.Empty, step.Parameter);
+        Assert.Equal(0, step.TimeoutMs);
+        Assert.Null(step.FailureStepId);
+
+        step.Action = SequenceStepAction.EjectWorkpiece;
+        SequenceDefinitionEditor.NormalizeStep(step, new SequenceStepTemplateCatalog(), targets);
+        Assert.Equal(string.Empty, step.TargetId);
+        Assert.Equal("workpiece-1", step.WorkpieceComponentId);
+    }
 }

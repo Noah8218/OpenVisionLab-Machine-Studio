@@ -776,6 +776,12 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
                 break;
         }
 
+        if (result.IsAccepted
+            && (command is StartSequenceCommand or StartAutomaticRunCommand or RetrySequenceCommand))
+        {
+            _runtimeState.EnsureWorkpieceRunStarted();
+        }
+
         EmitAtCommandBoundary(
             "Command",
             result.IsAccepted ? "CommandAccepted" : "CommandRejected",
@@ -1174,7 +1180,9 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
             && !admission.IsTerminalFailure)
         {
             _runtimeState.ClearAutomaticExternalRequestPublished();
-            _runMode = _runtimeState.AutomaticExternalResumeRealTime
+            var userPaused = SequenceRuntime.DebugState.CreateSnapshot().PauseReason
+                == SequenceDebugPauseReason.User;
+            _runMode = _runtimeState.AutomaticExternalResumeRealTime && !userPaused
                 ? SimulationRunMode.RealTime
                 : SimulationRunMode.Paused;
             EmitAtCommandBoundary(
@@ -1475,7 +1483,11 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
                 eventTime,
                 EmitSequenceRuntimeEvent,
                 _runtimeState.AutomaticExternalInspectionEnabled,
-                _runtimeState.AutomaticExternalSources);
+                _runtimeState.AutomaticExternalSources,
+                workpieceInstanceIdAccessor: componentId =>
+                    _runtimeState.MachineLayout?.GetWorkpieceInstanceId(componentId),
+                workpieceFeedHandler: _runtimeState.FeedWorkpiece,
+                workpieceEjectHandler: _runtimeState.EjectWorkpiece);
             var execution = executor.Tick(_settings.FixedStep, context);
             if (execution.Transitioned)
             {

@@ -11,5 +11,6 @@ public enum LayoutComponentKind
     DigitalSensor,
     PneumaticCylinder,
     Conveyor,
-    Workpiece
+    Workpiece,
+    Camera
 }

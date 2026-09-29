@@ -43,7 +43,8 @@ internal sealed class WaferHandlerRuntimeState
             && At(vertical.Position, Configuration.PickVerticalPosition);
         bool placeAtPosition = At(horizontal.Position, Configuration.PlaceHorizontalPosition)
             && At(vertical.Position, Configuration.PlaceVerticalPosition);
-        bool pickPermitted = State == WaferHandlerOwnershipState.Source && sourcePresent && !gateOpen && pickAtPosition;
+        bool pickPermitted = State == WaferHandlerOwnershipState.Source && _workpiece.IsPresent
+            && sourcePresent && !gateOpen && pickAtPosition;
         bool placePermitted = State == WaferHandlerOwnershipState.Handler && gateOpen && placeAtPosition;
 
         if (State != WaferHandlerOwnershipState.InterlockFault)

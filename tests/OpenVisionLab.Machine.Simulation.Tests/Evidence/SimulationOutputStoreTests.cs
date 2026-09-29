@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using OpenVisionLab.Machine.IO.Channels;
 using OpenVisionLab.Machine.Sequence.Runtime;
 using OpenVisionLab.Machine.Simulation.Commands;
@@ -150,6 +151,7 @@ public sealed class SimulationOutputStoreTests
         await engine.StopAsync();
 
         var package = await SimulationEventJournalExportPackage.CaptureAsync(engine);
+        var repeatedPackage = await SimulationEventJournalExportPackage.CaptureAsync(engine);
         var json = SimulationEventJournalExportPackage.SaveToJson(package);
         var path = Path.Combine(
             TestStorage.RootPath,
@@ -161,11 +163,66 @@ public sealed class SimulationOutputStoreTests
         Assert.True(package.CanExport);
         Assert.True(package.HasValidJournalHash());
         Assert.NotEmpty(package.Events);
+        Assert.Equal(
+            package.Events.Select(item => item.EventIndex),
+            Enumerable.Range(1, package.Events.Length).Select(index => (long)index));
+        Assert.Equal(package.JournalHash, repeatedPackage.JournalHash);
+        Assert.True(package.Events.SequenceEqual(repeatedPackage.Events));
         Assert.NotNull(restored);
         Assert.True(restored!.CanExport);
         Assert.True(restored.HasValidJournalHash());
         Assert.Equal(package.JournalHash, restored.JournalHash);
         Assert.Equal(json, SimulationEventJournalExportPackage.SaveToJson(restored));
+    }
+
+    [Fact]
+    public async Task EventJournalExport_RejectsOverflowAfterAConsumerFallsBehind()
+    {
+        using var engine = new FixedStepSimulationEngine(
+            new SimulationSettings
+            {
+                EventBufferCapacity = 1,
+                CanonicalEventJournalCapacity = 2
+            });
+        await engine.StartAsync();
+        var results = await Task.WhenAll(
+            Enumerable.Range(0, 8)
+                .Select(_ => engine.EnqueueCommandAsync(new StepCommand())));
+        Assert.All(results, result => Assert.True(result.IsAccepted, result.Detail));
+        await engine.StopAsync();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => SimulationEventJournalExportPackage.CaptureAsync(engine));
+
+        Assert.Contains(
+            "Incomplete canonical event journal evidence cannot be exported",
+            exception.Message,
+            StringComparison.Ordinal);
+        var journal = engine.EventJournal;
+        Assert.Equal(2, journal.Capacity);
+        Assert.Equal(2, journal.StoredEventCount);
+        Assert.True(journal.TotalEventCount > journal.StoredEventCount);
+        Assert.Equal(3, journal.FirstMissingEventIndex);
+        Assert.False(journal.IsComplete);
+        Assert.True(engine.EventReader.TryRead(out var latestPresentationEvent));
+        Assert.Equal(journal.LastEventIndex, latestPresentationEvent.EventIndex);
+    }
+
+    [Fact]
+    public async Task EventJournalExport_CancellationDuringCaptureDoesNotReturnPartialEvidence()
+    {
+        var source = new BlockingCanonicalEventSource();
+        using var cancellation = new CancellationTokenSource();
+        var captureTask = SimulationEventJournalExportPackage.CaptureAsync(
+            source,
+            cancellation.Token);
+
+        await source.FirstEventRead.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await captureTask);
+        Assert.False(captureTask.IsCompletedSuccessfully);
     }
 
     [Fact]
@@ -176,7 +233,7 @@ public sealed class SimulationOutputStoreTests
             StoredEventCount: 1,
             TotalEventCount: 2,
             FirstEventIndex: 1,
-            LastEventIndex: 1,
+            LastEventIndex: 2,
             IsCompleted: true,
             IsComplete: false,
             FirstMissingEventIndex: 2);
@@ -310,4 +367,34 @@ public sealed class SimulationOutputStoreTests
             0,
             Array.Empty<DigitalSignalSnapshot>(),
             Array.Empty<SequenceExecutionSnapshot>());
+
+    private sealed class BlockingCanonicalEventSource : ISimulationEventJournalSource
+    {
+        internal TaskCompletionSource<bool> FirstEventRead { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public SimulationEventJournalSnapshot EventJournal => new(
+            Capacity: 2,
+            StoredEventCount: 1,
+            TotalEventCount: 1,
+            FirstEventIndex: 1,
+            LastEventIndex: 1,
+            IsCompleted: false,
+            IsComplete: false,
+            FirstMissingEventIndex: null);
+
+        public async IAsyncEnumerable<SimulationEvent> ReadCanonicalEventsAsync(
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            yield return new SimulationEvent(
+                EventIndex: 1,
+                TickIndex: 0,
+                SimulationTime: TimeSpan.Zero,
+                Category: "Test",
+                Code: "First",
+                Message: "first");
+            FirstEventRead.TrySetResult(true);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+    }
 }

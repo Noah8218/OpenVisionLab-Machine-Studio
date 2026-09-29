@@ -45,3 +45,16 @@ included under `THIRD-PARTY-NOTICES` in the package.
 
 A framework-dependent development publish instead requires a compatible
 Microsoft .NET 8 Windows Desktop Runtime installed on the target computer.
+
+## OpenVisionLab integration packages
+
+- OpenVisionLab.Integration.Contracts 0.2.0-alpha.4
+- OpenVisionLab.Integration.Transport.Tcp 0.1.0-alpha.4
+- Source: https://github.com/Noah8218/OpenVisionLab-Integration-Contracts
+- Source commit recorded in both packages: `f4743f3307d20a963b2197f2019713320b9859b9`
+- License: MIT; Copyright (c) 2026 Noah Choi.
+
+The pinned packages under `third_party/OpenVisionLabIntegrationContracts`
+include their complete LICENSE and NOTICE. SHA-256 files accompany the exact
+package bytes. These prerelease dependencies provide contracts and transport;
+they are not a production-control or safety system.
