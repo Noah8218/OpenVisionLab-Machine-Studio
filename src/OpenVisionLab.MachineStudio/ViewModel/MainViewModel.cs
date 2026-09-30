@@ -496,7 +496,11 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
             ApplyMonitorSnapshot,
             () => ApplyMonitorSnapshot(SceneSnapshots.Latest ?? _simulationSession.Engine.CurrentSnapshot),
             _manualEquipment.StartManualCameraControlAsync,
-            () => MarkProjectChanged(requiresRuntimeRebuild: false),
+            () =>
+            {
+                _layoutAuthoring!.Reset();
+                MarkProjectChanged(requiresRuntimeRebuild: false);
+            },
             status =>
             {
                 if (!_disposed)

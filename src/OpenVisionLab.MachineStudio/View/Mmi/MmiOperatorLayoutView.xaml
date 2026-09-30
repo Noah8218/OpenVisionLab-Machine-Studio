@@ -531,12 +531,15 @@
                             <Border.Style>
                                 <Style TargetType="Border">
                                     <Setter Property="MinHeight" Value="260" />
+                                    <Setter Property="MaxHeight" Value="260" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
                                             <Setter Property="MinHeight" Value="180" />
+                                            <Setter Property="MaxHeight" Value="180" />
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding Navigation.IsNarrowLayout}" Value="True">
-                                            <Setter Property="MinHeight" Value="240" />
+                                            <Setter Property="MinHeight" Value="180" />
+                                            <Setter Property="MaxHeight" Value="180" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>

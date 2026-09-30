@@ -1047,6 +1047,7 @@ public sealed class MachineSceneViewport : FrameworkElement
         }
 
         using var context = _gridVisual.RenderOpen();
+        context.DrawRectangle(Brushes.Transparent, null, new Rect(RenderSize));
         if (IsObliqueView)
         {
             for (double x = 0; x <= ActualWidth; x += 32d)

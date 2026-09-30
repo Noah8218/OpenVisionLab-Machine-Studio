@@ -29,6 +29,38 @@ public sealed class SceneViewportRenderingTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task EmptyGridReceivesPointerInputWhileOverlayControlsKeepTheirOwnHitRegion(bool oblique)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var item = CreateItem("camera", LayoutComponentKind.Camera, 180, 120, 24, 20);
+            var viewport = new MachineSceneViewport { Width = 640, Height = 420, IsObliqueView = oblique, ItemsSource = new[] { item } };
+            var overlay = new Button { Content = "Settings", Width = 120, Height = 40, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top };
+            var root = new Grid { Background = Brushes.Black, Children = { viewport, overlay } };
+            var window = new Window { Content = root, Width = 680, Height = 460, WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false };
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                PumpRenderDispatcher();
+                foreach (var point in new[] { new Point(3.5, 7.5), new Point(71.5, 53.5), new Point(590.5, 370.5) })
+                {
+                    Assert.Same(viewport, window.InputHitTest(viewport.TranslatePoint(point, window)));
+                    Assert.False(viewport.SelectItemAt(point));
+                    Assert.Null(viewport.SelectedItem);
+                }
+                var overlayHit = window.InputHitTest(overlay.TranslatePoint(new Point(60, 20), window)) as DependencyObject;
+                while (overlayHit is not null && !ReferenceEquals(overlayHit, overlay)) overlayHit = VisualTreeHelper.GetParent(overlayHit);
+                Assert.Same(overlay, overlayHit);
+                return true;
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task CameraHeadAndPostRenderAndSelectWithoutSelectingEmptyEnvelope(bool oblique)
     {
         await _ui.InvokeAsync(() =>

@@ -342,9 +342,11 @@ public sealed class CameraResultInspectorViewAutomationTests
     }
 
     [Theory]
-    [InlineData(1280, false, OpenVisionLanguage.Korean)]
-    [InlineData(794, true, OpenVisionLanguage.English)]
-    public async Task CapturedImageBindingClearsStalePixelsAndRecoversAfterMalformedInput(double width, bool compact, OpenVisionLanguage language)
+    [InlineData(1280, 760, true, false, OpenVisionLanguage.Korean)]
+    [InlineData(1920, 1040, false, false, OpenVisionLanguage.Korean)]
+    [InlineData(794, 1032, true, true, OpenVisionLanguage.English)]
+    [InlineData(794, 760, true, true, OpenVisionLanguage.English)]
+    public async Task CapturedImageBindingClearsStalePixelsAndRecoversAfterMalformedInput(double width, double height, bool compact, bool narrow, OpenVisionLanguage language)
     {
         await _ui.InvokeAsync(() =>
         {
@@ -366,11 +368,11 @@ public sealed class CameraResultInspectorViewAutomationTests
                 camera.LoadProject(project, projectPath);
                 using var navigation = new ShellNavigationViewModel(false, () => false, () => false,
                     () => Task.CompletedTask, () => { }, exception => throw exception)
-                { IsCompactLayout = compact, IsNarrowLayout = compact };
+                { IsCompactLayout = compact, IsNarrowLayout = narrow };
                 var view = new MmiOperatorLayoutView { DataContext = new CameraInspectorContext(camera, navigation) };
                 var window = new Window
                 {
-                    Content = view, Width = width, Height = 1032, WindowStyle = WindowStyle.None,
+                    Content = view, Width = width, Height = height, WindowStyle = WindowStyle.None,
                     ShowInTaskbar = false, ShowActivated = false
                 };
                 window.Show();
@@ -378,6 +380,8 @@ public sealed class CameraResultInspectorViewAutomationTests
                 {
                     var image = Assert.IsType<Image>(view.FindName("MmiVirtualCameraImageViewer"));
                     var error = Assert.IsType<TextBlock>(view.FindName("MmiVirtualCameraImageError"));
+                    var frame = Assert.IsType<Border>(view.FindName("MmiVirtualCameraImageFrame"));
+                    var preview = Assert.IsType<ScrollViewer>(view.FindName("MmiInspectionPreviewScrollViewer"));
                     window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
                     Assert.Null(image.Source);
                     Assert.Equal(Visibility.Collapsed, error.Visibility);
@@ -387,6 +391,9 @@ public sealed class CameraResultInspectorViewAutomationTests
                     window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
                     Assert.IsAssignableFrom<BitmapSource>(image.Source);
                     Assert.Equal(Visibility.Collapsed, error.Visibility);
+                    var frameBounds = frame.TransformToAncestor(preview).TransformBounds(new Rect(frame.RenderSize));
+                    Assert.True(frameBounds.Top >= 0 && frameBounds.Bottom <= preview.ViewportHeight,
+                        $"Whole input image must fit the initial preview: frame={frameBounds}, viewportHeight={preview.ViewportHeight}.");
 
                     projection = projection with
                     {
@@ -424,6 +431,72 @@ public sealed class CameraResultInspectorViewAutomationTests
                 OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
                 Directory.Delete(root, recursive: true);
             }
+        });
+    }
+
+    [Fact]
+    public async Task AppliedImageSourceSurvivesLayoutUndoRedoAndSaveReopen()
+    {
+        await _ui.InvokeTaskAsync(async () =>
+        {
+            var root = Path.Combine(TestStorage.RootPath, "camera-source-layout-undo", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Path.Combine(root, "images"));
+            var path = Path.Combine(root, "machine.ovmachine");
+            var pixels = "P5\n2 2\n255\n"u8.ToArray().Concat(new byte[] { 0, 64, 128, 255 }).ToArray();
+            File.WriteAllBytes(Path.Combine(root, "images", "first.pgm"), pixels);
+            File.WriteAllBytes(Path.Combine(root, "images", "second.pgm"), pixels);
+            try
+            {
+                var project = new ProjectDocumentStore().Load(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Samples", "R19InspectionFlow.ovmachine")));
+                await new ProjectDocumentFileStore().SaveAsync(project, path);
+                using var main = new MainViewModel(project, path);
+                var readyUntil = DateTime.UtcNow.AddSeconds(10);
+                while (main.SceneSnapshots.Latest?.ProjectId != project.Id && DateTime.UtcNow < readyUntil) await Task.Delay(10);
+                Assert.Equal(project.Id, main.SceneSnapshots.Latest?.ProjectId);
+                main.Camera.SelectedCameraId = "device.camera-1";
+                main.Layout.Select("camera-height-verdict");
+                var originalX = main.Layout.SelectedItem!.CurrentX;
+                var editor = main.Camera.ImageSourceEditor;
+                editor.PathText = "images/first.pgm";
+                editor.Width = 2;
+                editor.Height = 2;
+                editor.PixelFormatText = "Mono8";
+                Assert.True(editor.ApplyCommand.CanExecute(null));
+                editor.ApplyCommand.Execute(null);
+                Assert.True(main.HasUnsavedChanges);
+                Assert.True(main.Layout.MoveSelectionBy(40, 20));
+                main.UndoLayoutEditCommand.Execute(null);
+                Assert.Equal(originalX, main.Layout.SelectedItem!.CurrentX);
+                Assert.Equal("images/first.pgm", project.Devices.Single(device => device.Id == "device.camera-1").Camera?.SingleImageSource?.SourceRelativePath);
+                Assert.Equal("images/first.pgm", editor.PathText);
+                Assert.Equal("images/first.pgm", main.Camera.CurrentCameraSourceText);
+                Assert.True(main.HasUnsavedChanges);
+                main.RedoLayoutEditCommand.Execute(null);
+                Assert.Equal(originalX + 40, main.Layout.SelectedItem!.CurrentX);
+                Assert.Equal("images/first.pgm", main.Camera.CurrentCameraSourceText);
+                main.UndoLayoutEditCommand.Execute(null);
+
+                editor.PathText = "images/second.pgm";
+                Assert.True(editor.ApplyCommand.CanExecute(null));
+                editor.ApplyCommand.Execute(null);
+                Assert.False(main.UndoLayoutEditCommand.CanExecute(null));
+                Assert.True(main.Layout.MoveSelectionBy(40, 20));
+                main.UndoLayoutEditCommand.Execute(null);
+                Assert.Equal(originalX, main.Layout.SelectedItem!.CurrentX);
+                Assert.Equal("images/second.pgm", main.Camera.CurrentCameraSourceText);
+                Assert.Equal("images/second.pgm", editor.PathText);
+                Assert.True(main.HasUnsavedChanges);
+                await main.SaveProjectAsync(path).WaitAsync(TimeSpan.FromSeconds(10));
+                Assert.False(main.HasUnsavedChanges);
+                Assert.True(await main.OpenProjectReplacingCurrentAsync(path).WaitAsync(TimeSpan.FromSeconds(10)));
+                Assert.Equal("images/second.pgm", main.Camera.CurrentCameraSourceText);
+                Assert.Equal("images/second.pgm", main.Camera.ImageSourceEditor.PathText);
+                Assert.False(main.HasUnsavedChanges || main.IsRunning);
+                Assert.Equal(0, main.SceneSnapshots.Latest!.TickIndex);
+                Assert.All(main.SceneSnapshots.Latest.Cameras, camera => Assert.Equal(0, camera.AcquisitionOrdinal));
+                return true;
+            }
+            finally { Directory.Delete(root, recursive: true); }
         });
     }
 
