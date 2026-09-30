@@ -334,6 +334,17 @@ public sealed class SimulationScenarioBatchViewModelTests
         Assert.True(viewModel.BatchWasCanceled);
         Assert.False(viewModel.IsBatchCancellationRequested);
         Assert.False(viewModel.IsBatchRunning);
+        Assert.Null(viewModel.LatestBatchResult);
+        Assert.True(viewModel.RunCommand.CanExecute(null));
+
+        workspace.ScenarioDurationCycles = 3;
+        viewModel.RunCommand.Execute(null);
+        await viewModel.BatchTask!.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.False(viewModel.BatchWasCanceled);
+        Assert.False(viewModel.IsBatchRunning);
+        Assert.True(viewModel.LatestBatchResult?.IsComplete);
+        Assert.True(viewModel.LatestBatchResult?.IsSuccess);
         Assert.Empty(outsideDispatch);
         Assert.False(propertyChangedOutsideDispatch);
     }

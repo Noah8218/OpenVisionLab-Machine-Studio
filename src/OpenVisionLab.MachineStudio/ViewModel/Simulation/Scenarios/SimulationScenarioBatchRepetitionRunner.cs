@@ -39,6 +39,7 @@ internal sealed class SimulationScenarioBatchRepetitionRunner
             var configured = await engine.EnqueueCommandAsync(
                 new ConfigureRuntimeCommand(request.Runtime),
                 cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             if (!configured.IsAccepted)
             {
                 throw new InvalidOperationException(
@@ -50,6 +51,7 @@ internal sealed class SimulationScenarioBatchRepetitionRunner
                 var automaticStarted = await engine.EnqueueCommandAsync(
                     new StartAutomaticRunCommand(beginRealTime: false),
                     cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!automaticStarted.IsAccepted)
                 {
                     throw new InvalidOperationException(
@@ -61,6 +63,7 @@ internal sealed class SimulationScenarioBatchRepetitionRunner
                 var sequenceStarted = await engine.EnqueueCommandAsync(
                     new StartSequenceCommand(recoverySequenceId),
                     cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!sequenceStarted.IsAccepted)
                 {
                     throw new InvalidOperationException(
@@ -72,6 +75,7 @@ internal sealed class SimulationScenarioBatchRepetitionRunner
                 engine,
                 request.Profile,
                 cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             return DeterministicSimulationRunResultPackage.FromReplay(
                 request.ProjectId,
                 request.ProjectName,

@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using System.IO;
+using System.Windows.Media.Imaging;
 using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Devices;
 using OpenVisionLab.Machine.Core.Projects;
@@ -13,6 +14,7 @@ using OpenVisionLab.MachineStudio.View.Inspector;
 using OpenVisionLab.MachineStudio.View.Mmi;
 using OpenVisionLab.MachineStudio.View.Simulation;
 using OpenVisionLab.MachineStudio.ViewModel;
+using OpenVisionLab.TestSupport;
 using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
@@ -335,6 +337,92 @@ public sealed class CameraResultInspectorViewAutomationTests
             finally
             {
                 OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(1280, false, OpenVisionLanguage.Korean)]
+    [InlineData(794, true, OpenVisionLanguage.English)]
+    public async Task CapturedImageBindingClearsStalePixelsAndRecoversAfterMalformedInput(double width, bool compact, OpenVisionLanguage language)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            OpenVisionLanguageService.Load();
+            var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+            var root = Path.Combine(TestStorage.RootPath, "camera-preview", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Path.Combine(root, "images"));
+            var projectPath = Path.Combine(root, "machine.ovmachine");
+            File.WriteAllText(projectPath, "{}");
+            File.WriteAllBytes(Path.Combine(root, "images", "part.pgm"), "P5\n2 2\n255\n"u8.ToArray().Concat(new byte[] { 0, 64, 128, 255 }).ToArray());
+            File.WriteAllBytes(Path.Combine(root, "images", "truncated.png"), new byte[] { 137, 80, 78, 71, 13, 10, 26, 10, 0, 0 });
+            try
+            {
+                OpenVisionLanguageService.SetLanguage(language, save: false);
+                var project = CameraCommissioningViewModelTests.CreateProject();
+                var frameReady = CreateCameraSnapshot("camera-1", "Camera 1", "acquisition-1", "inspection-1", PlaceholderInspectionDecision.Pass, "workpiece-1");
+                var projection = CreateProjection(frameReady with { State = VirtualCameraState.Idle, CurrentAcquisitionId = null }) with { ProjectPath = projectPath };
+                using var camera = CameraCommissioningViewModelTests.CreateViewModel(project, projection, () => projection);
+                camera.LoadProject(project, projectPath);
+                using var navigation = new ShellNavigationViewModel(false, () => false, () => false,
+                    () => Task.CompletedTask, () => { }, exception => throw exception)
+                { IsCompactLayout = compact, IsNarrowLayout = compact };
+                var view = new MmiOperatorLayoutView { DataContext = new CameraInspectorContext(camera, navigation) };
+                var window = new Window
+                {
+                    Content = view, Width = width, Height = 1032, WindowStyle = WindowStyle.None,
+                    ShowInTaskbar = false, ShowActivated = false
+                };
+                window.Show();
+                try
+                {
+                    var image = Assert.IsType<Image>(view.FindName("MmiVirtualCameraImageViewer"));
+                    var error = Assert.IsType<TextBlock>(view.FindName("MmiVirtualCameraImageError"));
+                    window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                    Assert.Null(image.Source);
+                    Assert.Equal(Visibility.Collapsed, error.Visibility);
+
+                    projection = CreateProjection(frameReady) with { ProjectPath = projectPath };
+                    camera.RefreshProjection();
+                    window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                    Assert.IsAssignableFrom<BitmapSource>(image.Source);
+                    Assert.Equal(Visibility.Collapsed, error.Visibility);
+
+                    projection = projection with
+                    {
+                        Snapshot = frameReady with
+                        {
+                            FrameEvidence = new VirtualCameraFrameEvidence("frame-corrupt", "images/truncated.png", new string('A', 64), 10, 2, 2, "Mono8")
+                        }
+                    };
+                    camera.RefreshProjection();
+                    window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                    Assert.True(camera.HasCurrentCameraImage);
+                    Assert.Null(image.Source);
+                    Assert.True(error.IsVisible);
+                    Assert.Equal(OpenVisionLanguageService.T("Integration.MmiVirtualCameraImageError"), error.Text);
+                    Assert.Same(view.FindResource("State.Fault"), error.Foreground);
+                    Assert.True(new Rect(view.RenderSize).Contains(error.TransformToAncestor(view).TransformBounds(new Rect(error.RenderSize))));
+
+                    projection = CreateProjection(frameReady) with { ProjectPath = projectPath };
+                    camera.RefreshProjection();
+                    window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                    var bitmap = Assert.IsAssignableFrom<BitmapSource>(image.Source);
+                    var actual = new byte[4];
+                    bitmap.CopyPixels(actual, 2, 0);
+                    Assert.Equal(new byte[] { 0, 64, 128, 255 }, actual);
+                    Assert.Equal(Visibility.Collapsed, error.Visibility);
+                    return true;
+                }
+                finally
+                {
+                    window.Close();
+                }
+            }
+            finally
+            {
+                OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
+                Directory.Delete(root, recursive: true);
             }
         });
     }

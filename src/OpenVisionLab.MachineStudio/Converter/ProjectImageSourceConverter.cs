@@ -36,6 +36,7 @@ public sealed class ProjectImageSourceConverter : IValueConverter
                 : LoadBitmap(path);
         }
         catch (Exception exception) when (exception is IOException
+            or FileFormatException
             or UnauthorizedAccessException
             or InvalidDataException
             or OverflowException
@@ -51,10 +52,11 @@ public sealed class ProjectImageSourceConverter : IValueConverter
 
     private static BitmapImage LoadBitmap(string path)
     {
+        using var stream = File.OpenRead(path);
         var image = new BitmapImage();
         image.BeginInit();
         image.CacheOption = BitmapCacheOption.OnLoad;
-        image.UriSource = new Uri(path, UriKind.Absolute);
+        image.StreamSource = stream;
         image.EndInit();
         image.Freeze();
         return image;

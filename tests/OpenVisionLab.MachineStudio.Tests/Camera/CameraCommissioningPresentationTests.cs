@@ -280,6 +280,36 @@ public sealed class CameraCommissioningPresentationTests
     }
 
     [Fact]
+    public void ProjectImageSourceConverterRecoversAfterTruncatedPng()
+    {
+        var root = Path.Combine(TestStorage.RootPath, "camera-preview", Guid.NewGuid().ToString("N"));
+        var imagePath = Path.Combine(root, "part.png");
+        Directory.CreateDirectory(root);
+        File.WriteAllBytes(imagePath, new byte[] { 137, 80, 78, 71, 13, 10, 26, 10, 0, 0 });
+        var converter = new ProjectImageSourceConverter();
+        try
+        {
+            Assert.Same(DependencyProperty.UnsetValue,
+                converter.Convert(imagePath, typeof(BitmapSource), null!, CultureInfo.InvariantCulture));
+            var pixels = new byte[] { 0, 64, 128, 255 };
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(BitmapSource.Create(2, 2, 96, 96, System.Windows.Media.PixelFormats.Gray8, null, pixels, 2)));
+            using (var stream = File.Create(imagePath)) encoder.Save(stream);
+            var bitmap = Assert.IsAssignableFrom<BitmapSource>(converter.Convert(imagePath, typeof(BitmapSource), null!, CultureInfo.InvariantCulture));
+            Assert.Equal(2, bitmap.PixelWidth);
+            Assert.Equal(2, bitmap.PixelHeight);
+            Assert.True(bitmap.IsFrozen);
+            var actual = new byte[4];
+            bitmap.CopyPixels(actual, 2, 0);
+            Assert.Equal(pixels, actual);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ProjectImageSourceConverterRecoversAsciiBlackPixelsAfterRejectedInput()
     {
         var root = Path.Combine(TestStorage.RootPath, "camera-preview", Guid.NewGuid().ToString("N"));

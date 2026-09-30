@@ -1085,6 +1085,7 @@ Integration.MmiApplyInspectionResult	검사 결과 적용	Apply inspection resul
 Integration.MmiApplyInspectionResultTooltip	현재 프로세스가 만든 Handoff와 일치하는 검증된 Result만 일시정지된 시뮬레이션에 적용합니다.	Apply only a validated Result matching a Handoff created by this process to the paused Simulation.
 Integration.MmiVirtualCameraImage	가상 카메라 입력 이미지	Virtual camera input image
 Integration.MmiVirtualCameraImageEmpty	가상 촬영 후 프로젝트 이미지가 여기에 표시됩니다.	Acquire a virtual frame to show the project image here.
+Integration.MmiVirtualCameraImageError	이미지를 표시할 수 없습니다. 파일이 손상되었거나 지원하지 않는 형식입니다.	The image cannot be displayed. The file is damaged or uses an unsupported format.
 Integration.MmiTwoDImage	2D Studio 이미지	2D Studio image
 Integration.MmiThreeDImage	3D Studio 이미지	3D Studio image
 Inspector.DigitalIo	디지털 I/O	Digital I/O
