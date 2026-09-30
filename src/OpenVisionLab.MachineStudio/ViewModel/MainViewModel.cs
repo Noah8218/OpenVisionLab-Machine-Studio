@@ -254,6 +254,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
             fileName => _projectFileDialogHost.SelectRecipeCopyDestination(fileName),
             () => OpenVisionLanguageService.T("Gallery.TemplateOverwriteRejected"),
             largeLayoutSamplePath);
+        var initialRuntime = BuildRuntimeConfiguration(CurrentProject);
         _shellNavigation = new(
             initialProject is null,
             () => !_disposed && !_sessionCloseRequested && !_isApplyingProject && !IsValidationBusy,
@@ -266,9 +267,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
                                             _projectLifecycle.HasLargeLayoutSample,
             openLargeLayoutSampleAsync: OpenLargeLayoutSampleAsync,
             resolvePendingPlacementDraft: TryResolvePendingPlacementDraft);
-        _shellNavigation.PropertyChanged += OnShellNavigationPropertyChanged;
-        _shellNavigation.LanguageChanged += OnLanguageChanged;
-        var initialRuntime = BuildRuntimeConfiguration(CurrentProject);
         _runtimeDefinitionApplicationWorkflow = new(
             _simulationSession.Engine,
             SimulationFixedStep);
@@ -856,6 +854,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
                 }
             }
         });
+        _shellNavigation.PropertyChanged += OnShellNavigationPropertyChanged;
+        _shellNavigation.LanguageChanged += OnLanguageChanged;
     }
 
     #endregion

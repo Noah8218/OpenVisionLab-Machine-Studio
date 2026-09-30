@@ -27,6 +27,67 @@ public sealed class SceneViewportRenderingTests
     public SceneViewportRenderingTests(StudioUiTestHost ui) => _ui = ui;
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CameraHeadAndPostRenderAndSelectWithoutSelectingEmptyEnvelope(bool oblique)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var component = new LayoutComponentDefinition
+            {
+                Id = "camera-r19", Name = "Camera", Kind = LayoutComponentKind.Camera,
+                Transform = new Transform2D { X = 26, Y = 33.5 },
+                Size = new Size2D { Width = 52, Height = 67 },
+                VerticalEnvelope = new LayoutVerticalEnvelope { BaseElevation = 0, Height = 125 }
+            };
+            var item = new LayoutItem(component, gridSize: 1, snapToGrid: false);
+            var viewport = new MachineSceneViewport { Width = 640, Height = 420, IsObliqueView = oblique, ItemsSource = new[] { item } };
+            var window = new Window { Content = viewport, Width = 640, Height = 420, ShowInTaskbar = false, ShowActivated = false, WindowStyle = WindowStyle.None };
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                PumpRenderDispatcher();
+                var projection = SceneViewportProjection.Create([new SceneViewportGeometry(26, 33.5, 52, 67, 0, 0, 125)], viewport.ActualWidth, viewport.ActualHeight, oblique);
+                // R19 camera head, post and empty space from the approved reference boxes.
+                var head = projection.ToScreen(17.5, 17.5, 108);
+                var post = projection.ToScreen(46, 61, 125);
+                var gap = oblique ? projection.ToScreen(0, 0, 35) : projection.ToScreen(50, 5);
+                Assert.True(viewport.SelectItemAt(head));
+                Assert.Same(item, viewport.SelectedItem);
+                Assert.True(viewport.SelectItemAt(post));
+                Assert.Same(item, viewport.SelectedItem);
+                Assert.False(viewport.SelectItemAt(gap));
+                Assert.Null(viewport.SelectedItem);
+                var rendered = Capture(viewport);
+                viewport.ItemsSource = Array.Empty<LayoutItem>();
+                var background = Capture(viewport);
+                Assert.True(DifferentPixelsNear(head) > 10, "The camera head must be visible at its authored elevation.");
+                Assert.True(DifferentPixelsNear(post) > 10, "The post must be a visible body, not a thin placeholder line.");
+                Assert.Equal(0, DifferentPixelsNear(gap));
+                Save(rendered.Bitmap, $"r19-camera-body-{oblique}.png", Path.Combine(TestStorage.RootPath, "r19-body-render"));
+                return true;
+
+                int DifferentPixelsNear(Point point)
+                {
+                    var count = 0;
+                    for (var y = (int)point.Y - 2; y <= (int)point.Y + 2; y++)
+                    for (var x = (int)point.X - 2; x <= (int)point.X + 2; x++)
+                    {
+                        var index = (y * rendered.Width + x) * 4;
+                        if (!rendered.Pixels.AsSpan(index, 4).SequenceEqual(background.Pixels.AsSpan(index, 4))) count++;
+                    }
+                    return count;
+                }
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Theory]
     [InlineData(false, 640)]
     [InlineData(true, 640)]
     [InlineData(false, 1000)]

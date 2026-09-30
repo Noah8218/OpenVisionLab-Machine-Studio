@@ -39,6 +39,31 @@ public sealed class LayoutStartupViewModelTests
         "R19InspectionFlow.ovmachine");
 
     [Fact]
+    public void RejectedStartupDoesNotLeaveLanguageCallbacksOnPartiallyInitializedShell()
+    {
+        var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+        var invalidLayout = new MachineLayoutDefinition
+        {
+            Id = "invalid",
+            Components = { new LayoutComponentDefinition { Id = "unbound-axis", Kind = LayoutComponentKind.LinearStage, Size = new Size2D { Width = 40, Height = 30 } } }
+        };
+        var project = new MachineProjectDocument { Layouts = { invalidLayout } };
+        project.Simulation.ActiveLayoutId = invalidLayout.Id;
+        try
+        {
+            Assert.Throws<InvalidDataException>(() => new MainViewModel(project));
+            var language = originalLanguage == OpenVisionLanguage.Korean ? OpenVisionLanguage.English : OpenVisionLanguage.Korean;
+            OpenVisionLanguageService.SetLanguage(language, save: false);
+            using var viewModel = new MainViewModel();
+            Assert.Equal(language, viewModel.Navigation.SelectedLanguageOption!.Language);
+            Assert.False(viewModel.IsRunMode);
+            Assert.False(viewModel.IsRunning);
+            Assert.False(viewModel.HasUnsavedChanges);
+        }
+        finally { OpenVisionLanguageService.SetLanguage(originalLanguage, save: false); }
+    }
+
+    [Fact]
     public async Task PlacementDraftDecisionProtectsSelectionNavigationAndProjectTransition()
     {
         var first = new LayoutComponentDefinition

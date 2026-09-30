@@ -1212,27 +1212,14 @@ public sealed class MachineSceneViewport : FrameworkElement
             var selected = renderItem.Item.IsSelected;
             var (componentFill, componentOutline) = GetComponentSurfaceStyle(renderItem);
 
+            if (HasCompositeBody(renderItem.Item.Kind)) DrawSchematicBody(context, renderItem, projection);
             context.PushTransform(new RotateTransform(renderItem.RotationDegrees, center.X, center.Y));
             switch (renderItem.Item.Kind)
             {
                 case LayoutItemKind.MachineFrame:
-                    context.DrawRoundedRectangle(
-                        componentFill,
-                        componentOutline,
-                        bounds,
-                        8,
-                        8);
-                    DrawPlanSchematicDetail(context, renderItem, bounds);
                     break;
 
                 case LayoutItemKind.LinearStage:
-                    context.DrawRoundedRectangle(
-                        componentFill,
-                        componentOutline,
-                        bounds,
-                        5,
-                        5);
-                    DrawPlanSchematicDetail(context, renderItem, bounds);
                     var axis = snapshot?.Axes.FirstOrDefault(item =>
                         string.Equals(item.Id, renderItem.Item.BehaviorBindingId, StringComparison.Ordinal));
                     if (showRuntimeState && axis is not null)
@@ -1293,7 +1280,7 @@ public sealed class MachineSceneViewport : FrameworkElement
                         bounds,
                         4,
                         4);
-                    DrawPlanSchematicDetail(context, renderItem, bounds);
+                    context.DrawEllipse(_resources.VisionBrush, _resources.VisionPen, center, 3.5, 3.5);
                     if (showRuntimeState)
                     {
                         var indicatorCenter = new Point(center.X, bounds.Top + Math.Min(8, bounds.Height * 0.18));
@@ -1320,13 +1307,6 @@ public sealed class MachineSceneViewport : FrameworkElement
                     var motionProgress = Math.Clamp(renderItem.MotionProgress ?? 0d, 0d, 1d);
                     var cylinderActive = cylinderState == PneumaticCylinderState.Extended;
                     var cylinderFaulted = cylinderState == PneumaticCylinderState.Fault;
-                    context.DrawRoundedRectangle(
-                        componentFill,
-                        componentOutline,
-                        bounds,
-                        5,
-                        5);
-                    DrawPlanSchematicDetail(context, renderItem, bounds);
                     if (showRuntimeState)
                     {
                         var travelStart = bounds.Left + 8;
@@ -1360,13 +1340,6 @@ public sealed class MachineSceneViewport : FrameworkElement
                 case LayoutItemKind.Conveyor:
                     var conveyorRunning = renderItem.ConveyorRunning == true;
                     var conveyorDirection = renderItem.ConveyorDirection ?? ConveyorDirection.Forward;
-                    context.DrawRoundedRectangle(
-                        componentFill,
-                        componentOutline,
-                        bounds,
-                        5,
-                        5);
-                    DrawPlanSchematicDetail(context, renderItem, bounds);
                     var arrowDirection = conveyorDirection == ConveyorDirection.Forward ? 1d : -1d;
                     if (showRuntimeState && conveyorRunning)
                     {
@@ -1469,12 +1442,6 @@ public sealed class MachineSceneViewport : FrameworkElement
                     break;
 
                 case LayoutItemKind.Camera:
-                    DrawCameraGlyph(
-                        context,
-                        bounds,
-                        componentFill,
-                        componentOutline,
-                        drawBody: true);
                     break;
             }
             context.Pop();
@@ -1498,15 +1465,6 @@ public sealed class MachineSceneViewport : FrameworkElement
         }
     }
 
-    private void DrawPlanSchematicDetail(DrawingContext context, LayoutRenderItem item, Rect bounds) =>
-        DrawObliqueSchematicDetail(context, item,
-        [
-            new Point(bounds.Left, bounds.Top),
-            new Point(bounds.Right, bounds.Top),
-            new Point(bounds.Right, bounds.Bottom),
-            new Point(bounds.Left, bounds.Bottom)
-        ]);
-
     private void DrawObliqueLayout(
         DrawingContext context,
         IReadOnlyList<LayoutRenderItem> items,
@@ -1516,48 +1474,8 @@ public sealed class MachineSceneViewport : FrameworkElement
         var showRuntimeState = !IsDesignMode && snapshot is not null;
         foreach (var item in items)
         {
-            var footprint = GetSceneGeometry(item).GetFootprintCorners();
-            var baseCorners = footprint
-                .Select(point => projection.ToScreen(point.X, point.Y, item.BaseElevation))
-                .ToArray();
-            var topCorners = footprint
-                .Select(point => projection.ToScreen(point.X, point.Y, item.BaseElevation + item.VerticalHeight))
-                .ToArray();
-            var (fill, outline) = GetComponentSurfaceStyle(item);
-            var selectedOutline = item.Item.IsSelected ? _resources!.SelectionPen : outline;
-            var sideBrush = _resources!.StructurePen.Brush;
-
-            var volumeBottom = baseCorners;
-            if (item.Item.Kind == LayoutItemKind.MachineFrame)
-            {
-                volumeBottom = footprint.Select(point => projection.ToScreen(point.X, point.Y,
-                    item.BaseElevation + (item.VerticalHeight * 0.84))).ToArray();
-                for (var index = 0; index < baseCorners.Length; index++)
-                {
-                    context.DrawLine(_resources.RailPen, baseCorners[index], volumeBottom[index]);
-                }
-            }
-            else if (item.Item.Kind == LayoutItemKind.Camera)
-            {
-                volumeBottom = footprint.Select(point => projection.ToScreen(point.X, point.Y,
-                    item.BaseElevation + (item.VerticalHeight * 0.72))).ToArray();
-                context.DrawLine(_resources.RailPen,
-                    new Point(baseCorners.Average(point => point.X), baseCorners.Average(point => point.Y)),
-                    new Point(volumeBottom.Average(point => point.X), volumeBottom.Average(point => point.Y)));
-            }
-
-            DrawPolygon(context, sideBrush, selectedOutline,
-                [volumeBottom[1], volumeBottom[2], topCorners[2], topCorners[1]]);
-            DrawPolygon(context, sideBrush, selectedOutline,
-                [volumeBottom[2], volumeBottom[3], topCorners[3], topCorners[2]]);
-            DrawPolygon(context, fill, selectedOutline, topCorners);
-
+            DrawSchematicBody(context, item, projection);
             var topBounds = GetTopFaceScreenBounds(item, projection);
-            DrawObliqueSchematicDetail(context, item, topCorners);
-            if (item.Item.Kind == LayoutItemKind.Camera)
-            {
-                DrawCameraGlyph(context, topBounds, fill, outline, drawBody: false);
-            }
             if (item.IsVerticalEnvelopeEstimated)
             {
                 DrawStatusBadgeAtRight(
@@ -1566,7 +1484,7 @@ public sealed class MachineSceneViewport : FrameworkElement
                     topBounds.Right - 3,
                     topBounds.Top + 2,
                     8,
-                    _resources.TextSecondary);
+                    _resources!.TextSecondary);
             }
 
             if (showRuntimeState)
@@ -1593,66 +1511,89 @@ public sealed class MachineSceneViewport : FrameworkElement
         }
     }
 
-    private void DrawObliqueSchematicDetail(
-        DrawingContext context,
-        LayoutRenderItem item,
-        IReadOnlyList<Point> corners)
+    private static bool HasCompositeBody(LayoutItemKind kind) => kind is LayoutItemKind.MachineFrame
+        or LayoutItemKind.LinearStage or LayoutItemKind.PneumaticCylinder or LayoutItemKind.Conveyor or LayoutItemKind.Camera;
+
+    private IEnumerable<(SceneViewportGeometry Geometry, Brush Fill)> GetSchematicVolumes(LayoutRenderItem item)
     {
-        var bounds = Bounds(corners);
-        if (bounds.Width < 12 || bounds.Height < 8)
-        {
-            return;
-        }
-
-        var center = new Point(corners.Average(point => point.X), corners.Average(point => point.Y));
-        if (item.Item.Kind == LayoutItemKind.MachineFrame)
-        {
-            for (var index = 0; index < corners.Count; index++)
-            {
-                context.DrawLine(_resources!.SchematicDetailPen,
-                    Lerp(corners[index], center, 0.12),
-                    Lerp(corners[(index + 1) % corners.Count], center, 0.12));
-            }
-            return;
-        }
-
-        var alongWidth = item.Width >= item.Height;
-        Point Along(double t, double across) => alongWidth
-            ? Lerp(Lerp(corners[0], corners[1], t), Lerp(corners[3], corners[2], t), across)
-            : Lerp(Lerp(corners[0], corners[3], t), Lerp(corners[1], corners[2], t), across);
-
+        var (fill, _) = GetComponentSurfaceStyle(item);
+        var materials = _resources!;
+        // Reference body proportions scale inside the existing authored envelope.
         switch (item.Item.Kind)
         {
-            case LayoutItemKind.Conveyor:
-                for (var index = 1; index <= 7; index++)
-                {
-                    var t = index / 8d;
-                    context.DrawLine(_resources!.SchematicDetailPen, Along(t, 0.12), Along(t, 0.88));
-                }
+            case LayoutItemKind.MachineFrame:
+                foreach (var x in new[] { 10d, 320d })
+                foreach (var y in new[] { 10d, 130d })
+                    yield return Volume(x / 340, y / 155, 10d / 340, 10d / 155, 0, 80d / 92, materials.FrameSupportFill);
+                yield return Volume(0, 0, 1, 1, 77d / 92, 15d / 92, fill);
                 break;
             case LayoutItemKind.LinearStage:
-                context.DrawLine(_resources!.SchematicDetailPen, Along(0.1, 0.25), Along(0.9, 0.25));
-                context.DrawLine(_resources.SchematicDetailPen, Along(0.1, 0.75), Along(0.9, 0.75));
-                context.DrawLine(_resources.AxisPen, Along(0.5, 0.15), Along(0.5, 0.85));
+                yield return Volume(0, 4d / 38, 1, 30d / 38, 0, 12d / 33, materials.AxisBaseFill);
+                yield return Volume(0, 0, 30d / 90, 1, 13d / 33, 20d / 33, fill);
                 break;
             case LayoutItemKind.PneumaticCylinder:
-                context.DrawLine(_resources!.SchematicDetailPen, Along(0.2, 0.5), Along(0.8, 0.5));
-                context.DrawEllipse(_resources.AccentBrush, null, Along(0.8, 0.5), 2.5, 2.5);
+                yield return Volume(0, 0, 38d / 58, 1, 0, 25d / 28, fill);
+                yield return Volume(38d / 58, 11d / 32, 12d / 58, 8d / 32, 9d / 28, 7d / 28, materials.CylinderRodFill);
+                yield return Volume(50d / 58, 2d / 32, 8d / 58, 27d / 32, 3d / 28, 25d / 28, materials.CylinderJawFill);
                 break;
-            case LayoutItemKind.DigitalSensor:
-                context.DrawEllipse(_resources!.VisionBrush, _resources.VisionPen, center, 3.5, 3.5);
+            case LayoutItemKind.Camera:
+                yield return Volume(40d / 52, 55d / 67, 12d / 52, 12d / 67, 0, 1, materials.CameraPostFill);
+                yield return Volume(5d / 52, 10d / 67, 47d / 52, 57d / 67, 110d / 125, 10d / 125, materials.CameraPlateFill);
+                yield return Volume(0, 0, 35d / 52, 35d / 67, 70d / 125, 38d / 125, fill);
                 break;
+            case LayoutItemKind.Conveyor:
+                yield return Volume(0, 0, 1, 1, 0, 13d / 18, materials.ConveyorBaseFill);
+                for (var index = 0; index < 9; index++)
+                    yield return Volume((3d + index * 24) / 205, 1d / 55, 6d / 205, 53d / 55, 14d / 18, 4d / 18, materials.ConveyorRollerFill);
+                break;
+            default:
+                yield return (GetSceneGeometry(item), fill);
+                break;
+        }
+
+        (SceneViewportGeometry Geometry, Brush Fill) Volume(double x, double y, double width, double depth, double bottom, double height, Brush brush)
+        {
+            var center = RotatePoint(new Point(item.X + ((x + width / 2 - 0.5) * item.Width),
+                item.Y + ((y + depth / 2 - 0.5) * item.Height)), new Point(item.X, item.Y), item.RotationDegrees);
+            return (new SceneViewportGeometry(center.X, center.Y, width * item.Width, depth * item.Height,
+                item.RotationDegrees, item.BaseElevation + bottom * item.VerticalHeight, height * item.VerticalHeight), brush);
         }
     }
 
-    private static Point Lerp(Point start, Point end, double fraction) =>
-        new(start.X + ((end.X - start.X) * fraction), start.Y + ((end.Y - start.Y) * fraction));
+    private void DrawSchematicBody(DrawingContext context, LayoutRenderItem item, SceneViewportProjection projection)
+    {
+        var (_, stateOutline) = GetComponentSurfaceStyle(item);
+        var outline = HasCompositeBody(item.Item.Kind)
+            ? item.Item.IsSelected ? _resources!.SelectionPen : _resources!.SchematicOutlinePen : stateOutline;
+        foreach (var (volume, fill) in GetSchematicVolumes(item))
+        {
+            var faces = GetVolumeFaces(volume, projection);
+            if (projection.IsObliqueView)
+            {
+                context.PushOpacity(0.72);
+                DrawPolygon(context, fill, outline, faces[0]);
+                context.Pop();
+                context.PushOpacity(0.88);
+                DrawPolygon(context, fill, outline, faces[1]);
+                context.Pop();
+            }
+            DrawPolygon(context, fill, outline, faces[2]);
+        }
+    }
+
+    private static Point[][] GetVolumeFaces(SceneViewportGeometry volume, SceneViewportProjection projection)
+    {
+        var footprint = volume.GetFootprintCorners();
+        var bottom = footprint.Select(point => projection.ToScreen(point.X, point.Y, volume.BaseElevation)).ToArray();
+        var top = footprint.Select(point => projection.ToScreen(point.X, point.Y, volume.BaseElevation + volume.VerticalHeight)).ToArray();
+        return [[bottom[0], bottom[1], top[1], top[0]], [bottom[1], bottom[2], top[2], top[1]], top];
+    }
 
     private (Brush Fill, Pen Outline) GetComponentSurfaceStyle(
         LayoutRenderItem item)
     {
         var selected = item.Item.IsSelected;
-        return item.Item.Kind switch
+        var surface = item.Item.Kind switch
         {
             LayoutItemKind.MachineFrame => (_resources!.SchematicFrameFill, selected ? _resources.SelectionPen : _resources.FramePen),
             LayoutItemKind.LinearStage or LayoutItemKind.RotaryStage => (_resources!.AxisComponentFill, selected ? _resources.SelectionPen : _resources.AxisPen),
@@ -1670,25 +1611,9 @@ public sealed class MachineSceneViewport : FrameworkElement
             LayoutItemKind.Camera => (_resources!.CameraComponentFill, selected ? _resources.SelectionPen : _resources.VisionPen),
             _ => (_resources!.DeviceFill, selected ? _resources.SelectionPen : _resources.StructurePen)
         };
-    }
-
-    private void DrawCameraGlyph(DrawingContext context, Rect bounds, Brush bodyFill, Pen outline, bool drawBody)
-    {
-        if (drawBody)
-        {
-            context.DrawRoundedRectangle(bodyFill, outline, bounds, 4, 4);
-        }
-
-        var lensCenter = new Point(bounds.Left + (bounds.Width * 0.58), bounds.Top + (bounds.Height * 0.5));
-        var lensRadius = Math.Max(2.5, Math.Min(bounds.Width, bounds.Height) * 0.18);
-        var resources = _resources!;
-        context.DrawEllipse(resources.DeviceFill, outline, lensCenter, lensRadius, lensRadius);
-        context.DrawEllipse(
-            resources.VisionBrush,
-            null,
-            lensCenter,
-            Math.Max(1.5, lensRadius * 0.38),
-            Math.Max(1.5, lensRadius * 0.38));
+        return selected && item.Item.Kind is not (LayoutItemKind.Workpiece or LayoutItemKind.MachineFrame)
+            && item.CylinderState != PneumaticCylinderState.Fault
+            ? (_resources!.SelectedComponentFill, surface.Item2) : surface;
     }
 
     private void DrawObliqueRuntimeStatus(
@@ -1770,7 +1695,9 @@ public sealed class MachineSceneViewport : FrameworkElement
         DrawingContext context,
         Brush fill,
         Pen outline,
-        IReadOnlyList<Point> points)
+        IReadOnlyList<Point> points) => context.DrawGeometry(fill, outline, CreatePolygon(points));
+
+    private static StreamGeometry CreatePolygon(IReadOnlyList<Point> points)
     {
         var geometry = new StreamGeometry();
         using (var geometryContext = geometry.Open())
@@ -1779,7 +1706,7 @@ public sealed class MachineSceneViewport : FrameworkElement
             geometryContext.PolyLineTo(points.Skip(1).ToArray(), true, true);
         }
         geometry.Freeze();
-        context.DrawGeometry(fill, outline, geometry);
+        return geometry;
     }
 
     private static Rect Bounds(IReadOnlyList<Point> points)
@@ -1899,6 +1826,18 @@ public sealed class MachineSceneViewport : FrameworkElement
         var projection = CreateProjection(geometry);
         foreach (var renderItem in geometry.Reverse())
         {
+            if (HasCompositeBody(renderItem.Item.Kind) && _resources is not null)
+            {
+                if (GetSchematicVolumes(renderItem).Any(volume => GetVolumeFaces(volume.Geometry, projection).Any(ContainsFace)))
+                    return renderItem.Item;
+                continue;
+
+                bool ContainsFace(Point[] face)
+                {
+                    var shape = CreatePolygon(face);
+                    return shape.FillContains(point) || shape.StrokeContains(_resources.SelectionPen, point);
+                }
+            }
             if (IsObliqueView)
             {
                 var obliqueBounds = GetScreenBounds(renderItem, projection);
@@ -2729,12 +2668,21 @@ public sealed class MachineSceneViewport : FrameworkElement
             FaultBrush = ResolveBrush(owner, "State.Fault", "#FF5D5D");
             AxisFill = ResolveBrush(owner, "Accent.Soft", "#17375A");
             DeviceFill = ResolveBrush(owner, "Surface.Raised", "#202833");
-            SchematicFrameFill = ResolveBrush(owner, "Surface.Selected", "#20394B");
+            SchematicFrameFill = ResolveBrush(owner, "Scene.Component.Frame", "#314F5E");
             AxisComponentFill = ResolveBrush(owner, "Scene.Component.Axis", "#6DC5D6");
             CylinderComponentFill = ResolveBrush(owner, "Scene.Component.Cylinder", "#70D9C5");
             SensorComponentFill = ResolveBrush(owner, "Scene.Component.Sensor", "#F0C76F");
             CameraComponentFill = ResolveBrush(owner, "Scene.Component.Camera", "#92A4ED");
             ConveyorComponentFill = ResolveBrush(owner, "Scene.Component.Conveyor", "#88A7B6");
+            FrameSupportFill = ResolveBrush(owner, "Scene.Component.FrameSupport", "#537687");
+            AxisBaseFill = ResolveBrush(owner, "Scene.Component.AxisBase", "#476978");
+            CylinderRodFill = ResolveBrush(owner, "Scene.Component.CylinderRod", "#BACBD3");
+            CylinderJawFill = ResolveBrush(owner, "Scene.Component.CylinderJaw", "#EAC77D");
+            CameraPostFill = ResolveBrush(owner, "Scene.Component.CameraPost", "#688A9B");
+            CameraPlateFill = ResolveBrush(owner, "Scene.Component.CameraPlate", "#9CB7C4");
+            ConveyorBaseFill = ResolveBrush(owner, "Scene.Component.ConveyorBase", "#375362");
+            ConveyorRollerFill = ResolveBrush(owner, "Scene.Component.ConveyorRoller", "#9EB1B9");
+            SelectedComponentFill = ResolveBrush(owner, "Scene.Component.Selected", "#B9FFF0");
             var grid = ResolveBrush(owner, "Scene.Grid", "#27313D");
             var obliqueGrid = ResolveBrush(owner, "Scene.ObliqueGrid", "#25414E");
             var gridMajor = ResolveBrush(owner, "Scene.GridMajor", "#344252");
@@ -2795,6 +2743,7 @@ public sealed class MachineSceneViewport : FrameworkElement
             MajorGridPen = CreatePen(gridMajor, 0.8);
             RailPen = CreatePen(border, 6);
             StructurePen = CreatePen(border, 2);
+            SchematicOutlinePen = CreatePen(ResolveBrush(owner, "Scene.Component.Outline", "#06141C"), 1);
             SchematicDetailPen = CreatePen(TextSecondary, 1.1);
             AxisPen = CreatePen(AccentBrush, 1.5);
             VisionPen = CreatePen(VisionBrush, 1.4);
@@ -2821,6 +2770,15 @@ public sealed class MachineSceneViewport : FrameworkElement
         public SolidColorBrush SensorComponentFill { get; }
         public SolidColorBrush CameraComponentFill { get; }
         public SolidColorBrush ConveyorComponentFill { get; }
+        public SolidColorBrush FrameSupportFill { get; }
+        public SolidColorBrush AxisBaseFill { get; }
+        public SolidColorBrush CylinderRodFill { get; }
+        public SolidColorBrush CylinderJawFill { get; }
+        public SolidColorBrush CameraPostFill { get; }
+        public SolidColorBrush CameraPlateFill { get; }
+        public SolidColorBrush ConveyorBaseFill { get; }
+        public SolidColorBrush ConveyorRollerFill { get; }
+        public SolidColorBrush SelectedComponentFill { get; }
         public SolidColorBrush VisionFieldFill { get; }
         public SolidColorBrush FrameFill { get; }
         public SolidColorBrush SensorOnFill { get; }
@@ -2834,6 +2792,7 @@ public sealed class MachineSceneViewport : FrameworkElement
         public Pen MajorGridPen { get; }
         public Pen RailPen { get; }
         public Pen StructurePen { get; }
+        public Pen SchematicOutlinePen { get; }
         public Pen SchematicDetailPen { get; }
         public Pen AxisPen { get; }
         public Pen VisionPen { get; }

@@ -36,6 +36,17 @@
     <SolidColorBrush x:Key="Scene.Component.Sensor" Color="#F0C76F" />
     <SolidColorBrush x:Key="Scene.Component.Camera" Color="#92A4ED" />
     <SolidColorBrush x:Key="Scene.Component.Conveyor" Color="#88A7B6" />
+    <SolidColorBrush x:Key="Scene.Component.Frame" Color="#314F5E" />
+    <SolidColorBrush x:Key="Scene.Component.FrameSupport" Color="#537687" />
+    <SolidColorBrush x:Key="Scene.Component.AxisBase" Color="#476978" />
+    <SolidColorBrush x:Key="Scene.Component.CylinderRod" Color="#BACBD3" />
+    <SolidColorBrush x:Key="Scene.Component.CylinderJaw" Color="#EAC77D" />
+    <SolidColorBrush x:Key="Scene.Component.CameraPost" Color="#688A9B" />
+    <SolidColorBrush x:Key="Scene.Component.CameraPlate" Color="#9CB7C4" />
+    <SolidColorBrush x:Key="Scene.Component.ConveyorBase" Color="#375362" />
+    <SolidColorBrush x:Key="Scene.Component.ConveyorRoller" Color="#9EB1B9" />
+    <SolidColorBrush x:Key="Scene.Component.Selected" Color="#B9FFF0" />
+    <SolidColorBrush x:Key="Scene.Component.Outline" Color="#06141C" />
     <LinearGradientBrush x:Key="Equipment.OverviewCardBackground" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#1F4151" Offset="0" />
         <GradientStop Color="#112633" Offset="1" />

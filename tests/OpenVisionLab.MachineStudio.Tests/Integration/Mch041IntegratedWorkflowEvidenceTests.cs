@@ -132,12 +132,14 @@ public sealed class Mch041IntegratedWorkflowEvidenceTests
             "/nodeReuse:false",
             "/p:ContinuousIntegrationBuild=true",
             "/p:TreatWarningsAsErrors=true",
-            $"-p:BaseOutputPath={EnsureTrailingSeparator(stubBuildRoot)}");
+            "--artifacts-path",
+            stubBuildRoot);
         Assert.Equal(0, buildStub.ExitCode);
         string stubDll = Path.Combine(
             stubBuildRoot,
-            "Release",
-            "net8.0",
+            "bin",
+            "MachineIntegrationInspectionStub",
+            "release",
             "MachineIntegrationInspectionStub.dll");
         Assert.True(File.Exists(stubDll), stubDll);
 
@@ -604,11 +606,6 @@ public sealed class Mch041IntegratedWorkflowEvidenceTests
 
         throw new InvalidOperationException("The Machine repository root could not be resolved.");
     }
-
-    private static string EnsureTrailingSeparator(string path) =>
-        path.EndsWith(Path.DirectorySeparatorChar)
-            ? path
-            : path + Path.DirectorySeparatorChar;
 
     private static string Sha256(byte[] bytes) =>
         Convert.ToHexString(SHA256.HashData(bytes));

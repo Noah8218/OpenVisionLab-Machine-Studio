@@ -7,6 +7,7 @@ using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
 
+[Collection(LayoutStartupTestCollection.Name)]
 public sealed class MachineLayoutViewModelTests
 {
     [Fact]
