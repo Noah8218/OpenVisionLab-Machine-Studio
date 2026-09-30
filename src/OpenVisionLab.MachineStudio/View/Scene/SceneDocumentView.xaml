@@ -8,6 +8,7 @@
              xmlns:project="clr-namespace:OpenVisionLab.MachineStudio.View.Project"
              xmlns:sequence="clr-namespace:OpenVisionLab.MachineStudio.View.Sequence"
              xmlns:simulation="clr-namespace:OpenVisionLab.MachineStudio.View.Simulation"
+             xmlns:diagnostics="clr-namespace:OpenVisionLab.MachineStudio.View.Diagnostics"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
     <TabControl SelectedIndex="{Binding Navigation.SelectedDocumentContentIndex, Mode=OneWay}">
         <TabControl.Template>
@@ -81,10 +82,10 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" MinHeight="220" />
-                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" SharedSizeGroup="EquipmentFooter" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" MinHeight="55" Style="{StaticResource PanelHeaderStyle}">
+            <Border Grid.Row="0" Height="Auto" MinHeight="55" Style="{StaticResource PanelHeaderStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -94,7 +95,8 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <WrapPanel Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"
+                    <WrapPanel x:Name="EquipmentAuthoringToolbar"
+                               Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"
                                Visibility="{Binding Navigation.IsEquipmentWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Button Margin="0,0,6,4"
                                 Command="{Binding ShowEquipmentOverviewCommand}"
@@ -111,6 +113,10 @@
                                 Content="{loc:Loc Key=Equipment.AddPartButton}"
                                 AutomationProperties.Name="{loc:Loc Key=Equipment.AddPartButton}"
                                 Style="{StaticResource GlobalCommandButtonStyle}" />
+                    </WrapPanel>
+
+                    <WrapPanel x:Name="EquipmentViewToolbar"
+                               Grid.Row="1" Grid.ColumnSpan="2" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <RadioButton Height="34" MinWidth="88" Margin="0,0,4,4"
                                      AutomationProperties.Name="{loc:Loc Key=Scene.ViewOblique}"
                                      Command="{Binding Layout.ShowObliqueViewCommand}"
@@ -127,7 +133,7 @@
                                      IsChecked="{Binding Layout.IsTopView, Mode=OneWay}"
                                      Style="{StaticResource WorkspaceModeRadioStyle}"
                                      ToolTip="{loc:Loc Key=Scene.ToggleViewTooltip}" />
-                        <Button MinWidth="38"
+                        <Button x:Name="SceneZoomOutButton" MinWidth="38"
                                 Margin="0,0,4,4"
                                 AutomationProperties.Name="{loc:Loc Key=Scene.ZoomOut}"
                                 Content="−"
@@ -137,7 +143,7 @@
                                 <behavior:ZoomSceneViewportBehavior SceneViewport="{Binding ElementName=SceneViewport}" WheelDelta="-120" />
                             </b:Interaction.Behaviors>
                         </Button>
-                        <Button Margin="0,0,4,4"
+                        <Button x:Name="FitLayoutButton" Margin="0,0,4,4"
                                 Padding="8,0"
                                 AutomationProperties.Name="{loc:Loc Key=Scene.FitLayout}"
                                 Content="{loc:Loc Key=Scene.FitLayout}"
@@ -147,7 +153,7 @@
                                 <behavior:FitSceneViewportBehavior SceneViewport="{Binding ElementName=SceneViewport}" />
                             </b:Interaction.Behaviors>
                         </Button>
-                        <Button MinWidth="38"
+                        <Button x:Name="SceneZoomInButton" MinWidth="38"
                                 Margin="0,0,0,4"
                                 AutomationProperties.Name="{loc:Loc Key=Scene.ZoomIn}"
                                 Content="+"
@@ -159,7 +165,7 @@
                         </Button>
                     </WrapPanel>
 
-                    <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
+                    <StackPanel Grid.Row="0" Grid.Column="1"
                                 Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"
                                 Margin="8,4">
                         <StackPanel.Style>
@@ -241,7 +247,7 @@
                         </Button>
                     </StackPanel>
 
-                    <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="0">
+                    <StackPanel Grid.Row="0" Grid.Column="0">
                         <StackPanel.Style>
                             <Style TargetType="StackPanel">
                                 <Setter Property="Visibility" Value="Visible" />
@@ -313,9 +319,6 @@
                             <Setter Property="Margin" Value="0" />
                             <Setter Property="Background" Value="{DynamicResource Scene.Background}" />
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
-                                    <Setter Property="Margin" Value="0,90,0,0" />
-                                </DataTrigger>
                                 <DataTrigger Binding="{Binding Layout.IsObliqueView}" Value="True">
                                     <Setter Property="Background" Value="{DynamicResource Scene.ObliqueBackground}" />
                                 </DataTrigger>
@@ -356,24 +359,7 @@
                     </Border.Style>
                 </Border>
 
-                <Button x:Name="SceneViewModeButton"
-                        Margin="10"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Top"
-                        AutomationProperties.Name="{Binding Layout.SceneViewToggleText}"
-                        Command="{Binding Layout.ToggleSceneViewCommand}"
-                        Content="{Binding Layout.SceneViewToggleText}"
-                        ToolTip="{loc:Loc Key=Scene.ToggleViewTooltip}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
+
 
                 <Border Width="430"
                         MaxWidth="430"
@@ -656,8 +642,7 @@
                 <WrapPanel Margin="18,0,18,14"
                            HorizontalAlignment="Left"
                            VerticalAlignment="Bottom"
-                           IsHitTestVisible="False"
-                           Visibility="{Binding Navigation.IsEquipmentWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}">
+                           IsHitTestVisible="False">
                     <TextBlock Margin="0,0,14,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Scene.LegendAxis}" />
                     <TextBlock Margin="0,0,14,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Scene.LegendCylinder}" />
                     <TextBlock Margin="0,0,14,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Scene.LegendSensor}" />
@@ -665,52 +650,6 @@
                     <TextBlock Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Scene.LegendUnit}" />
                 </WrapPanel>
 
-                <StackPanel Margin="10"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Bottom"
-                            Orientation="Horizontal">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </StackPanel.Style>
-                    <Button x:Name="SceneZoomOutButton"
-                            Margin="0,0,4,0"
-                            MinWidth="38"
-                            AutomationProperties.Name="{loc:Loc Key=Scene.ZoomOut}"
-                            Content="−"
-                            Style="{StaticResource GlobalCommandButtonStyle}"
-                            ToolTip="{loc:Loc Key=Scene.ZoomOutTooltip}">
-                        <b:Interaction.Behaviors>
-                            <behavior:ZoomSceneViewportBehavior SceneViewport="{Binding ElementName=SceneViewport}" WheelDelta="-120" />
-                        </b:Interaction.Behaviors>
-                    </Button>
-                    <Button x:Name="FitLayoutButton"
-                            Margin="0,0,4,0"
-                            Padding="8,0"
-                            AutomationProperties.Name="{loc:Loc Key=Scene.FitLayout}"
-                            Content="{loc:Loc Key=Scene.FitLayout}"
-                            Style="{StaticResource GlobalCommandButtonStyle}"
-                            ToolTip="{loc:Loc Key=Scene.FitLayoutTooltip}">
-                        <b:Interaction.Behaviors>
-                            <behavior:FitSceneViewportBehavior SceneViewport="{Binding ElementName=SceneViewport}" />
-                        </b:Interaction.Behaviors>
-                    </Button>
-                    <Button x:Name="SceneZoomInButton"
-                            MinWidth="38"
-                            AutomationProperties.Name="{loc:Loc Key=Scene.ZoomIn}"
-                            Content="+"
-                            Style="{StaticResource GlobalCommandButtonStyle}"
-                            ToolTip="{loc:Loc Key=Scene.ZoomInTooltip}">
-                        <b:Interaction.Behaviors>
-                            <behavior:ZoomSceneViewportBehavior SceneViewport="{Binding ElementName=SceneViewport}" WheelDelta="120" />
-                        </b:Interaction.Behaviors>
-                    </Button>
-                </StackPanel>
                 </Grid>
 
                 <Border Panel.ZIndex="10"
@@ -806,11 +745,15 @@
                     </ScrollViewer>
                 </Border>
 
-                <Grid Panel.ZIndex="20"
+                <Grid x:Name="StationUnitEditorOverlay" Panel.ZIndex="20"
+                      IsVisibleChanged="StationUnitEditor_OnIsVisibleChanged"
                       Visibility="{Binding IsStationUnitEditorOpen, Converter={StaticResource BooleanToVisibilityConverter}}"
                       AutomationProperties.Name="{loc:Loc Key=Equipment.StationUnitDialogTitle}"
                       FocusManager.IsFocusScope="True"
                       FocusManager.FocusedElement="{Binding ElementName=StationUnitNameTextBox}">
+                    <Grid.InputBindings>
+                        <KeyBinding Key="Escape" Command="{Binding CancelStationUnitEditorCommand}" />
+                    </Grid.InputBindings>
                     <Border Background="{DynamicResource Surface.Root}" Opacity="0.82" />
                     <Border Width="500"
                             MaxWidth="500"
@@ -1030,8 +973,56 @@
                 </Grid>
             </Grid>
 
-                <Grid Grid.Row="2">
+                <Grid Grid.Row="2" x:Name="EquipmentFooterRegion">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Border x:Name="EquipmentMaterialSlots" Padding="10,8" BorderThickness="0,1,0,0"
+                            Background="{DynamicResource Surface.Raised}" BorderBrush="{DynamicResource Border.Default}">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding EquipmentMaterialFlow.HasSlots}" Value="True" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <ScrollViewer MaxHeight="124" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding EquipmentMaterialFlow.Slots}"
+                                          MinWidth="{Binding ViewportWidth, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Height="Auto" MinWidth="180" Margin="0,0,8,0" Padding="10,8" HorizontalContentAlignment="Stretch"
+                                                Command="{Binding DataContext.ShowEquipmentUnitCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding UnitId}" AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding StateText}"
+                                                Style="{StaticResource GlobalCommandButtonStyle}">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Name}" MaxWidth="420" HorizontalAlignment="Left" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding CapacityText}" Foreground="{DynamicResource Text.Secondary}" />
+                                                <TextBlock Text="{Binding InstanceId}" MaxWidth="420" HorizontalAlignment="Left" FontFamily="{StaticResource Typography.Telemetry}" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding StateText}" MaxWidth="420" HorizontalAlignment="Left" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding ActivityText}" MaxWidth="420" HorizontalAlignment="Left"
+                                                           Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap"
+                                                           Visibility="{Binding DataContext.Navigation.IsSimulationWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
                 <Border
+                        Grid.Row="1"
+                        x:Name="EquipmentSelectionActions"
                         MinHeight="54"
                         Padding="10,8"
                         Background="{DynamicResource Surface.Raised}"
@@ -1043,36 +1034,30 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center">
+                        <WrapPanel VerticalAlignment="Center">
                             <TextBlock FontWeight="SemiBold"
-                                       Text="{Binding Layout.SelectionSummaryText}"
-                                       TextTrimming="CharacterEllipsis" />
-                            <TextBlock Margin="0,2,0,0"
+                                       Text="{Binding Layout.EquipmentSelectionNameText}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="8,0,0,0"
                                        FontFamily="{StaticResource Typography.Telemetry}"
                                        FontSize="10"
                                        Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding Layout.SelectedItem.Id}"
-                                       TextTrimming="CharacterEllipsis"
+                                       Text="{Binding Layout.EquipmentSelectionIdText}"
+                                       TextWrapping="Wrap"
                                        Visibility="{Binding Layout.HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        </StackPanel>
+                        </WrapPanel>
                         <WrapPanel Grid.Column="1" VerticalAlignment="Center">
                             <Button Margin="6,0,0,0"
                                     MinHeight="34"
                                     Command="{Binding OpenEquipmentPropertiesCommand}"
-                                    Content="{loc:Loc Key=Shell.Properties}"
-                                    AutomationProperties.Name="{loc:Loc Key=Shell.Properties}"
+                                    Content="{loc:Loc Key=Equipment.SettingsAction}"
+                                    AutomationProperties.Name="{loc:Loc Key=Equipment.SettingsAction}"
                                     Style="{StaticResource PrimaryCommandButtonStyle}" />
                             <Button Margin="6,0,0,0"
                                     MinHeight="34"
                                     Command="{Binding OpenEquipmentSinglePartCheckCommand}"
                                     Content="{loc:Loc Key=Equipment.SinglePartCheck}"
                                     AutomationProperties.Name="{loc:Loc Key=Equipment.SinglePartCheck}"
-                                    Style="{StaticResource GlobalCommandButtonStyle}" />
-                            <Button Margin="6,0,0,0"
-                                    MinHeight="34"
-                                    Command="{Binding DuplicateLayoutSelectionCommand}"
-                                    Content="{loc:Loc Key=Shell.Duplicate}"
-                                    AutomationProperties.Name="{loc:Loc Key=Shell.Duplicate}"
                                     Style="{StaticResource GlobalCommandButtonStyle}" />
                             <Button Margin="6,0,0,0"
                                     MinHeight="34"
@@ -1090,22 +1075,35 @@
                                     MinHeight="34"
                                     Command="{Binding Navigation.OpenSequenceEditorCommand}"
                                     IsEnabled="{Binding Layout.HasSelection}"
-                                    AutomationProperties.Name="{loc:Loc Key=Shell.Sequence}"
+                                    AutomationProperties.Name="{loc:Loc Key=Equipment.SequenceAction}"
                                     Style="{StaticResource GlobalCommandButtonStyle}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{loc:Loc Key=Shell.Sequence}" />
+                                    <TextBlock Text="{loc:Loc Key=Equipment.SequenceAction}" />
                                     <TextBlock Margin="5,0,0,0" Text="→" />
                                 </StackPanel>
                             </Button>
                         </WrapPanel>
                     </Grid>
                 </Border>
-                <Border MinHeight="96"
+                <Border x:Name="SimulationUnitActivities" MinHeight="96"
                         Padding="8"
                         Background="{DynamicResource Surface.Raised}"
                         BorderBrush="{DynamicResource Border.Default}"
-                        BorderThickness="0,1,0,0"
-                        Visibility="{Binding Navigation.IsSimulationWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        BorderThickness="0,1,0,0">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding Navigation.IsSimulationWorkspace}" Value="True" />
+                                        <Condition Binding="{Binding EquipmentMaterialFlow.HasSlots}" Value="False" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -1127,7 +1125,7 @@
                                     </Style.Triggers>
                                 </Style>
                             </ScrollViewer.Style>
-                            <ItemsControl ItemsSource="{Binding Layout.UnitOverviewItems}">
+                            <ItemsControl ItemsSource="{Binding EquipmentMaterialFlow.UnitActivities}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <StackPanel Orientation="Horizontal" />
@@ -1142,7 +1140,7 @@
                                                 HorizontalContentAlignment="Stretch"
                                                 Command="{Binding DataContext.ShowEquipmentUnitCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                 CommandParameter="{Binding UnitId}"
-                                                AutomationProperties.Name="{Binding UnitName}"
+                                                AutomationProperties.Name="{Binding Name}"
                                                 Style="{StaticResource GlobalCommandButtonStyle}">
                                             <Grid>
                                                 <Grid.RowDefinitions>
@@ -1154,19 +1152,16 @@
                                                                Margin="8,0,0,0"
                                                                FontWeight="SemiBold"
                                                                Foreground="{DynamicResource Text.Primary}"
-                                                               Text="{Binding UnitName}"
+                                                               Text="{Binding Name}"
                                                                TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Foreground="{DynamicResource Accent.Primary}"
-                                                               Text="{Binding StationName}"
-                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Foreground="{DynamicResource Accent.Primary}" Text="{Binding UnitId}" />
                                                 </DockPanel>
                                                 <TextBlock Grid.Row="1"
                                                            Margin="0,4,0,0"
                                                            FontFamily="{StaticResource Typography.Telemetry}"
                                                            FontSize="11"
                                                            Foreground="{DynamicResource Text.Secondary}"
-                                                           Text="{Binding CountText}"
-                                                           TextTrimming="CharacterEllipsis" />
+                                                           Text="{Binding StateText}" TextWrapping="Wrap" />
                                             </Grid>
                                         </Button>
                                     </DataTemplate>
@@ -1282,16 +1277,29 @@
         <TabItem Header="{loc:Loc Key=Connections.Tab}">
             <TabControl x:Name="InspectionWorkspaceTabs"
                         SelectedIndex="{Binding Navigation.SelectedInspectionTabIndex, Mode=TwoWay}">
-                <TabItem Header="{loc:Loc Key=Connections.Tab}">
+                <TabItem Header="{loc:Loc Key=Connections.RecipeConnectionsTab}">
                     <project:RecipeConnectionWorkbenchView />
                 </TabItem>
-                <TabItem x:Name="IntegrationWorkspaceTab" Header="{loc:Loc Key=Integration.InspectionWorkspace}">
+                <TabItem x:Name="IntegrationWorkspaceTab" Header="{loc:Loc Key=Integration.InputResultsTab}">
                     <simulation:SimulationIntegrationWorkspaceView />
                 </TabItem>
             </TabControl>
         </TabItem>
         <TabItem Header="{loc:Loc Key=Workspace.Results}" Visibility="Collapsed">
             <Border x:Name="ResultsWorkspacePanel" Style="{StaticResource PanelSurfaceStyle}">
+                <TabControl x:Name="ResultsWorkspaceTabs" SelectedIndex="0">
+                    <TabItem Header="{loc:Loc Key=Workspace.SessionRecords}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Margin="12,8" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Workspace.SessionRecordsHint}" />
+                            <diagnostics:EventJournalView x:Name="SessionRecordsView" Grid.Row="1" IsInline="True" />
+                        </Grid>
+                    </TabItem>
+                    <TabItem Header="{loc:Loc Key=Workspace.AxisValidationRecords}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Margin="16">
                         <TextBlock FontSize="18" FontWeight="SemiBold" Text="{loc:Loc Key=Workspace.Results}" />
@@ -1357,6 +1365,8 @@
                         </WrapPanel>
                     </StackPanel>
                 </ScrollViewer>
+                    </TabItem>
+                </TabControl>
             </Border>
         </TabItem>
     </TabControl>

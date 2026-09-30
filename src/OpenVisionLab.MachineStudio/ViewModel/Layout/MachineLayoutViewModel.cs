@@ -221,6 +221,8 @@ public sealed class MachineLayoutViewModel : ViewModelBase, IDisposable
     public int SelectionCount => _items.Count(item => item.IsSelected);
     public bool HasSelection => SelectionCount > 0;
     public bool HasMultipleSelection => SelectionCount > 1;
+    public string EquipmentSelectionNameText => SelectionCount == 1 ? SelectedItem?.CurrentName ?? string.Empty : SelectionSummaryText;
+    public string EquipmentSelectionIdText => SelectionCount == 1 ? SelectedItem?.Id ?? string.Empty : string.Empty;
     public string SelectionSummaryText => string.Format(
         CultureInfo.CurrentCulture,
         OpenVisionLanguageService.T(
@@ -655,6 +657,8 @@ public sealed class MachineLayoutViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(FilteredLibraryItems));
         OnPropertyChanged(nameof(HasNoLibrarySearchResults));
         OnPropertyChanged(nameof(SelectionSummaryText));
+        OnPropertyChanged(nameof(EquipmentSelectionNameText));
+        OnPropertyChanged(nameof(EquipmentSelectionIdText));
         OnPropertyChanged(nameof(EquipmentOutlineCountText));
         OnPropertyChanged(nameof(EquipmentOutlineSelectionText));
         OnPropertyChanged(nameof(EquipmentScopeContextText));
@@ -808,6 +812,7 @@ public sealed class MachineLayoutViewModel : ViewModelBase, IDisposable
         else if (args.PropertyName is nameof(LayoutItem.CurrentName) or nameof(LayoutItem.Name))
         {
             RefreshEquipmentOutline();
+            OnPropertyChanged(nameof(EquipmentSelectionNameText));
         }
 
         if (_isUpdatingSelection || args.PropertyName != nameof(LayoutItem.IsSelected))
@@ -873,6 +878,8 @@ public sealed class MachineLayoutViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(HasMultipleSelection));
         OnPropertyChanged(nameof(SelectionSummaryText));
+        OnPropertyChanged(nameof(EquipmentSelectionNameText));
+        OnPropertyChanged(nameof(EquipmentSelectionIdText));
         OnPropertyChanged(nameof(EquipmentOutlineSelectionText));
     }
 

@@ -21,21 +21,18 @@ using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
 
-[CollectionDefinition(Name, DisableParallelization = true)]
-public sealed class EventJournalAlarmViewAutomationTestCollection
-{
-    public const string Name = "Event journal alarm view WPF automation";
-}
-
-[Collection(EventJournalAlarmViewAutomationTestCollection.Name)]
+[Collection(StudioUiTestCollection.Name)]
 public sealed class EventJournalAlarmViewAutomationTests
 {
+    private readonly StudioUiTestHost _ui;
+
+    public EventJournalAlarmViewAutomationTests(StudioUiTestHost ui) => _ui = ui;
+
     [Fact]
     public async Task TimelineViewFiltersClearsAndAcceptsNewSessionEvents()
     {
-        var result = await RunOnStaAsync(() =>
+        var result = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
             var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
             try
             {
@@ -45,7 +42,7 @@ public sealed class EventJournalAlarmViewAutomationTests
                 runtimeDebugger.ApplyEvent(new SimulationEvent(1, 10, TimeSpan.FromMilliseconds(250), "Error", "CAMERA_WAIT_FAILURE", "external result wait failed", "command-10"));
                 runtimeDebugger.ApplyEvent(new SimulationEvent(2, 11, TimeSpan.FromMilliseconds(275), "Recovery", "CAMERA_WAIT_RECOVERED", "external result wait resumed", "command-11"));
 
-                var view = new EventJournalView { DataContext = new EventJournalContext(runtimeDebugger) };
+                var view = new EventJournalView { DataContext = new EventJournalContext(runtimeDebugger), IsInline = true };
                 var window = new Window
                 {
                     Width = 900,
@@ -125,9 +122,8 @@ public sealed class EventJournalAlarmViewAutomationTests
     [Fact]
     public async Task InspectorShowsUserPauseAfterExternalResultWait()
     {
-        var result = await RunOnStaAsync(() =>
+        var result = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
             var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
             try
             {
@@ -188,9 +184,8 @@ public sealed class EventJournalAlarmViewAutomationTests
     [InlineData(SequenceExecutionErrorCode.CameraTriggerFailed)]
     public async Task AlarmView_BindsRecoveredFailureAndClearedHistory(SequenceExecutionErrorCode errorCode)
     {
-        var result = await RunOnStaAsync(() =>
+        var result = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
             var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
             try
             {
@@ -201,7 +196,7 @@ public sealed class EventJournalAlarmViewAutomationTests
                 var failedSequence = CreateFailedSequence(errorCode);
                 runtimeDebugger.ApplySnapshot(CreateSnapshot(failedSequence));
 
-                var view = new EventJournalView { DataContext = new EventJournalContext(runtimeDebugger) };
+                var view = new EventJournalView { DataContext = new EventJournalContext(runtimeDebugger), IsInline = true };
                 var window = new Window
                 {
                     Width = 760,
@@ -283,19 +278,6 @@ public sealed class EventJournalAlarmViewAutomationTests
             if (child is T match) yield return match;
             foreach (var descendant in LogicalDescendants<T>(child)) yield return descendant;
         }
-    }
-
-    private static Task<T> RunOnStaAsync<T>(Func<T> action)
-    {
-        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            try { completion.SetResult(action()); }
-            catch (Exception exception) { completion.SetException(exception); }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return completion.Task;
     }
 
     private static MachineProjectDocument CreateProject() => new()

@@ -345,6 +345,7 @@ public sealed class SequenceStepEditorItem : ViewModelBase
 
         apply(normalized);
         OnPropertyChanged(propertyName);
+        if (propertyName == nameof(Name)) OnPropertyChanged(nameof(DisplayName));
         DefinitionChanged?.Invoke(this, EventArgs.Empty);
     }
 

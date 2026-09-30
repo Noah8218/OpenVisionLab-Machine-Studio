@@ -510,22 +510,24 @@ internal static class SmokeCameraCommissioningVerifier
             UsesCamera(inspector.CameraSelectionComboBox, ItemsControl.ItemsSourceProperty)
             && UsesCamera(inspector.CameraSelectionComboBox, Selector.SelectedValueProperty)
             && UsesCamera(inspector.CameraRecipeComboBox, Selector.SelectedItemProperty)
-            && UsesCamera(inspector.CameraSourcePixelFormatTextBox, TextBox.TextProperty)
-            && UsesCamera(inspector.CameraSourcePathTextBox, TextBox.TextProperty)
+            && UsesCamera(inspector.CameraSourceSettings.CameraSourcePixelFormatTextBox, TextBox.TextProperty)
+            && UsesCamera(inspector.CameraSourceSettings.CameraSourcePathTextBox, TextBox.TextProperty)
             && UsesCamera(inspector.StartCameraManualControlButton, Button.CommandProperty)
             && UsesCamera(inspector.TriggerCameraButton, Button.CommandProperty)
             && UsesCamera(inspector.CameraExecutionEvidenceDetailsTextBlock, TextBlock.TextProperty));
         check("cameraCommandsUseOwnerInstances",
             ReferenceEquals(inspector.StartCameraManualControlButton.Command, camera.StartManualCameraControlCommand)
             && ReferenceEquals(inspector.TriggerCameraButton.Command, camera.TriggerCameraCommand)
-            && ReferenceEquals(inspector.ApplyCameraSourceButton.Command, editor.ApplyCommand)
-            && ReferenceEquals(inspector.RevertCameraSourceButton.Command, editor.RevertCommand)
-            && ReferenceEquals(inspector.BrowseCameraSourceButton.Command, editor.BrowseCommand));
+            && ReferenceEquals(inspector.CameraSourceSettings.ApplyCameraSourceButton.Command, editor.ApplyCommand)
+            && ReferenceEquals(inspector.CameraSourceSettings.RevertCameraSourceButton.Command, editor.RevertCommand)
+            && ReferenceEquals(inspector.CameraSourceSettings.BrowseCameraSourceButton.Command, editor.BrowseCommand));
 
         if (camera.VirtualCameras.Count > 1)
         {
             var otherId = camera.VirtualCameras.First(item => item.Id != originalCameraId).Id;
+            inspector.CameraSelectionComboBox.IsDropDownOpen = true;
             inspector.CameraSelectionComboBox.SetCurrentValue(Selector.SelectedValueProperty, otherId);
+            inspector.CameraSelectionComboBox.IsDropDownOpen = false;
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             check("cameraSelectionControlToOwner", camera.SelectedCameraId == otherId);
             camera.SelectedCameraId = originalCameraId;
@@ -556,7 +558,7 @@ internal static class SmokeCameraCommissioningVerifier
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         check("sourceWidthOwnerToControl", widthEditor.Value == originalWidth);
 
-        inspector.CameraSourcePixelFormatTextBox.SetCurrentValue(TextBox.TextProperty, "Mono16");
+        inspector.CameraSourceSettings.CameraSourcePixelFormatTextBox.SetCurrentValue(TextBox.TextProperty, "Mono16");
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         check("sourceTextControlToOwner", editor.PixelFormatText == "Mono16");
         editor.PixelFormatText = string.Empty;
@@ -564,36 +566,36 @@ internal static class SmokeCameraCommissioningVerifier
         CommandManager.InvalidateRequerySuggested();
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         check("sourceValidationOwnerToControl",
-            inspector.CameraSourcePixelFormatTextBox.Text.Length == 0
+            inspector.CameraSourceSettings.CameraSourcePixelFormatTextBox.Text.Length == 0
             && editor.HasError
-            && !inspector.ApplyCameraSourceButton.IsEnabled
-            && inspector.CameraSourceValidationText.Text == editor.ValidationText);
+            && !inspector.CameraSourceSettings.ApplyCameraSourceButton.IsEnabled
+            && inspector.CameraSourceSettings.CameraSourceValidationText.Text == editor.ValidationText);
         capture.Capture(window, Path.Combine(evidenceDirectory, "bindings-validation.png"));
 
         using var input = new SmokeNativeInput();
         window.Activate();
         input.ActivateWindow(window);
-        inspector.RevertCameraSourceButton.BringIntoView();
-        inspector.RevertCameraSourceButton.UpdateLayout();
-        for (var attempt = 0; attempt < 3 && !inspector.RevertCameraSourceButton.IsKeyboardFocused; attempt++)
+        inspector.CameraSourceSettings.RevertCameraSourceButton.BringIntoView();
+        inspector.CameraSourceSettings.RevertCameraSourceButton.UpdateLayout();
+        for (var attempt = 0; attempt < 3 && !inspector.CameraSourceSettings.RevertCameraSourceButton.IsKeyboardFocused; attempt++)
         {
             await Task.Delay(50);
-            inspector.RevertCameraSourceButton.Focus();
-            Keyboard.Focus(inspector.RevertCameraSourceButton);
+            inspector.CameraSourceSettings.RevertCameraSourceButton.Focus();
+            Keyboard.Focus(inspector.CameraSourceSettings.RevertCameraSourceButton);
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         }
-        check("sourceRevertKeyboardFocused", inspector.RevertCameraSourceButton.IsKeyboardFocused);
-        if (!inspector.RevertCameraSourceButton.IsKeyboardFocused)
+        check("sourceRevertKeyboardFocused", inspector.CameraSourceSettings.RevertCameraSourceButton.IsKeyboardFocused);
+        if (!inspector.CameraSourceSettings.RevertCameraSourceButton.IsKeyboardFocused)
         {
-            Console.Error.WriteLine($"Camera Revert focus unavailable: WindowActive={window.IsActive}; Visible={inspector.RevertCameraSourceButton.IsVisible}; Enabled={inspector.RevertCameraSourceButton.IsEnabled}; Focusable={inspector.RevertCameraSourceButton.Focusable}; Focused={Keyboard.FocusedElement}.");
+            Console.Error.WriteLine($"Camera Revert focus unavailable: WindowActive={window.IsActive}; Visible={inspector.CameraSourceSettings.RevertCameraSourceButton.IsVisible}; Enabled={inspector.CameraSourceSettings.RevertCameraSourceButton.IsEnabled}; Focusable={inspector.CameraSourceSettings.RevertCameraSourceButton.Focusable}; Focused={Keyboard.FocusedElement}.");
         }
         capture.Capture(window, Path.Combine(evidenceDirectory, "bindings-keyboard-focus.png"));
-        if (inspector.RevertCameraSourceButton.IsKeyboardFocused)
+        if (inspector.CameraSourceSettings.RevertCameraSourceButton.IsKeyboardFocused)
         {
-            var inputSource = PresentationSource.FromVisual(inspector.RevertCameraSourceButton)
+            var inputSource = PresentationSource.FromVisual(inspector.CameraSourceSettings.RevertCameraSourceButton)
                 ?? throw new InvalidOperationException(
                     "The camera source Revert button had no presentation source.");
-            inspector.RevertCameraSourceButton.RaiseEvent(new KeyEventArgs(
+            inspector.CameraSourceSettings.RevertCameraSourceButton.RaiseEvent(new KeyEventArgs(
                 Keyboard.PrimaryDevice,
                 inputSource,
                 Environment.TickCount,
@@ -601,7 +603,7 @@ internal static class SmokeCameraCommissioningVerifier
             {
                 RoutedEvent = Keyboard.KeyDownEvent
             });
-            inspector.RevertCameraSourceButton.RaiseEvent(new KeyEventArgs(
+            inspector.CameraSourceSettings.RevertCameraSourceButton.RaiseEvent(new KeyEventArgs(
                 Keyboard.PrimaryDevice,
                 inputSource,
                 Environment.TickCount,
@@ -613,16 +615,16 @@ internal static class SmokeCameraCommissioningVerifier
         await Task.Delay(100);
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         check("sourceRevertKeyboardRestoresRenderedValues",
-            inspector.CameraSourcePixelFormatTextBox.Text == "Mono8"
+            inspector.CameraSourceSettings.CameraSourcePixelFormatTextBox.Text == "Mono8"
             && !editor.IsDirty && !editor.HasError
-            && !inspector.ApplyCameraSourceButton.IsEnabled
-            && !inspector.RevertCameraSourceButton.IsEnabled);
+            && !inspector.CameraSourceSettings.ApplyCameraSourceButton.IsEnabled
+            && !inspector.CameraSourceSettings.RevertCameraSourceButton.IsEnabled);
         editor.RevertCommand.Execute(null);
         check("bindingRoundTripDoesNotAcquireOrAdvance",
             viewModel.SceneSnapshots.Latest!.TickIndex == snapshot.TickIndex
             && viewModel.SceneSnapshots.Latest.Cameras.All(item => item.AcquisitionOrdinal == 0 && item.FrameEvidence is null));
         check("sourcePathIsReadOnlyAndHasAppliedValue",
-            inspector.CameraSourcePathTextBox.IsReadOnly && inspector.CameraSourcePathTextBox.Text == editor.PathText);
+            inspector.CameraSourceSettings.CameraSourcePathTextBox.IsReadOnly && inspector.CameraSourceSettings.CameraSourcePathTextBox.Text == editor.PathText);
         await ScrollIntoViewAsync(window);
     }
 
@@ -790,11 +792,11 @@ internal static class SmokeCameraCommissioningVerifier
         else if (state is "source-focus" or "source-invalid")
         {
             interaction.ActivateWindow();
-            inspector.CameraSourcePixelFormatTextBox.Focus();
+            inspector.CameraSourceSettings.CameraSourcePixelFormatTextBox.Focus();
         }
         else if (state is "source-hover-browse" or "source-pressed-browse")
         {
-            interaction.MovePointerToCenter(inspector.BrowseCameraSourceButton);
+            interaction.MovePointerToCenter(inspector.CameraSourceSettings.BrowseCameraSourceButton);
             if (state == "source-pressed-browse")
             {
                 interaction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
@@ -803,7 +805,7 @@ internal static class SmokeCameraCommissioningVerifier
         }
         else if (state is "source-hover-apply" or "source-pressed-apply")
         {
-            interaction.MovePointerToCenter(inspector.ApplyCameraSourceButton);
+            interaction.MovePointerToCenter(inspector.CameraSourceSettings.ApplyCameraSourceButton);
             if (state == "source-pressed-apply")
             {
                 interaction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
@@ -812,10 +814,10 @@ internal static class SmokeCameraCommissioningVerifier
         }
         else if (state is "source-hover-revert" or "source-pressed-revert")
         {
-            inspector.RevertCameraSourceButton.BringIntoView();
+            inspector.CameraSourceSettings.RevertCameraSourceButton.BringIntoView();
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             interaction.ActivateWindow();
-            interaction.MovePointerToCenter(inspector.RevertCameraSourceButton);
+            interaction.MovePointerToCenter(inspector.CameraSourceSettings.RevertCameraSourceButton);
             if (state == "source-pressed-revert")
             {
                 interaction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
@@ -836,6 +838,8 @@ internal static class SmokeCameraCommissioningVerifier
 
     public static async Task ScrollIntoViewAsync(ShellWindow window)
     {
+        ((MainViewModel)window.DataContext).Navigation.IsInspectorOpen = true;
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         var inspector = SmokeVisualTreeQuery.FindVisualDescendant<RightToolRegionView>(window)
             ?? throw new InvalidOperationException("Run inspector was unavailable.");
         var scrollViewer = inspector.RunInspectorScrollViewer;

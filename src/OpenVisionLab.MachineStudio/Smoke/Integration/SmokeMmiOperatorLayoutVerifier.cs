@@ -86,6 +86,7 @@ internal static class SmokeMmiOperatorLayoutVerifier
         viewModel.Navigation.IsInspectionSettingsExpanded = false;
         viewModel.Navigation.IsInspectionWorkspace = true;
         viewModel.Navigation.SelectedInspectionTabIndex = 1;
+        viewModel.Navigation.SelectedInspectionSettingsTabIndex = 1;
         await IdleAsync(window);
         var mmi = SmokeVisualTreeQuery.FindVisualDescendant<MmiOperatorLayoutView>(window);
         Check("run-mode", viewModel.IsRunMode);
@@ -106,15 +107,31 @@ internal static class SmokeMmiOperatorLayoutVerifier
                 monitor);
         }
 
-        var mmiScroll = FindParent<ScrollViewer>(mmi);
+        var mmiScroll = Find<ScrollViewer>(mmi, "MmiInspectionPreviewScrollViewer");
         var sceneViewport = SmokeVisualTreeQuery.FindVisualDescendant<MachineSceneViewport>(window);
         Check(
-            "mmi-scroll-container",
+            "mmi-preview-scroll-container",
             mmiScroll is { IsVisible: true, ActualWidth: > 0, ActualHeight: > 0 }
             && mmiScroll.VerticalScrollBarVisibility == ScrollBarVisibility.Auto);
-        Check(
-            "mmi-content-scrollable",
-            mmiScroll is { ScrollableHeight: > 0 });
+        if (mmiScroll is not null)
+        {
+            mmiScroll.ScrollToBottom();
+            await IdleAsync(window);
+            var resultText = Find<TextBlock>(mmi, "MmiThreeDResultStatusTextBlock");
+            var resultBounds = resultText?.TransformToAncestor(mmiScroll).TransformBounds(new Rect(resultText.RenderSize));
+            Check("mmi-preview-scroll-reaches-result", resultText is { IsVisible: true }
+                && resultBounds is { } bounds && bounds.Top >= 0 && bounds.Bottom <= mmiScroll.ViewportHeight + 1);
+            mmiScroll.ScrollToTop();
+            await IdleAsync(window);
+        }
+        else Check("mmi-preview-scroll-reaches-result", false);
+        foreach (var actionName in new[] { "MmiPublishButton", "MmiRefreshButton", "MmiApplyResultButton" })
+        {
+            var action = Find<Button>(mmi, actionName);
+            var actionBounds = action?.TransformToAncestor(mmi).TransformBounds(new Rect(action.RenderSize));
+            Check($"{actionName}-anchored-in-visible-workspace", action is { IsVisible: true }
+                && actionBounds is { } bounds && new Rect(mmi.RenderSize).Contains(bounds));
+        }
         var cameraImageFrame = Find<Border>(mmi, "MmiVirtualCameraImageFrame");
         var expectedCameraImageFrameHeight = viewModel.Navigation.IsNarrowLayout
             ? 240
@@ -128,6 +145,7 @@ internal static class SmokeMmiOperatorLayoutVerifier
         var inspectionLayout = Find<Grid>(mmi, "MmiInspectionLayoutGrid");
         var previewPanel = Find<Border>(mmi, "MmiInspectionPreviewPanel");
         var setupPanel = Find<Grid>(mmi, "MmiInspectionSetupPanel");
+        var externalSettingsGrid = Find<Grid>(mmi, "MmiExternalInspectionSettingsGrid");
         var headerActions = Find<StackPanel>(mmi, "MmiInspectionHeaderActions");
         var statusPill = Find<Border>(mmi, "MmiInspectionStatusPill");
         var settingsToggle = Find<ToggleButton>(mmi, "MmiInspectionSettingsToggle");
@@ -174,7 +192,7 @@ internal static class SmokeMmiOperatorLayoutVerifier
             {
                 await ToggleWithSpaceAsync(window, settingsToggle, nativeInput);
                 await IdleAsync(window);
-                var settingsColumns = setupPanel?.ColumnDefinitions;
+                var settingsColumns = externalSettingsGrid?.ColumnDefinitions;
                 var machineStateCard = Find<Border>(mmi, "MmiMachineStateCard");
                 var recipeCard = Find<Border>(mmi, "MmiInspectionRecipeCard");
                 var resultCard = Find<Border>(mmi, "MmiInspectionResultCard");
@@ -187,7 +205,7 @@ internal static class SmokeMmiOperatorLayoutVerifier
                     previewPanel?.Visibility == Visibility.Collapsed);
                 Check(
                     "inspection-wide-mode-expands-setup",
-                    setupPanel is { IsVisible: true, ColumnDefinitions.Count: 2 }
+                    setupPanel is { IsVisible: true } && externalSettingsGrid is { ColumnDefinitions.Count: 2 }
                     && inspectionLayout is not null
                     && Math.Abs(setupPanel.ActualWidth - inspectionLayout.ActualWidth) <= 1.0
                     && Grid.GetColumn(setupPanel) == 0
@@ -232,7 +250,7 @@ internal static class SmokeMmiOperatorLayoutVerifier
                     && setupPanel is { IsVisible: true }
                     && Grid.GetColumn(setupPanel) == (isNarrowLayout ? 0 : 2)
                     && Grid.GetRow(setupPanel) == (isNarrowLayout ? 3 : 2)
-                    && setupPanel.ColumnDefinitions[1].ActualWidth == 0
+                    && externalSettingsGrid?.ColumnDefinitions[1].ActualWidth == 0
                     && settingsToggle.Content?.ToString() == settingsToggleInitialText
                     && viewModel.Integration.Setup.SelectedRecipe == recipeBeforeToggle
                     && viewModel.Integration.Setup.InspectionRecipePath == setupPathBeforeToggle
@@ -566,8 +584,21 @@ internal static class SmokeMmiOperatorLayoutVerifier
         {
             throw new InvalidOperationException("Inspection settings toggle did not receive keyboard focus.");
         }
+        var expectedChecked = element.IsChecked != true;
+        nativeInput.MovePointerToCenter(element);
+        await Task.Delay(50);
+        var ownership = nativeInput.CheckPointerOwnership(window);
+        if (!ownership.IsOwned) throw new InvalidOperationException($"Inspection settings input lost window ownership. {ownership.Diagnostic}");
         nativeInput.SendKey(0x20);
-        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Input);
+        for (var attempt = 0; attempt < 40 && element.IsChecked != expectedChecked; attempt++)
+        {
+            await Task.Delay(25);
+            await IdleAsync(window);
+        }
+        if (element.IsChecked != expectedChecked)
+        {
+            throw new InvalidOperationException($"Inspection settings Space input did not change the toggle to {expectedChecked}.");
+        }
         await IdleAsync(window);
     }
 

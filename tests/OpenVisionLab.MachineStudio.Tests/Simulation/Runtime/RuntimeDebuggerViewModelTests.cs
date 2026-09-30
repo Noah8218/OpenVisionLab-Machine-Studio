@@ -14,6 +14,32 @@ namespace OpenVisionLab.MachineStudio.Tests;
 
 public sealed class RuntimeDebuggerViewModelTests
 {
+    [Theory]
+    [InlineData(SequenceDebugPauseReason.User, true)]
+    [InlineData(SequenceDebugPauseReason.SemanticStep, true)]
+    [InlineData(SequenceDebugPauseReason.Breakpoint, true)]
+    [InlineData(SequenceDebugPauseReason.FixedTick, true)]
+    [InlineData(SequenceDebugPauseReason.None, false)]
+    [InlineData(SequenceDebugPauseReason.SequenceCompleted, false)]
+    [InlineData(SequenceDebugPauseReason.SequenceFaulted, false)]
+    [InlineData(SequenceDebugPauseReason.SequenceAborted, false)]
+    public void ContinuationPresentationDistinguishesPauseFromReadyAndTerminalStates(SequenceDebugPauseReason reason, bool canContinue)
+    {
+        using var viewModel = new RuntimeDebuggerViewModel(command => Task.FromResult(Accepted(command)));
+        var changed = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+        var debug = new SequenceDebugSnapshot(false, null, reason, null, []);
+        Assert.False(viewModel.IsPausedForContinuation);
+        viewModel.ApplySnapshot(CreateSnapshot(debug));
+        Assert.Equal(canContinue, viewModel.IsPausedForContinuation);
+        Assert.Contains(nameof(RuntimeDebuggerViewModel.IsPausedForContinuation), changed);
+        viewModel.ApplySnapshot(CreateSnapshot(debug, runMode: SimulationRunMode.RealTime));
+        Assert.False(viewModel.IsPausedForContinuation);
+        viewModel.ApplySnapshot(CreateSnapshot(debug));
+        viewModel.LoadProject(CreateProject(), resetSession: true);
+        Assert.False(viewModel.IsPausedForContinuation);
+    }
+
     [Fact]
     public async Task SemanticStep_UsesActiveSequence_RejectsDuplicatesAndRunning_ThenRecovers()
     {
@@ -824,6 +850,30 @@ public sealed class RuntimeDebuggerViewModelTests
         Assert.Equal("Renamed Axis X", target.Name);
         Assert.Equal("Renamed Axis X", watch.Name);
         Assert.Same(target, watch.Target);
+    }
+
+    [Fact]
+    public void SequenceErrorLocationUsesTheErrorOwnerAndSurvivesResetWithinTheSession()
+    {
+        using var model = new RuntimeDebuggerViewModel(command => Task.FromResult(Accepted(command)));
+        var project = CreateProject();
+        project.Sequences[0].Steps[0].TargetId = "axis-x";
+        model.LoadProject(project, resetSession: true);
+        var error = new SequenceExecutionError(SequenceExecutionErrorCode.AxisFaulted, "cycle", "on", "Axis fault");
+        var sequence = new SequenceExecutionSnapshot("outer", SequenceExecutionStatus.Faulted, "different-active-step", 0,
+            TimeSpan.Zero, TimeSpan.Zero, 5, error, TimeSpan.FromSeconds(10), "nested");
+        model.ApplySnapshot(CreateSnapshot(sequence: sequence));
+        var location = Assert.IsType<RuntimeSequenceErrorLocation>(model.LastSequenceError);
+        Assert.Equal(error, location.Error);
+        Assert.Equal("axis-x", location.TargetId);
+        Assert.Equal("project", location.ProjectId);
+        Assert.Equal(5, location.TickIndex);
+        project.Sequences[0].Steps[0].TargetId = "edited-target";
+        model.LoadProject(project, resetSession: false);
+        model.ApplySnapshot(CreateSnapshot());
+        Assert.Same(location, model.LastSequenceError);
+        model.LoadProject(project, resetSession: true);
+        Assert.Null(model.LastSequenceError);
     }
 
     private static MachineProjectDocument CreateProject() => new()

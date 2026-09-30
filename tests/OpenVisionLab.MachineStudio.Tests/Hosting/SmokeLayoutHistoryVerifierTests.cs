@@ -14,9 +14,12 @@ using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
 
-[Collection(LayoutStartupTestCollection.Name)]
+[Collection(StudioUiTestCollection.Name)]
 public sealed class SmokeLayoutHistoryVerifierTests
 {
+    private readonly StudioUiTestHost _ui;
+
+    public SmokeLayoutHistoryVerifierTests(StudioUiTestHost ui) => _ui = ui;
     private static string SamplePath => Path.Combine(
         AppContext.BaseDirectory,
         "Samples",
@@ -31,7 +34,7 @@ public sealed class SmokeLayoutHistoryVerifierTests
         Directory.CreateDirectory(evidenceRoot);
         var reportPath = Path.Combine(evidenceRoot, "layout-history-report.json");
 
-        var report = await RunOnStaAsync(async () =>
+        var report = await _ui.InvokeTaskAsync(async () =>
         {
             var project = new ProjectDocumentStore().Load(File.ReadAllText(SamplePath));
             using var viewModel = new MainViewModel(project);
@@ -57,7 +60,7 @@ public sealed class SmokeLayoutHistoryVerifierTests
     [Fact]
     public async Task ModeMeasurementWaitsForResetAndRejectsWrongMode()
     {
-        await RunOnStaAsync(async () =>
+        await _ui.InvokeTaskAsync(async () =>
         {
             var project = new ProjectDocumentStore().Load(File.ReadAllText(SamplePath));
             using var viewModel = new MainViewModel(project);
@@ -80,7 +83,7 @@ public sealed class SmokeLayoutHistoryVerifierTests
     [Fact]
     public async Task PerformanceVerifierHonorsIndependentIsEnabledConstraints()
     {
-        await RunOnStaAsync(async () =>
+        await _ui.InvokeTaskAsync(async () =>
         {
             var project = new ProjectDocumentStore().Load(File.ReadAllText(SamplePath));
             using var viewModel = new MainViewModel(project);
@@ -124,7 +127,7 @@ public sealed class SmokeLayoutHistoryVerifierTests
     [Fact]
     public async Task EquipmentAddButtonsFollowDesignAndRunCommandAvailability()
     {
-        await RunOnStaAsync(async () =>
+        await _ui.InvokeTaskAsync(async () =>
         {
             var project = new ProjectDocumentStore().Load(File.ReadAllText(SamplePath));
             using var viewModel = new MainViewModel(project);
@@ -170,13 +173,8 @@ public sealed class SmokeLayoutHistoryVerifierTests
     [Fact]
     public async Task GlobalCommandBarReflectsPauseResumeAndDesignResetAvailability()
     {
-        await RunOnStaAsync(async () =>
+        await _ui.InvokeTaskAsync(async () =>
         {
-            if (Application.Current is null)
-            {
-                new App().InitializeComponent();
-            }
-
             var project = new ProjectDocumentStore().Load(File.ReadAllText(SamplePath));
             using var viewModel = new MainViewModel(project);
             var commandBar = new GlobalCommandBarView { DataContext = viewModel };
@@ -194,8 +192,10 @@ public sealed class SmokeLayoutHistoryVerifierTests
                 Assert.True(
                     designModeRadio.IsChecked == true,
                     $"Design radio did not reflect initial mode. Model={viewModel.IsDesignMode}, run radio={runModeRadio.IsChecked}, binding={BindingOperations.GetBindingExpression(designModeRadio, ToggleButton.IsCheckedProperty)?.Status}.");
-                Assert.False(pauseButton.IsVisible);
-                Assert.False(resetButton.IsVisible);
+                Assert.True(pauseButton.IsVisible);
+                Assert.False(pauseButton.IsEnabled);
+                Assert.True(resetButton.IsVisible);
+                Assert.False(resetButton.IsEnabled);
 
                 runModeRadio.IsChecked = true;
                 await SmokePerformanceVerifier.WaitForModeAsync(viewModel, window.Dispatcher, true);
@@ -211,13 +211,19 @@ public sealed class SmokeLayoutHistoryVerifierTests
                 Assert.Equal(pauseButton.Command.CanExecute(null), pauseButton.IsEnabled);
 
                 pauseButton.Command.Execute(null);
-                await WaitForStateAsync(() => !viewModel.IsRunning);
-                Assert.True(runButton.IsEnabled);
-                Assert.False(pauseButton.IsEnabled);
-                Assert.Equal(runButton.Command.CanExecute(null), runButton.IsEnabled);
+                await WaitForStateAsync(() => !viewModel.IsRunning && viewModel.RuntimeDebugger.IsPausedForContinuation);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.Same(viewModel.RunCommand, pauseButton.Command);
+                Assert.True(pauseButton.IsEnabled);
+                Assert.False(runButton.IsVisible);
+                Assert.Equal(OpenVisionLanguageService.T("Shell.ContinueRun"),
+                    System.Windows.Automation.AutomationProperties.GetName(pauseButton));
 
-                runButton.Command.Execute(null);
-                await WaitForStateAsync(() => viewModel.IsRunning);
+                pauseButton.Command.Execute(null);
+                await WaitForStateAsync(() => viewModel.IsRunning && !viewModel.RuntimeDebugger.IsPausedForContinuation);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.Same(viewModel.PauseCommand, pauseButton.Command);
+                Assert.True(runButton.IsVisible);
                 designModeRadio.IsChecked = true;
                 await SmokePerformanceVerifier.WaitForModeAsync(viewModel, window.Dispatcher, false);
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.DataBind);
@@ -226,8 +232,11 @@ public sealed class SmokeLayoutHistoryVerifierTests
                 Assert.True(
                     designModeRadio.IsChecked == true,
                     $"Design radio remained unchecked after reset. Model={viewModel.IsDesignMode}, run radio={runModeRadio.IsChecked}, binding={BindingOperations.GetBindingExpression(designModeRadio, ToggleButton.IsCheckedProperty)?.Status}, DataContextMatches={ReferenceEquals(designModeRadio.DataContext, viewModel)}.");
-                Assert.False(pauseButton.IsVisible);
-                Assert.False(resetButton.IsVisible);
+                Assert.True(pauseButton.IsVisible);
+                Assert.False(pauseButton.IsEnabled);
+                Assert.True(resetButton.IsVisible);
+                Assert.False(resetButton.IsEnabled);
+                Assert.True(runButton.IsVisible);
             }
             finally
             {
@@ -295,34 +304,4 @@ public sealed class SmokeLayoutHistoryVerifierTests
         }
     }
 
-    private static Task<T> RunOnStaAsync<T>(Func<Task<T>> action)
-    {
-        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            var dispatcher = Dispatcher.CurrentDispatcher;
-            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
-            _ = RunAsync();
-            Dispatcher.Run();
-
-            async Task RunAsync()
-            {
-                try
-                {
-                    completion.SetResult(await action());
-                }
-                catch (Exception exception)
-                {
-                    completion.SetException(exception);
-                }
-                finally
-                {
-                    dispatcher.BeginInvokeShutdown(DispatcherPriority.Normal);
-                }
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return completion.Task;
-    }
 }

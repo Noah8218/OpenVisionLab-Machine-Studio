@@ -49,6 +49,9 @@ internal sealed class SceneViewportInteractionWorkflow
             case SceneViewportMoveAction.Cancel:
                 _layout.CancelSelectionDrag();
                 break;
+            case SceneViewportMoveAction.MoveBy:
+                _layout.MoveSelectionBy(request.Delta.X, request.Delta.Y);
+                break;
         }
     }
 

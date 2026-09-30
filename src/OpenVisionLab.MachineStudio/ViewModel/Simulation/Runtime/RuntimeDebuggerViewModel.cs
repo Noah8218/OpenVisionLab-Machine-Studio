@@ -27,6 +27,11 @@ public sealed record RuntimeWatchTarget(RuntimeWatchKind Kind, string Id, string
     public string DisplayText => $"{Kind} · {Name} · {Id}";
 }
 
+public sealed record RuntimeSequenceErrorLocation(string ProjectId, SequenceExecutionError Error, string? TargetId, long TickIndex)
+{
+    public string DisplayText => $"{Error.SequenceId} / {Error.StepId ?? "—"} / {TargetId ?? "—"} · {Error.Code} · tick {TickIndex}";
+}
+
 public sealed class RuntimeWatchItem : ViewModelBase
 {
     private RuntimeWatchTarget _target;
@@ -92,6 +97,8 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
     private readonly RuntimeDebuggerWatchTargetCatalog _watchTargetCatalog = new();
     private SimulationSnapshot? _latestSnapshot;
     private string? _projectId;
+    private MachineProjectDocument? _project;
+    private RuntimeSequenceErrorLocation? _lastSequenceError;
     private bool _defaultWatchApplied;
     private bool _isEnabled;
     private bool _isOperationPending;
@@ -223,6 +230,10 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public bool IsPausedForContinuation => _latestSnapshot?.RunMode == SimulationRunMode.Paused
+        && _latestSnapshot.SequenceDebug.PauseReason is SequenceDebugPauseReason.User
+            or SequenceDebugPauseReason.SemanticStep or SequenceDebugPauseReason.Breakpoint or SequenceDebugPauseReason.FixedTick;
+
     public string PauseReasonText => _latestSnapshot?.SequenceDebug.PauseReason switch
     {
         SequenceDebugPauseReason.SemanticStep => T("Debugger.PauseSemanticStep", "다음 단계 경계", "Next-step boundary"),
@@ -340,6 +351,12 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
     public ICommand AcknowledgeAlarmCommand => _alarmCollection.AcknowledgeAlarmCommand;
     public ICommand AcknowledgeAllAlarmsCommand => _alarmCollection.AcknowledgeAllAlarmsCommand;
 
+    public RuntimeSequenceErrorLocation? LastSequenceError
+    {
+        get => _lastSequenceError;
+        private set => SetProperty(ref _lastSequenceError, value);
+    }
+
     public void LoadProject(MachineProjectDocument project, bool resetSession)
     {
         ArgumentNullException.ThrowIfNull(project);
@@ -351,6 +368,7 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
         Interlocked.Increment(ref _operationGeneration);
         var projectChanged = !string.Equals(_projectId, project.Id, StringComparison.Ordinal);
         _projectId = project.Id;
+        _project = project;
 
         if (resetSession || projectChanged)
         {
@@ -361,6 +379,7 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
                 "Pause to move to the next sequence boundary or configure a breakpoint.");
             Watches.Clear();
             _timeline.Clear();
+            LastSequenceError = null;
             _alarmCollection.Reset();
             _defaultWatchApplied = false;
             SelectedWatch = null;
@@ -413,6 +432,13 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
         }
 
         _latestSnapshot = snapshot;
+        if (_project is not null && snapshot.Sequences.FirstOrDefault(sequence =>
+            sequence.Status == SequenceExecutionStatus.Faulted && sequence.LastError is not null)?.LastError is { } error)
+        {
+            var targetId = _project.Sequences.FirstOrDefault(sequence => sequence.Id == error.SequenceId)?
+                .Steps.FirstOrDefault(step => step.Id == error.StepId)?.TargetId;
+            LastSequenceError = new(_project.Id, error, targetId, snapshot.TickIndex);
+        }
         var enabledBreakpoints = snapshot.SequenceDebug.Breakpoints
             .Select(item => (item.SequenceId, item.StepId))
             .ToHashSet();
@@ -645,6 +671,7 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
         }
 
         _timeline.Clear();
+        LastSequenceError = null;
         RefreshTimelinePresentation();
     }
 
@@ -749,6 +776,7 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(SequenceStateText));
         OnPropertyChanged(nameof(CurrentStepText));
         OnPropertyChanged(nameof(PauseReasonText));
+        OnPropertyChanged(nameof(IsPausedForContinuation));
         OnPropertyChanged(nameof(BreakpointActionText));
         OnPropertyChanged(nameof(TimelineSummaryText));
     }

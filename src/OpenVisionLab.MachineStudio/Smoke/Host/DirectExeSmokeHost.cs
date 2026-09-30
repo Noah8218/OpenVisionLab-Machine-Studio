@@ -309,27 +309,38 @@ internal static class DirectExeSmokeHost
             smokeOptions.ConnectionWorkbenchSavePath);
         if (!string.IsNullOrWhiteSpace(smokeOptions.DocumentTab))
         {
-            var document = FindVisualDescendant<SceneDocumentView>(window)
-                ?? throw new InvalidOperationException("Scene document view was not available.");
-            var tabs = FindVisualDescendant<TabControl>(document)
-                ?? throw new InvalidOperationException("Document tabs were not available.");
-            var localizedDocumentTab = smokeOptions.DocumentTab switch
+            if (smokeOptions.DocumentTab is "Simulation Workspace" or "Sequence")
             {
-                "Machine Layout" => OpenVisionLanguageService.T("Shell.MachineLayout"),
-                "Simulation Workspace" => OpenVisionLanguageService.T("Shell.SimulationWorkspace"),
-                "Sequence" => OpenVisionLanguageService.T("Shell.Sequence"),
-                "Connections" => OpenVisionLanguageService.T("Connections.Tab"),
-                _ => smokeOptions.DocumentTab
-            };
-            var tab = tabs.Items.OfType<TabItem>().FirstOrDefault(item =>
-                string.Equals(item.Header?.ToString(), smokeOptions.DocumentTab, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(
-                    item.Header?.ToString(),
-                    localizedDocumentTab,
-                    StringComparison.OrdinalIgnoreCase))
-                ?? throw new InvalidOperationException(
-                    $"Document tab '{smokeOptions.DocumentTab}' was not available.");
-            tab.IsSelected = true;
+                vm.Navigation.IsSimulationWorkspace = true;
+                vm.Navigation.SelectedExecutionTabIndex = smokeOptions.DocumentTab == "Sequence" ? 1 : 0;
+            }
+            else
+            {
+                var document = FindVisualDescendant<SceneDocumentView>(window)
+                    ?? throw new InvalidOperationException("Scene document view was not available.");
+                var tabs = FindVisualDescendant<TabControl>(document)
+                    ?? throw new InvalidOperationException("Document tabs were not available.");
+                var localizedDocumentTab = smokeOptions.DocumentTab switch
+                {
+                    "Machine Layout" => OpenVisionLanguageService.T("Shell.MachineLayout"),
+                    "Simulation Workspace" => OpenVisionLanguageService.T("Shell.SimulationWorkspace"),
+                    "Sequence" => OpenVisionLanguageService.T("Shell.Sequence"),
+                    "Connections" => OpenVisionLanguageService.T("Connections.Tab"),
+                    _ => smokeOptions.DocumentTab
+                };
+                var tab = tabs.Items.OfType<TabItem>().FirstOrDefault(item =>
+                    string.Equals(item.Header?.ToString(), smokeOptions.DocumentTab, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(
+                        item.Header?.ToString(),
+                        localizedDocumentTab,
+                        StringComparison.OrdinalIgnoreCase))
+                    ?? throw new InvalidOperationException(
+                        $"Document tab '{smokeOptions.DocumentTab}' was not available.");
+                tab.IsSelected = true;
+                if (Equals(tab.Header, OpenVisionLanguageService.T("Connections.Tab"))) vm.Navigation.IsInspectionWorkspace = true;
+                else if (Equals(tab.Header, OpenVisionLanguageService.T("Workspace.Results"))) vm.Navigation.IsResultsWorkspace = true;
+                else if (Equals(tab.Header, OpenVisionLanguageService.T("Shell.MachineLayout"))) vm.Navigation.IsEquipmentWorkspace = true;
+            }
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             await Task.Delay(100);
         }

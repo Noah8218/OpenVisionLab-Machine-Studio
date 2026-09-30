@@ -3,11 +3,15 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
              xmlns:inspection="clr-namespace:OpenVisionLab.MachineStudio.View.Mmi">
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled"
-                  CanContentScroll="False">
-        <StackPanel Margin="12">
-            <inspection:MmiOperatorLayoutView Margin="0,0,0,12" />
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <inspection:MmiOperatorLayoutView Margin="0,0,0,6" />
+        <Expander x:Name="IntegrationExchangeDetailsExpander" Grid.Row="1" Header="{loc:Loc Key=Integration.ExchangeStatusCaption}">
+        <ScrollViewer MaxHeight="280" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False">
+        <StackPanel>
             <Border Style="{StaticResource PanelSurfaceStyle}">
                 <StackPanel>
                     <TextBlock Style="{StaticResource SectionCaptionStyle}"
@@ -223,5 +227,7 @@
                 </StackPanel>
             </Border>
         </StackPanel>
-    </ScrollViewer>
+        </ScrollViewer>
+        </Expander>
+    </Grid>
 </UserControl>

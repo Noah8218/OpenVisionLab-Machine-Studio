@@ -17,6 +17,9 @@
         shell:ShellWindow.IsCompactLayout="{Binding Navigation.IsCompactLayout, Mode=TwoWay}"
         shell:ShellWindow.IsNarrowLayout="{Binding Navigation.IsNarrowLayout, Mode=TwoWay}"
         WindowStartupLocation="CenterScreen">
+    <scene:MachineSceneViewport.LabelOverlayElement>
+        <Binding ElementName="RightToolRegionView" />
+    </scene:MachineSceneViewport.LabelOverlayElement>
     <b:Interaction.Behaviors>
         <behavior:ShellKeyboardCommandBehavior
             DeleteCommand="{Binding DeleteLayoutComponentCommand}"
@@ -64,7 +67,7 @@
         <Grid x:Name="WorkspaceRowsGrid" Grid.Row="2" Style="{StaticResource OpenedRecipeVisibility}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="48" />
-                <RowDefinition Height="51" />
+                <RowDefinition Height="Auto" MinHeight="51" />
                 <RowDefinition Height="2*" MinHeight="240" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition x:Name="BottomWorkspaceRow">
@@ -125,7 +128,11 @@
 
             <shell:GlobalCommandBarView Grid.Row="1" Style="{StaticResource OpenedRecipeVisibility}" />
 
-            <Grid x:Name="WorkspaceColumnsGrid" Grid.Row="2">
+            <Grid x:Name="WorkspaceColumnsGrid" Grid.Row="2" Grid.IsSharedSizeScope="True">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" SharedSizeGroup="EquipmentFooter" />
+                </Grid.RowDefinitions>
                 <Grid.Resources>
                     <Style x:Key="WorkspaceInspectorStyle" TargetType="{x:Type inspector:RightToolRegionView}">
                         <Setter Property="Grid.Column" Value="2" />
@@ -136,35 +143,22 @@
                         <Setter Property="MinWidth" Value="300" />
                         <Setter Property="MaxWidth" Value="405" />
                         <Setter Property="MaxHeight" Value="580" />
-                        <Setter Property="Margin" Value="16,68,16,68" />
+                        <Setter Property="Margin" Value="16,88,16,10" />
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
                                 <Setter Property="Width" Value="360" />
-                                <Setter Property="Margin" Value="16,68,16,68" />
+                                <Setter Property="Margin" Value="16,88,16,10" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Navigation.IsSimulationWorkspace}" Value="True">
-                                <Setter Property="Margin" Value="16,108,16,68" />
+                                <Setter Property="Margin" Value="16,138,16,10" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Navigation.IsInspectorOpen}" Value="False">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                    <Style x:Key="EquipmentInspectorToggleStyle"
-                           TargetType="Button"
-                           BasedOn="{StaticResource GlobalCommandButtonStyle}">
-                        <Setter Property="Visibility" Value="Visible" />
-                        <Setter Property="Content" Value="{loc:Loc Key=Shell.Properties}" />
-                        <Setter Property="AutomationProperties.Name" Value="{loc:Loc Key=Shell.Properties}" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                            <DataTrigger Binding="{Binding Navigation.IsInspectionWorkspace}" Value="True">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
-                            <DataTrigger Binding="{Binding Navigation.IsInspectorOpen}" Value="True">
-                                <Setter Property="Content" Value="×" />
-                                <Setter Property="AutomationProperties.Name" Value="{loc:Loc Key=Shell.CloseProperties}" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding Navigation.IsSimulationWorkspace}" Value="True">
+                            <DataTrigger Binding="{Binding Navigation.IsResultsWorkspace}" Value="True">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
                         </Style.Triggers>
@@ -178,24 +172,17 @@
                     <ColumnDefinition x:Name="RightWorkspaceColumn" Width="0" MinWidth="0" MaxWidth="0" />
                 </Grid.ColumnDefinitions>
 
-                <project:LeftToolRegionView Grid.Column="0" />
-                <GridSplitter Grid.Column="1"
+                <project:LeftToolRegionView Grid.Column="0" Grid.RowSpan="2" />
+                <GridSplitter Grid.Column="1" Grid.RowSpan="2"
                               HorizontalAlignment="Stretch"
                               VerticalAlignment="Stretch" />
-                <scene:SceneDocumentView Grid.Column="2" />
+                <scene:SceneDocumentView Grid.Column="2" Grid.RowSpan="2" />
                 <GridSplitter Grid.Column="3" Visibility="Collapsed"
                               HorizontalAlignment="Stretch"
                               VerticalAlignment="Stretch" />
                 <inspector:RightToolRegionView x:Name="RightToolRegionView"
                                                Panel.ZIndex="5"
                                                Style="{StaticResource WorkspaceInspectorStyle}" />
-                <Button Grid.Column="2"
-                        x:Name="WorkspaceInspectorToggleButton"
-                        HorizontalAlignment="Right" VerticalAlignment="Top"
-                        Margin="12,68,12,0" Width="108" Height="34"
-                        Panel.ZIndex="6"
-                        Command="{Binding Navigation.ToggleInspectorCommand}"
-                        Style="{StaticResource EquipmentInspectorToggleStyle}" />
             </Grid>
 
             <GridSplitter x:Name="BottomWorkspaceSplitter" Grid.Row="3" Height="5"

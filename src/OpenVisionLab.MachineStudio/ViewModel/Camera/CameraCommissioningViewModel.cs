@@ -24,7 +24,7 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
         nameof(SelectedCameraRecipe), nameof(CurrentCameraName), nameof(CurrentCameraStateText),
         nameof(CurrentCameraResultText), nameof(CurrentCameraFrameText),
         nameof(CurrentCameraExposureTicksText), nameof(CurrentCameraTransferTicksText),
-        nameof(CurrentCameraSourceText), nameof(CurrentCameraSourceModeText),
+        nameof(CurrentCameraSourceText), nameof(CurrentCameraSourceModeText), nameof(CurrentCameraInputKindText),
         nameof(CurrentCameraImagePath), nameof(HasCurrentCameraImage),
         nameof(CurrentCameraResultSourceText), nameof(CurrentCameraVerificationLevelText),
         nameof(CurrentCameraInputHashText), nameof(CurrentCameraModelKindText),
@@ -134,6 +134,7 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
             _ => CanTriggerCamera,
             _handleCommandException,
             useCommandManagerRequery: false);
+        SelectCameraCommand = new RelayCommand(value => SelectedCameraId = value as string, _ => !_disposed);
     }
 
     public CameraImageSourceEditorViewModel ImageSourceEditor { get; }
@@ -141,6 +142,8 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
     public ICommand StartManualCameraControlCommand { get; }
 
     public ICommand TriggerCameraCommand { get; }
+
+    public ICommand SelectCameraCommand { get; }
 
     internal CameraSelectionWorkflow Selection { get; }
 
@@ -198,6 +201,7 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
     public string CurrentCameraTransferTicksText => _presentation.CurrentCameraTransferTicksText;
     public string CurrentCameraSourceText => _presentation.CurrentCameraSourceText;
     public string CurrentCameraSourceModeText => _presentation.CurrentCameraSourceModeText;
+    public string CurrentCameraInputKindText => _presentation.CurrentCameraInputKindText;
     public string? CurrentCameraImagePath => _presentation.CurrentCameraImagePath;
     public bool HasCurrentCameraImage => _presentation.HasCurrentCameraImage;
     public string CurrentCameraResultSourceText => _presentation.CurrentCameraResultSourceText;
@@ -216,6 +220,7 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
         Environment.NewLine,
         $"{OpenVisionLanguageService.T("Camera.ResultSource")}: {CurrentCameraResultSourceText}",
         $"{OpenVisionLanguageService.T("Camera.WorkpieceAssociation")}: {_presentation.CurrentCameraWorkpieceComponentIdText}",
+        $"{OpenVisionLanguageService.T("Camera.WorkpieceInstanceId")}: {_presentation.CurrentCameraWorkpieceInstanceIdText}",
         $"{OpenVisionLanguageService.T("Camera.VerificationLevel")}: {CurrentCameraVerificationLevelText}",
         $"{OpenVisionLanguageService.T("Camera.ClockMode")}: {CurrentCameraClockModeText}",
         $"{OpenVisionLanguageService.T("Camera.InputHash")}: {CurrentCameraInputHashText}",

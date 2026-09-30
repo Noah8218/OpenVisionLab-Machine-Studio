@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -18,12 +19,126 @@ using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
 
+[Collection(StudioUiTestCollection.Name)]
 public sealed class SceneViewportRenderingTests
 {
+    private readonly StudioUiTestHost _ui;
+
+    public SceneViewportRenderingTests(StudioUiTestHost ui) => _ui = ui;
+
+    [Theory]
+    [InlineData(false, 640)]
+    [InlineData(true, 640)]
+    [InlineData(false, 1000)]
+    [InlineData(true, 1000)]
+    public async Task SelectedLabelAvoidsActualOverlayAndRecoversAfterResizeAndCollapse(bool oblique, double width)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var frame = CreateItem("frame", LayoutComponentKind.MachineFrame, 0, 0, 400, 250);
+            var camera = CreateItem("camera-right", LayoutComponentKind.Camera, 530, 120, 24, 20);
+            camera.IsSelected = true;
+            var viewport = new MachineSceneViewport { IsObliqueView = oblique, ItemsSource = new[] { frame, camera }, SelectedItem = camera };
+            var overlay = new Border
+            {
+                Width = 260, Height = 400, HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 60, 16, 0), Background = Brushes.Black
+            };
+            var root = new Grid();
+            root.Children.Add(viewport);
+            root.Children.Add(overlay);
+            MachineSceneViewport.SetLabelOverlayElement(root, overlay);
+            var window = new Window { Width = width, Height = 480, Content = root, WindowStyle = WindowStyle.None, ShowActivated = false, ShowInTaskbar = false };
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                PumpRenderDispatcher();
+                Assert.Same(overlay, MachineSceneViewport.GetLabelOverlayElement(viewport));
+                var panelBounds = overlay.TransformToVisual(viewport).TransformBounds(new Rect(overlay.RenderSize));
+                var label = Assert.IsType<Rect>(viewport.LastRenderedSelectedLabelBounds);
+                Assert.False(label.IntersectsWith(panelBounds), $"Label {label}; panel {panelBounds}");
+                Assert.True(new Rect(viewport.RenderSize).Contains(label));
+                var before = Capture(viewport);
+                camera.CurrentName = string.Concat(Enumerable.Repeat("검사 위치의 긴 카메라 이름 ", 8));
+                var longName = Capture(viewport);
+                label = Assert.IsType<Rect>(viewport.LastRenderedSelectedLabelBounds);
+                Assert.False(label.IntersectsWith(panelBounds));
+                Assert.True(new Rect(viewport.RenderSize).Contains(label));
+                Assert.True(label.Height > 20, "The full name and ID must wrap rather than disappear under the panel.");
+                Assert.True(CountDifferentPixelsInRegion(before, longName, 0, (int)panelBounds.Left) > 10);
+                var accent = (viewport.TryFindResource("Accent.Primary") as SolidColorBrush)?.Color ?? Color.FromRgb(0x3A, 0x8D, 0xFF);
+                var visibleTextPixels = 0;
+                for (var y = (int)label.Top + 2; y < Math.Min(label.Bottom, label.Top + 14); y++)
+                for (var x = (int)(label.Left + label.Width / 4); x < label.Left + label.Width * 3 / 4; x++)
+                {
+                    var index = (y * longName.Width + x) * 4;
+                    if (Math.Abs(longName.Pixels[index] - accent.B) < 8 && Math.Abs(longName.Pixels[index + 1] - accent.G) < 8 && Math.Abs(longName.Pixels[index + 2] - accent.R) < 8) visibleTextPixels++;
+                }
+                Assert.True(visibleTextPixels > 3, "The center of the label must remain visible above scene geometry.");
+                Save(longName.Bitmap, $"label-overlay-{oblique}-{width}.png", Path.Combine(TestStorage.RootPath, "label-render"));
+
+                camera.CurrentName = "Camera";
+                window.Width += 120;
+                window.UpdateLayout();
+                PumpRenderDispatcher();
+                panelBounds = overlay.TransformToVisual(viewport).TransformBounds(new Rect(overlay.RenderSize));
+                label = Assert.IsType<Rect>(viewport.LastRenderedSelectedLabelBounds);
+                Assert.False(label.IntersectsWith(panelBounds));
+                var protectedLabel = label;
+                overlay.Visibility = Visibility.Collapsed;
+                window.UpdateLayout();
+                PumpRenderDispatcher();
+                label = Assert.IsType<Rect>(viewport.LastRenderedSelectedLabelBounds);
+                Assert.NotEqual(protectedLabel, label);
+                Assert.True(new Rect(viewport.RenderSize).Contains(label));
+                overlay.Visibility = Visibility.Visible;
+                window.UpdateLayout();
+                PumpRenderDispatcher();
+                Assert.Equal(protectedLabel, viewport.LastRenderedSelectedLabelBounds);
+                return true;
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SelectedComponentNameIsRenderedInBothProjections(bool oblique)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var item = CreateItem("AX-002", LayoutComponentKind.LinearStage, 180, 120, 100, 28);
+            item.IsSelected = true;
+            var viewport = new MachineSceneViewport { Width = 640, Height = 420, IsObliqueView = oblique, ItemsSource = new[] { item } };
+            var window = new Window { Content = viewport, Width = 640, Height = 420, ShowInTaskbar = false, ShowActivated = false, WindowStyle = WindowStyle.None };
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                var before = Capture(viewport);
+                item.CurrentName = "검사 위치 정렬 축";
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                var after = Capture(viewport);
+                Assert.True(CountDifferentPixels(before.Pixels, after.Pixels) > 10, "The selected name must be visible in the scene, not only the outline.");
+                Save(after.Bitmap, $"selected-label-{(oblique ? "oblique" : "plan")}.png", Path.Combine(TestStorage.RootPath, "r19-batch-1-4-20260930", "inprocess"));
+                return true;
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
     [Fact]
     public async Task EveryLayoutComponentKindRendersInPlanAndObliqueViews()
     {
-        var result = await RunOnStaAsync(() => RenderEquipmentViews());
+        var result = await _ui.InvokeAsync(() => RenderEquipmentViews());
 
         Assert.Equal(640, result.Width);
         Assert.Equal(420, result.Height);
@@ -37,7 +152,7 @@ public sealed class SceneViewportRenderingTests
     [Fact]
     public async Task RuntimeSnapshotsRenderIndependentConveyorStatesInPlanAndObliqueViews()
     {
-        var result = await RunOnStaAsync(() => RenderConveyorStates());
+        var result = await _ui.InvokeAsync(() => RenderConveyorStates());
 
         AssertStateDifferences(result.Plan);
         AssertStateDifferences(result.Oblique);
@@ -330,25 +445,6 @@ public sealed class SceneViewportRenderingTests
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var stream = File.Create(Path.Combine(outputDirectory, fileName));
         encoder.Save(stream);
-    }
-
-    private static Task<T> RunOnStaAsync<T>(Func<T> action)
-    {
-        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                completion.SetResult(action());
-            }
-            catch (Exception exception)
-            {
-                completion.SetException(exception);
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return completion.Task;
     }
 
     private sealed record CapturedBitmap(int Width, int Height, BitmapSource Bitmap, byte[] Pixels);

@@ -31,7 +31,8 @@ public enum MachineSceneMoveAction
     Begin,
     Update,
     Commit,
-    Cancel
+    Cancel,
+    MoveBy
 }
 
 public sealed class MachineSceneMoveRequestedEventArgs(
@@ -97,6 +98,7 @@ public sealed class MachineSceneViewport : FrameworkElement
     private double _zoomFactor = 1d;
     private LayoutTransformHandle? _transformHandle;
     private Point? _libraryDropPreviewPoint;
+    private Rect _labelOverlayBounds = Rect.Empty;
 
     public event EventHandler<MachineSceneSelectionRequestedEventArgs>? SelectionRequested;
     public event EventHandler<MachineSceneMoveRequestedEventArgs>? MoveRequested;
@@ -153,6 +155,16 @@ public sealed class MachineSceneViewport : FrameworkElement
             typeof(MachineSceneViewport),
             new PropertyMetadata(true, OnIsObliqueViewChanged));
 
+    public static readonly DependencyProperty LabelOverlayElementProperty = DependencyProperty.RegisterAttached(
+        "LabelOverlayElement", typeof(FrameworkElement), typeof(MachineSceneViewport),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.Inherits, OnLabelOverlayElementChanged));
+
+    public static FrameworkElement? GetLabelOverlayElement(DependencyObject element) =>
+        (FrameworkElement?)element.GetValue(LabelOverlayElementProperty);
+
+    public static void SetLabelOverlayElement(DependencyObject element, FrameworkElement? value) =>
+        element.SetValue(LabelOverlayElementProperty, value);
+
     public IEnumerable<LayoutItem>? ItemsSource
     {
         get => (IEnumerable<LayoutItem>?)GetValue(ItemsSourceProperty);
@@ -184,6 +196,7 @@ public sealed class MachineSceneViewport : FrameworkElement
     }
 
     internal double LastFormattedTextPixelsPerDip { get; private set; }
+    internal Rect? LastRenderedSelectedLabelBounds { get; private set; }
     internal bool? LastRenderedGripperValue { get; private set; }
     internal string? LastRenderedGripperText { get; private set; }
     internal PickPlaceWorkpieceSnapshot? LastRenderedWorkpiece { get; private set; }
@@ -460,6 +473,11 @@ public sealed class MachineSceneViewport : FrameworkElement
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+        if (!e.Handled && RequestKeyboardMove(e.Key, Keyboard.Modifiers))
+        {
+            e.Handled = true;
+            return;
+        }
         if (e.Key != Key.Escape || _pointerGesture == PointerGesture.None)
         {
             return;
@@ -482,6 +500,29 @@ public sealed class MachineSceneViewport : FrameworkElement
         }
         ResetPointerGesture(releaseMouse: true);
         e.Handled = true;
+    }
+
+    internal bool RequestKeyboardMove(Key key, ModifierKeys modifiers)
+    {
+        if (!IsKeyboardFocused || !IsDesignMode || _pointerGesture != PointerGesture.None ||
+            SelectedItem?.IsSelected != true || SelectedItem.Component is null ||
+            (modifiers & ~ModifierKeys.Shift) != ModifierKeys.None)
+        {
+            return false;
+        }
+
+        var step = modifiers.HasFlag(ModifierKeys.Shift) ? 10d : 1d;
+        var delta = key switch
+        {
+            Key.Left => new Vector(-step, 0),
+            Key.Right => new Vector(step, 0),
+            Key.Up => new Vector(0, -step),
+            Key.Down => new Vector(0, step),
+            _ => default
+        };
+        if (delta == default) return false;
+        MoveRequested?.Invoke(this, new MachineSceneMoveRequestedEventArgs(MachineSceneMoveAction.MoveBy, delta));
+        return true;
     }
 
     internal double ZoomFactor => _zoomFactor;
@@ -830,19 +871,42 @@ public sealed class MachineSceneViewport : FrameworkElement
         _resources = SceneRenderResources.Create(this);
         _textCache.Clear();
         OpenVisionLanguageService.LanguageChanged += OnLanguageChanged;
+        LayoutUpdated += OnLabelOverlayLayoutUpdated;
         ObserveCollection(ItemsSource as INotifyCollectionChanged);
         ObserveItems();
         ObserveSnapshotSource(null, SnapshotSource);
+        OnLabelOverlayLayoutUpdated(null, EventArgs.Empty);
         DrawGrid();
         InvalidateScene();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
+        LayoutUpdated -= OnLabelOverlayLayoutUpdated;
+        _labelOverlayBounds = Rect.Empty;
         OpenVisionLanguageService.LanguageChanged -= OnLanguageChanged;
         ObserveSnapshotSource(SnapshotSource, null);
         ObserveCollection(null);
         ClearObservedItems();
+    }
+
+    private void OnLabelOverlayLayoutUpdated(object? sender, EventArgs e)
+    {
+        var bounds = Rect.Empty;
+        if (GetLabelOverlayElement(this) is { IsVisible: true } overlay &&
+            PresentationSource.FromVisual(this) is { } source && ReferenceEquals(source, PresentationSource.FromVisual(overlay)))
+        {
+            bounds = overlay.TransformToVisual(this).TransformBounds(new Rect(overlay.RenderSize));
+            bounds.Intersect(new Rect(RenderSize));
+        }
+        if (bounds == _labelOverlayBounds) return;
+        _labelOverlayBounds = bounds;
+        InvalidateScene();
+    }
+
+    private static void OnLabelOverlayElementChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
+    {
+        if (element is MachineSceneViewport viewport) viewport.OnLabelOverlayLayoutUpdated(null, EventArgs.Empty);
     }
 
     private void OnSizeChanged(object sender, SizeChangedEventArgs e)
@@ -854,6 +918,13 @@ public sealed class MachineSceneViewport : FrameworkElement
 
     private void OnLanguageChanged(object? sender, EventArgs e)
     {
+        if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(new Action(() => OnLanguageChanged(sender, e)));
+            return;
+        }
+        if (!IsLoaded) return;
         _textCache.Clear();
         InvalidateScene();
     }
@@ -1023,6 +1094,7 @@ public sealed class MachineSceneViewport : FrameworkElement
         }
 
         LastFormattedTextPixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        LastRenderedSelectedLabelBounds = null;
         LastRenderedGripperValue = null;
         LastRenderedGripperText = null;
         LastRenderedWorkpiece = null;
@@ -1408,6 +1480,8 @@ public sealed class MachineSceneViewport : FrameworkElement
             context.Pop();
         }
 
+        foreach (var item in geometry.Where(item => item.Item.IsSelected)) DrawSelectedComponentLabel(context, item, projection);
+
         if (!IsDesignMode)
         {
             return;
@@ -1480,11 +1554,6 @@ public sealed class MachineSceneViewport : FrameworkElement
 
             var topBounds = GetTopFaceScreenBounds(item, projection);
             DrawObliqueSchematicDetail(context, item, topCorners);
-            if (item.Item.IsSelected)
-            {
-                DrawStatusBadge(context, $"{item.Item.Name} {item.Item.Id}",
-                    topBounds.Left + 3, Math.Max(2, topBounds.Top - 18), 9, _resources.AccentBrush);
-            }
             if (item.Item.Kind == LayoutItemKind.Camera)
             {
                 DrawCameraGlyph(context, topBounds, fill, outline, drawBody: false);
@@ -1505,6 +1574,8 @@ public sealed class MachineSceneViewport : FrameworkElement
                 DrawObliqueRuntimeStatus(context, item, snapshot!, topBounds);
             }
         }
+
+        foreach (var item in items.Where(item => item.Item.IsSelected)) DrawSelectedComponentLabel(context, item, projection);
 
         if (!IsDesignMode)
         {
@@ -2326,6 +2397,38 @@ public sealed class MachineSceneViewport : FrameworkElement
             field);
     }
 
+    private void DrawSelectedComponentLabel(DrawingContext context, LayoutRenderItem item, SceneViewportProjection projection)
+    {
+        var bounds = GetTopFaceScreenBounds(item, projection);
+        var text = $"{item.Item.Name} {item.Item.Id}";
+        var formatted = GetText(text, 11, _resources!.AccentBrush, Math.Max(1, ActualWidth - 12));
+        var width = formatted.Width + 8;
+        var x = Math.Clamp(bounds.Left + 3, 2, Math.Max(2, ActualWidth - width - 2));
+        var y = Math.Clamp(bounds.Top - (IsDesignMode ? 44 : 20), 2, Math.Max(2, ActualHeight - formatted.Height - 4));
+        if (_labelOverlayBounds.IntersectsWith(new Rect(x, y, width, formatted.Height + 2)))
+        {
+            if (_labelOverlayBounds.Left > 12)
+            {
+                formatted = GetText(text, 11, _resources.AccentBrush, _labelOverlayBounds.Left - 12);
+                width = formatted.Width + 8;
+                x = Math.Min(x, Math.Max(2, _labelOverlayBounds.Left - width - 2));
+                y = Math.Min(y, Math.Max(2, ActualHeight - formatted.Height - 4));
+            }
+            else if (_labelOverlayBounds.Top > formatted.Height + 4)
+            {
+                y = _labelOverlayBounds.Top - formatted.Height - 4;
+            }
+            else
+            {
+                y = _labelOverlayBounds.Bottom + 2;
+            }
+        }
+        var badge = new Rect(x, y, width, formatted.Height + 2);
+        LastRenderedSelectedLabelBounds = badge;
+        context.DrawRoundedRectangle(_resources.StatusBadgeFill, null, badge, 3, 3);
+        context.DrawText(formatted, new Point(x + 4, y + 1));
+    }
+
     private void DrawStatusBadge(
         DrawingContext context,
         string text,
@@ -2592,9 +2695,9 @@ public sealed class MachineSceneViewport : FrameworkElement
         context.DrawText(GetText(text, fontSize, brush), new Point(x, y));
     }
 
-    private FormattedText GetText(string text, double fontSize, Brush brush)
+    private FormattedText GetText(string text, double fontSize, Brush brush, double? maxWidth = null)
     {
-        var cacheKey = $"{fontSize:F1}|{brush.GetHashCode()}|{text}";
+        var cacheKey = $"{fontSize:F1}|{brush.GetHashCode()}|{maxWidth}|{text}";
         if (_textCache.TryGetValue(cacheKey, out var cached))
         {
             return cached;
@@ -2609,6 +2712,7 @@ public sealed class MachineSceneViewport : FrameworkElement
             brush,
             VisualTreeHelper.GetDpi(this).PixelsPerDip);
         LastFormattedTextPixelsPerDip = formatted.PixelsPerDip;
+        if (maxWidth is { } width) formatted.MaxTextWidth = width;
         _textCache[cacheKey] = formatted;
         return formatted;
     }

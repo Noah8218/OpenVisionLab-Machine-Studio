@@ -3,6 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
+             xmlns:inspector="clr-namespace:OpenVisionLab.MachineStudio.View.Inspector"
+             xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+             xmlns:behavior="clr-namespace:OpenVisionLab.MachineStudio.Behavior"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
              Margin="8,6,8,4">
     <UserControl.Resources>
@@ -18,7 +21,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
@@ -80,22 +83,52 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Row="0" Grid.Column="0">
-                <TextBlock FontSize="13"
-                           FontWeight="SemiBold"
-                           Text="{loc:Loc Key=Integration.InspectionWorkspaceTitle}" />
+                <DockPanel LastChildFill="True">
+                    <TextBlock Margin="0,0,10,0"
+                               VerticalAlignment="Center"
+                               FontWeight="SemiBold"
+                               Text="{loc:Loc Key=Camera.SelectedCamera}" />
+                    <ComboBox x:Name="MmiCameraSelectionComboBox"
+                              MinHeight="34"
+                              MaxWidth="440"
+                              HorizontalAlignment="Left"
+                              HorizontalContentAlignment="Stretch"
+                              IsEnabled="{Binding Camera.HasVirtualCamera}"
+                              ItemsSource="{Binding Camera.VirtualCameras}"
+                              SelectedValuePath="Id"
+                              SelectedValue="{Binding Camera.SelectedCameraId, Mode=OneWay}"
+                              AutomationProperties.Name="{loc:Loc Key=Camera.SelectedCamera}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
+                                    <TextBlock Foreground="{DynamicResource Text.Secondary}" Text="{Binding Id}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                        <b:Interaction.Behaviors>
+                            <behavior:ComboBoxSelectionCommandBehavior Command="{Binding Camera.SelectCameraCommand}" />
+                        </b:Interaction.Behaviors>
+                    </ComboBox>
+                </DockPanel>
                 <TextBlock Margin="0,2,0,0"
                            Foreground="{DynamicResource Text.Secondary}"
-                           Text="{loc:Loc Key=Integration.InspectionWorkspaceHint}"
+                           Text="{Binding Camera.CurrentCameraInputKindText}"
+                           TextWrapping="Wrap" />
+                <TextBlock Margin="0,2,0,0"
+                           Foreground="{DynamicResource Text.Secondary}"
+                           Text="{Binding Camera.CurrentCameraSourceModeText}"
                            TextWrapping="Wrap" />
             </StackPanel>
             <StackPanel x:Name="MmiInspectionHeaderActions"
                         Orientation="Horizontal"
-                        HorizontalAlignment="Right">
+                        VerticalAlignment="Center">
                 <StackPanel.Style>
                     <Style TargetType="StackPanel">
                         <Setter Property="Grid.Row" Value="0" />
                         <Setter Property="Grid.Column" Value="2" />
-                        <Setter Property="Margin" Value="10,0,0,0" />
+                        <Setter Property="Grid.ColumnSpan" Value="1" />
+                        <Setter Property="Margin" Value="0" />
                         <Setter Property="HorizontalAlignment" Value="Right" />
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding Navigation.IsNarrowLayout}" Value="True">
@@ -104,12 +137,18 @@
                                 <Setter Property="Margin" Value="0,4,0,0" />
                                 <Setter Property="HorizontalAlignment" Value="Left" />
                             </DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
+                                <Setter Property="Grid.Row" Value="1" />
+                                <Setter Property="Grid.Column" Value="0" />
+                                <Setter Property="Grid.ColumnSpan" Value="3" />
+                                <Setter Property="Margin" Value="0,4,0,0" />
+                            </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </StackPanel.Style>
                 <Border x:Name="MmiInspectionStatusPill"
                         Margin="0,0,6,0"
-                        Padding="7,3">
+                        Padding="7,3" VerticalAlignment="Center">
                     <Border.Style>
                         <Style TargetType="Border" BasedOn="{StaticResource StatusPillStyle}" />
                     </Border.Style>
@@ -192,15 +231,39 @@
                             <DataTrigger Binding="{Binding Navigation.IsNarrowLayout}" Value="True">
                                 <Setter Property="Grid.Row" Value="3" />
                                 <Setter Property="Grid.Column" Value="0" />
+                                <Setter Property="MaxHeight" Value="220" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
                                 <Setter Property="Grid.Row" Value="2" />
                                 <Setter Property="Grid.Column" Value="0" />
                                 <Setter Property="Grid.ColumnSpan" Value="3" />
+                                <Setter Property="MaxHeight" Value="Infinity" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Grid.Style>
+                <TabControl x:Name="MmiInspectionSettingsTabs"
+                            SelectedIndex="{Binding Navigation.SelectedInspectionSettingsTabIndex, Mode=TwoWay}">
+                    <TabItem Header="{loc:Loc Key=Camera.CaptureSetup}">
+                        <Grid Margin="12" DataContext="{Binding Camera}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="{Binding CameraCommissioningHintText}" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource Text.Secondary}" />
+                            <TextBlock Grid.Row="1" Margin="0,10,0,3" Text="{loc:Loc Key=Camera.Recipe}" />
+                            <ComboBox Grid.Row="2" ItemsSource="{Binding CurrentCameraRecipes}"
+                                      SelectedItem="{Binding SelectedCameraRecipe, Mode=TwoWay}"
+                                      AutomationProperties.Name="{loc:Loc Key=Camera.Recipe}" />
+                            <inspector:CameraImageSourceView x:Name="MmiCameraSourceSettings" Grid.Row="3" />
+                        </Grid>
+                    </TabItem>
+                    <TabItem Header="{loc:Loc Key=Integration.ExternalSetup}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <Grid x:Name="MmiExternalInspectionSettingsGrid" Margin="12">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -417,6 +480,10 @@
                                    ToolTip="{Binding Integration.ResultStatusText}" />
                     </StackPanel>
                 </Border>
+                        </Grid>
+                        </ScrollViewer>
+                    </TabItem>
+                </TabControl>
             </Grid>
 
             <Border x:Name="MmiInspectionPreviewPanel"
@@ -437,6 +504,7 @@
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
+                <ScrollViewer x:Name="MmiInspectionPreviewScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -584,68 +652,12 @@
                         </StackPanel>
                     </Grid>
                 </Grid>
+                </ScrollViewer>
             </Border>
 
             <WrapPanel Grid.Row="4"
                        Grid.ColumnSpan="3"
                        Margin="0,8,0,0">
-                <Button x:Name="MmiRunButton"
-                        Margin="0,0,5,4"
-                        Command="{Binding RunCommand}"
-                        Content="{loc:Loc Key=Shell.SimulationOn}"
-                        Style="{StaticResource SimulationOnCommandButtonStyle}"
-                        ToolTip="{loc:Loc Key=Shell.SimulationOn}"
-                        AutomationProperties.Name="{loc:Loc Key=Shell.SimulationOn}" />
-                <Button x:Name="MmiPauseButton"
-                        Margin="0,0,5,4"
-                        Command="{Binding PauseCommand}"
-                        Content="{loc:Loc Key=Shell.Pause}"
-                        Style="{StaticResource GlobalCommandButtonStyle}"
-                        ToolTip="{loc:Loc Key=Shell.Pause}"
-                        AutomationProperties.Name="{loc:Loc Key=Shell.Pause}" />
-                <Button x:Name="MmiAbortButton"
-                        Margin="0,0,5,4"
-                        Command="{Binding AbortSequenceCommand}"
-                        Content="{loc:Loc Key=Shell.AbortSequence}"
-                        Style="{StaticResource GlobalCommandButtonStyle}"
-                        ToolTip="{loc:Loc Key=Shell.AbortSequenceTooltip}"
-                        AutomationProperties.Name="{loc:Loc Key=Shell.AbortSequence}" />
-                <Button x:Name="MmiRetryButton"
-                        Margin="0,0,5,4"
-                        Command="{Binding RetrySequenceCommand}"
-                        Content="{loc:Loc Key=Shell.RetrySequence}"
-                        Style="{StaticResource GlobalCommandButtonStyle}"
-                        ToolTip="{loc:Loc Key=Shell.RetrySequenceTooltip}"
-                        AutomationProperties.Name="{loc:Loc Key=Shell.RetrySequence}" />
-                <Button x:Name="MmiResetButton"
-                        Margin="0,0,5,4"
-                        Command="{Binding ResetCommand}"
-                        Content="{loc:Loc Key=Shell.Reset}"
-                        Style="{StaticResource GlobalCommandButtonStyle}"
-                        ToolTip="{loc:Loc Key=Shell.Reset}"
-                        AutomationProperties.Name="{loc:Loc Key=Shell.Reset}" />
-                <Button x:Name="MmiCycleStartButton"
-                        Margin="0,0,5,4"
-                        Command="{Binding CycleStartCommand}"
-                        Content="{loc:Loc Key=Shell.CycleStart}"
-                        ToolTip="{loc:Loc Key=Shell.CycleStart}"
-                        AutomationProperties.Name="{loc:Loc Key=Shell.CycleStart}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource PrimaryCommandButtonStyle}">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding HasEmbeddedSequence}" Value="True" />
-                                        <Condition Binding="{Binding HasCycleStartInput}" Value="True" />
-                                        <Condition Binding="{Binding IsRunMode}" Value="True" />
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </MultiDataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
                 <Button x:Name="MmiPublishButton"
                         Margin="0,0,5,4"
                         Command="{Binding Integration.PublishTwoDImageHandoffCommand}"

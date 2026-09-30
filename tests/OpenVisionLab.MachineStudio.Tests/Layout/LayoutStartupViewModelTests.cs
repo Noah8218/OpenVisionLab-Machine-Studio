@@ -881,6 +881,8 @@ public sealed class LayoutStartupViewModelTests
         var store = new ProjectDocumentStore();
         var before = store.Serialize(project);
         var promptCount = 0;
+        string? presentedBlock = null;
+        viewModel.EquipmentUnitRemovalBlockedPresenter = message => presentedBlock = message;
         viewModel.EquipmentUnitRemovalPrompt = (_, _) =>
         {
             promptCount++;
@@ -893,6 +895,7 @@ public sealed class LayoutStartupViewModelTests
         Assert.Same(unit, Assert.Single(station.Units));
         Assert.Equal(before, store.Serialize(project));
         Assert.Equal(0, promptCount);
+        Assert.Equal(viewModel.StatusMessage, presentedBlock);
         Assert.False(viewModel.HasUnsavedChanges);
         Assert.Contains(unit.Name, viewModel.StatusMessage, StringComparison.Ordinal);
         Assert.Contains("2", viewModel.StatusMessage, StringComparison.Ordinal);
@@ -938,6 +941,8 @@ public sealed class LayoutStartupViewModelTests
         editor.DraftXText = "42";
         viewModel.PlacementDraftPrompt = () => PlacementDraftDecision.Apply;
         var removalPromptCount = 0;
+        string? presentedBlock = null;
+        viewModel.EquipmentUnitRemovalBlockedPresenter = message => presentedBlock = message;
         viewModel.EquipmentUnitRemovalPrompt = (_, _) =>
         {
             removalPromptCount++;
@@ -950,6 +955,7 @@ public sealed class LayoutStartupViewModelTests
         Assert.Equal(unit.Id, component.UnitId);
         Assert.Same(unit, Assert.Single(station.Units));
         Assert.Equal(0, removalPromptCount);
+        Assert.Equal(viewModel.StatusMessage, presentedBlock);
         Assert.Contains(unit.Name, viewModel.StatusMessage, StringComparison.Ordinal);
         Assert.True(new MachineProjectLayoutValidator().Validate(project).IsValid);
     }
@@ -1626,6 +1632,62 @@ public sealed class LayoutStartupViewModelTests
     }
 
     [Fact]
+    public async Task ReassigningUnitPreservesPlacementDraftAndSaveReopenRestoresItsScope()
+    {
+        await RunOnStaAsync(async () =>
+        {
+            var project = new ProjectDocumentStore().Load(File.ReadAllText(InspectionSamplePath));
+            var station = Assert.Single(project.Stations);
+            var originalUnit = Assert.Single(station.Units);
+            var target = new MachineUnitDefinition { Id = "unit-secondary", Name = "Secondary Unit" };
+            station.Units.Add(target);
+            var component = project.Layouts.SelectMany(layout => layout.Components).Single(item => item.Id == "camera-top-2d");
+            var originalX = component.Transform.X;
+            var path = Path.Combine(TestStorage.RootPath, "r19-unit-draft-reassignment", Guid.NewGuid().ToString("N"), "reassigned.ovmachine");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            using (var main = new MainViewModel(project))
+            {
+                main.Layout.Select(component.Id);
+                var editor = Assert.IsType<LayoutComponentEditorViewModel>(main.Layout.SelectedComponentEditor);
+                editor.DraftXText = "499";
+                editor.UnitId = target.Id;
+                Assert.Equal(target.Id, component.UnitId);
+                Assert.Same(editor, main.Layout.SelectedComponentEditor);
+                Assert.Equal("499", editor.DraftXText);
+                Assert.Equal(originalX, component.Transform.X);
+                Assert.True(main.HasUnsavedChanges);
+                Assert.Equal(1, main.Layout.EquipmentOutlineUnits.Single(unit => unit.UnitId == target.Id).ComponentCount);
+                Assert.Equal(9, main.Layout.EquipmentOutlineUnits.Single(unit => unit.UnitId == originalUnit.Id).ComponentCount);
+
+                main.PlacementDraftPrompt = () => PlacementDraftDecision.Cancel;
+                main.ShowEquipmentUnitCommand.Execute(target.Id);
+                Assert.Equal(component.Id, main.Layout.SelectedItem?.Id);
+                Assert.Same(editor, main.Layout.SelectedComponentEditor);
+                Assert.True(editor.HasPendingPlacementDraft);
+                Assert.True(editor.TryApplyPlacementDraft());
+                main.ShowEquipmentUnitCommand.Execute(target.Id);
+                Assert.Equal(target.Id, main.Layout.ActiveUnitId);
+                Assert.Equal([component.Id], main.Layout.SceneItems.Select(item => item.Id));
+                await main.SaveProjectAsync(path).WaitAsync(TimeSpan.FromSeconds(10));
+                Assert.False(main.HasUnsavedChanges);
+                Assert.False(main.IsRunning);
+            }
+
+            using var reopened = new MainViewModel();
+            Assert.True(await reopened.OpenProjectReplacingCurrentAsync(path).WaitAsync(TimeSpan.FromSeconds(10)));
+            reopened.Layout.Select(component.Id);
+            var restored = Assert.IsType<LayoutComponentEditorViewModel>(reopened.Layout.SelectedComponentEditor);
+            Assert.Equal(target.Id, restored.UnitId);
+            Assert.Equal("499", restored.DraftXText);
+            Assert.Equal(target.Id, reopened.Layout.ActiveUnitId);
+            Assert.Equal([component.Id], reopened.Layout.SceneItems.Select(item => item.Id));
+            Assert.False(reopened.HasUnsavedChanges);
+            Assert.False(reopened.IsRunning);
+            return true;
+        });
+    }
+
+    [Fact]
     public void LargeLayoutProjectTreeSearchFiltersAndRestoresWithoutChangingRecipeOrSelection()
     {
         var project = new ProjectDocumentStore().Load(File.ReadAllText(LargeLayoutSamplePath));
@@ -2116,6 +2178,31 @@ public sealed class LayoutStartupViewModelTests
         Assert.Equal(WpfMessageDialogResult.No, unitOptions.DefaultResult);
         Assert.Contains(station.Name, stationOptions.Title, StringComparison.Ordinal);
         Assert.Equal(WpfMessageDialogResult.No, stationOptions.DefaultResult);
+    }
+
+    [Theory]
+    [InlineData(OpenVisionLanguage.Korean, "유닛을 삭제할 수 없습니다", "확인")]
+    [InlineData(OpenVisionLanguage.English, "Cannot delete unit", "OK")]
+    public void AssignedUnitRemovalMessageIsVisibleAndHasNoDeleteAction(OpenVisionLanguage language, string title, string acknowledge)
+    {
+        var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+        try
+        {
+            OpenVisionLanguageService.SetLanguage(language, save: false);
+            var details = string.Format(OpenVisionLanguageService.T("Equipment.UnitRemovalBlocked"), "Inspection unit", 2);
+            var options = MainMessageDialogHost.CreateEquipmentUnitRemovalBlockedDialogOptions(details);
+            Assert.Equal(title, options.Title);
+            Assert.Equal(details, options.Message);
+            Assert.Equal(WpfMessageDialogKind.Warning, options.Kind);
+            Assert.Equal(WpfMessageDialogResult.OK, options.DefaultResult);
+            Assert.Equal(acknowledge, options.PrimaryButtonText);
+            Assert.True(string.IsNullOrEmpty(options.SecondaryButtonText));
+            Assert.True(string.IsNullOrEmpty(options.TertiaryButtonText));
+        }
+        finally
+        {
+            OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
+        }
     }
 
     [Fact]

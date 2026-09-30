@@ -27,6 +27,7 @@
                BasedOn="{StaticResource {x:Type ComboBox}}">
             <Setter Property="Height" Value="{StaticResource Density.InspectorFieldHeight}" />
             <Setter Property="Margin" Value="0,1" />
+            <Setter Property="Padding" Value="8,0" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
     </UserControl.Resources>
@@ -39,8 +40,8 @@
                 <RowDefinition Height="*" MinHeight="110" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="390" />
-                <ColumnDefinition Width="410" />
+                <ColumnDefinition Width="*" MinWidth="310" />
+                <ColumnDefinition Width="0.55*" MinWidth="280" />
             </Grid.ColumnDefinitions>
 
             <Border Grid.Row="0" Grid.ColumnSpan="2" Style="{StaticResource PanelHeaderStyle}">
@@ -189,8 +190,8 @@
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel MaxWidth="420" HorizontalAlignment="Center">
-                                <Border MaxWidth="420" HorizontalAlignment="Stretch"
+                                <StackPanel MaxWidth="570" HorizontalAlignment="Stretch">
+                                <Border HorizontalAlignment="Stretch"
                                         Padding="2" BorderThickness="2" CornerRadius="8">
                                     <Border.Style>
                                         <Style TargetType="Border">
@@ -343,6 +344,8 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="58" />
@@ -357,7 +360,7 @@
                                  Text="{Binding SelectedStep.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="1" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Action}" />
-                        <ComboBox Grid.Row="1" Grid.Column="1"
+                        <ComboBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3"
                                   ItemsSource="{Binding SelectedStep.AvailableActions}"
                                   SelectedItem="{Binding SelectedStep.Action, Mode=TwoWay}"
                                   Style="{StaticResource SequenceComboBoxStyle}">
@@ -434,27 +437,27 @@
                                  Text="{Binding SelectedStep.TimeoutMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="4" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Next}" />
-                        <TextBox Grid.Row="4" Grid.Column="1"
+                        <TextBox Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="3"
                                  Style="{StaticResource SequenceTextBoxStyle}"
                                  Text="{Binding SelectedStep.NextStepId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Grid.Row="4" Grid.Column="2" Margin="8,0,7,0"
+                        <TextBlock Grid.Row="5"
                                    Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Error}" />
-                        <TextBox Grid.Row="4" Grid.Column="3"
+                        <TextBox Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="3"
                                  Style="{StaticResource SequenceTextBoxStyle}"
                                  Text="{Binding SelectedStep.ErrorStepId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                        <TextBlock Grid.Row="5" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Failure}" />
-                        <TextBox Grid.Row="5" Grid.Column="1"
+                        <TextBlock Grid.Row="6" Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.Failure}" />
+                        <TextBox Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="3"
                                  Style="{StaticResource SequenceTextBoxStyle}"
                                  Text="{Binding SelectedStep.FailureStepId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Grid.Row="5" Grid.Column="2" Margin="8,0,7,0"
+                        <TextBlock Grid.Row="7"
                                    Style="{StaticResource SequenceFieldLabelStyle}" Text="{loc:Loc Key=Sequence.StepId}" />
-                        <TextBox Grid.Row="5" Grid.Column="3"
+                        <TextBox Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="3"
                                  IsReadOnly="True"
                                  Style="{StaticResource SequenceTextBoxStyle}"
                                  Text="{Binding SelectedStep.Id, Mode=OneWay}" />
 
-                        <Grid Grid.Row="6" Grid.ColumnSpan="4" Margin="0,3,0,0">
+                        <Grid Grid.Row="8" Grid.ColumnSpan="4" Margin="0,3,0,0">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -487,7 +490,7 @@
                                       Style="{StaticResource SequenceComboBoxStyle}" />
                         </Grid>
 
-                        <Grid Grid.Row="7" Grid.ColumnSpan="4" Margin="0,4,0,0">
+                        <Grid Grid.Row="9" Grid.ColumnSpan="4" Margin="0,4,0,0">
                             <Grid.Style>
                                 <Style TargetType="Grid">
                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -498,17 +501,14 @@
                                     </Style.Triggers>
                                 </Style>
                             </Grid.Style>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="58" />
-                                <ColumnDefinition Width="5*" />
-                                <ColumnDefinition Width="58" />
-                                <ColumnDefinition Width="7*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.ColumnSpan="2"
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock
                                        Style="{StaticResource SequenceFieldLabelStyle}"
                                        Text="{loc:Loc Key=Sequence.WorkpieceTarget}" />
-                            <ComboBox Grid.Column="2"
-                                      Grid.ColumnSpan="2"
+                            <ComboBox Grid.Row="1"
                                       AutomationProperties.Name="{loc:Loc Key=Sequence.WorkpieceTarget}"
                                       DisplayMemberPath="Name"
                                       ItemsSource="{Binding SelectedStep.AvailableWorkpieceTargets}"

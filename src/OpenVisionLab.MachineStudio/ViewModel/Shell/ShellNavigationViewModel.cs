@@ -23,7 +23,8 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
     private int _selectedDocumentTabIndex;
     private int _selectedWorkspaceIndex;
     private int _selectedExecutionTabIndex;
-    private int _selectedInspectionTabIndex;
+    private int _selectedInspectionTabIndex = 1;
+    private int _selectedInspectionSettingsTabIndex;
     private bool _isInspectorOpen;
     private bool _isEvidenceExpanded;
     private bool _isInspectionSettingsExpanded;
@@ -194,7 +195,7 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
         set { if (value) SelectedWorkspaceIndex = 1; }
     }
 
-    public bool IsEquipmentOutlineVisible => IsEquipmentWorkspace && SelectedLeftToolTabIndex == 0
+    public bool IsEquipmentOutlineVisible => (IsEquipmentWorkspace || IsInspectionWorkspace) && SelectedLeftToolTabIndex == 0
         || IsSimulationWorkspace && SelectedLeftToolTabIndex == 3;
 
     public int SelectedExecutionTabIndex
@@ -227,6 +228,16 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
         {
             if (value is < 0 or > 1) return;
             SetProperty(ref _selectedInspectionTabIndex, value);
+        }
+    }
+
+    public int SelectedInspectionSettingsTabIndex
+    {
+        get => _selectedInspectionSettingsTabIndex;
+        set
+        {
+            if (value is < 0 or > 1) return;
+            SetProperty(ref _selectedInspectionSettingsTabIndex, value);
         }
     }
 

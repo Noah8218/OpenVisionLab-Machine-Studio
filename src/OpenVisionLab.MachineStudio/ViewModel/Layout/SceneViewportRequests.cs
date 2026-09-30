@@ -8,7 +8,8 @@ internal enum SceneViewportMoveAction
     Begin,
     Update,
     Commit,
-    Cancel
+    Cancel,
+    MoveBy
 }
 
 internal sealed record SceneSelectionRequest(LayoutItem Item, bool Toggle);

@@ -37,7 +37,9 @@ internal sealed class LayoutSelectionEditingWorkflow
         bool snapToGrid,
         double gridSize)
     {
-        if (_dragStartPositions is null || _dragStartPositions.Count == 0)
+        if (_dragStartPositions is null || _dragStartPositions.Count == 0 ||
+            !double.IsFinite(deltaX) || !double.IsFinite(deltaY) ||
+            snapToGrid && (!double.IsFinite(gridSize) || gridSize <= 0))
         {
             return false;
         }
@@ -52,6 +54,12 @@ internal sealed class LayoutSelectionEditingWorkflow
         var appliedY = snapToGrid
             ? SnapCoordinate(primaryStart.Y + deltaY, gridSize) - primaryStart.Y
             : deltaY;
+
+        if (_dragStartPositions.Any(entry =>
+            !double.IsFinite(entry.Value.X + appliedX) || !double.IsFinite(entry.Value.Y + appliedY)))
+        {
+            return false;
+        }
 
         foreach (var (item, start) in _dragStartPositions)
         {
@@ -197,6 +205,11 @@ internal sealed class LayoutSelectionEditingWorkflow
         double gridSize)
     {
         ArgumentNullException.ThrowIfNull(selectedItems);
+        if (snapToGrid && (!double.IsFinite(gridSize) || gridSize <= 0))
+        {
+            return false;
+        }
+
         var step = snapToGrid ? gridSize : 1d;
         return direction switch
         {
@@ -532,7 +545,8 @@ internal sealed class LayoutSelectionEditingWorkflow
     private bool MoveSelection(IEnumerable<LayoutItem> selectedItems, double deltaX, double deltaY)
     {
         var selected = selectedItems.Where(item => item.Component is not null).ToArray();
-        if (selected.Length == 0)
+        if (selected.Length == 0 || !double.IsFinite(deltaX) || !double.IsFinite(deltaY) ||
+            selected.Any(item => !double.IsFinite(item.CurrentX + deltaX) || !double.IsFinite(item.CurrentY + deltaY)))
         {
             return false;
         }

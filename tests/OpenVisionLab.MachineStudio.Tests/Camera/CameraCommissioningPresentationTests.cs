@@ -15,6 +15,19 @@ namespace OpenVisionLab.MachineStudio.Tests;
 public sealed class CameraCommissioningPresentationTests
 {
     [Fact]
+    public void InputKindDescribesConfiguredPixelsWithoutClaimingAcquisition()
+    {
+        var presentation = new CameraCommissioningPresentation();
+        presentation.ApplyProjection(CreateProjection(VirtualCameraState.Idle, true, false, SimulationControlOwner.Definition, hasResult: false));
+        Assert.Contains("images/part.png", presentation.CurrentCameraInputKindText, StringComparison.Ordinal);
+        Assert.Contains("10×10", presentation.CurrentCameraInputKindText, StringComparison.Ordinal);
+        Assert.Contains("Mono8", presentation.CurrentCameraInputKindText, StringComparison.Ordinal);
+        Assert.False(presentation.HasCurrentCameraImage);
+        presentation.ApplyProjection(CreateProjection(VirtualCameraState.Idle, true, false, SimulationControlOwner.Definition, hasUsableSource: false));
+        Assert.Equal(OpenVisionLab.OpenVisionLanguageService.T("Camera.InputNotConfigured"), presentation.CurrentCameraInputKindText);
+    }
+
+    [Fact]
     public void FrameReadyProjectionPreservesCameraPresentationValues()
     {
         var presentation = new CameraCommissioningPresentation();
@@ -259,6 +272,48 @@ public sealed class CameraCommissioningPresentationTests
             var pixels = new byte[4];
             bitmap.CopyPixels(pixels, 2, 0);
             Assert.Equal(new byte[] { 0, 64, 128, 255 }, pixels);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ProjectImageSourceConverterRecoversAsciiBlackPixelsAfterRejectedInput()
+    {
+        var root = Path.Combine(TestStorage.RootPath, "camera-preview", Guid.NewGuid().ToString("N"));
+        var imagePath = Path.Combine(root, "part.pgm");
+        Directory.CreateDirectory(root);
+        var converter = new ProjectImageSourceConverter();
+        string[] rejected =
+        [
+            "P2\n0 2\n15\n0 1 8 15",
+            "P2\n2 0\n15\n0 1 8 15",
+            "P2\n2 2\n0\n0 1 8 15",
+            "P2\n2 2\n15\n0 1 8 16",
+            "P2\n2 2\n15\n0 1 8 -1",
+            "P2\n2 2\n15\n0 1 8",
+            "P2\n2147483647 1\n255\n0",
+            "P5\n2147483647 1\n255\n0"
+        ];
+        try
+        {
+            foreach (var input in rejected)
+            {
+                File.WriteAllText(imagePath, input);
+                Assert.Same(DependencyProperty.UnsetValue,
+                    converter.Convert(imagePath, typeof(BitmapSource), null!, CultureInfo.InvariantCulture));
+                File.WriteAllText(imagePath, "P2\n# black and non-255 scale\n2 2\n15\n0 1 8 15\n");
+                var bitmap = Assert.IsAssignableFrom<BitmapSource>(
+                    converter.Convert(imagePath, typeof(BitmapSource), null!, CultureInfo.InvariantCulture));
+                Assert.Equal(2, bitmap.PixelWidth);
+                Assert.Equal(2, bitmap.PixelHeight);
+                Assert.True(bitmap.IsFrozen);
+                var pixels = new byte[4];
+                bitmap.CopyPixels(pixels, 2, 0);
+                Assert.Equal(new byte[] { 0, 17, 136, 255 }, pixels);
+            }
         }
         finally
         {

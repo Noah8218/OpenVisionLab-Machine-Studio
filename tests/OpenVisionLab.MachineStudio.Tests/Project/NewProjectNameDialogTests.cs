@@ -10,8 +10,13 @@ using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests.Project;
 
+[Collection(StudioUiTestCollection.Name)]
 public sealed class NewProjectNameDialogTests
 {
+    private readonly StudioUiTestHost _ui;
+
+    public NewProjectNameDialogTests(StudioUiTestHost ui) => _ui = ui;
+
     [Fact]
     public async Task NewCommandOpensNameEntryAndCancelLeavesCurrentProjectUntouched()
     {
@@ -37,7 +42,7 @@ public sealed class NewProjectNameDialogTests
     [Fact]
     public async Task NewRecipeNameRejectsOverSixtyCharactersThenAcceptsSixtyOnRetry()
     {
-        await RunOnStaAsync(async () =>
+        await _ui.InvokeTaskAsync(async () =>
         {
             using var viewModel = new MainViewModel(new MachineProjectDocument { Name = "Current recipe" });
             var currentName = viewModel.ProjectTree.Roots.Single().DisplayName;
@@ -63,10 +68,8 @@ public sealed class NewProjectNameDialogTests
     [Fact]
     public async Task NewProjectNameViewBindsInputAndKeepsRejectedEntryRecoverable()
     {
-        await RunOnStaAsync(async () =>
+        await _ui.InvokeTaskAsync(async () =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             using var viewModel = new MainViewModel(new MachineProjectDocument { Name = "Current recipe" });
             var currentName = viewModel.ProjectTree.Roots.Single().DisplayName;
             var view = new NewProjectNameDialogView { DataContext = viewModel };
@@ -152,38 +155,6 @@ public sealed class NewProjectNameDialogTests
         window.Dispatcher.Invoke(DispatcherPriority.DataBind, new Action(() => { }));
         window.UpdateLayout();
         window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(() => { }));
-    }
-
-    private static Task RunOnStaAsync(Func<Task> action)
-    {
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            var dispatcher = Dispatcher.CurrentDispatcher;
-            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
-            _ = RunAsync();
-            Dispatcher.Run();
-
-            async Task RunAsync()
-            {
-                try
-                {
-                    await action();
-                    completion.SetResult();
-                }
-                catch (Exception exception)
-                {
-                    completion.SetException(exception);
-                }
-                finally
-                {
-                    dispatcher.BeginInvokeShutdown(DispatcherPriority.Normal);
-                }
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return completion.Task;
     }
 
 }

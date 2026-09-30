@@ -12,16 +12,18 @@ using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
 
-[Collection(EquipmentOutlineViewAutomationTestCollection.Name)]
+[Collection(StudioUiTestCollection.Name)]
 public sealed class TreeViewSelectedItemBehaviorTests
 {
+    private readonly StudioUiTestHost _ui;
+
+    public TreeViewSelectedItemBehaviorTests(StudioUiTestHost ui) => _ui = ui;
+
     [Fact]
     public async Task TwoWaySelectionBindingSynchronizesTreeAndProjectState()
     {
-        var result = await RunOnStaAsync(() =>
+        var result = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             var projectTree = new ProjectTreeViewModel();
             projectTree.LoadProject(CreateProject());
             var root = Assert.Single(projectTree.Roots);
@@ -157,22 +159,4 @@ public sealed class TreeViewSelectedItemBehaviorTests
         return project;
     }
 
-    private static Task<T> RunOnStaAsync<T>(Func<T> action)
-    {
-        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                completion.SetResult(action());
-            }
-            catch (Exception exception)
-            {
-                completion.SetException(exception);
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return completion.Task;
-    }
 }

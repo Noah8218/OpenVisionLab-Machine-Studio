@@ -149,6 +149,7 @@ public sealed class MachineSceneViewportCommandBehavior : Behavior<MachineSceneV
             MachineSceneMoveAction.Update => SceneViewportMoveAction.Update,
             MachineSceneMoveAction.Commit => SceneViewportMoveAction.Commit,
             MachineSceneMoveAction.Cancel => SceneViewportMoveAction.Cancel,
+            MachineSceneMoveAction.MoveBy => SceneViewportMoveAction.MoveBy,
             _ => null
         };
 

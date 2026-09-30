@@ -591,10 +591,10 @@ public sealed class SequenceEditorViewModel : ViewModelBase
         SequenceCompilationErrorCode.NextStepNotFound
             or SequenceCompilationErrorCode.MissingSuccessor
             or SequenceCompilationErrorCode.CompleteStepHasTransition => "Step.NextStepId",
-        SequenceCompilationErrorCode.ErrorStepNotFound
-            or SequenceCompilationErrorCode.FailureStepRequired
+        SequenceCompilationErrorCode.ErrorStepNotFound => "Step.ErrorStepId",
+        SequenceCompilationErrorCode.FailureStepRequired
             or SequenceCompilationErrorCode.FailureStepNotFound
-            or SequenceCompilationErrorCode.FailureStepNotAllowed => "Step.ErrorStepId",
+            or SequenceCompilationErrorCode.FailureStepNotAllowed => "Step.FailureStepId",
         SequenceCompilationErrorCode.RecipeIdRequired => "Step.Parameter",
         SequenceCompilationErrorCode.ExpectedTargetIdRequired => "Step.ExpectedTargetId",
         SequenceCompilationErrorCode.ExpectedStateRequired => "Step.ExpectedState",

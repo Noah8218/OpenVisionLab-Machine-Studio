@@ -168,6 +168,12 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
         }
 
         var state = _getState();
+        if (state.IsRunMode && state.ControlOwner == SimulationControlOwner.Manual)
+        {
+            await DispatchPlayAsync("Manual simulation running", "Manual simulation resumed", operationGeneration, cancellationToken);
+            return;
+        }
+
         if (state.HasAutomaticRun)
         {
             if (state.AutomaticExternalInspectionEnabled)
@@ -553,13 +559,13 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
         Func<CancellationToken, Task> operation,
         CancellationToken cancellationToken)
     {
-        BeginOperation();
+        var operationGeneration = BeginOperation();
         try
         {
             await _executionGate.WaitAsync(cancellationToken);
             try
             {
-                if (!CanEnterExecution())
+                if (!IsOperationCurrent(operationGeneration))
                 {
                     return;
                 }
@@ -585,14 +591,6 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
         }
     }
 
-    private bool CanEnterExecution()
-    {
-        lock (_lifecycleGate)
-        {
-            return !_disposeRequested;
-        }
-    }
-
     private bool IsOperationCurrent(int operationGeneration)
     {
         lock (_lifecycleGate)
@@ -606,13 +604,13 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
         Func<CancellationToken, Task<bool>> operation,
         CancellationToken cancellationToken)
     {
-        BeginOperation();
+        var operationGeneration = BeginOperation();
         try
         {
             await _executionGate.WaitAsync(cancellationToken);
             try
             {
-                if (!CanEnterExecution())
+                if (!IsOperationCurrent(operationGeneration))
                 {
                     return false;
                 }
@@ -649,7 +647,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
         }
     }
 
-    private void BeginOperation()
+    private int BeginOperation()
     {
         lock (_lifecycleGate)
         {
@@ -659,6 +657,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
             }
 
             _activeOperations++;
+            return _operationGeneration;
         }
     }
 

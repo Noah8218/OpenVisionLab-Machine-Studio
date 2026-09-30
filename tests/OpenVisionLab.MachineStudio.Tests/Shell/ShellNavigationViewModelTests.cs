@@ -193,7 +193,8 @@ public sealed class ShellNavigationViewModelTests
         Assert.Equal(2, navigation.SelectedDocumentTabIndex);
 
         navigation.IsInspectionWorkspace = true;
-        navigation.SelectedInspectionTabIndex = 1;
+        Assert.Equal(1, navigation.SelectedInspectionTabIndex);
+        Assert.True(navigation.IsEquipmentOutlineVisible);
         Assert.Equal(1, navigation.SelectedDocumentTabIndex);
         navigation.IsResultsWorkspace = true;
         Assert.Equal(3, navigation.SelectedDocumentTabIndex);

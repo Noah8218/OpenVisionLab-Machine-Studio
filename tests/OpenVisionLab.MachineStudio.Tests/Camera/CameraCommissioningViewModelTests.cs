@@ -39,6 +39,49 @@ public sealed class CameraCommissioningViewModelTests
     }
 
     [Fact]
+    public void CameraRemovalThenEmptyProjectAndReloadRecoverSelectionWithoutEditingTheProject()
+    {
+        OpenVisionLanguageService.Load();
+        var project = CreateProject();
+        using var viewModel = CreateViewModel(project, CreateProjection());
+        var store = new ProjectDocumentStore();
+        viewModel.LoadProject(project, null);
+        viewModel.SelectedCameraId = "camera-2";
+
+        project.Devices.RemoveAll(device => device.Id == "camera-2");
+        var removedCameraProject = store.SerializeForEvidence(project);
+        viewModel.LoadProject(project, null);
+
+        Assert.Equal("camera-1", viewModel.SelectedCameraId);
+        Assert.Same(project.Devices[0], viewModel.SelectedVirtualCamera);
+        Assert.Equal("alpha", viewModel.SelectedCameraRecipe);
+        Assert.Equal(removedCameraProject, store.SerializeForEvidence(project));
+
+        project.Devices.Clear();
+        var emptyProject = store.SerializeForEvidence(project);
+        viewModel.LoadProject(project, null);
+
+        Assert.False(viewModel.HasVirtualCamera);
+        Assert.Null(viewModel.SelectedCameraId);
+        Assert.Null(viewModel.SelectedVirtualCamera);
+        Assert.Empty(viewModel.CurrentCameraRecipes);
+        Assert.Null(viewModel.SelectedCameraRecipe);
+        Assert.False(viewModel.ImageSourceEditor.CanBrowse);
+        Assert.Equal(emptyProject, store.SerializeForEvidence(project));
+
+        project.Devices = CreateProject().Devices;
+        var restoredProject = store.SerializeForEvidence(project);
+        viewModel.LoadProject(project, null);
+        viewModel.SelectedCameraId = "camera-2";
+        viewModel.SelectedCameraId = "missing-camera";
+
+        Assert.True(viewModel.HasVirtualCamera);
+        Assert.Equal("camera-2", viewModel.SelectedCameraId);
+        Assert.Same(project.Devices[1], viewModel.SelectedVirtualCamera);
+        Assert.Equal(restoredProject, store.SerializeForEvidence(project));
+    }
+
+    [Fact]
     public void SessionCloseAdmissionAndDisposeGateCameraCommands()
     {
         OpenVisionLanguageService.Load();
@@ -96,6 +139,7 @@ public sealed class CameraCommissioningViewModelTests
         Assert.Equal("camera-1", viewModel.SelectedCameraId);
         Assert.Equal("inspection-1", viewModel.CurrentCameraInspectionIdText);
         Assert.Contains("workpiece-component-1", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
+        Assert.Contains("run-1/WP-001", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
         Assert.Equal(OpenVisionLanguageService.T("Camera.ResultSourceMock"), viewModel.CurrentCameraResultSourceText);
 
         changedProperties.Clear();
@@ -109,6 +153,7 @@ public sealed class CameraCommissioningViewModelTests
         Assert.DoesNotContain("acquisition-1", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
         Assert.DoesNotContain("inspection-1", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
         Assert.DoesNotContain("workpiece-component-1", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
+        Assert.DoesNotContain("run-1/WP-001", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
         AssertContainsResultProjectionNotifications(changedProperties);
 
         changedProperties.Clear();
@@ -135,6 +180,7 @@ public sealed class CameraCommissioningViewModelTests
         Assert.DoesNotContain("acquisition-1", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
         Assert.DoesNotContain("inspection-1", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
         Assert.DoesNotContain("workpiece-component-1", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
+        Assert.DoesNotContain("run-1/WP-001", viewModel.CurrentCameraEvidenceDetailsText, StringComparison.Ordinal);
         AssertContainsResultProjectionNotifications(changedProperties);
         Assert.Equal(projectBefore, new ProjectDocumentStore().SerializeForEvidence(project));
     }

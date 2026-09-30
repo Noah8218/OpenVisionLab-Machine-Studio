@@ -60,6 +60,11 @@ internal static class SimulationRunControlAdmissionPolicy
             return state.HasAxes || state.HasEmbeddedSequence;
         }
 
+        if (state.IsRunMode && state.ControlOwner == SimulationControlOwner.Manual)
+        {
+            return state.HasAuthoredLayout || state.HasAxes || state.HasVirtualCamera;
+        }
+
         if (state.HasAutomaticRun)
         {
             return state.AutomaticRunConfigured

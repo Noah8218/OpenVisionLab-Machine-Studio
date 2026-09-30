@@ -15,6 +15,11 @@
             <Setter Property="Margin" Value="0,7,0,3" />
             <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
         </Style>
+        <Style x:Key="EquipmentInspectorTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Height" Value="{StaticResource Density.InspectorFieldHeight}" />
+            <Setter Property="Padding" Value="7,0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
         <Style x:Key="EquipmentInspectorTabButtonStyle" TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
             <Setter Property="MinHeight" Value="34" />
             <Setter Property="Margin" Value="2,0" />
@@ -505,7 +510,7 @@
                                 </StackPanel.Style>
                             <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Name}" />
                             <TextBox x:Name="ComponentNameTextBox"
-                                     Height="30"
+                                     Style="{StaticResource EquipmentInspectorTextBoxStyle}"
                                       Text="{Binding DraftName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                       ToolTip="{Binding DraftName}" />
                             <StackPanel Margin="0,5,0,0"
@@ -525,15 +530,15 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
                                     <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Equipment.CoordinateX}" />
-                                    <TextBox Height="30" Text="{Binding DraftXText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding DraftXText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Equipment.CoordinateHeightY}" />
-                                    <TextBox Height="30" Text="{Binding DraftBaseElevationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding DraftBaseElevationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                             </Grid>
                             <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Equipment.CoordinateDepthZ}" />
-                            <TextBox Height="30" Text="{Binding DraftDepthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding DraftDepthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource Text.Secondary}"
                                        Text="{loc:Loc Key=Equipment.PlacementDraftHint}"
                                        TextWrapping="Wrap" />
@@ -615,21 +620,21 @@
                                 </Grid.RowDefinitions>
                                 <StackPanel x:Name="EquipmentDraftRotationField" Grid.Row="0" Grid.Column="0" Margin="0,0,0,8">
                                     <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Rotation}" />
-                                    <TextBox Height="30" x:Name="EquipmentDraftRotationTextBox"
+                                    <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" x:Name="EquipmentDraftRotationTextBox"
                                              AutomationProperties.Name="{loc:Loc Key=Properties.Rotation}"
                                              AutomationProperties.AutomationId="EquipmentDraftRotation"
                                              Text="{Binding DraftRotationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,8">
                                     <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Width}" />
-                                    <TextBox Height="30" x:Name="EquipmentDraftWidthTextBox"
+                                    <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" x:Name="EquipmentDraftWidthTextBox"
                                              AutomationProperties.Name="{loc:Loc Key=Properties.Width}"
                                              AutomationProperties.AutomationId="EquipmentDraftWidth"
                                              Text="{Binding DraftFootprintWidthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,8">
                                     <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Depth}" />
-                                    <TextBox Height="30" x:Name="EquipmentDraftDepthTextBox"
+                                    <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" x:Name="EquipmentDraftDepthTextBox"
                                              AutomationProperties.Name="{loc:Loc Key=Properties.Depth}"
                                              AutomationProperties.AutomationId="EquipmentDraftDepth"
                                              Text="{Binding DraftFootprintDepthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -640,7 +645,7 @@
                                                Text="{loc:Loc Key=Inspector.VerticalEnvelopeHint}" TextWrapping="Wrap" />
                                     <StackPanel x:Name="EquipmentDraftVerticalHeightField">
                                         <TextBlock x:Name="EquipmentDraftVerticalHeightLabel" Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.VerticalHeight}" />
-                                        <TextBox Height="30" x:Name="EquipmentDraftVerticalHeightTextBox"
+                                        <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" x:Name="EquipmentDraftVerticalHeightTextBox"
                                                  AutomationProperties.Name="{loc:Loc Key=Properties.VerticalHeight}"
                                                  AutomationProperties.AutomationId="EquipmentDraftVerticalHeight"
                                                  Text="{Binding DraftVerticalHeightText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -692,7 +697,7 @@
                                     </Style>
                                 </StackPanel.Style>
                                 <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.VerticalHeight}" />
-                                <TextBox Height="30" AutomationProperties.Name="{loc:Loc Key=Properties.VerticalHeight}"
+                                <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" AutomationProperties.Name="{loc:Loc Key=Properties.VerticalHeight}"
                                          Text="{Binding DraftVerticalHeightText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource State.Warning}"
                                            Text="{loc:Loc Key=Inspector.VerticalEnvelopeEstimated}" TextWrapping="Wrap"
@@ -749,19 +754,19 @@
                                     </Grid.RowDefinitions>
                                     <StackPanel Grid.Row="0" Grid.Column="0">
                                         <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.SoftLimitMin}" />
-                                        <TextBox x:Name="ComponentAxisMinTextBox" Height="30" Text="{Binding DraftAxisMinText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox x:Name="ComponentAxisMinTextBox" Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding DraftAxisMinText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
                                     <StackPanel Grid.Row="0" Grid.Column="2">
                                         <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.SoftLimitMax}" />
-                                        <TextBox Height="30" Text="{Binding DraftAxisMaxText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding DraftAxisMaxText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
                                     <StackPanel Grid.Row="1" Grid.Column="0">
                                         <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.HomePosition}" />
-                                        <TextBox Height="30" Text="{Binding DraftAxisHomeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding DraftAxisHomeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
                                     <StackPanel Grid.Row="1" Grid.Column="2">
                                         <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.MaxVelocity}" />
-                                        <TextBox Height="30" Text="{Binding DraftAxisSpeedText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding DraftAxisSpeedText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
                                 </Grid>
                             </StackPanel>
@@ -821,7 +826,7 @@
                             <StackPanel Visibility="{Binding ShowWorkpieceProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Workpiece}" />
                                 <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Type}" />
-                                <TextBox Height="30" Text="{Binding WorkpieceType, Mode=TwoWay}" />
+                                <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding WorkpieceType, Mode=TwoWay}" />
                                 <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Conveyor}" />
                                 <ComboBox ItemsSource="{Binding ConveyorComponentOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding WorkpieceConveyorComponentId, Mode=TwoWay}" />
                                 <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.InspectionState}" />
@@ -1685,118 +1690,17 @@
                                       ItemsSource="{Binding VirtualCameras}"
                                       DisplayMemberPath="Name"
                                       SelectedValuePath="Id"
-                                      SelectedValue="{Binding SelectedCameraId, Mode=TwoWay}" />
+                                      SelectedValue="{Binding SelectedCameraId, Mode=OneWay}">
+                                <b:Interaction.Behaviors>
+                                    <behavior:ComboBoxSelectionCommandBehavior Command="{Binding SelectCameraCommand}" />
+                                </b:Interaction.Behaviors>
+                            </ComboBox>
                             <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
                                        Text="{loc:Loc Key=Camera.Recipe}" />
                             <ComboBox x:Name="CameraRecipeComboBox"
                                       ItemsSource="{Binding CurrentCameraRecipes}"
                                       SelectedItem="{Binding SelectedCameraRecipe, Mode=TwoWay}" />
-                            <TextBlock Margin="0,10,0,2"
-                                       Style="{StaticResource SectionCaptionStyle}"
-                                       Text="{loc:Loc Key=Camera.SourceSetup}" />
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="6" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBox x:Name="CameraSourcePathTextBox"
-                                         Height="{StaticResource Density.InspectorFieldHeight}"
-                                         Padding="7,0"
-                                         VerticalContentAlignment="Center"
-                                         IsReadOnly="True"
-                                         Text="{Binding ImageSourceEditor.PathText}"
-                                         ToolTip="{Binding ImageSourceEditor.PathText}"
-                                         AutomationProperties.Name="{loc:Loc Key=Camera.SourceRelativePath}" />
-                                <Button x:Name="BrowseCameraSourceButton"
-                                        Grid.Column="2"
-                                        MinWidth="58"
-                                        Command="{Binding ImageSourceEditor.BrowseCommand}"
-                                        Content="{loc:Loc Key=Camera.Browse}"
-                                        ToolTip="{loc:Loc Key=Camera.BrowseTooltip}"
-                                        AutomationProperties.Name="{loc:Loc Key=Camera.Browse}" />
-                            </Grid>
-                            <Grid Margin="0,7,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="8" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
-                                               Text="{loc:Loc Key=Camera.SourceWidth}" />
-                                    <ui:NumberBox AutomationProperties.AutomationId="CameraSourceWidthNumberBox"
-                                                  Minimum="1"
-                                                  Maximum="100000"
-                                                  SmallChange="1"
-                                                  Value="{Binding ImageSourceEditor.Width, Mode=TwoWay}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
-                                               Text="{loc:Loc Key=Camera.SourceHeight}" />
-                                    <ui:NumberBox AutomationProperties.AutomationId="CameraSourceHeightNumberBox"
-                                                  Minimum="1"
-                                                  Maximum="100000"
-                                                  SmallChange="1"
-                                                  Value="{Binding ImageSourceEditor.Height, Mode=TwoWay}" />
-                                </StackPanel>
-                            </Grid>
-                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
-                                       Text="{loc:Loc Key=Camera.SourcePixelFormat}" />
-                            <TextBox x:Name="CameraSourcePixelFormatTextBox"
-                                     Height="{StaticResource Density.InspectorFieldHeight}"
-                                     Padding="7,0"
-                                     VerticalContentAlignment="Center"
-                                     Text="{Binding ImageSourceEditor.PixelFormatText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="{loc:Loc Key=Camera.PixelFormatTooltip}"
-                                     AutomationProperties.Name="{loc:Loc Key=Camera.SourcePixelFormat}">
-                                <TextBox.Style>
-                                    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ImageSourceEditor.HasError}" Value="True">
-                                                <Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBox.Style>
-                            </TextBox>
-                            <TextBlock x:Name="CameraSourceValidationText"
-                                       Margin="2,5,2,0"
-                                       FontSize="10.5"
-                                       Text="{Binding ImageSourceEditor.ValidationText}"
-                                       TextWrapping="Wrap">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="{DynamicResource State.Running}" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ImageSourceEditor.HasError}" Value="True">
-                                                <Setter Property="Foreground" Value="{DynamicResource State.Fault}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                            <Grid Margin="0,7,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="7" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Button x:Name="ApplyCameraSourceButton"
-                                        Command="{Binding ImageSourceEditor.ApplyCommand}"
-                                        IsEnabled="{Binding ImageSourceEditor.CanApply}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
-                                        Content="{loc:Loc Key=Camera.ApplySource}"
-                                        ToolTip="{loc:Loc Key=Camera.ApplySourceTooltip}"
-                                        AutomationProperties.Name="{loc:Loc Key=Camera.ApplySource}" />
-                                <Button x:Name="RevertCameraSourceButton"
-                                        Grid.Column="2"
-                                        Command="{Binding ImageSourceEditor.RevertCommand}"
-                                        IsEnabled="{Binding ImageSourceEditor.CanRevert}"
-                                        Content="{loc:Loc Key=Camera.RevertSource}"
-                                        ToolTip="{loc:Loc Key=Camera.RevertSourceTooltip}"
-                                        AutomationProperties.Name="{loc:Loc Key=Camera.RevertSource}" />
-                            </Grid>
+                            <local:CameraImageSourceView x:Name="CameraSourceSettings" />
                             <Grid Margin="0,9,0,0">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />

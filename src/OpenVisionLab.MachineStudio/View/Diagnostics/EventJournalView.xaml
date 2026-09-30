@@ -1,4 +1,4 @@
-<UserControl x:Class="OpenVisionLab.MachineStudio.View.Diagnostics.EventJournalView"
+<UserControl x:Class="OpenVisionLab.MachineStudio.View.Diagnostics.EventJournalView" x:Name="JournalView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
@@ -23,6 +23,15 @@
                           HorizontalContentAlignment="Stretch"
                           AutomationProperties.Name="{loc:Loc Key=Diagnostics.Toggle}"
                           ToolTip="{loc:Loc Key=Diagnostics.Hint}">
+                <ToggleButton.Style>
+                    <Style TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsInline, ElementName=JournalView}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ToggleButton.Style>
                 <ToggleButton.Template>
                     <ControlTemplate TargetType="ToggleButton">
                         <Border x:Name="DrawerHeader"
@@ -103,8 +112,20 @@
                 </Grid>
             </ToggleButton>
             <TabControl x:Name="EvidenceTabs" Grid.Row="0"
-                        SelectedIndex="{Binding Navigation.SelectedEvidenceTabIndex, Mode=TwoWay}"
-                        Visibility="{Binding Navigation.IsEvidenceExpanded, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        SelectedIndex="{Binding Navigation.SelectedEvidenceTabIndex, Mode=TwoWay}">
+                <TabControl.Style>
+                    <Style TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsEvidenceExpanded}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsInline, ElementName=JournalView}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TabControl.Style>
                 <TabItem Header="{loc:Loc Key=Diagnostics.Timeline}">
                     <Grid Margin="6">
                         <Grid.RowDefinitions>
@@ -131,6 +152,14 @@
                             <Button Command="{Binding RuntimeDebugger.ClearTimelineCommand}"
                                     Content="{loc:Loc Key=Debugger.ClearTimeline}"
                                     Style="{StaticResource GlobalCommandButtonStyle}" />
+                            <Button x:Name="NavigateRuntimeErrorButton" Margin="6,0,0,0"
+                                    Command="{Binding NavigateRuntimeErrorCommand}"
+                                    CommandParameter="{Binding RuntimeDebugger.LastSequenceError}"
+                                    Content="{loc:Loc Key=Workspace.NavigateRuntimeError}"
+                                    ToolTip="{Binding RuntimeDebugger.LastSequenceError.DisplayText}"
+                                    Style="{StaticResource GlobalCommandButtonStyle}" />
+                            <TextBlock MaxWidth="420" Margin="6,0,0,0" VerticalAlignment="Center"
+                                       Text="{Binding RuntimeDebugger.LastSequenceError.DisplayText}" TextWrapping="Wrap" />
                         </WrapPanel>
                         <ListBox x:Name="DebuggerTimelineList" Grid.Row="1"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"

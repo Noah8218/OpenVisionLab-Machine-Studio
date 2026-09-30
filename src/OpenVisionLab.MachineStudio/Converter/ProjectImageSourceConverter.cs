@@ -71,15 +71,20 @@ public sealed class ProjectImageSourceConverter : IValueConverter
             throw new InvalidDataException("Only P2 and P5 PGM images are supported.");
         }
 
-        var width = ReadPositiveInt(ReadToken(bytes, ref index), "width");
-        var height = ReadPositiveInt(ReadToken(bytes, ref index), "height");
-        var maximum = ReadPositiveInt(ReadToken(bytes, ref index), "maximum gray value");
+        var width = ReadInt(ReadToken(bytes, ref index), "width");
+        var height = ReadInt(ReadToken(bytes, ref index), "height");
+        var maximum = ReadInt(ReadToken(bytes, ref index), "maximum gray value");
         if (maximum > 255)
         {
             throw new InvalidDataException("16-bit PGM images are not supported.");
         }
 
         var pixelCount = checked(width * height);
+        if (pixelCount > bytes.Length - index)
+        {
+            throw new InvalidDataException("The PGM payload is truncated.");
+        }
+
         var pixels = new byte[pixelCount];
         if (magic == "P5")
         {
@@ -99,7 +104,7 @@ public sealed class ProjectImageSourceConverter : IValueConverter
             for (var pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++)
             {
                 pixels[pixelIndex] = Scale(
-                    ReadPositiveInt(ReadToken(bytes, ref index), "pixel"),
+                    ReadInt(ReadToken(bytes, ref index), "pixel", minimum: 0),
                     maximum);
             }
         }
@@ -117,10 +122,10 @@ public sealed class ProjectImageSourceConverter : IValueConverter
         return bitmap;
     }
 
-    private static int ReadPositiveInt(string token, string field)
+    private static int ReadInt(string token, string field, int minimum = 1)
     {
         if (!int.TryParse(token, NumberStyles.None, CultureInfo.InvariantCulture, out var value)
-            || value <= 0)
+            || value < minimum)
         {
             throw new InvalidDataException($"Invalid PGM {field}.");
         }

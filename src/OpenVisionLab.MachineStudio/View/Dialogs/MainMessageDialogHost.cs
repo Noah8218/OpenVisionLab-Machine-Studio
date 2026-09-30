@@ -57,6 +57,17 @@ internal sealed class MainMessageDialogHost
     internal bool ConfirmEquipmentUnitRemoval(MachineStationDefinition station, MachineUnitDefinition unit) =>
         Show(CreateEquipmentUnitRemovalDialogOptions(station, unit)) == WpfMessageDialogResult.Yes;
 
+    internal void ShowEquipmentUnitRemovalBlocked(string details) => Show(CreateEquipmentUnitRemovalBlockedDialogOptions(details));
+
+    internal static WpfMessageDialogOptions CreateEquipmentUnitRemovalBlockedDialogOptions(string details) => new()
+    {
+        Title = OpenVisionLanguageService.T("Equipment.UnitRemovalBlockedTitle"),
+        Message = details,
+        Kind = WpfMessageDialogKind.Warning,
+        DefaultResult = WpfMessageDialogResult.OK,
+        PrimaryButtonText = OpenVisionLanguageService.T("MessageBox.OK", "확인", "OK")
+    };
+
     internal bool ConfirmEquipmentStationRemoval(MachineStationDefinition station) =>
         Show(CreateEquipmentStationRemovalDialogOptions(station)) == WpfMessageDialogResult.Yes;
 

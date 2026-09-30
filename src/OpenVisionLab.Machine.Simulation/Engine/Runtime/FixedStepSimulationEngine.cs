@@ -823,7 +823,8 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
                 SequenceRuntime.SequenceExecutors,
                 SequenceRuntime.DebugState,
                 CommandBoundaryTick,
-                CommandBoundaryTime));
+                CommandBoundaryTime,
+                _controlOwner));
         if (outcome.RunMode.HasValue)
         {
             _runMode = outcome.RunMode.Value;

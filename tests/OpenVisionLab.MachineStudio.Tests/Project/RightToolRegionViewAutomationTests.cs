@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using OpenVisionLab;
+using OpenVisionLab.Machine.Core.Axes;
 using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Persistence.Projects;
@@ -18,16 +19,18 @@ using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
 
-[Collection(EquipmentOutlineViewAutomationTestCollection.Name)]
+[Collection(StudioUiTestCollection.Name)]
 public sealed class RightToolRegionViewAutomationTests
 {
+    private readonly StudioUiTestHost _ui;
+
+    public RightToolRegionViewAutomationTests(StudioUiTestHost ui) => _ui = ui;
+
     [Fact]
     public async Task UnitAssignmentComboBoxUpdatesSelectedComponentThroughBinding()
     {
-        var assignment = await RunOnStaAsync(() =>
+        var assignment = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             var project = CreateProject();
             using var layout = new MachineLayoutViewModel();
             layout.Load(project);
@@ -88,10 +91,8 @@ public sealed class RightToolRegionViewAutomationTests
     [Fact]
     public async Task MultiSelectionPropertiesPaneUsesR19FirstSelectedComponent()
     {
-        var state = await RunOnStaAsync(() =>
+        var state = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             var project = CreateProject();
             var layoutDefinition = Assert.Single(project.Layouts);
             layoutDefinition.Components.Add(new LayoutComponentDefinition
@@ -138,10 +139,8 @@ public sealed class RightToolRegionViewAutomationTests
     [Fact]
     public async Task VerticalEnvelopeTextBoxKeepsInvalidDraftThenAppliesValidBoundary()
     {
-        var result = await RunOnStaAsync(() =>
+        var result = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             using var layout = CreateEnvelopeLayout();
             layout.Select("frame-01");
             var editor = Assert.IsType<LayoutComponentEditorViewModel>(layout.SelectedComponentEditor);
@@ -252,10 +251,8 @@ public sealed class RightToolRegionViewAutomationTests
     [Fact]
     public async Task VerticalEnvelopeDraftActionsAreReachableAndUsableByKeyboard()
     {
-        var result = await RunOnStaAsync(() =>
+        var result = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             using var layout = CreateEnvelopeLayout();
             layout.Select("frame-01");
             var editor = Assert.IsType<LayoutComponentEditorViewModel>(layout.SelectedComponentEditor);
@@ -363,10 +360,8 @@ public sealed class RightToolRegionViewAutomationTests
     [InlineData(900d)]
     public async Task VerticalEnvelopeFieldAndDraftActionsRemainReachableAtScrollEnd(double windowHeight)
     {
-        var layoutResult = await RunOnStaAsync(() =>
+        var layoutResult = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             using var layout = CreateEnvelopeLayout();
             layout.Select("frame-01");
             var editor = Assert.IsType<LayoutComponentEditorViewModel>(layout.SelectedComponentEditor);
@@ -453,6 +448,54 @@ public sealed class RightToolRegionViewAutomationTests
         Assert.True(layoutResult.FooterVisible && layoutResult.ApplyVisible && layoutResult.DiscardVisible);
     }
 
+    [Theory]
+    [InlineData(360d, false)]
+    [InlineData(400d, false)]
+    [InlineData(360d, true)]
+    [InlineData(400d, true)]
+    public async Task EquipmentInputContentHostFitsACompleteTextLine(double inspectorWidth, bool driveTab)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var project = CreateProject();
+            project.Layouts[0].Components[0].Kind = LayoutComponentKind.LinearStage;
+            project.Layouts[0].Components[0].BehaviorBindingId = "axis-x";
+            project.Axes.Add(new VirtualAxisDefinition { Id = "axis-x", Name = "X", SoftLimitMin = -50, SoftLimitMax = 250 });
+            using var layout = new MachineLayoutViewModel();
+            layout.Load(project);
+            layout.Select("camera-01");
+            using var navigation = new ShellNavigationViewModel(false, () => false, () => false,
+                () => Task.CompletedTask, () => { }, _ => { });
+            var view = new RightToolRegionView
+            {
+                DataContext = new InspectorDataContext(layout, navigation, IsRunMode: false, IsEquipmentDriveTabOpen: driveTab)
+            };
+            var window = new Window
+            {
+                Width = inspectorWidth, Height = 900, ShowInTaskbar = false, ShowActivated = false,
+                WindowStyle = WindowStyle.None, Content = view
+            };
+            window.Show();
+            try
+            {
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                var fields = Descendants(view).OfType<TextBox>().Where(field => field.IsVisible && field.Height == 30 && ReferenceEquals(field.DataContext, layout.SelectedComponentEditor)).ToArray();
+                Assert.NotEmpty(fields);
+                foreach (var field in fields)
+                {
+                    var contentHost = Assert.IsAssignableFrom<ScrollViewer>(field.Template.FindName("PART_ContentHost", field));
+                    var line = new FormattedText("장비 Ag0123456789", System.Globalization.CultureInfo.GetCultureInfo("ko-KR"),
+                        FlowDirection.LeftToRight, new Typeface(field.FontFamily, field.FontStyle, field.FontWeight, field.FontStretch),
+                        field.FontSize, Brushes.Black, VisualTreeHelper.GetDpi(field).PixelsPerDip);
+                    Assert.True(contentHost.ViewportHeight + 0.5 >= line.Height,
+                        $"{field.Name}: input text needs {line.Height:F2} DIP, but its content viewport is {contentHost.ViewportHeight:F2} DIP.");
+                }
+                return true;
+            }
+            finally { window.Close(); }
+        });
+    }
+
     private static MachineProjectDocument CreateProject()
     {
         var station = new MachineStationDefinition { Id = "station-main", Name = "Main" };
@@ -504,19 +547,6 @@ public sealed class RightToolRegionViewAutomationTests
             yield return child;
             foreach (var descendant in Descendants(child)) yield return descendant;
         }
-    }
-
-    private static Task<T> RunOnStaAsync<T>(Func<T> action)
-    {
-        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            try { completion.SetResult(action()); }
-            catch (Exception exception) { completion.SetException(exception); }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return completion.Task;
     }
 
     private static void PumpBindings()

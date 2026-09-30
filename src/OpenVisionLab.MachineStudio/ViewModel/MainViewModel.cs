@@ -60,7 +60,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
 
     private static readonly string[] LocalizedPropertyNames =
     [
-        nameof(ModeText), nameof(ModeTransitionStatusText), nameof(StateText),
+        nameof(ModeText), nameof(ModeTransitionStatusText), nameof(StateText), nameof(RunTargetText),
         nameof(LeftPanelHeaderText), nameof(RightPanelHeaderText),
         nameof(ProjectStatusText), nameof(SelectionStatusText), nameof(NewProjectNameValidationText),
         nameof(StationUnitValidationText), nameof(StationUnitRemovalHintText),
@@ -166,6 +166,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
     private ICommand? _confirmNewProjectNameCommand;
     private ICommand? _cancelNewProjectNameCommand;
     private ICommand? _openProjectCommand;
+    private ICommand? _navigateRuntimeErrorCommand;
     private ICommand? _saveProjectCommand;
     private ICommand? _saveProjectAsCommand;
     private ICommand? _openStationUnitEditorCommand;
@@ -225,6 +226,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         ProjectOpenFailurePresenter = _mainMessageDialogHost.ShowProjectOpenFailure;
         LayoutComponentRemovalPrompt = _mainMessageDialogHost.ConfirmLayoutComponentRemoval;
         EquipmentUnitRemovalPrompt = _mainMessageDialogHost.ConfirmEquipmentUnitRemoval;
+        EquipmentUnitRemovalBlockedPresenter = _mainMessageDialogHost.ShowEquipmentUnitRemovalBlocked;
         EquipmentStationRemovalPrompt = _mainMessageDialogHost.ConfirmEquipmentStationRemoval;
         _simulationSession = new(
             SimulationFixedStep,
@@ -879,6 +881,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
     internal Action<string> ProjectOpenFailurePresenter { get; set; }
     internal Func<IReadOnlyList<LayoutComponentDefinition>, IReadOnlyList<LayoutComponentRemovalImpact>, bool> LayoutComponentRemovalPrompt { get; set; }
     internal Func<MachineStationDefinition, MachineUnitDefinition, bool> EquipmentUnitRemovalPrompt { get; set; }
+    internal Action<string> EquipmentUnitRemovalBlockedPresenter { get; set; }
     internal Func<MachineStationDefinition, bool> EquipmentStationRemovalPrompt { get; set; }
     internal string? CurrentProjectPath => _projectLifecycle.CurrentPath;
     internal bool IsSessionCloseRequested => _sessionCloseRequested;
@@ -1256,6 +1259,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
     public SemiconductorRecipeGalleryViewModel SemiconductorRecipes { get; }
     public RecipeDryRunPlaybackViewModel DryRunPlayback => _recipeAuthoring.Playback;
     public SceneSnapshotStore SceneSnapshots { get; }
+    public EquipmentMaterialFlowViewModel EquipmentMaterialFlow { get; } = new();
     public SceneSnapshotStore SceneSnapshotSource => DryRunPlayback.IsActive
         ? DryRunPlayback.PlaybackSnapshots
         : SceneSnapshots;
@@ -1437,9 +1441,33 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
     public string ModeTransitionStatusText => _isModeTransitioning
         ? GetModeTransitionStatusText()
         : string.Empty;
-    public string StateText => IsRunning
-        ? OpenVisionLanguageService.T("Shell.Running")
-        : OpenVisionLanguageService.T("Shell.Paused");
+    public string StateText => IsModeTransitioning ? ModeTransitionStatusText
+        : IsRunning ? OpenVisionLanguageService.T("Shell.Running")
+        : IsDesignMode ? OpenVisionLanguageService.T("Shell.Editing")
+        : PresentationSnapshot.SequenceDebug.PauseReason switch
+        {
+            SequenceDebugPauseReason.SequenceCompleted => OpenVisionLanguageService.T("Equipment.State.Completed"),
+            SequenceDebugPauseReason.SequenceFaulted => OpenVisionLanguageService.T("Equipment.State.Error"),
+            SequenceDebugPauseReason.SequenceAborted => OpenVisionLanguageService.T("Equipment.State.Aborted"),
+            _ => OpenVisionLanguageService.T(RuntimeDebugger.IsPausedForContinuation ? "Shell.Paused" : "Equipment.State.Ready")
+        };
+    public string RunTargetText
+    {
+        get
+        {
+            if (IsRunMode && !_runtimeDefinitionDirty && RuntimeProjection.ControlOwner == SimulationControlOwner.Manual)
+                return OpenVisionLanguageService.T("Shell.ManualRunTarget");
+
+            var sequence = CurrentProject.Sequences.FirstOrDefault(candidate => candidate.Id == ActiveSequenceId);
+            if (sequence is null) return OpenVisionLanguageService.T("Shell.ManualRunTarget");
+            var target = $"{sequence.Name} / {sequence.Id}";
+            var automatic = CurrentProject.Simulation.AutomaticRun;
+            var repeat = automatic?.Repeat == true
+                ? string.Format(CultureInfo.CurrentCulture, OpenVisionLanguageService.T("Shell.RepeatRunTarget"), automatic.RepeatDelayMilliseconds)
+                : OpenVisionLanguageService.T("Shell.SingleRunTarget");
+            return string.Format(CultureInfo.CurrentCulture, OpenVisionLanguageService.T("Shell.RunTarget"), target, repeat);
+        }
+    }
     public string LeftPanelHeaderText => OpenVisionLanguageService.T("Shell.Project");
     public string RightPanelHeaderText => IsEquipmentSinglePartCheckOpen
         ? OpenVisionLanguageService.T("Equipment.SinglePartCheck")
@@ -1452,6 +1480,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
             ? "Shell.ProjectStatusUnsaved"
             : "Shell.ProjectStatus"),
         ProjectDisplayName);
+    public string EquipmentFooterStatusText => string.Format(System.Globalization.CultureInfo.CurrentCulture,
+        OpenVisionLanguageService.T("Equipment.FooterStatus"), _projectLifecycle.Revision, Layout.SelectionCount);
     public string SelectionStatusText => Layout.SelectionCount > 1 && Layout.SelectedItem is not null
         ? string.Format(
             System.Globalization.CultureInfo.CurrentCulture,
@@ -1923,6 +1953,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
 
     public ICommand NavigateToCommissioningMismatchCommand =>
         _multiAxisCommissioning.NavigateToMismatchCommand;
+
+    public ICommand NavigateRuntimeErrorCommand => _navigateRuntimeErrorCommand ??= CreateRelayCommand(NavigateRuntimeError, CanNavigateRuntimeError);
 
     public ICommand ForceSensorOnCommand => _manualEquipment.ForceSensorOnCommand;
 
@@ -2439,6 +2471,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         {
             StatusMessage = string.Format(CultureInfo.CurrentCulture,
                 OpenVisionLanguageService.T("Equipment.UnitRemovalBlocked"), target.Unit.Name, assignedComponentCount);
+            EquipmentUnitRemovalBlockedPresenter(StatusMessage);
             return;
         }
 
@@ -2559,6 +2592,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         _selectionSynchronization.ClearAnalogEditor();
         ProjectTree.LoadProject(CurrentProject);
         Layout.Load(CurrentProject);
+        EquipmentMaterialFlow.Update(CurrentProject, Layout.Items, PresentationSnapshot);
         if (selectedComponentId is not null)
         {
             Layout.Select(selectedComponentId);
@@ -2706,11 +2740,13 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         RefreshProjectIdentity();
         StatusMessage = "Ready";
         OnPropertyChanged(nameof(ProjectStatusText));
+        OnPropertyChanged(nameof(EquipmentFooterStatusText));
         OnPropertyChanged(nameof(SelectionStatusText));
         OnPropertyChanged(nameof(AxisCountText));
         OnPropertyChanged(nameof(LayoutComponentCountText));
         OnPropertyChanged(nameof(HasEmbeddedSequence));
         OnPropertyChanged(nameof(HasAutomaticRun));
+        OnPropertyChanged(nameof(RunTargetText));
         OnPropertyChanged(nameof(HasAuthoredLayout));
         OnPropertyChanged(nameof(HasCycleStartInput));
         OnPropertyChanged(nameof(ControlOwnerHelpText));
@@ -2810,6 +2846,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
 
     private void ApplyMonitorSnapshot(SimulationSnapshot snapshot)
     {
+        EquipmentMaterialFlow.Update(CurrentProject, Layout.Items, DryRunPlayback.IsActive ? PresentationSnapshot : snapshot);
         _runtimeProjectionCoordinator.Apply(
             snapshot,
             CreateRuntimeProjectionSelection());
@@ -2876,6 +2913,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         OnPropertyChanged(nameof(CanImportUnifiedCommissioningEvidence));
         OnPropertyChanged(nameof(StateText));
         OnPropertyChanged(nameof(RunStatusText));
+        OnPropertyChanged(nameof(RunTargetText));
         _supportDiagnostics.Refresh();
         InvalidateCommands();
     }
@@ -3149,6 +3187,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
     {
         Title = IsStartupChoiceVisible ? "OpenVisionLab Machine Studio" : $"OpenVisionLab Machine Studio · {ProjectDisplayName}{(HasUnsavedChanges ? " *" : string.Empty)}";
         OnPropertyChanged(nameof(ProjectStatusText));
+        OnPropertyChanged(nameof(EquipmentFooterStatusText));
         OnPropertyChanged(nameof(SceneTitleText));
     }
 
@@ -3164,6 +3203,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         InvalidateManualCameraPreparation();
         _projectLifecycle.MarkChanged();
         RecipeConnections.SetProjectRevision(_projectLifecycle.Revision);
+        EquipmentMaterialFlow.Update(CurrentProject, Layout.Items, PresentationSnapshot);
+        OnPropertyChanged(nameof(EquipmentFooterStatusText));
         _camera.VisionEvidence.RefreshContext();
         if (requiresRuntimeRebuild)
         {
@@ -3405,6 +3446,9 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         OnPropertyChanged(nameof(IsSceneEditable));
         OnPropertyChanged(nameof(ModeText));
         OnPropertyChanged(nameof(ControlOwnerText));
+        OnPropertyChanged(nameof(StateText));
+        OnPropertyChanged(nameof(RunStatusText));
+        OnPropertyChanged(nameof(RunTargetText));
         OnPropertyChanged(nameof(SceneControlText));
         OnPropertyChanged(nameof(LeftPanelHeaderText));
         OnPropertyChanged(nameof(RightPanelHeaderText));
@@ -3445,6 +3489,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         OnPropertyChanged(nameof(IsModeTransitioning));
         OnPropertyChanged(nameof(ModeText));
         OnPropertyChanged(nameof(ModeTransitionStatusText));
+        OnPropertyChanged(nameof(StateText));
         StatusMessage = GetModeTransitionStatusText();
         InvalidateCommands();
         _ = CompleteDesignModeTransitionAsync(generation);
@@ -3487,6 +3532,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         OnPropertyChanged(nameof(IsRunMode));
         OnPropertyChanged(nameof(ModeText));
         OnPropertyChanged(nameof(ModeTransitionStatusText));
+        OnPropertyChanged(nameof(StateText));
 
         if (failure is not null)
         {
@@ -3580,6 +3626,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
             return;
         }
 
+        OnPropertyChanged(nameof(EquipmentFooterStatusText));
         OnPropertyChanged(nameof(SelectionStatusText));
         OnPropertyChanged(nameof(HasSelectedEquipment));
         OnPropertyChanged(nameof(SelectedEquipmentStatus));
@@ -4138,6 +4185,33 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         _runtimeObservabilityJournal.Log("Motion", $"Commissioning mismatch selected · {mismatch.TargetId} · Tick {mismatch.TickIndex}");
     }
 
+    private bool CanNavigateRuntimeError(object? parameter) => !_disposed && !IsRunning && !IsModeTransitioning
+        && parameter is RuntimeSequenceErrorLocation location && location.ProjectId == CurrentProject.Id
+        && CurrentProject.Sequences.Any(sequence => sequence.Id == location.Error.SequenceId
+            && (location.Error.StepId is null || sequence.Steps.Any(step => step.Id == location.Error.StepId)));
+
+    private void NavigateRuntimeError(object? parameter)
+    {
+        if (!CanNavigateRuntimeError(parameter) || parameter is not RuntimeSequenceErrorLocation location
+            || !TryResolvePendingPlacementDraft()) return;
+        var part = string.IsNullOrEmpty(location.TargetId) ? null : Layout.Items.FirstOrDefault(item =>
+            item.Id == location.TargetId || item.BehaviorBindingId == location.TargetId);
+        if (part is not null)
+        {
+            _selectionSynchronization.ClearSelection();
+            if (string.IsNullOrEmpty(part.UnitId)) Layout.ShowOverview();
+            else Layout.ShowUnit(part.UnitId);
+            Layout.Select(part.Id);
+        }
+        Navigation.IsSimulationWorkspace = true;
+        Navigation.SelectedExecutionTabIndex = 1;
+        SequenceEditor.SelectSequence(location.Error.SequenceId);
+        if (location.Error.StepId is not null) SequenceEditor.SelectStep(location.Error.SequenceId, location.Error.StepId);
+        else SequenceEditor.SelectedStep = null;
+        Navigation.IsInspectorOpen = true;
+        StatusMessage = location.DisplayText;
+    }
+
     #endregion
 
     #region Runtime Workspace
@@ -4264,6 +4338,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         OnPropertyChanged(nameof(IsDryRunPlaybackActive));
         OnPropertyChanged(nameof(IsSceneEditable));
         OnPropertyChanged(nameof(SceneSnapshotSource));
+        EquipmentMaterialFlow.Update(CurrentProject, Layout.Items, PresentationSnapshot);
         RefreshManualEquipmentProjection();
         RefreshCameraCommissioningProjection();
         OnPropertyChanged(nameof(DryRunPlaybackTitleText));
@@ -4830,6 +4905,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         SemiconductorRecipes.RefreshLocalization();
         RecipeConnections.RefreshLocalization();
         Layout.RefreshLocalization();
+        EquipmentMaterialFlow.Update(CurrentProject, Layout.Items, PresentationSnapshot);
+        OnPropertyChanged(nameof(EquipmentFooterStatusText));
         Integration.RefreshLocalization();
         DigitalIo.RefreshLocalization();
         AnalogIoAuthoring?.RefreshLocalization();
@@ -4894,6 +4971,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         RaiseCanExecuteChanged(_showEquipmentOverviewCommand);
         RaiseCanExecuteChanged(_showEquipmentUnitCommand);
         RaiseCanExecuteChanged(_runCommand);
+        RaiseCanExecuteChanged(_navigateRuntimeErrorCommand);
         RaiseCanExecuteChanged(_pauseCommand);
         RaiseCanExecuteChanged(_abortSequenceCommand);
         RaiseCanExecuteChanged(_retrySequenceCommand);

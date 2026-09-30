@@ -10,16 +10,18 @@ using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
 
-[Collection(EquipmentOutlineViewAutomationTestCollection.Name)]
+[Collection(StudioUiTestCollection.Name)]
 public sealed class LeftToolRegionSearchAutomationTests
 {
+    private readonly StudioUiTestHost _ui;
+
+    public LeftToolRegionSearchAutomationTests(StudioUiTestHost ui) => _ui = ui;
+
     [Fact]
     public async Task ProjectSearchInputAndEmptyStateStayBoundToTheLargeLayoutTree()
     {
-        var result = await RunOnStaAsync(() =>
+        var result = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             var samplePath = Path.Combine(AppContext.BaseDirectory, "Samples", "LargeLayoutExploration.ovmachine");
             var project = new ProjectDocumentStore().Load(File.ReadAllText(samplePath));
             using var viewModel = new MainViewModel(project);
@@ -130,22 +132,4 @@ public sealed class LeftToolRegionSearchAutomationTests
         window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(() => { }));
     }
 
-    private static Task<T> RunOnStaAsync<T>(Func<T> action)
-    {
-        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                completion.SetResult(action());
-            }
-            catch (Exception exception)
-            {
-                completion.SetException(exception);
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return completion.Task;
-    }
 }

@@ -16,16 +16,110 @@ using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
 
-[Collection(EquipmentOutlineViewAutomationTestCollection.Name)]
+[Collection(StudioUiTestCollection.Name)]
 public sealed class SequenceEditorViewAutomationTests
 {
+    private readonly StudioUiTestHost _ui;
+
+    public SequenceEditorViewAutomationTests(StudioUiTestHost ui) => _ui = ui;
+
+    [Fact]
+    public async Task EditingStepUpdatesCardNameAndReportsTheCorrectTransitionFieldAfterRecovery()
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var editor = new SequenceEditorViewModel();
+            editor.Load(CreateProject());
+            var step = editor.Steps.Single(item => item.Id == "trigger-camera");
+            editor.SelectedStep = step;
+            var view = new SequenceEditorView { DataContext = editor };
+            var window = new Window { Content = view, Width = 1680, Height = 850, ShowInTaskbar = false, ShowActivated = false };
+            window.Show();
+            try
+            {
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                var controls = Descendants(view).ToArray();
+                var name = controls.OfType<TextBox>().Single(control => control.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path.Path == "SelectedStep.Name");
+                var cardName = controls.OfType<TextBlock>().Single(control => ReferenceEquals(control.DataContext, step)
+                    && control.GetBindingExpression(TextBlock.TextProperty)?.ParentBinding.Path.Path == "DisplayName");
+                name.Text = "상면 촬영 · 수정 이름";
+                PumpBindings();
+                Assert.Equal(name.Text, cardName.Text);
+
+                foreach (var property in new[] { "NextStepId", "ErrorStepId", "FailureStepId" })
+                {
+                    var field = controls.OfType<TextBox>().Single(control => control.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path.Path == "SelectedStep." + property);
+                    var original = field.Text;
+                    field.Text = "missing-step";
+                    PumpBindings();
+                    Assert.Contains(editor.ValidationIssues, issue => issue.PropertyName == "Step." + property && issue.Message.Contains("missing-step", StringComparison.Ordinal));
+                    field.Text = original;
+                    PumpBindings();
+                    Assert.Empty(editor.ValidationIssues);
+                }
+                return true;
+            }
+            finally
+            {
+                window.Close();
+                editor.Dispose();
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(760)]
+    [InlineData(1680)]
+    public async Task GraphCardsFillAvailableWidthAndRouteFieldsRemainReachable(double width)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var editor = new SequenceEditorViewModel();
+            editor.Load(CreateProject());
+            editor.SelectedStep = editor.Steps.First();
+            editor.SelectedStep.NextStepId = "wait-cylinder-extended";
+            var view = new SequenceEditorView { DataContext = editor };
+            var window = new Window { Width = width, Height = 800, WindowStyle = WindowStyle.None, Content = view };
+            window.Show();
+            try
+            {
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                var controls = Descendants(view).ToArray();
+                var graph = controls.OfType<ListBox>().Single(list =>
+                    list.GetBindingExpression(ItemsControl.ItemsSourceProperty)?.ParentBinding.Path.Path == "Steps");
+                var container = Assert.IsType<ListBoxItem>(graph.ItemContainerGenerator.ContainerFromItem(editor.SelectedStep));
+                var card = Descendants(container).OfType<StackPanel>().First(panel => ReferenceEquals(panel.DataContext, editor.SelectedStep));
+                if (width > 1000) Assert.InRange(card.ActualWidth, 569, 571);
+                else Assert.InRange(card.ActualWidth, graph.ActualWidth * .8, graph.ActualWidth);
+
+                foreach (var path in new[] { "NextStepId", "ErrorStepId", "FailureStepId", "Id" })
+                {
+                    var field = controls.OfType<TextBox>().Single(textBox =>
+                        textBox.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path.Path == "SelectedStep." + path);
+                    var bounds = field.TransformToAncestor(view).TransformBounds(new Rect(field.RenderSize));
+                    Assert.InRange(bounds.Right, 0, view.ActualWidth);
+                    Assert.InRange(bounds.Bottom, 0, view.ActualHeight);
+                    var line = new FormattedText("wait-cylinder-extended", System.Globalization.CultureInfo.CurrentCulture,
+                        FlowDirection.LeftToRight, new Typeface(field.FontFamily, field.FontStyle, field.FontWeight, field.FontStretch),
+                        field.FontSize, Brushes.White, VisualTreeHelper.GetDpi(field).PixelsPerDip);
+                    Assert.True(field.ActualWidth - field.Padding.Left - field.Padding.Right >= line.Width,
+                        $"{path} cannot show a normal step ID at view width {width}.");
+                }
+            }
+            finally
+            {
+                window.Close();
+                editor.Dispose();
+            }
+            return true;
+        });
+    }
+
     [Fact]
     public async Task GraphConnectorShowsConfiguredRoutesAndTerminalCompletion()
     {
-        await RunOnStaAsync(() =>
+        await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             var project = CreateProject();
             var sequence = Assert.Single(project.Sequences);
             var cameraDefinition = sequence.Steps.Single(step => step.Id == "trigger-camera");
@@ -92,10 +186,8 @@ public sealed class SequenceEditorViewAutomationTests
     [Fact]
     public async Task WorkpieceTargetComboBoxBindingSurvivesFeedAndEjectActionChanges()
     {
-        var state = await RunOnStaAsync(() =>
+        var state = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             var project = CreateProject();
             var editor = new SequenceEditorViewModel();
             editor.Load(project);
@@ -238,16 +330,4 @@ public sealed class SequenceEditorViewAutomationTests
         }
     }
 
-    private static Task<T> RunOnStaAsync<T>(Func<T> action)
-    {
-        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            try { completion.SetResult(action()); }
-            catch (Exception exception) { completion.SetException(exception); }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return completion.Task;
-    }
 }

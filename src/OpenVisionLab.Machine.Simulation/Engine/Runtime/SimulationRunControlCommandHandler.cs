@@ -15,7 +15,8 @@ internal sealed record SimulationRunControlContext(
     IReadOnlyDictionary<string, DeterministicSequenceExecutor> SequenceExecutors,
     DeterministicSequenceDebugState SequenceDebugState,
     long CommandBoundaryTick,
-    TimeSpan CommandBoundaryTime);
+    TimeSpan CommandBoundaryTime,
+    SimulationControlOwner ControlOwner = SimulationControlOwner.Definition);
 
 internal sealed record SimulationRunControlEvent(
     string Category,
@@ -65,7 +66,9 @@ internal sealed class SimulationRunControlCommandHandler
             context,
             "Simulation entered RealTime mode.",
             runMode: SimulationRunMode.RealTime,
-            controlOwner: context.SequenceExecutors.Count > 0
+            controlOwner: context.ControlOwner == SimulationControlOwner.Manual
+                ? SimulationControlOwner.Manual
+                : context.SequenceExecutors.Count > 0
                 ? SimulationControlOwner.EmbeddedSequence
                 : SimulationControlOwner.Manual,
             pendingSteps: 0);
@@ -108,7 +111,9 @@ internal sealed class SimulationRunControlCommandHandler
             context,
             $"Simulation will run {fastForward.TickBudget} deterministic fixed ticks without wall-clock pacing.",
             runMode: SimulationRunMode.FastForward,
-            controlOwner: context.SequenceExecutors.Count > 0
+            controlOwner: context.ControlOwner == SimulationControlOwner.Manual
+                ? SimulationControlOwner.Manual
+                : context.SequenceExecutors.Count > 0
                 ? SimulationControlOwner.EmbeddedSequence
                 : SimulationControlOwner.Manual,
             pendingSteps: fastForward.TickBudget);

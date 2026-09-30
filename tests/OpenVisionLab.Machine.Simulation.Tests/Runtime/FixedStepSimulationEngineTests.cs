@@ -1201,6 +1201,29 @@ public class FixedStepSimulationEngineTests
     }
 
     [Fact]
+    public async Task ManualControl_PausePlayAndFastForwardPreserveOwnerWithConfiguredSequence()
+    {
+        using var engine = new FixedStepSimulationEngine(new SimulationSettings { FixedStep = TimeSpan.FromMilliseconds(5) });
+        await engine.StartAsync();
+        Assert.True((await engine.EnqueueCommandAsync(new ConfigureRuntimeCommand(CreateRuntimeConfiguration()))).IsAccepted);
+        Assert.True((await engine.EnqueueCommandAsync(new StartManualControlCommand())).IsAccepted);
+
+        for (var repeat = 0; repeat < 2; repeat++)
+        {
+            Assert.True((await engine.EnqueueCommandAsync(new PauseCommand())).IsAccepted);
+            Assert.True((await engine.EnqueueCommandAsync(new PlayCommand())).IsAccepted);
+            Assert.Equal(SimulationControlOwner.Manual, engine.CurrentSnapshot.ControlOwner);
+            Assert.Equal(OpenVisionLab.Machine.Sequence.Runtime.SequenceExecutionStatus.Ready, Assert.Single(engine.CurrentSnapshot.Sequences).Status);
+        }
+        Assert.True((await engine.EnqueueCommandAsync(new PauseCommand())).IsAccepted);
+        var before = engine.CurrentSnapshot.TickIndex;
+        Assert.True((await engine.EnqueueCommandAsync(new FastForwardCommand(2))).IsAccepted);
+        var snapshot = await WaitForSnapshotAsync(engine.SnapshotReader, state => state.TickIndex >= before + 2 && state.RunMode == SimulationRunMode.Paused);
+        Assert.Equal(SimulationControlOwner.Manual, snapshot.ControlOwner);
+        Assert.Equal(OpenVisionLab.Machine.Sequence.Runtime.SequenceExecutionStatus.Ready, Assert.Single(snapshot.Sequences).Status);
+    }
+
+    [Fact]
     public async Task ManualControl_RejectsWhileEmbeddedSequenceIsRunning()
     {
         using var engine = new FixedStepSimulationEngine(

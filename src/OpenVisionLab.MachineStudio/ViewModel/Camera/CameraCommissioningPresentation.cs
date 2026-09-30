@@ -160,6 +160,12 @@ internal sealed class CameraCommissioningPresentation
 
     internal string CurrentCameraSourceText => Projection.ImageSource?.SourceRelativePath ?? "—";
 
+    internal string CurrentCameraInputKindText => !Projection.HasCameraDefinition
+        ? OpenVisionLanguageService.T("Camera.SourceModeUnavailable")
+        : Projection.ImageSource is { SourceRelativePath.Length: > 0 } source
+            ? string.Format(OpenVisionLanguageService.T("Camera.InputSingleImage"), source.SourceRelativePath, source.Width, source.Height, source.PixelFormat)
+            : OpenVisionLanguageService.T("Camera.InputNotConfigured");
+
     /// <summary>
     /// Returns the project-owned image captured by the latest virtual-camera
     /// frame. The path is exposed only after a frame has been acquired so the
@@ -218,6 +224,9 @@ internal sealed class CameraCommissioningPresentation
 
     internal string CurrentCameraWorkpieceComponentIdText =>
         Projection.Snapshot?.Result?.WorkpieceComponentId ?? "—";
+
+    internal string CurrentCameraWorkpieceInstanceIdText =>
+        Projection.Snapshot?.Result?.WorkpieceInstanceId ?? "—";
 
     internal bool HasUsableCameraImageSource => !string.IsNullOrWhiteSpace(Projection.ProjectPath)
         && !string.IsNullOrWhiteSpace(Projection.SelectedCameraRecipe)

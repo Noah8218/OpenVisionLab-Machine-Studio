@@ -15,25 +15,18 @@ using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
 
-[CollectionDefinition(Name, DisableParallelization = true)]
-public sealed class EquipmentOutlineViewAutomationTestCollection
-{
-    public const string Name = "Equipment outline WPF automation";
-}
-
-[Collection(EquipmentOutlineViewAutomationTestCollection.Name)]
+[Collection(StudioUiTestCollection.Name)]
 public sealed class EquipmentOutlineViewAutomationTests
 {
+    private readonly StudioUiTestHost _ui;
+
+    public EquipmentOutlineViewAutomationTests(StudioUiTestHost ui) => _ui = ui;
+
     [Fact]
     public async Task OutlineControlsExposeLocalizedNamesAndAreKeyboardReachable()
     {
-        var result = await RunOnStaAsync(() =>
+        var result = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null)
-            {
-                new App().InitializeComponent();
-            }
-
             var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
             try
             {
@@ -175,13 +168,8 @@ public sealed class EquipmentOutlineViewAutomationTests
     [Fact]
     public async Task DisabledOutlineAutomationToggleDoesNotChangeSelection()
     {
-        var result = await RunOnStaAsync(() =>
+        var result = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null)
-            {
-                new App().InitializeComponent();
-            }
-
             using var layout = CreateLayout();
             var view = CreateView(layout);
             var window = new Window
@@ -223,13 +211,8 @@ public sealed class EquipmentOutlineViewAutomationTests
     [Fact]
     public async Task UnitRemovalButtonInvokesTheMainViewModelCommandAndUsesTheUnitName()
     {
-        var result = await RunOnStaAsync(() =>
+        var result = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null)
-            {
-                new App().InitializeComponent();
-            }
-
             var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
             try
             {
@@ -380,22 +363,4 @@ public sealed class EquipmentOutlineViewAutomationTests
         }
     }
 
-    private static Task<T> RunOnStaAsync<T>(Func<T> action)
-    {
-        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                completion.SetResult(action());
-            }
-            catch (Exception exception)
-            {
-                completion.SetException(exception);
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return completion.Task;
-    }
 }

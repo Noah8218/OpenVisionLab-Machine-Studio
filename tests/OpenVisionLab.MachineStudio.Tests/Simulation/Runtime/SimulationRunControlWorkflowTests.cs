@@ -86,6 +86,38 @@ public sealed class SimulationRunControlWorkflowTests
     }
 
     [Fact]
+    public async Task ManualPauseAndResumeDoesNotStartConfiguredSequencesOrExternalInspection()
+    {
+        using var engine = new RecordingSimulationEngine { BlockFirstCommand = false };
+        var state = CreateState() with
+        {
+            IsRunning = true,
+            HasAutomaticRun = true,
+            AutomaticRunConfigured = true,
+            HasEmbeddedSequence = true,
+            ActiveSequenceId = "automatic-sequence",
+            ActiveSequenceStatus = SequenceExecutionStatus.Ready,
+            AutomaticExternalInspectionEnabled = true
+        };
+        var preparationCount = 0;
+        using var workflow = new SimulationRunControlWorkflow(
+            engine, TimeSpan.FromMilliseconds(5), () => state, () => Task.FromResult(true),
+            _ => { }, value => state = state with { IsRunning = value },
+            _ => { }, () => { }, _ => { }, (_, _) => { }, () => { },
+            _ => { preparationCount++; return Task.FromResult(true); });
+
+        await workflow.PauseAsync();
+        Assert.False(state.IsRunning);
+        await workflow.RunAsync();
+        Assert.True(state.IsRunning);
+        Assert.Equal(SimulationControlOwner.Manual, state.ControlOwner);
+        Assert.Equal(0, preparationCount);
+        Assert.Collection(engine.Commands,
+            command => Assert.IsType<PauseCommand>(command),
+            command => Assert.IsType<PlayCommand>(command));
+    }
+
+    [Fact]
     public async Task FailedAutomaticInspectionPreparationKeepsDesignModeAndAllowsRetry()
     {
         using var engine = new RecordingSimulationEngine { BlockFirstCommand = false };
@@ -372,6 +404,36 @@ public sealed class SimulationRunControlWorkflowTests
         Assert.False(state.IsRunning);
         Assert.Empty(statuses);
         Assert.Empty(logs);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProjectInvalidationDropsQueuedCommandsAndAllowsExplicitRetry(bool reset)
+    {
+        using var engine = new RecordingSimulationEngine();
+        var state = CreateState();
+        using var workflow = CreateWorkflow(engine, () => state, value => state = state with
+        {
+            IsRunning = value
+        });
+
+        var run = workflow.RunAsync();
+        await engine.FirstCommandSeen.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var queued = reset ? workflow.ResetAsync() : workflow.StepAsync();
+        Assert.False(queued.IsCompleted);
+
+        workflow.InvalidatePendingExecution();
+        engine.ReleaseFirstCommand();
+        await Task.WhenAll(run, queued).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.IsType<PlayCommand>(Assert.Single(engine.Commands));
+        Assert.False(state.IsRunning);
+        Assert.False(workflow.IsBusy);
+
+        await (reset ? workflow.ResetAsync() : workflow.StepAsync());
+        Assert.Equal(2, engine.Commands.Count);
+        Assert.Equal(reset ? typeof(ResetCommand) : typeof(StepCommand), engine.Commands[1].GetType());
     }
 
     [Fact]

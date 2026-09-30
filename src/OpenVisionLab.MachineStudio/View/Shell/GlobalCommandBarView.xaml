@@ -9,9 +9,13 @@
         <Grid Margin="6,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
             <StackPanel Grid.Column="0"
                         VerticalAlignment="Center"
@@ -76,36 +80,69 @@
                 </StackPanel>
             </Border>
 
-            <StackPanel Grid.Column="2"
+            <WrapPanel Grid.Column="2" x:Name="CommonRunCommands"
+                        HorizontalAlignment="Right"
                         VerticalAlignment="Center"
                         Orientation="Horizontal">
                 <Button Command="{Binding RunCommand}"
                         AutomationProperties.Name="{loc:Loc Key=Shell.SimulationOn}"
-                        Style="{StaticResource SimulationOnCommandButtonStyle}"
                         ToolTip="{loc:Loc Key=Shell.SimulationOnTooltip}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource SimulationOnCommandButtonStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding RuntimeDebugger.IsPausedForContinuation}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Play24" Foreground="{DynamicResource State.Running}" />
                         <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.SimulationOn}" />
                     </StackPanel>
                 </Button>
-                <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Setter Property="Visibility" Value="Collapsed" />
+                <Button>
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource QuietCommandButtonStyle}">
+                            <Setter Property="Command" Value="{Binding PauseCommand}" />
+                            <Setter Property="AutomationProperties.Name" Value="{loc:Loc Key=Shell.Pause}" />
+                            <Setter Property="ToolTip" Value="{loc:Loc Key=Shell.PauseTooltip}" />
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsRunMode}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
+                                <DataTrigger Binding="{Binding RuntimeDebugger.IsPausedForContinuation}" Value="True">
+                                    <Setter Property="Command" Value="{Binding RunCommand}" />
+                                    <Setter Property="AutomationProperties.Name" Value="{loc:Loc Key=Shell.ContinueRun}" />
+                                    <Setter Property="ToolTip" Value="{loc:Loc Key=Shell.ContinueRunTooltip}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </StackPanel.Style>
-                <Button Command="{Binding PauseCommand}"
-                        AutomationProperties.Name="{loc:Loc Key=Shell.Pause}"
-                        Style="{StaticResource QuietCommandButtonStyle}"
-                        ToolTip="{loc:Loc Key=Shell.PauseTooltip}">
+                    </Button.Style>
                     <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Pause24" Foreground="{DynamicResource State.Paused}" />
-                        <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.Pause}" />
+                        <ui:SymbolIcon>
+                            <ui:SymbolIcon.Style>
+                                <Style TargetType="ui:SymbolIcon">
+                                    <Setter Property="Symbol" Value="Pause24" />
+                                    <Setter Property="Foreground" Value="{DynamicResource State.Paused}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding RuntimeDebugger.IsPausedForContinuation}" Value="True">
+                                            <Setter Property="Symbol" Value="Play24" />
+                                            <Setter Property="Foreground" Value="{DynamicResource State.Running}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:SymbolIcon.Style>
+                        </ui:SymbolIcon>
+                        <TextBlock>
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource CompactCommandLabelStyle}">
+                                    <Setter Property="Text" Value="{loc:Loc Key=Shell.Pause}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding RuntimeDebugger.IsPausedForContinuation}" Value="True">
+                                            <Setter Property="Text" Value="{loc:Loc Key=Shell.ContinueRun}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
                 </Button>
                 <Button x:Name="SemanticSequenceStepButton"
@@ -174,8 +211,19 @@
                         <TextBlock Style="{StaticResource CompactCommandLabelStyle}" Text="{loc:Loc Key=Shell.CycleStart}" />
                     </StackPanel>
                 </Button>
-                </StackPanel>
-            </StackPanel>
+            </WrapPanel>
+            <Grid Grid.Row="1" Grid.ColumnSpan="3" Margin="4,4,4,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Padding="8,3" VerticalAlignment="Center" Style="{StaticResource StatusPillStyle}">
+                    <TextBlock x:Name="CommonRunStateText" Text="{Binding StateText}" FontWeight="SemiBold" />
+                </Border>
+                <TextBlock x:Name="CommonRunTargetText" Grid.Column="1" Margin="10,0,0,0"
+                           VerticalAlignment="Center" Text="{Binding RunTargetText}" TextWrapping="Wrap"
+                           Foreground="{DynamicResource Text.Secondary}" />
+            </Grid>
         </Grid>
     </Border>
 </UserControl>

@@ -90,6 +90,67 @@ public sealed class LayoutSelectionEditingWorkflowTests
         Assert.False(workflow.MoveSelectionBy(items, 1, 1, isEditable: false));
     }
 
+    [Fact]
+    public void DragRejectsInvalidCoordinatesAndGridWithoutMutationThenRecoversOrCancels()
+    {
+        var items = CreateItems();
+        var workflow = new LayoutSelectionEditingWorkflow();
+        var initial = items.Select(item => (item.CurrentX, item.CurrentY)).ToArray();
+        var notifications = 0;
+        foreach (var item in items) item.DefinitionChanged += (_, _) => notifications++;
+
+        Assert.True(workflow.BeginSelectionDrag(items, isEditable: true));
+        foreach (var invalid in new[] { double.NaN, double.PositiveInfinity, double.NegativeInfinity })
+        {
+            Assert.False(workflow.UpdateSelectionDrag(invalid, 1, items[0], snapToGrid: false, gridSize: 10));
+            Assert.False(workflow.UpdateSelectionDrag(1, invalid, items[0], snapToGrid: false, gridSize: 10));
+            Assert.False(workflow.UpdateSelectionDrag(1, 1, items[0], snapToGrid: true, gridSize: invalid));
+        }
+        Assert.False(workflow.UpdateSelectionDrag(1, 1, items[0], snapToGrid: true, gridSize: 0));
+        Assert.False(workflow.UpdateSelectionDrag(1, 1, items[0], snapToGrid: true, gridSize: -10));
+        Assert.Equal(initial, items.Select(item => (item.CurrentX, item.CurrentY)).ToArray());
+        Assert.Equal(0, notifications);
+
+        Assert.True(workflow.UpdateSelectionDrag(12.5, -7.25, items[0], snapToGrid: false, gridSize: 0));
+        Assert.Equal(52.5, items[0].CurrentX);
+        Assert.Equal(12.75, items[0].CurrentY);
+        workflow.CancelSelectionDrag();
+        Assert.Equal(initial, items.Select(item => (item.CurrentX, item.CurrentY)).ToArray());
+        Assert.False(workflow.CompleteSelectionDrag());
+        Assert.True(workflow.BeginSelectionDrag(items, isEditable: true));
+        Assert.True(workflow.UpdateSelectionDrag(13, 17, items[0], snapToGrid: true, gridSize: 10));
+        Assert.True(workflow.CompleteSelectionDrag());
+        Assert.Equal(50, items[0].Component!.Transform.X);
+        Assert.Equal(40, items[0].Component!.Transform.Y);
+    }
+
+    [Fact]
+    public void DragAndMoveRejectGroupOverflowBeforeWritingAnyComponentThenRecover()
+    {
+        var items = CreateItems();
+        items[1].SetCurrentX(double.MaxValue, snapToGrid: false);
+        var workflow = new LayoutSelectionEditingWorkflow();
+        var initial = items.Select(item => (item.CurrentX, item.CurrentY)).ToArray();
+        var notifications = 0;
+        foreach (var item in items) item.DefinitionChanged += (_, _) => notifications++;
+
+        Assert.True(workflow.BeginSelectionDrag(items, isEditable: true));
+        Assert.False(workflow.UpdateSelectionDrag(double.MaxValue, 2, items[0], snapToGrid: false, gridSize: 10));
+        Assert.Equal(initial, items.Select(item => (item.CurrentX, item.CurrentY)).ToArray());
+        Assert.Equal(0, notifications);
+        workflow.CancelSelectionDrag();
+        Assert.False(workflow.MoveSelectionBy(items, double.MaxValue, 2, isEditable: true));
+        Assert.False(workflow.NudgeSelection(items, "Right", snapToGrid: true, gridSize: double.PositiveInfinity));
+        Assert.False(workflow.NudgeSelection(items, "Right", snapToGrid: true, gridSize: -10));
+        Assert.Equal(initial, items.Select(item => (item.CurrentX, item.CurrentY)).ToArray());
+        Assert.Equal(0, notifications);
+
+        Assert.True(workflow.MoveSelectionBy(items, 12.5, -7.25, isEditable: true));
+        Assert.Equal(52.5, items[0].Component!.Transform.X);
+        Assert.Equal(12.75, items[0].Component!.Transform.Y);
+        Assert.All(items, item => Assert.True(double.IsFinite(item.CurrentX) && double.IsFinite(item.CurrentY)));
+    }
+
     private static LayoutItem[] CreateItems() =>
         [
             CreateItem("stage-1", LayoutComponentKind.LinearStage, 40, 20, 84, 48, 10),

@@ -20,16 +20,72 @@ using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
 
-[Collection(EquipmentOutlineViewAutomationTestCollection.Name)]
+[Collection(StudioUiTestCollection.Name)]
 public sealed class SceneDocumentViewAutomationTests
 {
+    private readonly StudioUiTestHost _ui;
+
+    public SceneDocumentViewAutomationTests(StudioUiTestHost ui) => _ui = ui;
+
+    [Theory]
+    [InlineData(1674)]
+    [InlineData(1034)]
+    [InlineData(794)]
+    public async Task EquipmentToolbarSeparatesAuthoringAndViewControlsWithoutClipping(double width)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            using var layout = CreateLayout(out _);
+            using var navigation = new ShellNavigationViewModel(false, () => false, () => false,
+                () => Task.CompletedTask, () => { }, _ => { });
+            navigation.SelectedDocumentTabIndex = 0;
+            var view = new SceneDocumentView { DataContext = new SceneDataContext(layout, navigation, IsSceneEditable: true) };
+            var window = new Window
+            {
+                Width = width, Height = 760, WindowStyle = WindowStyle.None,
+                ShowInTaskbar = false, ShowActivated = false, Content = view
+            };
+            window.Show();
+            try
+            {
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                var authoring = Assert.IsType<WrapPanel>(view.FindName("EquipmentAuthoringToolbar"));
+                var viewing = Assert.IsType<WrapPanel>(view.FindName("EquipmentViewToolbar"));
+                var authoringBounds = authoring.TransformToAncestor(view).TransformBounds(new Rect(authoring.RenderSize));
+                var viewingBounds = viewing.TransformToAncestor(view).TransformBounds(new Rect(viewing.RenderSize));
+                Assert.True(authoring.IsVisible && viewing.IsVisible);
+                Assert.True(authoringBounds.Right <= viewingBounds.Left || authoringBounds.Bottom <= viewingBounds.Top);
+                var header = Assert.IsType<Grid>(viewing.Parent);
+                var headerBounds = header.TransformToAncestor(view).TransformBounds(new Rect(header.RenderSize));
+                Assert.Equal(headerBounds.Right, viewingBounds.Right, precision: 3);
+                var viewport = Assert.IsType<MachineSceneViewport>(view.FindName("SceneViewport"));
+                var viewportBounds = viewport.TransformToAncestor(view).TransformBounds(new Rect(viewport.RenderSize));
+                var identity = Assert.IsType<Border>(view.FindName("SceneIdentityCard"));
+                var identityBounds = identity.TransformToAncestor(view).TransformBounds(new Rect(identity.RenderSize));
+                var headerBorder = Assert.IsType<Border>(header.Parent);
+                Assert.Equal(headerBounds.Bottom + headerBorder.BorderThickness.Bottom, viewportBounds.Top, precision: 3);
+                Assert.True(viewportBounds.Contains(identityBounds));
+                Assert.False(identity.IsHitTestVisible);
+                var visibleBounds = new Rect(view.RenderSize);
+                foreach (var control in authoring.Children.Cast<FrameworkElement>().Concat(viewing.Children.Cast<FrameworkElement>()))
+                {
+                    Assert.True(control.IsVisible);
+                    Assert.True(visibleBounds.Contains(control.TransformToAncestor(view).TransformBounds(new Rect(control.RenderSize))));
+                }
+                return true;
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
     [Fact]
     public async Task SceneHitAndMultiSelectionKeepPrimaryComponentInProjectTree()
     {
-        var state = await RunOnStaAsync(() =>
+        var state = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             var first = new LayoutComponentDefinition
             {
                 Id = "frame-01", Name = "Machine Frame 01", Kind = LayoutComponentKind.MachineFrame,
@@ -115,10 +171,8 @@ public sealed class SceneDocumentViewAutomationTests
     [Fact]
     public async Task EquipmentViewSelectorsPreserveSelectionAndSessionPreferenceAcrossProjectReload()
     {
-        var state = await RunOnStaAsync(() =>
+        var state = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             using var layout = CreateLayout(out var project);
             using var navigation = new ShellNavigationViewModel(false, () => false, () => false,
                 () => Task.CompletedTask, () => { }, _ => { });
@@ -169,10 +223,7 @@ public sealed class SceneDocumentViewAutomationTests
                     $"source={obliqueBinding?.DataItem?.GetType().FullName}; dataContext={oblique.DataContext?.GetType().FullName}; " +
                     $"viewport={viewport.IsObliqueView}";
 
-                var planPeer = UIElementAutomationPeer.CreatePeerForElement(plan)
-                    ?? throw new InvalidOperationException("The plan-view radio button had no automation peer.");
-                var planInvoke = Assert.IsAssignableFrom<IInvokeProvider>(planPeer.GetPattern(PatternInterface.Invoke));
-                planInvoke.Invoke();
+                PressSpace(plan, window);
                 window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(() => { }));
                 PumpBindings();
                 var selectionPreservedOnPlan = ReferenceEquals(selectedItem, layout.SelectedItem)
@@ -198,10 +249,7 @@ public sealed class SceneDocumentViewAutomationTests
                 var selectedInPlan = layout.SelectedItem;
                 var editorInPlan = layout.SelectedComponentEditor;
 
-                var obliquePeer = UIElementAutomationPeer.CreatePeerForElement(oblique)
-                    ?? throw new InvalidOperationException("The oblique-view radio button had no automation peer.");
-                var obliqueInvoke = Assert.IsAssignableFrom<IInvokeProvider>(obliquePeer.GetPattern(PatternInterface.Invoke));
-                obliqueInvoke.Invoke();
+                PressSpace(oblique, window);
                 window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(() => { }));
                 PumpBindings();
                 var obliqueState = (oblique.IsChecked == true, plan.IsChecked == true, viewport.IsObliqueView);
@@ -260,10 +308,8 @@ public sealed class SceneDocumentViewAutomationTests
     [Fact]
     public async Task ProjectionRadioButtonsRespondToKeyboardSpaceAndPreserveSelection()
     {
-        var state = await RunOnStaAsync(() =>
+        var state = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             using var layout = CreateLayout(out _);
             using var navigation = new ShellNavigationViewModel(false, () => false, () => false,
                 () => Task.CompletedTask, () => { }, _ => { });
@@ -295,30 +341,13 @@ public sealed class SceneDocumentViewAutomationTests
                     ReferenceEquals(button.Command, layout.ShowTopViewCommand));
                 var viewport = Assert.Single(controls.OfType<MachineSceneViewport>());
 
-                void PressSpace(RadioButton button)
-                {
-                    Assert.Same(button, Keyboard.Focus(button));
-                    var source = PresentationSource.FromVisual(button)
-                        ?? throw new InvalidOperationException("The projection radio button had no presentation source.");
-                    button.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, Key.Space)
-                    {
-                        RoutedEvent = Keyboard.KeyDownEvent
-                    });
-                    button.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, Key.Space)
-                    {
-                        RoutedEvent = Keyboard.KeyUpEvent
-                    });
-                    window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
-                    PumpBindings();
-                }
-
-                PressSpace(plan);
+                PressSpace(plan, window);
                 var planMode = !layout.IsObliqueView && plan.IsChecked == true
                     && oblique.IsChecked == false && !viewport.IsObliqueView;
                 var selectionPreservedOnPlan = ReferenceEquals(selected, layout.SelectedItem)
                     && ReferenceEquals(selectedEditor, layout.SelectedComponentEditor);
 
-                PressSpace(oblique);
+                PressSpace(oblique, window);
                 var obliqueMode = layout.IsObliqueView && oblique.IsChecked == true
                     && plan.IsChecked == false && viewport.IsObliqueView;
                 var selectionPreservedOnOblique = ReferenceEquals(selected, layout.SelectedItem)
@@ -340,10 +369,8 @@ public sealed class SceneDocumentViewAutomationTests
     [Fact]
     public async Task PlanSelectionUpdatesInspectorAndAppliesBoundDraftToSelectedComponent()
     {
-        var state = await RunOnStaTaskAsync(async () =>
+        var state = await _ui.InvokeTaskAsync(async () =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             using var seedLayout = CreateLayout(out var initialProject);
             initialProject.Name = "P14 Inspector edit";
             initialProject.Devices.Add(new DeviceDefinition
@@ -480,68 +507,187 @@ public sealed class SceneDocumentViewAutomationTests
         Assert.True(state.ReopenedProjectIsClean);
     }
 
-    [Fact]
-    public async Task StationRemovalControlBindsGuardAndCommandForAnEmptyStation()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FocusedSceneArrowMovesUseExactLayoutUnitsAndPreserveEditingGuards(bool oblique)
     {
-        var state = await RunOnStaAsync(() =>
+        await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
-            var unit = new MachineUnitDefinition { Id = "unit-inspection", Name = "Inspection" };
-            var station = new MachineStationDefinition
+            using var seed = CreateLayout(out var project);
+            project.Layouts.Single().GridSize = 25;
+            project.Layouts.Single().SnapToGrid = true;
+            project.Devices.Add(new DeviceDefinition
             {
-                Id = "station-main",
-                Name = "Main station",
-                Units = [unit]
-            };
-            var project = new MachineProjectDocument { Name = "Station deletion UI", Stations = [station] };
+                Id = "camera-01", Name = "Camera", Kind = DeviceKind.Camera,
+                Camera = new VirtualCameraDefinition()
+            });
+            project.Layouts.Single().Components.Single().BehaviorBindingId = "camera-01";
             using var viewModel = new MainViewModel(project);
-            viewModel.OpenStationUnitEditorCommand.Execute(null);
+            viewModel.Navigation.SelectedDocumentTabIndex = 0;
+            if (oblique) viewModel.Layout.ShowObliqueViewCommand.Execute(null);
+            else viewModel.Layout.ShowTopViewCommand.Execute(null);
             var scene = new SceneDocumentView { DataContext = viewModel };
-            scene.Measure(new System.Windows.Size(900, 700));
-            scene.Arrange(new System.Windows.Rect(0, 0, 900, 700));
-            scene.UpdateLayout();
-            scene.Dispatcher.Invoke(DispatcherPriority.DataBind, new Action(scene.UpdateLayout));
-            var controls = Descendants(scene).OfType<Button>().ToArray();
-            var removeButton = Assert.Single(controls.Where(button =>
-                ReferenceEquals(button.Command, viewModel.RemoveSelectedStationCommand)));
-            var hint = Descendants(scene).OfType<TextBlock>().Single(textBlock =>
-                textBlock.GetBindingExpression(TextBlock.TextProperty)?.ParentBinding.Path.Path
-                == "StationUnitRemovalHintText");
-            var childState = (removeButton.IsEnabled, hint.Visibility,
-                System.Windows.Automation.AutomationProperties.GetName(removeButton));
+            var input = new TextBox { Text = "keep draft" };
+            var root = new DockPanel();
+            DockPanel.SetDock(input, Dock.Top);
+            root.Children.Add(input);
+            root.Children.Add(scene);
+            var window = new Window { Content = root, Width = 1280, Height = 760, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                viewModel.Layout.Select("camera-01");
+                PumpBindings();
+                var viewport = Assert.IsType<MachineSceneViewport>(scene.FindName("SceneViewport"));
+                var item = viewModel.Layout.SelectedItem!;
+                Assert.Same(viewport, Keyboard.Focus(viewport));
+                var source = PresentationSource.FromVisual(viewport)!;
+                var right = new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, Key.Right)
+                {
+                    RoutedEvent = Keyboard.KeyDownEvent
+                };
+                viewport.RaiseEvent(right);
+                PumpBindings();
+                Assert.True(right.Handled);
+                Assert.Equal(36, item.CurrentX); // Initial 35 + 1, despite the 25-unit grid.
+                Assert.Equal(24, item.CurrentY);
+                Assert.Equal(36, item.Component!.Transform.X);
+                Assert.Equal("36", viewModel.Layout.SelectedComponentEditor!.DraftXText);
+                Assert.False(viewModel.Layout.SelectedComponentEditor.HasPendingPlacementDraft);
+                Assert.True(viewModel.HasUnsavedChanges);
+                Assert.True(viewport.RequestKeyboardMove(Key.Up, ModifierKeys.Shift));
+                Assert.Equal(14, item.CurrentY);
+                Assert.True(viewport.RequestKeyboardMove(Key.Left, ModifierKeys.Shift));
+                Assert.Equal(26, item.CurrentX);
+                Assert.True(viewport.RequestKeyboardMove(Key.Down, ModifierKeys.None));
+                Assert.Equal(15, item.CurrentY);
+                Assert.False(viewport.RequestKeyboardMove(Key.Right, ModifierKeys.Control));
+                Assert.False(viewport.RequestKeyboardMove(Key.Down, ModifierKeys.Alt));
+                Assert.False(viewport.RequestKeyboardMove(Key.Space, ModifierKeys.None));
+                Assert.Equal((26d, 15d), (item.CurrentX, item.CurrentY));
+                for (var index = 0; index < 4; index++) viewModel.UndoLayoutEditCommand.Execute(null);
+                PumpBindings();
+                item = viewModel.Layout.SelectedItem!; // Undo restores the layout items by identity.
+                Assert.Equal((35d, 24d), (item.CurrentX, item.CurrentY));
+                Assert.Equal("35", viewModel.Layout.SelectedComponentEditor!.DraftXText);
 
-            viewModel.CancelStationUnitEditorCommand.Execute(null);
-            viewModel.EquipmentUnitRemovalPrompt = (_, _) => true;
-            viewModel.RemoveEquipmentUnitCommand.Execute(unit.Id);
-            viewModel.OpenStationUnitEditorCommand.Execute(null);
-            scene.Dispatcher.Invoke(DispatcherPriority.DataBind, new Action(scene.UpdateLayout));
-            var enabledButton = Descendants(scene).OfType<Button>().Single(button =>
-                ReferenceEquals(button.Command, viewModel.RemoveSelectedStationCommand));
-            viewModel.EquipmentStationRemovalPrompt = _ => true;
-            var commandCanExecute = enabledButton.Command?.CanExecute(null) == true;
-            var emptyEnabled = enabledButton.IsEnabled;
-            enabledButton.Command?.Execute(null);
-            scene.Dispatcher.Invoke(DispatcherPriority.DataBind, new Action(scene.UpdateLayout));
+                Assert.Same(input, Keyboard.Focus(input));
+                Assert.False(viewport.RequestKeyboardMove(Key.Right, ModifierKeys.None));
+                Assert.Equal("keep draft", input.Text);
+                Assert.Equal(35, item.CurrentX);
+                Assert.Same(viewport, Keyboard.Focus(viewport));
+                viewport.IsDesignMode = false;
+                Assert.False(viewport.RequestKeyboardMove(Key.Right, ModifierKeys.None));
+                Assert.Equal(35, item.CurrentX);
+                viewport.IsDesignMode = true;
+                viewModel.Layout.IsEditable = false;
+                viewport.RequestKeyboardMove(Key.Right, ModifierKeys.None);
+                Assert.Equal(35, item.CurrentX);
+                viewModel.Layout.IsEditable = true;
+                Assert.True(viewport.RequestKeyboardMove(Key.Right, ModifierKeys.None));
+                Assert.Equal(36, item.CurrentX);
+                var editor = viewModel.Layout.SelectedComponentEditor!;
+                editor.DraftXText = "77";
+                viewModel.PlacementDraftPrompt = () => PlacementDraftDecision.Cancel;
+                viewport.RequestKeyboardMove(Key.Right, ModifierKeys.None);
+                Assert.Equal(36, item.CurrentX);
+                Assert.Equal("77", editor.DraftXText);
+                editor.DiscardPlacementDraftCommand.Execute(null);
+                viewport.RequestKeyboardMove(Key.Right, ModifierKeys.None);
+                Assert.Equal(37, item.CurrentX);
+                Assert.Equal("37", editor.DraftXText);
+                return true;
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
 
-            return (ChildEnabled: childState.IsEnabled,
-                HintVisibility: childState.Visibility,
-                AutomationName: childState.Item3,
-                EmptyEnabled: emptyEnabled,
-                EmptyCanExecute: commandCanExecute,
-                EditorOpen: viewModel.IsStationUnitEditorOpen,
-                IsCreatingNewStation: viewModel.IsCreatingNewStation,
-                SelectedStationId: viewModel.SelectedStationId,
-                HasSelectedStationChildren: viewModel.HasSelectedStationChildren,
-                IsSceneEditable: viewModel.IsSceneEditable,
-                IsEquipmentWorkspace: viewModel.Navigation.IsEquipmentWorkspace,
-                RemainingStations: project.Stations.Count,
-                HasUnsavedChanges: viewModel.HasUnsavedChanges);
+    [Theory]
+    [InlineData(OpenVisionLanguage.Korean)]
+    [InlineData(OpenVisionLanguage.English)]
+    public async Task StationRemovalControlBindsGuardAndCommandForAnEmptyStation(OpenVisionLanguage language)
+    {
+        var state = await _ui.InvokeAsync(() =>
+        {
+            OpenVisionLanguageService.Load();
+            var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+            OpenVisionLanguageService.SetLanguage(language, save: false);
+            try
+            {
+                var unit = new MachineUnitDefinition { Id = "unit-inspection", Name = "Inspection" };
+                var station = new MachineStationDefinition
+                {
+                    Id = "station-main",
+                    Name = "Main station",
+                    Units = [unit]
+                };
+                var project = new MachineProjectDocument { Name = "Station deletion UI", Stations = [station] };
+                using var viewModel = new MainViewModel(project);
+                viewModel.OpenStationUnitEditorCommand.Execute(null);
+                var scene = new SceneDocumentView { DataContext = viewModel };
+                scene.Measure(new System.Windows.Size(900, 700));
+                scene.Arrange(new System.Windows.Rect(0, 0, 900, 700));
+                scene.UpdateLayout();
+                scene.Dispatcher.Invoke(DispatcherPriority.DataBind, new Action(scene.UpdateLayout));
+                var controls = Descendants(scene).OfType<Button>().ToArray();
+                var removeButton = Assert.Single(controls.Where(button =>
+                    ReferenceEquals(button.Command, viewModel.RemoveSelectedStationCommand)));
+                var hint = Descendants(scene).OfType<TextBlock>().Single(textBlock =>
+                    textBlock.GetBindingExpression(TextBlock.TextProperty)?.ParentBinding.Path.Path
+                    == "StationUnitRemovalHintText");
+                var childState = (removeButton.IsEnabled, hint.Visibility,
+                    System.Windows.Automation.AutomationProperties.GetName(removeButton));
+                var serialized = new ProjectDocumentStore().Serialize(project);
+                var stationPromptCount = 0;
+                viewModel.EquipmentStationRemovalPrompt = _ => { stationPromptCount++; return true; };
+                removeButton.Command.Execute(null);
+                Assert.Equal(serialized, new ProjectDocumentStore().Serialize(project));
+                Assert.Equal(0, stationPromptCount);
+                Assert.False(viewModel.HasUnsavedChanges);
+                Assert.Equal(string.Format(OpenVisionLanguageService.T("Equipment.StationRemovalRequiresEmpty"), 1), hint.Text);
+
+                viewModel.CancelStationUnitEditorCommand.Execute(null);
+                viewModel.EquipmentUnitRemovalPrompt = (_, _) => true;
+                viewModel.RemoveEquipmentUnitCommand.Execute(unit.Id);
+                viewModel.OpenStationUnitEditorCommand.Execute(null);
+                scene.Dispatcher.Invoke(DispatcherPriority.DataBind, new Action(scene.UpdateLayout));
+                var enabledButton = Descendants(scene).OfType<Button>().Single(button =>
+                    ReferenceEquals(button.Command, viewModel.RemoveSelectedStationCommand));
+                viewModel.EquipmentStationRemovalPrompt = _ => true;
+                var commandCanExecute = enabledButton.Command?.CanExecute(null) == true;
+                var emptyEnabled = enabledButton.IsEnabled;
+                enabledButton.Command?.Execute(null);
+                scene.Dispatcher.Invoke(DispatcherPriority.DataBind, new Action(scene.UpdateLayout));
+
+                return (ChildEnabled: childState.IsEnabled,
+                    HintVisibility: childState.Visibility,
+                    AutomationName: childState.Item3,
+                    ExpectedAutomationName: OpenVisionLanguageService.T("Equipment.StationRemove"),
+                    EmptyEnabled: emptyEnabled,
+                    EmptyCanExecute: commandCanExecute,
+                    EditorOpen: viewModel.IsStationUnitEditorOpen,
+                    IsCreatingNewStation: viewModel.IsCreatingNewStation,
+                    SelectedStationId: viewModel.SelectedStationId,
+                    HasSelectedStationChildren: viewModel.HasSelectedStationChildren,
+                    IsSceneEditable: viewModel.IsSceneEditable,
+                    IsEquipmentWorkspace: viewModel.Navigation.IsEquipmentWorkspace,
+                    RemainingStations: project.Stations.Count,
+                    HasUnsavedChanges: viewModel.HasUnsavedChanges);
+            }
+            finally
+            {
+                OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
+            }
         });
 
         Assert.False(state.ChildEnabled);
         Assert.Equal(Visibility.Visible, state.HintVisibility);
-        Assert.Equal(OpenVisionLanguageService.T("Equipment.StationRemove"), state.AutomationName);
+        Assert.Equal(state.ExpectedAutomationName, state.AutomationName);
         Assert.True(state.EmptyCanExecute,
             $"EditorOpen={state.EditorOpen}; NewStation={state.IsCreatingNewStation}; SelectedStation={state.SelectedStationId}; HasChildren={state.HasSelectedStationChildren}; Editable={state.IsSceneEditable}; Equipment={state.IsEquipmentWorkspace}");
         Assert.True(state.EmptyEnabled);
@@ -551,12 +697,61 @@ public sealed class SceneDocumentViewAutomationTests
     }
 
     [Fact]
+    public async Task StationUnitEditorKeepsKeyboardFocusInsideAndReturnsToLauncherOnCancel()
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var project = new MachineProjectDocument { Name = "Station focus" };
+            using var viewModel = new MainViewModel(project);
+            var view = new SceneDocumentView { DataContext = viewModel };
+            var window = new Window
+            {
+                Width = 900, Height = 700, WindowStyle = WindowStyle.None,
+                ShowInTaskbar = false, Content = view
+            };
+            window.Show();
+            try
+            {
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                var launcher = Descendants(view).OfType<Button>().First(button =>
+                    button.IsVisible && ReferenceEquals(button.Command, viewModel.OpenStationUnitEditorCommand));
+                var before = new ProjectDocumentStore().Serialize(project);
+                for (var attempt = 0; attempt < 2; attempt++)
+                {
+                    launcher.Focus();
+                    ((IInvokeProvider)new ButtonAutomationPeer(launcher).GetPattern(PatternInterface.Invoke)).Invoke();
+                    window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                    var name = Assert.IsType<TextBox>(view.FindName("StationUnitNameTextBox"));
+                    var overlay = Assert.IsType<Grid>(view.FindName("StationUnitEditorOverlay"));
+                    Assert.Same(name, Keyboard.FocusedElement);
+                    for (var tab = 0; tab < 12; tab++)
+                    {
+                        ((UIElement)Keyboard.FocusedElement).MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
+                        Assert.Contains((DependencyObject)Keyboard.FocusedElement, Descendants(overlay));
+                    }
+                    var escape = Assert.Single(overlay.InputBindings.OfType<KeyBinding>(), binding => binding.Key == Key.Escape);
+                    Assert.Same(viewModel.CancelStationUnitEditorCommand, escape.Command);
+                    escape.Command.Execute(null);
+                    window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                    Assert.False(viewModel.IsStationUnitEditorOpen);
+                    Assert.Same(launcher, Keyboard.FocusedElement);
+                }
+                Assert.Equal(before, new ProjectDocumentStore().Serialize(project));
+                Assert.False(viewModel.HasUnsavedChanges);
+                return true;
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
     public async Task UnitSceneKeepsItsComponentsAcrossPlanAndObliqueViewsAndOverviewRestoresAllUnits()
     {
-        var state = await RunOnStaAsync(() =>
+        var state = await _ui.InvokeAsync(() =>
         {
-            if (Application.Current is null) new App().InitializeComponent();
-
             using var layout = CreateUnitLayout();
             using var navigation = new ShellNavigationViewModel(false, () => false, () => false,
                 () => Task.CompletedTask, () => { }, _ => { });
@@ -676,6 +871,23 @@ public sealed class SceneDocumentViewAutomationTests
         return layout;
     }
 
+    private static void PressSpace(RadioButton button, Window window)
+    {
+        Assert.Same(button, Keyboard.Focus(button));
+        var source = PresentationSource.FromVisual(button)
+            ?? throw new InvalidOperationException("The projection radio button had no presentation source.");
+        button.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, Key.Space)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent
+        });
+        button.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, Key.Space)
+        {
+            RoutedEvent = Keyboard.KeyUpEvent
+        });
+        window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+        PumpBindings();
+    }
+
     private static void PumpBindings() =>
         Dispatcher.CurrentDispatcher.Invoke(DispatcherPriority.DataBind, new Action(() => { }));
 
@@ -687,39 +899,6 @@ public sealed class SceneDocumentViewAutomationTests
             yield return child;
             foreach (var descendant in Descendants(child)) yield return descendant;
         }
-    }
-
-    private static Task<T> RunOnStaAsync<T>(Func<T> action)
-    {
-        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            try { completion.SetResult(action()); }
-            catch (Exception exception) { completion.SetException(exception); }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return completion.Task;
-    }
-
-    private static Task<T> RunOnStaTaskAsync<T>(Func<Task<T>> action)
-    {
-        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            var dispatcher = Dispatcher.CurrentDispatcher;
-            dispatcher.BeginInvoke(new Action(async () =>
-            {
-                SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
-                try { completion.SetResult(await action()); }
-                catch (Exception exception) { completion.SetException(exception); }
-                finally { dispatcher.BeginInvokeShutdown(DispatcherPriority.ApplicationIdle); }
-            }));
-            Dispatcher.Run();
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return completion.Task;
     }
 
     private sealed record SceneDataContext(

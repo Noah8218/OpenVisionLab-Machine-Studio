@@ -1,4 +1,5 @@
 Key	Korean	English
+Camera.CaptureSetup	촬영 구성	Capture setup
 Simulation.ScheduledFaultRecovery	예약 장애 및 복구	Scheduled fault and recovery
 Simulation.ScheduledFaultRecoveryHint	선언한 Tick에 선택한 장애를 주입하고 해제한 뒤 같은 엔진에서 복구합니다.	Inject the selected fault at the authored tick, clear it, and recover in the same engine.
 Simulation.EnableScheduledFault	예약 장애 사용	Enable scheduled fault
@@ -567,6 +568,8 @@ Shell.SimulationOn	시뮬레이션 시작	Simulation ON
 Shell.SimulationOnTooltip	작성한 머신을 빌드하고 자동 시뮬레이션을 시작합니다. (F5)	Build the authored machine and start automatic simulation (F5)
 Shell.Pause	일시정지	Pause
 Shell.PauseTooltip	시뮬레이션을 일시정지합니다. (F6)	Pause simulation (F6)
+Shell.ContinueRun	계속 운전	Continue run
+Shell.ContinueRunTooltip	현재 실행을 초기화하지 않고 이어서 실행합니다. (F5)	Continue the current run without resetting it (F5)
 Shell.AbortSequence	시퀀스 중단	Abort sequence
 Shell.AbortSequenceTooltip	활성 시퀀스를 중단합니다. Reset 후 다시 시작할 수 있습니다.	Abort the active sequence. Reset is required before starting again.
 Shell.SequenceAbortedStatus	시퀀스가 중단되었습니다. Reset 후 다시 시작할 수 있습니다.	The sequence was aborted. Reset is required before starting again.
@@ -792,6 +795,11 @@ Shell.Sequence	시퀀스	Sequence
 Shell.Selected	선택됨	Selected
 Shell.None	없음	None
 Shell.Paused	일시정지	PAUSED
+Shell.Editing	편집 중	Editing
+Shell.RunTarget	전체 장비 실행: {0} / {1}	Whole-machine run: {0} / {1}
+Shell.ManualRunTarget	수동 시운전	Manual commissioning
+Shell.SingleRunTarget	반복 없음	No repeat
+Shell.RepeatRunTarget	자동 반복 / 대기 {0} ms	Automatic repeat / delay {0} ms
 Shell.Running	실행 중	RUNNING
 Shell.FixedStep	고정 5 ms	Fixed 5 ms
 Shell.Tick	틱	Tick
@@ -934,6 +942,7 @@ Camera.InspectionMetrics	검사 메트릭	Inspection metrics
 Camera.ExecutionEvidence	실행 증거	Execution evidence
 Camera.ResultSource	결과 출처	Result source
 Camera.WorkpieceAssociation	연결 작업물 ID	Associated workpiece ID
+Camera.WorkpieceInstanceId	실행 작업물 ID	Workpiece instance ID
 Camera.ResultSourceMock	모의 · 결정적 모델 (실제 검사 아님)	Mock · deterministic model (not a real inspection)
 Camera.ResultSourceExternalVerified	외부 결과 · 상관관계 확인됨 (외부 실행)	External result · correlation verified (external execution)
 Camera.ResultSourceExternalUnverified	외부 결과 · 미검증	External result · not verified
@@ -1427,6 +1436,7 @@ Equipment.StationRemovedStatus	스테이션 '{0}'을(를) 프로젝트에서 삭
 Equipment.UnitRemovalTitle	유닛 '{0}'을(를) 삭제할까요?	Delete unit '{0}'?
 Equipment.UnitRemovalMessage	'{0}' 스테이션의 '{1}' 유닛을 프로젝트에서 삭제합니다. 연결된 부품은 삭제하지 않습니다. 변경을 보존하려면 프로젝트를 저장하세요.	Remove unit '{1}' from station '{0}'. Assigned components are never deleted. Save the project separately to keep this change.
 Equipment.UnitRemovalBlocked	'{0}' 유닛에 연결된 부품 {1}개가 있어 삭제할 수 없습니다. 다른 유닛으로 재배정하거나 미배정으로 바꾸세요.	Cannot delete unit '{0}' while {1} assigned components remain. Reassign them or set them to Unassigned first.
+Equipment.UnitRemovalBlockedTitle	유닛을 삭제할 수 없습니다	Cannot delete unit
 Equipment.UnitRemovedStatus	유닛 '{0}'을(를) 프로젝트에서 삭제했습니다. 변경을 보존하려면 저장하세요.	Removed unit '{0}' from the project. Save to retain the change.
 Equipment.LargeOverviewTitle	전체 장비 / {0}개 유닛	Whole machine / {0} units
 Equipment.LargeOverviewHint	구성요소가 많은 장비입니다. 작업할 유닛을 선택하세요.	This machine has many components. Select a unit to work on.
@@ -1987,3 +1997,34 @@ RecipeEntry.Hint	내 가상 장비를 만들고 동작·검사를 연결해 시�
 Workspace.EndAndEdit	종료 후 편집	End run and edit
 Workspace.EndAndEditHint	실행을 끝내고 초기 상태로 되돌린 뒤 편집합니다. 일시정지 후 계속하기와 다릅니다.	End and reset the run before editing. This is different from pause and resume.
 Workspace.SaveSettings	설정 저장	Save settings
+
+Equipment.MaterialSlot	{0} 자리	{0} slot
+Equipment.SlotEmpty	비어 있음	Empty
+Equipment.UnitCurrentTarget	현재 대상: {0} / {1}	Current target: {0} / {1}
+Equipment.UnitNoCurrentTarget	현재 대상 동작 없음	No current target action
+Equipment.SlotInitialInstance	초기 배치 / 실행 ID 생성 전	Initial placement / no run ID yet
+Equipment.SlotInitialPlacement	초기 작업물 배치	Initial workpiece placement
+Equipment.SlotBeforeInspection	초기 작업물 / 검사 전	Initial workpiece / not inspected
+Equipment.SlotOccupied	작업물 대기	Workpiece present
+Equipment.SlotCapacity	정원 1개	Capacity 1
+Equipment.SlotCapacityExceeded	정원 초과 / 작업물 {0}개	Capacity exceeded / {0} workpieces
+Equipment.SlotInspectionProgress	검사 결과 {0}/{1}	Inspection results {0}/{1}
+Equipment.SlotInspectionPassed	검사 완료 / 통과	Inspection complete / PASS
+Equipment.SlotInspectionFailed	검사 완료 / 실패	Inspection complete / FAIL
+Equipment.SlotWaitingResult	검사 응답 대기	Waiting for inspection response
+Equipment.SlotInspecting	검사 중	Inspecting
+Equipment.SlotInspectionError	검사 오류	Inspection error
+Equipment.SlotMoving	이송 중	Moving
+Equipment.SettingsAction	설정	Settings
+Equipment.SequenceAction	동작 순서	Action sequence
+Equipment.FooterStatus	설정 r{0} / {1}개 선택	Settings r{0} / {1} selected
+Equipment.SimulationOnly	모의 동작 / 실제 장비 제어 없음	Simulation only / no physical device control
+Connections.RecipeConnectionsTab	레시피 연결	Recipe connections
+Integration.InputResultsTab	입력·검사 결과	Input and results
+Integration.ExternalSetup	외부 검사 설정	External inspection setup
+Camera.InputSingleImage	단일 이미지: {0} / {1}×{2} px / {3}	Single image: {0} / {1}×{2} px / {3}
+Camera.InputNotConfigured	이미지 입력 미설정 / 모의 판정 설정 사용	Image input not configured / uses placeholder decision settings
+Workspace.SessionRecords	현재 세션 기록	Current session records
+Workspace.SessionRecordsHint	최근 실행 이벤트를 확인하고 오류 위치로 이동하세요. 현재 세션의 최대 200개 이벤트를 표시하며 재시작 후 복원하지 않습니다.	Review recent runtime events and navigate to their error location. Shows up to 200 events from the current session; they are not restored after restart.
+Workspace.AxisValidationRecords	다축 검증 기록	Multi-axis validation records
+Workspace.NavigateRuntimeError	오류 위치로 이동	Go to error location

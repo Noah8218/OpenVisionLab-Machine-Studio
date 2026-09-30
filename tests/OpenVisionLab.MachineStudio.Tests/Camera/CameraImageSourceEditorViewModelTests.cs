@@ -40,22 +40,43 @@ public sealed class CameraImageSourceEditorViewModelTests
     }
 
     [Fact]
-    public void BrowseCancelLeavesDraftUnchanged()
+    public void BrowseCancelLeavesDraftUnchangedAndValidRetryAppliesOnlyOnExplicitCommand()
     {
         var root = CreateTestDirectory();
         var projectPath = Path.Combine(root, "machine.ovmachine");
         var project = CreateProject();
+        var selectedPath = (string?)null;
+        var applyCount = 0;
         var viewModel = new CameraImageSourceEditorViewModel(
-            (_, _) => { },
-            _ => null);
+            (_, _) => applyCount++,
+            _ => selectedPath);
 
         try
         {
             viewModel.Load(project, projectPath, "camera-1");
             viewModel.PathText = "existing.png";
+            viewModel.Width = 640;
+            viewModel.Height = 480;
+            viewModel.PixelFormatText = "Mono8";
             viewModel.BrowseCommand.Execute(null);
 
             Assert.Equal("existing.png", viewModel.PathText);
+            Assert.Equal(640, viewModel.Width);
+            Assert.Equal(480, viewModel.Height);
+            Assert.Equal("Mono8", viewModel.PixelFormatText);
+            Assert.Equal(0, applyCount);
+            Assert.Null(project.Devices[0].Camera!.SingleImageSource);
+            selectedPath = Path.Combine(root, "images", "retry.png");
+            Directory.CreateDirectory(Path.GetDirectoryName(selectedPath)!);
+            File.WriteAllBytes(selectedPath, [1, 2, 3]);
+            viewModel.BrowseCommand.Execute(null);
+            Assert.Equal("images/retry.png", viewModel.PathText);
+            Assert.Equal(0, applyCount);
+            Assert.Null(project.Devices[0].Camera!.SingleImageSource);
+            Assert.True(viewModel.ApplyCommand.CanExecute(null));
+            viewModel.ApplyCommand.Execute(null);
+            Assert.Equal(1, applyCount);
+            Assert.Equal("images/retry.png", project.Devices[0].Camera!.SingleImageSource?.SourceRelativePath);
         }
         finally
         {

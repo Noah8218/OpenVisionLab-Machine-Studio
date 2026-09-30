@@ -21,6 +21,7 @@ public sealed class SimulationRunControlAdmissionPolicyTests
 
         var automatic = CreateState() with
         {
+            ControlOwner = SimulationControlOwner.Definition,
             HasAutomaticRun = true,
             AutomaticRunConfigured = true,
             AutomaticRunActive = false,
@@ -36,6 +37,22 @@ public sealed class SimulationRunControlAdmissionPolicyTests
             AutomaticRunActive = true,
             AutomaticExternalInspectionWaiting = true
         }));
+    }
+
+    [Fact]
+    public void ManualResumeUsesManualEquipmentEvenWhenAnAutomaticSequenceIsNotReady()
+    {
+        var state = CreateState() with
+        {
+            HasAxes = false,
+            HasAuthoredLayout = false,
+            HasVirtualCamera = true,
+            HasAutomaticRun = true,
+            ActiveSequenceStatus = SequenceExecutionStatus.Faulted
+        };
+        Assert.True(SimulationRunControlAdmissionPolicy.CanRun(state));
+        Assert.False(SimulationRunControlAdmissionPolicy.CanRun(state with { IsRunning = true }));
+        Assert.False(SimulationRunControlAdmissionPolicy.CanRun(state with { HasVirtualCamera = false }));
     }
 
     [Fact]

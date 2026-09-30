@@ -2,34 +2,35 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
     <!-- OpenVisionLab Machine Studio semantic tokens. -->
-    <SolidColorBrush x:Key="Surface.Root" Color="#10151B" />
-    <SolidColorBrush x:Key="Surface.Panel" Color="#171D24" />
-    <SolidColorBrush x:Key="Surface.Raised" Color="#202833" />
-    <SolidColorBrush x:Key="Surface.Hover" Color="#293440" />
-    <SolidColorBrush x:Key="Surface.Selected" Color="#20394B" />
-    <SolidColorBrush x:Key="Border.Default" Color="#354251" />
-    <SolidColorBrush x:Key="Border.Subtle" Color="#283441" />
+    <SolidColorBrush x:Key="Surface.Root" Color="#09131B" />
+    <SolidColorBrush x:Key="Surface.Panel" Color="#122430" />
+    <SolidColorBrush x:Key="Surface.Raised" Color="#1B3340" />
+    <SolidColorBrush x:Key="Surface.Hover" Color="#254653" />
+    <SolidColorBrush x:Key="Surface.Selected" Color="#203F49" />
+    <SolidColorBrush x:Key="Border.Default" Color="#34505E" />
+    <SolidColorBrush x:Key="Border.Subtle" Color="#29434F" />
 
-    <SolidColorBrush x:Key="Text.Primary" Color="#F3F6F9" />
-    <SolidColorBrush x:Key="Text.Secondary" Color="#AAB5C0" />
+    <SolidColorBrush x:Key="Text.Primary" Color="#E5EEF3" />
+    <SolidColorBrush x:Key="Text.Secondary" Color="#A7BECB" />
     <SolidColorBrush x:Key="Text.Disabled" Color="#6F7B87" />
+    <SolidColorBrush x:Key="Text.OnAccent" Color="#08362C" />
 
-    <SolidColorBrush x:Key="Accent.Primary" Color="#27B8CE" />
-    <SolidColorBrush x:Key="Accent.Hover" Color="#5BD4E6" />
-    <SolidColorBrush x:Key="Accent.Soft" Color="#153A43" />
+    <SolidColorBrush x:Key="Accent.Primary" Color="#70D9C5" />
+    <SolidColorBrush x:Key="Accent.Hover" Color="#9FE8DC" />
+    <SolidColorBrush x:Key="Accent.Soft" Color="#173E3D" />
 
     <SolidColorBrush x:Key="State.Ready" Color="#7F8C99" />
     <SolidColorBrush x:Key="State.Running" Color="#2CCB78" />
     <SolidColorBrush x:Key="State.Paused" Color="#F0B429" />
-    <SolidColorBrush x:Key="State.Warning" Color="#F59E0B" />
-    <SolidColorBrush x:Key="State.Fault" Color="#FF5D5D" />
+    <SolidColorBrush x:Key="State.Warning" Color="#F4D38D" />
+    <SolidColorBrush x:Key="State.Fault" Color="#FFA7B0" />
     <SolidColorBrush x:Key="State.Forced" Color="#B579FF" />
     <SolidColorBrush x:Key="State.Vision" Color="#3BC9DB" />
-    <SolidColorBrush x:Key="State.Selected" Color="#4EC9DA" />
+    <SolidColorBrush x:Key="State.Selected" Color="#70D9C5" />
     <SolidColorBrush x:Key="State.RunningSurface" Color="#173B2D" />
     <SolidColorBrush x:Key="State.PausedSurface" Color="#3D3018" />
 
-    <SolidColorBrush x:Key="Scene.Background" Color="#0C1219" />
+    <SolidColorBrush x:Key="Scene.Background" Color="#0D202B" />
     <SolidColorBrush x:Key="Scene.Component.Axis" Color="#6DC5D6" />
     <SolidColorBrush x:Key="Scene.Component.Cylinder" Color="#70D9C5" />
     <SolidColorBrush x:Key="Scene.Component.Sensor" Color="#F0C76F" />
@@ -66,7 +67,7 @@
 
     <Style TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource Typography.FontFamily}" />
-        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+        <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}, FallbackValue={StaticResource Text.Primary}}" />
         <Setter Property="FontSize" Value="12" />
     </Style>
 
@@ -429,7 +430,18 @@
         </Setter>
     </Style>
 
+    <Style x:Key="CommandFocusVisualStyle" TargetType="Control">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Control">
+                    <Rectangle Margin="-3" RadiusX="4" RadiusY="4" Stroke="{DynamicResource Accent.Hover}" StrokeThickness="2" StrokeDashArray="2,2" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="GlobalCommandButtonStyle" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource CommandFocusVisualStyle}" />
         <Setter Property="Height" Value="{StaticResource Density.GlobalCommandButtonHeight}" />
         <Setter Property="MinWidth" Value="58" />
         <Setter Property="Margin" Value="3,0" />
@@ -480,7 +492,12 @@
     <Style x:Key="PrimaryCommandButtonStyle"
            TargetType="Button"
            BasedOn="{StaticResource GlobalCommandButtonStyle}">
-        <Setter Property="Background" Value="{DynamicResource Accent.Soft}" />
+        <Style.Resources>
+            <SolidColorBrush x:Key="Surface.Hover" Color="#9FE8DC" />
+            <SolidColorBrush x:Key="Accent.Soft" Color="#55BDA9" />
+        </Style.Resources>
+        <Setter Property="Foreground" Value="{DynamicResource Text.OnAccent}" />
+        <Setter Property="Background" Value="{DynamicResource Accent.Primary}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
     </Style>
 

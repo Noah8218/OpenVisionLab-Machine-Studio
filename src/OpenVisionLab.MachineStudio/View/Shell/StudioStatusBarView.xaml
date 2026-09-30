@@ -18,22 +18,51 @@
                     Command="{Binding Navigation.ToggleEvidenceDrawerCommand}"
                     Content="{loc:Loc Key=Shell.Evidence}"
                     AutomationProperties.Name="{loc:Loc Key=Diagnostics.Toggle}"
-                    ToolTip="{loc:Loc Key=Diagnostics.Hint}"
-                    Style="{StaticResource GlobalCommandButtonStyle}" />
+                    ToolTip="{loc:Loc Key=Diagnostics.Hint}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
             <TextBlock Grid.Column="1"
                        MaxWidth="280"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource Text.Secondary}"
-                       Text="{Binding ProjectStatusText}"
                        TextTrimming="CharacterEllipsis"
-                       ToolTip="{Binding ProjectStatusText}" />
+                       ToolTip="{Binding ProjectStatusText}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Text" Value="{Binding ProjectStatusText}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                                <Setter Property="Text" Value="{Binding EquipmentFooterStatusText}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
             <TextBlock Grid.Column="2"
                        Margin="16,0,12,0"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource Text.Secondary}"
                        Text="{Binding SelectionStatusText}"
                        TextTrimming="CharacterEllipsis"
-                       ToolTip="{Binding SelectionStatusText}" />
+                       ToolTip="{Binding SelectionStatusText}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
 
             <TextBlock Grid.Column="3"
                        Margin="10,0"
@@ -44,7 +73,20 @@
                        Margin="10,0"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource Text.Secondary}"
-                       Text="{Binding FixedStepStatusText}" />
+                       Text="{Binding FixedStepStatusText}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Grid.Column="4" Margin="10,0" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Equipment.SimulationOnly}"
+                       Visibility="{Binding Navigation.IsEquipmentWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </Grid>
     </Border>
 </UserControl>
