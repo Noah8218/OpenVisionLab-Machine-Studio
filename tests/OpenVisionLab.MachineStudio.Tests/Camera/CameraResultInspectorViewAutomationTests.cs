@@ -342,11 +342,14 @@ public sealed class CameraResultInspectorViewAutomationTests
     }
 
     [Theory]
-    [InlineData(1280, 760, true, false, OpenVisionLanguage.Korean)]
-    [InlineData(1920, 1040, false, false, OpenVisionLanguage.Korean)]
-    [InlineData(794, 1032, true, true, OpenVisionLanguage.English)]
-    [InlineData(794, 760, true, true, OpenVisionLanguage.English)]
-    public async Task CapturedImageBindingClearsStalePixelsAndRecoversAfterMalformedInput(double width, double height, bool compact, bool narrow, OpenVisionLanguage language)
+    [InlineData(1280, 760, true, false, OpenVisionLanguage.Korean, false)]
+    [InlineData(1920, 1040, false, false, OpenVisionLanguage.Korean, false)]
+    [InlineData(794, 1032, true, true, OpenVisionLanguage.English, false)]
+    [InlineData(794, 760, true, true, OpenVisionLanguage.English, false)]
+    [InlineData(1280, 450, true, false, OpenVisionLanguage.English, true)]
+    [InlineData(794, 510, true, true, OpenVisionLanguage.English, true)]
+    [InlineData(794, 450, true, true, OpenVisionLanguage.English, true)]
+    public async Task CapturedImageBindingClearsStalePixelsAndRecoversAfterMalformedInput(double width, double height, bool compact, bool narrow, OpenVisionLanguage language, bool longName)
     {
         await _ui.InvokeAsync(() =>
         {
@@ -362,7 +365,9 @@ public sealed class CameraResultInspectorViewAutomationTests
             {
                 OpenVisionLanguageService.SetLanguage(language, save: false);
                 var project = CameraCommissioningViewModelTests.CreateProject();
-                var frameReady = CreateCameraSnapshot("camera-1", "Camera 1", "acquisition-1", "inspection-1", PlaceholderInspectionDecision.Pass, "workpiece-1");
+                var cameraName = longName ? "상면 촬영부 · 장시간 검사 장비의 카메라 입력과 검사 결과 확인 Camera source and inspection result verification" : "Camera 1";
+                project.Devices.Single(device => device.Id == "camera-1").Name = cameraName;
+                var frameReady = CreateCameraSnapshot("camera-1", cameraName, "acquisition-1", "inspection-1", PlaceholderInspectionDecision.Pass, "workpiece-1");
                 var projection = CreateProjection(frameReady with { State = VirtualCameraState.Idle, CurrentAcquisitionId = null }) with { ProjectPath = projectPath };
                 using var camera = CameraCommissioningViewModelTests.CreateViewModel(project, projection, () => projection);
                 camera.LoadProject(project, projectPath);
@@ -392,6 +397,7 @@ public sealed class CameraResultInspectorViewAutomationTests
                     Assert.IsAssignableFrom<BitmapSource>(image.Source);
                     Assert.Equal(Visibility.Collapsed, error.Visibility);
                     var frameBounds = frame.TransformToAncestor(preview).TransformBounds(new Rect(frame.RenderSize));
+                    Assert.True(frame.ActualHeight > 0);
                     Assert.True(frameBounds.Top >= 0 && frameBounds.Bottom <= preview.ViewportHeight,
                         $"Whole input image must fit the initial preview: frame={frameBounds}, viewportHeight={preview.ViewportHeight}.");
 
@@ -409,7 +415,7 @@ public sealed class CameraResultInspectorViewAutomationTests
                     Assert.True(error.IsVisible);
                     Assert.Equal(OpenVisionLanguageService.T("Integration.MmiVirtualCameraImageError"), error.Text);
                     Assert.Same(view.FindResource("State.Fault"), error.Foreground);
-                    Assert.True(new Rect(view.RenderSize).Contains(error.TransformToAncestor(view).TransformBounds(new Rect(error.RenderSize))));
+                    Assert.True(new Rect(frame.RenderSize).Contains(error.TransformToAncestor(frame).TransformBounds(new Rect(error.RenderSize))));
 
                     projection = CreateProjection(frameReady) with { ProjectPath = projectPath };
                     camera.RefreshProjection();

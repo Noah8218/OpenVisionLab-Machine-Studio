@@ -33,6 +33,9 @@ public sealed class EquipmentFooterViewAutomationTests
     [Theory]
     [InlineData(1920, 1040)]
     [InlineData(1280, 760)]
+    [InlineData(1000, 760)]
+    [InlineData(1000, 720)]
+    [InlineData(1000, 1032)]
     public async Task InspectionActionsStayVisibleWhileInputAndResultFieldsScroll(double width, double height)
     {
         await _ui.InvokeAsync(() =>
@@ -63,7 +66,20 @@ public sealed class EquipmentFooterViewAutomationTests
                     Assert.True(new Rect(window.RenderSize).Contains(Bounds(button, window)));
                 }
                 var cameraSource = Assert.IsType<CameraImageSourceView>(mmi.FindName("MmiCameraSourceSettings"));
-                Assert.True(new Rect(window.RenderSize).Contains(Bounds(cameraSource.ApplyCameraSourceButton, window)));
+                if (model.Navigation.IsNarrowLayout)
+                {
+                    var setup = Assert.IsType<ScrollViewer>(mmi.FindName("MmiCaptureSetupScrollViewer"));
+                    cameraSource.ApplyCameraSourceButton.BringIntoView();
+                    Pump(window);
+                    Assert.True(new Rect(0, 0, setup.ViewportWidth, setup.ViewportHeight).Contains(Bounds(cameraSource.ApplyCameraSourceButton, setup)),
+                        $"Apply must fit setup viewport: button={Bounds(cameraSource.ApplyCameraSourceButton, setup)}, viewport={setup.ViewportWidth}x{setup.ViewportHeight}, offset={setup.VerticalOffset}, scrollable={setup.ScrollableHeight}.");
+                    Assert.True(new Rect(window.RenderSize).Contains(Bounds(cameraSource.ApplyCameraSourceButton, window)));
+                    cameraSource.BrowseCameraSourceButton.BringIntoView();
+                    Pump(window);
+                    Assert.True(new Rect(0, 0, setup.ViewportWidth, setup.ViewportHeight).Contains(Bounds(cameraSource.BrowseCameraSourceButton, setup)),
+                        $"Browse must fit setup viewport: button={Bounds(cameraSource.BrowseCameraSourceButton, setup)}, viewport={setup.ViewportWidth}x{setup.ViewportHeight}, offset={setup.VerticalOffset}.");
+                }
+                else Assert.True(new Rect(window.RenderSize).Contains(Bounds(cameraSource.ApplyCameraSourceButton, window)));
                 var before = Bounds(Assert.IsType<Button>(mmi.FindName("MmiApplyResultButton")), window);
                 preview.ScrollToBottom();
                 Pump(window);

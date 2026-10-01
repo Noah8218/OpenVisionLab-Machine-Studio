@@ -22,7 +22,22 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
+                <RowDefinition>
+                    <RowDefinition.Style>
+                        <Style TargetType="RowDefinition">
+                            <Setter Property="Height" Value="Auto" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsNarrowLayout}" Value="True">
+                                    <Setter Property="Height" Value="*" />
+                                    <Setter Property="MaxHeight" Value="220" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
+                                    <Setter Property="Height" Value="Auto" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </RowDefinition.Style>
+                </RowDefinition>
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
@@ -245,6 +260,20 @@
                 <TabControl x:Name="MmiInspectionSettingsTabs"
                             SelectedIndex="{Binding Navigation.SelectedInspectionSettingsTabIndex, Mode=TwoWay}">
                     <TabItem Header="{loc:Loc Key=Camera.CaptureSetup}">
+                        <ScrollViewer x:Name="MmiCaptureSetupScrollViewer" HorizontalScrollBarVisibility="Disabled">
+                            <ScrollViewer.Style>
+                                <Style TargetType="ScrollViewer">
+                                    <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Navigation.IsNarrowLayout}" Value="True">
+                                            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Navigation.IsInspectionSettingsExpanded}" Value="True">
+                                            <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ScrollViewer.Style>
                         <Grid Margin="12" DataContext="{Binding Camera}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -260,6 +289,7 @@
                                       AutomationProperties.Name="{loc:Loc Key=Camera.Recipe}" />
                             <inspector:CameraImageSourceView x:Name="MmiCameraSourceSettings" Grid.Row="3" />
                         </Grid>
+                        </ScrollViewer>
                     </TabItem>
                     <TabItem Header="{loc:Loc Key=Integration.ExternalSetup}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -505,12 +535,12 @@
                     </Style>
                 </Border.Style>
                 <ScrollViewer x:Name="MmiInspectionPreviewScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <Grid>
+                <StackPanel>
+                <Grid MaxHeight="{Binding ElementName=MmiInspectionPreviewScrollViewer, Path=ViewportHeight}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <TextBlock Style="{StaticResource SectionCaptionStyle}"
                                Text="{loc:Loc Key=Integration.MmiCaptureInspectionImages}" />
@@ -518,11 +548,18 @@
                                Margin="0,2,0,6"
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="{loc:Loc Key=Integration.MmiCaptureInspectionImagesHint}"
+                               Visibility="{Binding Navigation.IsNarrowLayout, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}"
                                TextWrapping="Wrap" />
-                    <StackPanel Grid.Row="2">
+                    <Grid Grid.Row="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <TextBlock FontWeight="SemiBold"
                                    Text="{loc:Loc Key=Integration.MmiVirtualCameraImage}" />
                         <Border x:Name="MmiVirtualCameraImageFrame"
+                                Grid.Row="1"
                                 Margin="0,4,0,0"
                                 Background="{DynamicResource Surface.Panel}"
                                 BorderBrush="{DynamicResource Border.Subtle}"
@@ -530,15 +567,12 @@
                                 CornerRadius="4">
                             <Border.Style>
                                 <Style TargetType="Border">
-                                    <Setter Property="MinHeight" Value="260" />
                                     <Setter Property="MaxHeight" Value="260" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
-                                            <Setter Property="MinHeight" Value="180" />
                                             <Setter Property="MaxHeight" Value="180" />
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding Navigation.IsNarrowLayout}" Value="True">
-                                            <Setter Property="MinHeight" Value="180" />
                                             <Setter Property="MaxHeight" Value="180" />
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -583,16 +617,17 @@
                                 </TextBlock>
                             </Grid>
                         </Border>
-                        <TextBlock Margin="0,4,0,0"
+                        <TextBlock Grid.Row="2" Margin="0,4,0,0"
                                    FontFamily="{StaticResource Typography.Telemetry}"
                                    FontSize="9.5"
                                    Foreground="{DynamicResource Text.Secondary}"
                                    Text="{Binding Camera.CurrentCameraSourceText}"
+                                   Visibility="{Binding Navigation.IsNarrowLayout, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}"
                                    TextTrimming="CharacterEllipsis"
                                    ToolTip="{Binding Camera.CurrentCameraSourceText}" />
-                    </StackPanel>
-                    <Grid Grid.Row="3"
-                          Margin="0,8,0,0">
+                    </Grid>
+                </Grid>
+                    <Grid Margin="0,8,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="8" />
@@ -677,7 +712,7 @@
                                        ToolTip="{Binding Integration.LatestThreeDResultStatusText}" />
                         </StackPanel>
                     </Grid>
-                </Grid>
+                </StackPanel>
                 </ScrollViewer>
             </Border>
 
