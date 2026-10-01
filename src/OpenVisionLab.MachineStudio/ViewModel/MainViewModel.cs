@@ -1453,6 +1453,9 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
             SequenceDebugPauseReason.SequenceCompleted => OpenVisionLanguageService.T("Equipment.State.Completed"),
             SequenceDebugPauseReason.SequenceFaulted => OpenVisionLanguageService.T("Equipment.State.Error"),
             SequenceDebugPauseReason.SequenceAborted => OpenVisionLanguageService.T("Equipment.State.Aborted"),
+            SequenceDebugPauseReason.None when PresentationSnapshot.AutomaticRun.IsActive
+                && PresentationSnapshot.Cameras.Any(camera => camera.State == VirtualCameraState.AwaitingExternalResult)
+                => OpenVisionLanguageService.T("Equipment.State.AwaitingExternalResult"),
             _ => OpenVisionLanguageService.T(RuntimeDebugger.IsPausedForContinuation ? "Shell.Paused" : "Equipment.State.Ready")
         };
     public string RunTargetText

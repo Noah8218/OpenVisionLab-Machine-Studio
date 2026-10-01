@@ -1,4 +1,8 @@
 using System.Collections.Concurrent;
+using System.Threading.Channels;
+using OpenVisionLab.Machine.Sequence.Runtime;
+using OpenVisionLab.Machine.Simulation.Axis;
+using OpenVisionLab.Machine.Simulation.Camera;
 using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Events;
@@ -330,6 +334,97 @@ public sealed class SimulationRuntimeLoopTests
         Assert.Equal([1L, 2L], canonicalEvents.Select(item => item.EventIndex));
         Assert.True(loop.CanonicalEventConsumption.IsCompleted);
         Assert.Empty(unhandledExceptions);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CoalescesExternalWaitMonitorRefreshesWithoutDroppingPauseResultOrReset(bool slowProjection)
+    {
+        var waiting = CreateExternalSnapshot(VirtualCameraState.AwaitingExternalResult, SequenceDebugPauseReason.None);
+        var paused = CreateExternalSnapshot(VirtualCameraState.AwaitingExternalResult, SequenceDebugPauseReason.User);
+        var result = CreateExternalSnapshot(VirtualCameraState.FrameReady, SequenceDebugPauseReason.User);
+        var reset = new SimulationSnapshot(TimeSpan.Zero, 0, SimulationRunMode.Paused, SimulationControlOwner.Definition, 1, [], 0, [], []);
+        var stream = Enumerable.Repeat(waiting, 100).Append(paused).Append(result).Append(reset).ToArray();
+        using var engine = new SnapshotBurstEngine(stream);
+        var published = new List<SimulationSnapshot>();
+        var applied = new List<SimulationSnapshot>();
+        var failures = new List<Exception>();
+        using var loop = new SimulationRuntimeLoop(engine, async action =>
+        {
+            action();
+            if (slowProjection) await Task.Delay(60);
+        }, published.Add, applied.Add, () => { }, _ => { }, _ => { }, _ => { }, failures.Add);
+
+        loop.Start(new SimulationRuntimeConfiguration([], [], []));
+        await loop.RuntimeTask.WaitAsync(TimeSpan.FromSeconds(15));
+        await loop.TerminationObservationTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(published, applied);
+        Assert.Same(waiting, applied[0]);
+        Assert.Equal(new[] { paused, result, reset }, applied.TakeLast(3));
+        Assert.True(applied.Count < stream.Length, "Repeated external-wait snapshots must not each dispatch a full UI projection.");
+        Assert.Empty(failures);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CoalescesRealTimeSceneAndMonitorUpdatesWithoutDroppingUserPause(bool slowProjection)
+    {
+        var running = new SimulationSnapshot(TimeSpan.FromMilliseconds(60), 12, SimulationRunMode.RealTime, SimulationControlOwner.EmbeddedSequence, 1, [], 0, [], [], [], AutomaticRunSnapshot.NotConfigured, [], projectId: "resume", runtimeGeneration: 1);
+        var paused = new SimulationSnapshot(TimeSpan.FromMilliseconds(65), 13, SimulationRunMode.Paused, SimulationControlOwner.EmbeddedSequence, 1, [], 0, [], [], [], AutomaticRunSnapshot.NotConfigured, [], sequenceDebug: new SequenceDebugSnapshot(false, null, SequenceDebugPauseReason.User, null, []), projectId: "resume", runtimeGeneration: 1);
+        var stream = Enumerable.Repeat(running, 100).Append(paused).ToArray();
+        using var engine = new SnapshotBurstEngine(stream);
+        var published = new List<SimulationSnapshot>();
+        var applied = new List<SimulationSnapshot>();
+        var failures = new List<Exception>();
+        using var loop = new SimulationRuntimeLoop(engine, async action =>
+        {
+            action();
+            if (slowProjection) await Task.Delay(60);
+        }, published.Add, applied.Add, () => { }, _ => { }, _ => { }, _ => { }, failures.Add);
+
+        loop.Start(new SimulationRuntimeConfiguration([], [], []));
+        await loop.RuntimeTask.WaitAsync(TimeSpan.FromSeconds(15));
+        await loop.TerminationObservationTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Same(running, applied[0]);
+        Assert.Same(paused, applied[^1]);
+        Assert.Equal(published, applied);
+        Assert.True(applied.Count < stream.Length, "Real-time refreshes must leave dispatcher time after a slow projection.");
+        Assert.Empty(failures);
+    }
+
+    private static SimulationSnapshot CreateExternalSnapshot(VirtualCameraState state, SequenceDebugPauseReason reason) => new(
+        TimeSpan.FromMilliseconds(60), 12, SimulationRunMode.Paused, SimulationControlOwner.EmbeddedSequence, 1, [], 0, [], [],
+        [new VirtualCameraSnapshot("camera", "Camera", state, 1, "acquisition", "recipe", 0, 0, null),
+            new VirtualCameraSnapshot("second-camera", "Second camera", VirtualCameraState.AwaitingExternalResult, 1, "second-acquisition", "recipe", 0, 0, null)],
+        new AutomaticRunSnapshot(true, true, false, 0, 0), [],
+        sequenceDebug: new SequenceDebugSnapshot(false, null, reason, null, []), projectId: "external-wait", runtimeGeneration: 1);
+
+    private sealed class SnapshotBurstEngine : ISimulationEngine
+    {
+        private readonly Channel<SimulationSnapshot> _snapshots = Channel.CreateUnbounded<SimulationSnapshot>();
+        private readonly Channel<SimulationEvent> _events = Channel.CreateUnbounded<SimulationEvent>();
+
+        internal SnapshotBurstEngine(IReadOnlyList<SimulationSnapshot> snapshots)
+        {
+            CurrentSnapshot = snapshots[^1];
+            foreach (var snapshot in snapshots) _snapshots.Writer.TryWrite(snapshot);
+            _snapshots.Writer.TryComplete();
+            _events.Writer.TryComplete();
+        }
+
+        public SimulationSnapshot CurrentSnapshot { get; }
+        public ChannelReader<SimulationSnapshot> SnapshotReader => _snapshots.Reader;
+        public ChannelReader<SimulationEvent> EventReader => _events.Reader;
+        public Task<SimulationEngineTerminationResult> Termination => Task.FromResult(new SimulationEngineTerminationResult(SimulationEngineTerminationOutcome.Normal, 0, TimeSpan.Zero));
+        public Task StartAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<SimulationCommandResult> EnqueueCommandAsync(SimulationCommand command, CancellationToken cancellationToken = default) => Task.FromResult(new SimulationCommandResult(command.CommandId, true, 0, TimeSpan.Zero, SimulationCommandErrorCode.None, null));
+        public void AddAxis(ServoAxisComponent axis) => throw new NotSupportedException();
+        public void Dispose() { }
     }
 
     private static async Task WaitForAsync(Func<bool> condition)

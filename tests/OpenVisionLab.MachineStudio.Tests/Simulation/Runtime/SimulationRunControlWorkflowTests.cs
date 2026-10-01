@@ -118,6 +118,63 @@ public sealed class SimulationRunControlWorkflowTests
     }
 
     [Fact]
+    public async Task AutomaticResultWaitAcceptsExplicitPauseWithoutAdvancingTheSequence()
+    {
+        using var engine = new RecordingSimulationEngine { BlockFirstCommand = false };
+        var state = CreateState() with
+        {
+            HasAutomaticRun = true,
+            AutomaticRunConfigured = true,
+            AutomaticRunActive = true,
+            HasEmbeddedSequence = true,
+            ControlOwner = SimulationControlOwner.EmbeddedSequence,
+            ActiveSequenceStatus = SequenceExecutionStatus.Running,
+            AutomaticExternalInspectionEnabled = true,
+            AutomaticExternalInspectionWaiting = true
+        };
+        using var workflow = CreateWorkflow(engine, () => state, value => state = state with { IsRunning = value });
+
+        Assert.True(workflow.CanPause());
+        await workflow.PauseAsync();
+        Assert.IsType<PauseCommand>(Assert.Single(engine.Commands));
+        Assert.False(state.IsRunning);
+        Assert.False(workflow.CanRun());
+        Assert.False(workflow.CanStep());
+    }
+
+    [Fact]
+    public async Task ResumesActiveExternalRunAfterResultWithoutRearmingInspection()
+    {
+        using var engine = new RecordingSimulationEngine { BlockFirstCommand = false };
+        var state = CreateState() with
+        {
+            HasAutomaticRun = true,
+            AutomaticRunConfigured = true,
+            AutomaticRunActive = true,
+            HasEmbeddedSequence = true,
+            ControlOwner = SimulationControlOwner.EmbeddedSequence,
+            ActiveSequenceId = "automatic-sequence",
+            ActiveSequenceStatus = SequenceExecutionStatus.Running,
+            AutomaticExternalInspectionEnabled = true
+        };
+        var preparationCount = 0;
+        using var workflow = new SimulationRunControlWorkflow(
+            engine, TimeSpan.FromMilliseconds(5), () => state, () => Task.FromResult(true),
+            _ => { }, value => state = state with { IsRunning = value },
+            _ => { }, () => { }, _ => { }, (_, _) => { }, () => { },
+            _ => { preparationCount++; return Task.FromResult(false); });
+
+        Assert.True(workflow.CanRun());
+        await workflow.RunAsync();
+
+        Assert.Equal(0, preparationCount);
+        Assert.IsType<PlayCommand>(Assert.Single(engine.Commands));
+        Assert.True(state.IsRunning);
+        Assert.True(state.AutomaticRunActive);
+        Assert.Equal(SimulationControlOwner.EmbeddedSequence, state.ControlOwner);
+    }
+
+    [Fact]
     public async Task FailedAutomaticInspectionPreparationKeepsDesignModeAndAllowsRetry()
     {
         using var engine = new RecordingSimulationEngine { BlockFirstCommand = false };

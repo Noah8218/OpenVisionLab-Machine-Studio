@@ -133,15 +133,15 @@ internal static class SmokeMmiOperatorLayoutVerifier
                 && actionBounds is { } bounds && new Rect(mmi.RenderSize).Contains(bounds));
         }
         var cameraImageFrame = Find<Border>(mmi, "MmiVirtualCameraImageFrame");
-        var expectedCameraImageFrameHeight = viewModel.Navigation.IsNarrowLayout
-            ? 240
-            : viewModel.Navigation.IsCompactLayout
-                ? 180
-                : 260;
+        var expectedCameraImageFrameMaximumHeight = viewModel.Navigation.IsNarrowLayout || viewModel.Navigation.IsCompactLayout ? 180 : 260;
         Check(
             "camera-input-preview-matches-r19-density",
-            cameraImageFrame is { IsVisible: true }
-            && Math.Abs(cameraImageFrame.ActualHeight - expectedCameraImageFrameHeight) <= 1.0);
+            cameraImageFrame is { IsVisible: true, ActualWidth: > 0, ActualHeight: > 0 }
+            && Math.Abs(cameraImageFrame.MaxHeight - expectedCameraImageFrameMaximumHeight) <= 1.0
+            && cameraImageFrame.ActualHeight <= expectedCameraImageFrameMaximumHeight + 1.0
+            && mmiScroll is not null
+            && new Rect(0, 0, mmiScroll.ViewportWidth, mmiScroll.ViewportHeight).Contains(
+                cameraImageFrame.TransformToAncestor(mmiScroll).TransformBounds(new Rect(cameraImageFrame.RenderSize))));
         var inspectionLayout = Find<Grid>(mmi, "MmiInspectionLayoutGrid");
         var previewPanel = Find<Border>(mmi, "MmiInspectionPreviewPanel");
         var setupPanel = Find<Grid>(mmi, "MmiInspectionSetupPanel");

@@ -176,7 +176,7 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
 
         if (state.HasAutomaticRun)
         {
-            if (state.AutomaticExternalInspectionEnabled)
+            if (state.AutomaticExternalInspectionEnabled && !state.AutomaticRunActive)
             {
                 if (_prepareAutomaticExternalInspection is null
                     || !await _prepareAutomaticExternalInspection(cancellationToken))

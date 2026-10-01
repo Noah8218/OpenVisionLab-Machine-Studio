@@ -2,6 +2,7 @@ using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Core.Sequences;
 using OpenVisionLab.Machine.Sequence.Runtime;
+using OpenVisionLab.Machine.Simulation.Camera;
 using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Events;
@@ -70,6 +71,35 @@ public sealed class RuntimeDebuggerViewModelTests
         Assert.True(viewModel.SemanticStepCommand.CanExecute(null));
         viewModel.SetEnabled(false, invalidateCommands: true);
         Assert.False(viewModel.SemanticStepCommand.CanExecute(null));
+    }
+
+    [Theory]
+    [InlineData(SequenceDebugPauseReason.None)]
+    [InlineData(SequenceDebugPauseReason.User)]
+    public async Task SemanticStepRejectsAutomaticExternalWaitAndRecoversAfterResult(SequenceDebugPauseReason reason)
+    {
+        var commands = new List<SimulationCommand>();
+        using var viewModel = new RuntimeDebuggerViewModel(command =>
+        {
+            commands.Add(command);
+            return Task.FromResult(Accepted(command));
+        });
+        viewModel.LoadProject(CreateProject(), resetSession: true);
+        viewModel.SetEnabled(true, invalidateCommands: true);
+        var camera = new VirtualCameraSnapshot("camera", "Camera", VirtualCameraState.AwaitingExternalResult, 1, "acquisition", "recipe", 0, 0, null);
+        var automatic = new AutomaticRunSnapshot(true, true, false, 0, 0);
+        var debug = new SequenceDebugSnapshot(false, null, reason, null, []);
+        viewModel.ApplySnapshot(CreateSnapshot(debug, cameras: [camera], automaticRun: automatic));
+
+        Assert.False(viewModel.SemanticStepCommand.CanExecute(null));
+        viewModel.SemanticStepCommand.Execute(null);
+        Assert.Empty(commands);
+
+        viewModel.ApplySnapshot(CreateSnapshot(debug, cameras: [camera with { State = VirtualCameraState.FrameReady }], automaticRun: automatic));
+        Assert.True(viewModel.SemanticStepCommand.CanExecute(null));
+        viewModel.SemanticStepCommand.Execute(null);
+        await WaitUntilAsync(() => !viewModel.IsOperationPending);
+        Assert.Equal("cycle", Assert.IsType<StepSequenceCommand>(Assert.Single(commands)).SequenceId);
     }
 
     [Fact]
@@ -900,7 +930,9 @@ public sealed class RuntimeDebuggerViewModelTests
         IEnumerable<SimulationFaultSnapshot>? faults = null,
         SequenceExecutionSnapshot? sequence = null,
         string axisName = "Axis X",
-        SimulationRunMode runMode = SimulationRunMode.Paused) => new(
+        SimulationRunMode runMode = SimulationRunMode.Paused,
+        IEnumerable<VirtualCameraSnapshot>? cameras = null,
+        AutomaticRunSnapshot? automaticRun = null) => new(
         TimeSpan.FromMilliseconds(25),
         5,
         runMode,
@@ -919,8 +951,8 @@ public sealed class RuntimeDebuggerViewModelTests
             5,
             null,
             TimeSpan.FromSeconds(10))],
-        [],
-        AutomaticRunSnapshot.NotConfigured,
+        cameras ?? [],
+        automaticRun ?? AutomaticRunSnapshot.NotConfigured,
         [],
         faults,
         sequenceDebug: debug);

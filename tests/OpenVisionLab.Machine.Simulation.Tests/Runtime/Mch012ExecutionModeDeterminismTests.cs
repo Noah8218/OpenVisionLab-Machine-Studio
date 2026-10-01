@@ -34,12 +34,14 @@ public sealed class Mch012ExecutionModeDeterminismTests
         Assert.Equal(steppedAxis.FollowingError, fastForwardedAxis.FollowingError, precision: 12);
     }
 
-    [Fact]
-    public async Task RealTimeAndPausedProduceTheSameSemanticSnapshotAtTheObservedTickBoundary()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5)]
+    public async Task RealTimeAndPausedProduceTheSameSemanticSnapshotAtTheObservedTickBoundary(int minimumSetupTick)
     {
         const int targetTick = 5;
-        var realtime = await RunRealTimeManualMoveAsync(targetTick);
-        var stepped = await RunPausedManualMoveAsync(realtime.TickIndex);
+        var (realtime, motionStartTick) = await RunRealTimeManualMoveAsync(targetTick, minimumSetupTick);
+        var stepped = await RunPausedManualMoveAsync(realtime.TickIndex, motionStartTick);
 
         Assert.Equal(stepped.TickIndex, realtime.TickIndex);
         Assert.Equal(stepped.SimulationTime, realtime.SimulationTime);
@@ -134,7 +136,7 @@ public sealed class Mch012ExecutionModeDeterminismTests
         return snapshot;
     }
 
-    private static async Task<SimulationSnapshot> RunPausedManualMoveAsync(long tickBudget)
+    private static async Task<SimulationSnapshot> RunPausedManualMoveAsync(long tickBudget, long motionStartTick)
     {
         using var engine = new FixedStepSimulationEngine(
             new SimulationSettings
@@ -148,8 +150,12 @@ public sealed class Mch012ExecutionModeDeterminismTests
 
         Assert.True((await engine.EnqueueCommandAsync(new StartManualControlCommand())).IsAccepted);
         Assert.True((await engine.EnqueueCommandAsync(new PauseCommand())).IsAccepted);
+        for (var index = 0; index < motionStartTick; index++)
+        {
+            Assert.True((await engine.EnqueueCommandAsync(new StepCommand())).IsAccepted);
+        }
         Assert.True((await engine.EnqueueCommandAsync(new MoveAbsoluteCommand("x", 100))).IsAccepted);
-        for (var index = 0; index < tickBudget; index++)
+        for (var index = motionStartTick; index < tickBudget; index++)
         {
             Assert.True((await engine.EnqueueCommandAsync(new StepCommand())).IsAccepted);
         }
@@ -159,7 +165,7 @@ public sealed class Mch012ExecutionModeDeterminismTests
         return snapshot;
     }
 
-    private static async Task<SimulationSnapshot> RunRealTimeManualMoveAsync(int targetTick)
+    private static async Task<(SimulationSnapshot Snapshot, long MotionStartTick)> RunRealTimeManualMoveAsync(int targetTick, int minimumSetupTick)
     {
         using var engine = new FixedStepSimulationEngine(
             new SimulationSettings
@@ -172,7 +178,9 @@ public sealed class Mch012ExecutionModeDeterminismTests
         await engine.StartAsync();
 
         Assert.True((await engine.EnqueueCommandAsync(new StartManualControlCommand())).IsAccepted);
+        if (minimumSetupTick > 0) await WaitUntilAsync(() => engine.CurrentSnapshot.TickIndex >= minimumSetupTick);
         Assert.True((await engine.EnqueueCommandAsync(new PauseCommand())).IsAccepted);
+        var motionStartTick = engine.CurrentSnapshot.TickIndex;
         Assert.True((await engine.EnqueueCommandAsync(new MoveAbsoluteCommand("x", 100))).IsAccepted);
         Assert.True((await engine.EnqueueCommandAsync(new PlayCommand())).IsAccepted);
 
@@ -182,7 +190,7 @@ public sealed class Mch012ExecutionModeDeterminismTests
         {
             while (engine.SnapshotReader.TryRead(out var candidate))
             {
-                if (candidate.TickIndex >= targetTick)
+                if (candidate.TickIndex >= motionStartTick + targetTick)
                 {
                     observed = candidate;
                     break;
@@ -199,7 +207,7 @@ public sealed class Mch012ExecutionModeDeterminismTests
         Assert.True((await engine.EnqueueCommandAsync(new PauseCommand())).IsAccepted);
         var snapshot = engine.CurrentSnapshot;
         await engine.StopAsync();
-        return snapshot;
+        return (snapshot, motionStartTick);
     }
 
     private static async Task<SimulationSnapshot> RunSequenceAsync(

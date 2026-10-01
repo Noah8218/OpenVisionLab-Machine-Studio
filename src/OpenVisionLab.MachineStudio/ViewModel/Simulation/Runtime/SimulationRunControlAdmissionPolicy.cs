@@ -85,7 +85,7 @@ internal static class SimulationRunControlAdmissionPolicy
         !state.IsApplyingProject
             && !state.IsValidationBusy
             && state.IsRunMode
-            && state.IsRunning;
+            && (state.IsRunning || state.AutomaticExternalInspectionWaiting);
 
     internal static bool CanAbortSequence(SimulationRunControlState state) =>
         state.IsRunMode

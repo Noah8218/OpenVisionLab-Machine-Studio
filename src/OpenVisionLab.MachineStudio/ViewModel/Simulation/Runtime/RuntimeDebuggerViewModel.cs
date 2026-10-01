@@ -6,6 +6,7 @@ using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Sequence.Runtime;
 using OpenVisionLab.Machine.Simulation.Axis;
+using OpenVisionLab.Machine.Simulation.Camera;
 using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Events;
@@ -543,6 +544,7 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
         && IsEnabled
         && !_isOperationPending
         && _latestSnapshot?.RunMode == SimulationRunMode.Paused
+        && !(_latestSnapshot.AutomaticRun.IsActive && _latestSnapshot.Cameras.Any(camera => camera.State == VirtualCameraState.AwaitingExternalResult))
         && ActiveSequence?.Status == SequenceExecutionStatus.Running;
 
     private async Task StepSequenceAsync()

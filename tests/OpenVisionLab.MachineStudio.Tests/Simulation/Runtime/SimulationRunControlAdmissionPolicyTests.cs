@@ -63,6 +63,13 @@ public sealed class SimulationRunControlAdmissionPolicyTests
         Assert.False(SimulationRunControlAdmissionPolicy.CanPause(running with { IsRunMode = false }));
         Assert.False(SimulationRunControlAdmissionPolicy.CanPause(running with { IsValidationBusy = true }));
 
+        var waiting = running with { IsRunning = false, AutomaticExternalInspectionWaiting = true };
+        Assert.True(SimulationRunControlAdmissionPolicy.CanPause(waiting));
+        Assert.False(SimulationRunControlAdmissionPolicy.CanPause(waiting with { IsRunMode = false }));
+        Assert.False(SimulationRunControlAdmissionPolicy.CanPause(waiting with { IsApplyingProject = true }));
+        Assert.False(SimulationRunControlAdmissionPolicy.CanPause(waiting with { IsValidationBusy = true }));
+        Assert.False(SimulationRunControlAdmissionPolicy.CanPause(CreateState()));
+
         Assert.True(SimulationRunControlAdmissionPolicy.CanReset(CreateState()));
         Assert.False(SimulationRunControlAdmissionPolicy.CanReset(CreateState() with { RuntimeDefinitionDirty = true }));
     }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using OpenVisionLab.Machine.Simulation.Camera;
 using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Events;
@@ -186,26 +187,44 @@ internal sealed class SimulationRuntimeLoop : IDisposable
     private async Task ConsumeSnapshotsAsync()
     {
         var monitorStopwatch = Stopwatch.StartNew();
+        SimulationSnapshot? lastMonitorSnapshot = null;
         await foreach (var snapshot in _engine.SnapshotReader.ReadAllAsync(_cancellation.Token))
         {
+            // Snapshot projections must leave dispatcher time for input and rendering.
+            var externalWait = snapshot.RunMode == SimulationRunMode.Paused
+                && snapshot.AutomaticRun.IsActive
+                && snapshot.Cameras.Any(camera => camera.State == VirtualCameraState.AwaitingExternalResult);
+            var repeatedExternalWait = externalWait
+                && lastMonitorSnapshot?.RunMode == SimulationRunMode.Paused
+                && lastMonitorSnapshot.RuntimeGeneration == snapshot.RuntimeGeneration
+                && lastMonitorSnapshot.ProjectId == snapshot.ProjectId
+                && lastMonitorSnapshot.TickIndex == snapshot.TickIndex
+                && lastMonitorSnapshot.SignalRevision == snapshot.SignalRevision
+                && lastMonitorSnapshot.SequenceDebug.PauseReason == snapshot.SequenceDebug.PauseReason
+                && lastMonitorSnapshot.AutomaticRun == snapshot.AutomaticRun
+                && lastMonitorSnapshot.Cameras.SequenceEqual(snapshot.Cameras);
+            var repeatedRealTime = snapshot.RunMode == SimulationRunMode.RealTime
+                && lastMonitorSnapshot?.RunMode == SimulationRunMode.RealTime
+                && lastMonitorSnapshot.RuntimeGeneration == snapshot.RuntimeGeneration
+                && lastMonitorSnapshot.ProjectId == snapshot.ProjectId
+                && lastMonitorSnapshot.ControlOwner == snapshot.ControlOwner;
+            if ((repeatedExternalWait || repeatedRealTime) && monitorStopwatch.Elapsed < MonitorRefreshInterval)
+            {
+                continue;
+            }
             if (IsSnapshotAdmitted(snapshot))
             {
                 _publishSnapshot(snapshot);
             }
-            if (snapshot.RunMode == SimulationRunMode.RealTime
-                && monitorStopwatch.Elapsed < MonitorRefreshInterval)
-            {
-                continue;
-            }
-
-            monitorStopwatch.Restart();
             await _dispatch(() =>
             {
                 if (IsSnapshotAdmitted(snapshot))
                 {
                     _applySnapshot(snapshot);
+                    lastMonitorSnapshot = snapshot;
                 }
             }).ConfigureAwait(false);
+            monitorStopwatch.Restart();
         }
     }
 
