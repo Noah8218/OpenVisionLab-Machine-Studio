@@ -140,11 +140,16 @@
                 </TabControl.Template>
                 <TabItem Header="{loc:Loc Key=Scene.EquipmentView}">
             <Border><Border.Style><Style TargetType="Border" BasedOn="{StaticResource PanelSurfaceStyle}"><Style.Triggers><DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True"><Setter Property="BorderThickness" Value="0" /><Setter Property="CornerRadius" Value="0" /></DataTrigger></Style.Triggers></Style></Border.Style>
-                <Grid>
+                <Grid x:Name="SceneWorkspaceLayout">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="SimulationDiagnosticsColumn"><ColumnDefinition.Style><Style TargetType="ColumnDefinition"><Setter Property="Width" Value="0" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Navigation.IsSimulationOverviewWorkspace}" Value="True" /><Condition Binding="{Binding Navigation.IsSimulationDiagnosticsExpanded}" Value="True" /><Condition Binding="{Binding Navigation.IsCompactLayout}" Value="False" /><Condition Binding="{Binding Navigation.IsInspectorOpen}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Width" Value="360" /></MultiDataTrigger></Style.Triggers></Style></ColumnDefinition.Style></ColumnDefinition>
+            </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" MinHeight="220" />
                 <RowDefinition Height="Auto" SharedSizeGroup="EquipmentFooter" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <Border x:Name="EquipmentTaskHeader" Grid.Row="0" Padding="14,10" Background="{DynamicResource Surface.Panel}" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1"
@@ -464,8 +469,9 @@
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>
-                        <TextBlock Style="{StaticResource PanelHeaderTextStyle}"
-                                   Text="{Binding Layout.SceneTitleText}" TextWrapping="Wrap" />
+                        <TextBlock x:Name="SimulationSceneTitle" Text="{Binding Layout.SceneTitleText}">
+                            <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource PanelHeaderTextStyle}"><Setter Property="TextWrapping" Value="Wrap" /><Style.Triggers><DataTrigger Binding="{Binding Navigation.IsSimulationOverviewWorkspace}" Value="True"><Setter Property="TextWrapping" Value="NoWrap" /><Setter Property="TextTrimming" Value="CharacterEllipsis" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                        </TextBlock>
                         <WrapPanel x:Name="MachineExecutionSummary" Margin="0,6,0,0"
                                    Visibility="{Binding Navigation.IsSimulationWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Border Margin="0,0,8,3" Padding="8,3" CornerRadius="4">
@@ -1383,19 +1389,26 @@
                                 </WrapPanel>
                             </Grid>
                         </Border></Grid>
+                <Border x:Name="SimulationRunSummary" Padding="10,6" Background="{DynamicResource Surface.Raised}" BorderBrush="{DynamicResource Border.Default}" BorderThickness="0,1,0,0">
+                    <Border.Style><Style TargetType="Border"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Navigation.IsSimulationOverviewWorkspace}" Value="True" /><Condition Binding="{Binding Navigation.IsSimulationDiagnosticsExpanded}" Value="True" /><Condition Binding="{Binding Navigation.IsCompactLayout}" Value="False" /><Condition Binding="{Binding Navigation.IsInspectorOpen}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger><DataTrigger Binding="{Binding EquipmentMaterialFlow.HasSlots}" Value="True"><Setter Property="Grid.Row" Value="1" /></DataTrigger></Style.Triggers></Style></Border.Style>
+                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,10,0"><TextBlock TextWrapping="Wrap" FontWeight="SemiBold"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Text" Value="{Binding CurrentRunStatusText}" /><Style.Triggers><DataTrigger Binding="{Binding IsDryRunPlaybackActive}" Value="True"><Setter Property="Text" Value="{Binding DryRunPlaybackTitleText}" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock><TextBlock x:Name="SimulationRunSummaryRecipe" Text="{Binding RecipeExecutionStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding HasRecipeExecutionStatus}" Value="True" /><Condition Binding="{Binding IsDryRunPlaybackActive}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></StackPanel>
+                        <TextBlock x:Name="SimulationRunSummaryTime" Grid.Column="1" Text="{Binding SimulationSecondsStatusText}" VerticalAlignment="Center" FontFamily="{StaticResource Typography.Telemetry}"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding IsDryRunPlaybackActive}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                    </Grid>
+                </Border>
+                </Grid>
                 <simulation:SimulationObservationView x:Name="SimulationUnitActivities">
                     <simulation:SimulationObservationView.Style>
                         <Style TargetType="simulation:SimulationObservationView">
-                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Setter Property="Visibility" Value="Collapsed" /><Setter Property="Grid.Row" Value="3" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding Navigation.IsSimulationOverviewWorkspace}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
-                                <DataTrigger Binding="{Binding EquipmentMaterialFlow.HasSlots}" Value="True"><Setter Property="Grid.Row" Value="1" /></DataTrigger>
+                                <MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Navigation.IsSimulationOverviewWorkspace}" Value="True" /><Condition Binding="{Binding Navigation.IsSimulationDiagnosticsExpanded}" Value="True" /><Condition Binding="{Binding Navigation.IsCompactLayout}" Value="False" /><Condition Binding="{Binding Navigation.IsInspectorOpen}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Grid.Row" Value="0" /><Setter Property="Grid.Column" Value="1" /><Setter Property="Grid.RowSpan" Value="4" /><Setter Property="IsSidebar" Value="True" /></MultiDataTrigger>
                             </Style.Triggers>
                         </Style>
                     </simulation:SimulationObservationView.Style>
                 </simulation:SimulationObservationView>
-                </Grid>
-                <scene:MaterialFlowSettingsView Grid.RowSpan="3" Panel.ZIndex="21" DataContext="{Binding MaterialFlowSettings}" />
+                <scene:MaterialFlowSettingsView Grid.RowSpan="4" Grid.ColumnSpan="2" Panel.ZIndex="21" DataContext="{Binding MaterialFlowSettings}" />
                 </Grid>
             </Border>
                 </TabItem>

@@ -131,10 +131,10 @@
     },
     {
       "path": "docs/images/simulation.png",
-      "sha256": "b999ecc2664491aba3932fe25b428a67bd591e85732ebcab38638eed36459dad",
+      "sha256": "b801c1cfc3656c2934ef6d2dec04a94f9c7faa056fe0fc922ce625201a246822",
       "mediaType": "image/png",
       "purpose": "Current simulation interface",
-      "originSummary": "Unedited first-party Machine Studio v0.2.0-dev.81 WPF view, rendered in process on 2026-10-18 with owned example data. Native 96 DPI; 1920x1032 working area of a 1920x1080 display. No crop, composite or resizing.",
+      "originSummary": "Unedited first-party Machine Studio v0.2.0-dev.82 WPF view from the prepared Dev source, rendered in process on 2026-10-18 with owned example data. Native 96 DPI; 1920x1032 working area of a 1920x1080 display. No crop, composite or resizing.",
       "firstRecordedCommit": "Introduced by the v0.2.0-dev.81 source update.",
       "vendorReferenceStatus": "none-recorded",
       "distributionStatus": "approved",

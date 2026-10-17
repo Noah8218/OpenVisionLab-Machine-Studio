@@ -7,7 +7,7 @@ engineers. Arrange conveyors, axes, sensors, cylinders and virtual cameras;
 define their signals and sequences; then inspect motion, interlocks, acquisition
 and inspection results in the same project.
 
-Current version: **`v0.2.0-dev.81`**. This is an actively developed, hardware-free
+Current version: **`v0.2.0-dev.82`**. This is an actively developed, hardware-free
 simulation environment. It is not qualified for production equipment control
 or safety functions.
 
@@ -54,8 +54,14 @@ they do not establish inspection accuracy or provide a production AI model.
 
 Start the authored machine, pause and resume it, advance a tick or sequence
 step, and reset it to inspect a control problem. Read axis, signal, device and
-sequence state beside the equipment scene. The simulation uses a fixed 5 ms
-tick; this is simulation time, not a hard real-time scheduling guarantee.
+sequence state beside the equipment scene. Expand process diagnostics to use a
+right-hand panel in wide layouts or a scrolling panel below the scene in compact
+layouts. Choose a unit by its ID to narrow the displayed processes; this does
+not change the run target or open equipment settings. Current-run diagnostics
+are hidden while viewing isolated playback or unapplied definitions.
+
+The simulation uses a fixed 5 ms tick; this is simulation time, not a hard
+real-time scheduling guarantee.
 
 End the run before changing equipment settings. Pausing retains the current
 run; it does not apply edited definitions to that run.
@@ -148,8 +154,14 @@ review and retention are not presented as a completed workflow.
 
 ## Version history
 
-Machine Studio uses explicit development versions. The entries below record
-versions delivered to the public source repository; older history remains in Git.
+Machine Studio uses explicit development versions. Older history remains in Git.
+
+### `v0.2.0-dev.82` (2026-10-18)
+
+- Move expanded simulation diagnostics beside the scene in wide layouts and
+  retain the compact scrolling layout.
+- Add explicit unit observation by ID, preserve the run target and drafts,
+  and keep current-run information separate from playback.
 
 ### `v0.2.0-dev.81` (2026-10-18)
 
@@ -197,19 +209,15 @@ versions delivered to the public source repository; older history remains in Git
 
 - Extend external inspection-result integration.
 
-### `v0.2.0-dev.22` (2026-09-22)
-
-- Add external inspection results and machine-operation displays.
-
 ## Contributing and licensing
 
 For source ownership and build guidance, see [Architecture](docs/ARCHITECTURE.md).
-Follow [Contributing](CONTRIBUTING.md) for changes and include the version,
+Follow [Contributing](https://github.com/Noah8218/OpenVisionLab-Machine-Studio/blob/main/CONTRIBUTING.md) for changes and include the version,
 reproduction steps and relevant layout/scaling information with UI reports.
 Remove customer data and credentials from shared projects.
 
-[Support](SUPPORT.md) · [Security reporting](SECURITY.md) ·
-[Code of conduct](CODE_OF_CONDUCT.md)
+[Support](https://github.com/Noah8218/OpenVisionLab-Machine-Studio/blob/main/SUPPORT.md) · [Security reporting](https://github.com/Noah8218/OpenVisionLab-Machine-Studio/blob/main/SECURITY.md) ·
+[Code of conduct](https://github.com/Noah8218/OpenVisionLab-Machine-Studio/blob/main/CODE_OF_CONDUCT.md)
 
 Machine Studio is available under the [MIT License](LICENSE). See
 [NOTICE](NOTICE), [third-party notices](THIRD-PARTY-NOTICES.md) and

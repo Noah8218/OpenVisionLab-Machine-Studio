@@ -2890,3 +2890,4 @@ R40.Experiment.ScenarioScope	카메라 편차 설정과 별개입니다.	Separat
 R40.Experiment.CurrentValidation	현재 검증 상태	Current validation state
 R40.Experiment.Summary	설정 요약	Settings summary
 R40.Fault.CommandPending	명령 처리 중	Command in progress
+SimObservation.NoScopedProcesses	선택한 유닛에 관찰할 공정 정보가 없습니다.	No process information is available for this unit.

@@ -45,6 +45,21 @@ scene. These projections are presentation, not separate simulation engines.
 Views retain only presentation and framework lifecycle behavior. Business
 changes pass through the bound command and its existing state owner.
 
+## Simulation diagnostics
+
+`SceneDocumentView` keeps one `SimulationObservationView` with the inherited
+`MainViewModel` DataContext. Expanded diagnostics use the right side in wide
+layouts and an independently scrolling area below the scene in compact layouts.
+`ObserveSimulationUnitCommand` and `ObserveWholeSimulationCommand` pass an
+explicit display scope to the existing layout owner after draft admission and
+current-context checks. They preserve the run target and equipment-properties
+commands. `SimulationObservationScopeConverter` reads actual unit IDs and
+preserves the source rows; it owns no runtime or persisted state.
+
+Read `R40SimulationDiagnosticsTests`, `R40SimulationWorkspaceTests` and
+`SimulationSequenceObservationTests` for display, state and failure boundaries.
+These in-process checks do not establish complete desktop interaction.
+
 ## From project to running machine
 
 ```text

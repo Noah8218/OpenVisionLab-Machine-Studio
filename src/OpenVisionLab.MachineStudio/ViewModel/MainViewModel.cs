@@ -199,6 +199,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
     private ICommand? _openCameraAcquisitionStepCommand;
     private ICommand? _openExperimentCameraInputCommand;
     private ICommand? _openSimulationObservationStepCommand;
+    private ICommand? _observeSimulationUnitCommand;
+    private ICommand? _observeWholeSimulationCommand;
     private ICommand? _openStepAxisSettingsCommand;
     private ICommand? _addEquipmentLayoutComponentCommand;
     private ICommand? _openEquipmentComponentLibraryDialogCommand;
@@ -2607,6 +2609,27 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         parameter => Navigation.IsInspectionWorkspace && !Navigation.IsModalOverlayOpen && !IsStationUnitEditorOpen && !IsBulkMoveEditorOpen
             && parameter is CameraSequenceStepReference reference && Camera.CurrentAcquisitionSteps.Contains(reference));
 
+    public ICommand ObserveSimulationUnitCommand => _observeSimulationUnitCommand ??= CreateRelayCommand(
+        parameter =>
+        {
+            if (!CanObserveSimulationScope() || FindSimulationObservationUnit(parameter) is not { } unit) return;
+            var project = CurrentProject;
+            if (!TryResolvePendingPlacementDraft() || !CanObserveSimulationScope()
+                || !ReferenceEquals(project, CurrentProject) || !ReferenceEquals(unit, FindSimulationObservationUnit(parameter))
+                || SequenceEditor.HasPendingStepDraft || Layout.SelectedComponentEditor?.HasPendingInspectorDraft == true) return;
+            Layout.ShowUnit(unit.Id);
+        }, parameter => CanObserveSimulationScope() && FindSimulationObservationUnit(parameter) is not null);
+
+    public ICommand ObserveWholeSimulationCommand => _observeWholeSimulationCommand ??= CreateRelayCommand(
+        _ =>
+        {
+            if (!CanObserveSimulationScope()) return;
+            var project = CurrentProject;
+            if (!TryResolvePendingPlacementDraft() || !CanObserveSimulationScope() || !ReferenceEquals(project, CurrentProject)
+                || SequenceEditor.HasPendingStepDraft || Layout.SelectedComponentEditor?.HasPendingInspectorDraft == true) return;
+            Layout.ShowOverview();
+        }, _ => CanObserveSimulationScope());
+
     public ICommand OpenSimulationObservationStepCommand => _openSimulationObservationStepCommand ??= CreateRelayCommand(
         parameter =>
         {
@@ -3582,6 +3605,17 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         && !_isApplyingProject && !_isModeTransitioning && AreSimulationObservationsCurrent
         && input.ProjectId == CurrentProject.Id && input.RuntimeGeneration == _simulationSession.Engine.CurrentSnapshot.RuntimeGeneration
         && Camera.CurrentCameraInputs.Contains(input);
+
+    private bool CanObserveSimulationScope() => !_disposed && !_sessionCloseRequested
+        && Navigation.IsSimulationOverviewWorkspace && !Navigation.IsModalOverlayOpen && !IsStationUnitEditorOpen && !IsBulkMoveEditorOpen
+        && !_isApplyingProject && !_isModeTransitioning;
+
+    private MachineUnitDefinition? FindSimulationObservationUnit(object? parameter)
+    {
+        if (parameter is not string id || string.IsNullOrWhiteSpace(id)) return null;
+        var units = CurrentProject.Stations.SelectMany(station => station.Units).Where(unit => string.Equals(unit.Id, id, StringComparison.Ordinal)).Take(2).ToArray();
+        return units.Length == 1 ? units[0] : null;
+    }
 
     private bool CanOpenSimulationObservationStep(SimulationSequenceObservation observation) =>
         Navigation.IsSimulationOverviewWorkspace && !Navigation.IsModalOverlayOpen && !IsStationUnitEditorOpen && !IsBulkMoveEditorOpen
@@ -5655,7 +5689,12 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         if (args.PropertyName is nameof(ShellNavigationViewModel.IsSequenceWorkspace) or nameof(ShellNavigationViewModel.IsModalOverlayOpen)) RaiseCanExecuteChanged(_openStepAxisSettingsCommand);
         if (args.PropertyName is nameof(ShellNavigationViewModel.IsResultsWorkspace) or nameof(ShellNavigationViewModel.IsModalOverlayOpen)) RunHistory?.InvalidateCommands();
         if (args.PropertyName is nameof(ShellNavigationViewModel.IsExperimentWorkspace) or nameof(ShellNavigationViewModel.IsModalOverlayOpen)) RaiseCanExecuteChanged(_openExperimentCameraInputCommand);
-        if (args.PropertyName is nameof(ShellNavigationViewModel.IsSimulationOverviewWorkspace) or nameof(ShellNavigationViewModel.IsModalOverlayOpen)) RaiseCanExecuteChanged(_openSimulationObservationStepCommand);
+        if (args.PropertyName is nameof(ShellNavigationViewModel.IsSimulationOverviewWorkspace) or nameof(ShellNavigationViewModel.IsModalOverlayOpen))
+        {
+            RaiseCanExecuteChanged(_openSimulationObservationStepCommand);
+            RaiseCanExecuteChanged(_observeSimulationUnitCommand);
+            RaiseCanExecuteChanged(_observeWholeSimulationCommand);
+        }
         if (args.PropertyName is nameof(ShellNavigationViewModel.IsInspectionWorkspace) or nameof(ShellNavigationViewModel.IsModalOverlayOpen)) RaiseCanExecuteChanged(_openCameraAcquisitionStepCommand);
 
         if (args.PropertyName is nameof(ShellNavigationViewModel.SelectedWorkspaceIndex)
@@ -5870,6 +5909,8 @@ public sealed class MainViewModel : ViewModelBase, IDisposable, IShellCloseHost
         RaiseCanExecuteChanged(_openCameraAcquisitionStepCommand);
         RaiseCanExecuteChanged(_openExperimentCameraInputCommand);
         RaiseCanExecuteChanged(_openSimulationObservationStepCommand);
+        RaiseCanExecuteChanged(_observeSimulationUnitCommand);
+        RaiseCanExecuteChanged(_observeWholeSimulationCommand);
         RaiseCanExecuteChanged(_openStepAxisSettingsCommand);
         RaiseCanExecuteChanged(_confirmNewProjectNameCommand);
         RaiseCanExecuteChanged(_cancelNewProjectNameCommand);

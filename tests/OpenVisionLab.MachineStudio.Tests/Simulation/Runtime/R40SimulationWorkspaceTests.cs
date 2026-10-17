@@ -96,7 +96,7 @@ public sealed class R40SimulationWorkspaceTests(StudioUiTestHost ui)
                 Pump(window);
                 var view = Assert.Single(Descendants(window).OfType<SimulationObservationView>());
                 var scroll = Assert.IsType<ScrollViewer>(view.FindName("SimulationDiagnosticsScroll"));
-                Assert.InRange(scroll.ActualHeight, 30, 200);
+                Assert.InRange(scroll.ActualHeight, 30, main.Navigation.IsCompactLayout ? 200 : window.ActualHeight);
                 if (empty)
                 {
                     Assert.Empty(main.RuntimeDebugger.SequenceObservations);
@@ -111,7 +111,7 @@ public sealed class R40SimulationWorkspaceTests(StudioUiTestHost ui)
                     var command = Descendants(view).OfType<Button>().Single(item => item.Command == main.OpenSimulationObservationStepCommand);
                     command.BringIntoView();
                     Pump(window);
-                    Assert.True(scroll.ScrollableHeight > 0);
+                    if (main.Navigation.IsCompactLayout) Assert.True(scroll.ScrollableHeight > 0);
                     Assert.True(new Rect(window.RenderSize).Contains(Bounds(command, window)));
                     Assert.False(command.IsEnabled); // Synthetic display data cannot navigate through the real engine identity.
                 }
@@ -176,13 +176,21 @@ public sealed class R40SimulationWorkspaceTests(StudioUiTestHost ui)
                 Assert.Equal("17", main.SequenceEditor.SelectedStepDraft.Parameter);
                 main.SequenceEditor.SelectedStepDraft.Parameter = originalParameter;
                 var scroll = Assert.IsType<ScrollViewer>(observationView.FindName("SimulationDiagnosticsScroll"));
-                Assert.InRange(scroll.ActualHeight, 100, 200);
+                Assert.InRange(scroll.ActualHeight, 100, main.Navigation.IsCompactLayout ? 200 : window.ActualHeight);
                 var scene = Assert.Single(Descendants(window).OfType<SceneDocumentView>());
                 var viewport = Assert.IsType<MachineSceneViewport>(scene.FindName("SceneViewport"));
                 Assert.True(viewport.ActualHeight >= 150, $"Scene height was {viewport.ActualHeight}.");
-                Assert.True(Bounds(viewport, window).Bottom <= Bounds(observationView, window).Top + 1);
+                if (main.Navigation.IsCompactLayout)
+                    Assert.True(Bounds(viewport, window).Bottom <= Bounds(observationView, window).Top + 1);
+                else
+                {
+                    Assert.True(observationView.IsSidebar);
+                    Assert.InRange(observationView.ActualWidth, 350, 370);
+                    Assert.True(Bounds(viewport, window).Right <= Bounds(observationView, window).Left + 1);
+                    Assert.True(new Rect(window.RenderSize).Contains(Bounds(observationView, window)));
+                }
                 Capture(window, $"paused-{language}-{width}x{height}");
-                var unitButton = Descendants(rows).OfType<Button>().Single(item => item.Command == main.ShowEquipmentUnitCommand && Equals(item.CommandParameter, "b"));
+                var unitButton = Descendants(rows).OfType<Button>().Single(item => item.Command == main.ObserveSimulationUnitCommand && Equals(item.CommandParameter, "b"));
                 unitButton.BringIntoView();
                 Pump(window);
                 Assert.IsAssignableFrom<IInvokeProvider>(new ButtonAutomationPeer(unitButton).GetPattern(PatternInterface.Invoke)).Invoke();
@@ -246,6 +254,7 @@ public sealed class R40SimulationWorkspaceTests(StudioUiTestHost ui)
             view.Arrange(new Rect(0, 0, 800, 400));
             view.UpdateLayout();
             Assert.Equal(Visibility.Collapsed, view.SimulationSequenceRows.Visibility);
+            Assert.Equal(Visibility.Collapsed, view.SimulationUnitCards.Visibility);
             Assert.Equal(Visibility.Visible, view.SimulationPendingDefinitionHint.Visibility);
             await WaitForAsync(() => main.RunCommand.CanExecute(null));
             main.RunCommand.Execute(null);
