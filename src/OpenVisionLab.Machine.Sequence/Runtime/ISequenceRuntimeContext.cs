@@ -81,6 +81,14 @@ public readonly record struct SequenceCameraTriggerResult(
         new(false, null, new SequenceContextError(code, message));
 }
 
+public readonly record struct SequenceUnitOperationResult(bool IsSuccess, bool IsComplete, SequenceContextError? Error, bool EndSequence = false)
+{
+    public static SequenceUnitOperationResult SupplyFinished() => new(true, false, null, true);
+    public static SequenceUnitOperationResult Complete() => new(true, true, null);
+    public static SequenceUnitOperationResult Waiting() => new(true, false, null);
+    public static SequenceUnitOperationResult Failure(string message) => new(false, false, new SequenceContextError(SequenceContextErrorCode.Rejected, message));
+}
+
 public interface ISequenceRuntimeContext
 {
     SequenceSignalReadResult ReadSignal(string signalId);
@@ -121,6 +129,12 @@ public interface ISequenceRuntimeContext
         SequenceContextOperationResult.Failure(
             SequenceContextErrorCode.Unavailable,
             "Workpiece ejection is not available in this runtime context.");
+
+    SequenceUnitOperationResult ExecuteUnitOperation(Compilation.UnitOperationStep step, TimeSpan elapsed) =>
+        SequenceUnitOperationResult.Failure("Unit material flow is not available in this runtime context.");
+
+    SequenceVisionResultReadResult ReadUnitInspection(string unitId) =>
+        SequenceVisionResultReadResult.Failure(SequenceContextErrorCode.Unavailable, "Unit inspection is not available in this runtime context.");
 
     SequenceVisionResultReadResult ReadVisionResult(string cameraId, string acquisitionId) =>
         SequenceVisionResultReadResult.Failure(

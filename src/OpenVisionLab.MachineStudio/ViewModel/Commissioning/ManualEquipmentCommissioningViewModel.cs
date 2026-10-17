@@ -1,4 +1,6 @@
 using System.Windows.Input;
+using OpenVisionLab;
+using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.Machine.IO.Channels;
 using OpenVisionLab.Machine.Simulation.Layout;
@@ -24,13 +26,19 @@ public sealed class ManualEquipmentCommissioningViewModel : ViewModelBase, IDisp
         nameof(CanExtendCylinder), nameof(CanRetractCylinder), nameof(HasSelectedConveyor),
         nameof(ConveyorCommissioningHintText), nameof(CanRunConveyorForward),
         nameof(CanRunConveyorReverse), nameof(CanStopConveyor),
-        nameof(CanStartManualEquipmentControl)
+        nameof(CanStartManualEquipmentControl), nameof(HasSelectedManualControlTarget),
+        nameof(ManualControlOwnerText), nameof(ManualControlHintText), nameof(StartManualControlText)
     ];
 
     private readonly Func<SimulationSnapshot?, ManualEquipmentProjection> _projectionFactory;
     private readonly ManualEquipmentPresentation _presentation = new();
     private readonly ManualControlCommandWorkflow _commandWorkflow;
+    private readonly Func<Task<bool>>? _prepareManualControlAsync;
+    private readonly Action? _markManualControlPaused;
     private ManualEquipmentProjection? _lastProjection;
+    private bool _isStartingManualControl;
+    private bool _isManualControlAdmissionLocked;
+    private string? _manualEntryNotice;
     private bool _sessionCloseRequested;
     private bool _disposed;
 
@@ -39,11 +47,15 @@ public sealed class ManualEquipmentCommissioningViewModel : ViewModelBase, IDisp
         Func<SimulationSnapshot?, ManualEquipmentProjection> projectionFactory,
         Func<LayoutComponentKind?> selectedComponentKind,
         Action markManualControlStarted,
-        Action<Exception> handleCommandException)
+        Action<Exception> handleCommandException,
+        Func<Task<bool>>? prepareManualControlAsync = null,
+        Action? markManualControlPaused = null)
     {
         ArgumentNullException.ThrowIfNull(handleCommandException);
         var controlStartedCallback = markManualControlStarted
             ?? throw new ArgumentNullException(nameof(markManualControlStarted));
+        _prepareManualControlAsync = prepareManualControlAsync;
+        _markManualControlPaused = markManualControlPaused;
         _projectionFactory = projectionFactory
             ?? throw new ArgumentNullException(nameof(projectionFactory));
         _commandWorkflow = new(
@@ -53,7 +65,7 @@ public sealed class ManualEquipmentCommissioningViewModel : ViewModelBase, IDisp
             () => MarkManualControlStarted(controlStartedCallback));
 
         StartManualEquipmentControlCommand = CreateCommand(
-            _commandWorkflow.StartEquipmentControlAsync,
+            StartSelectedManualControlAsync,
             () => CanStartManualEquipmentControl,
             handleCommandException);
         ForceSensorOnCommand = CreateCommand(
@@ -120,16 +132,49 @@ public sealed class ManualEquipmentCommissioningViewModel : ViewModelBase, IDisp
     public bool CanRunConveyorForward => CanExecute(_presentation.CanRunConveyorForward);
     public bool CanRunConveyorReverse => CanExecute(_presentation.CanRunConveyorReverse);
     public bool CanStopConveyor => CanExecute(_presentation.CanStopConveyor);
-    public bool CanStartManualEquipmentControl => CanExecute(_presentation.CanStartManualEquipmentControl);
+    public bool HasSelectedManualControlTarget => IsReady && _presentation.HasSelectedManualControlTarget;
+    public bool IsStartingManualControl => _isStartingManualControl;
+    public bool IsManualControlAdmissionLocked => _isManualControlAdmissionLocked;
+    public string StartManualControlText => OpenVisionLanguageService.T(
+        "Equipment.EnterManualCommissioning", "수동 시운전 시작", "Start manual commissioning");
+    public string ManualControlOwnerText => IsReady ? _presentation.ManualControlOwnerText : string.Empty;
+    public string ManualControlHintText => !IsReady ? string.Empty
+        : _sessionCloseRequested
+            ? OpenVisionLanguageService.T("Equipment.ManualHint.Closing", "종료 중에는 수동 시운전을 시작할 수 없습니다.", "Manual commissioning cannot start while closing.")
+        : _isStartingManualControl
+            ? OpenVisionLanguageService.T("Equipment.ManualHint.Busy", "수동 제어를 준비하고 있습니다. 완료까지 기다려 주세요.", "Manual control is being prepared. Wait for it to finish.")
+        : _prepareManualControlAsync is null && _lastProjection?.IsRunMode == false
+            ? OpenVisionLanguageService.T("Equipment.ManualHint.RunMode", "운전 모드로 전환한 뒤 수동 시운전을 시작하세요.", "Switch to Run mode before starting manual commissioning.")
+        : _manualEntryNotice is null ? _presentation.ManualControlHintText : OpenVisionLanguageService.T(_manualEntryNotice);
+    public bool CanStartManualEquipmentControl => CanExecute(_prepareManualControlAsync is null
+        ? _presentation.CanStartManualEquipmentControl : _presentation.CanPrepareManualControl);
 
     internal DigitalSignalSnapshot? CurrentSelectedSensorSignal =>
         IsReady ? _presentation.CurrentSelectedSensorSignal : null;
 
     internal bool IsDisposed => _disposed;
 
-    internal Task StartManualCameraControlAsync() => _disposed || _sessionCloseRequested
+    internal Task StartManualCameraControlAsync() => _disposed || _sessionCloseRequested || _isStartingManualControl
         ? Task.CompletedTask
         : _commandWorkflow.StartCameraControlAsync();
+
+    internal async Task<bool> PrepareInspectorActionAsync()
+    {
+        if (_disposed || _sessionCloseRequested || _isStartingManualControl) return false;
+        RefreshProjection();
+        if (_lastProjection is { ControlOwner: SimulationControlOwner.Manual, IsRuntimeDefinitionDirty: false }
+            && !_lastProjection.IsAutomaticRunActive) return true;
+        await StartSelectedManualControlAsync();
+        return !_disposed && !_sessionCloseRequested && _lastProjection is { ControlOwner: SimulationControlOwner.Manual, IsRuntimeDefinitionDirty: false };
+    }
+
+    internal Task ExecuteInspectorActionAsync(string action) => _commandWorkflow.ExecuteInspectorActionAsync(action);
+
+    internal async Task PauseInspectorControlAsync()
+    {
+        var result = await _commandWorkflow.PauseManualControlAsync(_lastProjection?.SelectedComponentKind);
+        if (result.IsAccepted && !_disposed && !_sessionCloseRequested) _markManualControlPaused?.Invoke();
+    }
 
     internal void ApplyProjection(
         ManualEquipmentProjection projection,
@@ -140,6 +185,10 @@ public sealed class ManualEquipmentCommissioningViewModel : ViewModelBase, IDisp
             return;
         }
 
+        if (_lastProjection is { } previous && (previous.SelectedComponentId != projection.SelectedComponentId
+            || previous.SelectedComponentKind != projection.SelectedComponentKind
+            || previous.Snapshot.ProjectId != projection.Snapshot.ProjectId
+            || previous.IsRunMode != projection.IsRunMode)) _manualEntryNotice = null;
         var isModeOnlyChange = IsModeOnlyChange(_lastProjection, projection);
         _lastProjection = projection;
         _presentation.ApplyProjection(projection);
@@ -180,7 +229,15 @@ public sealed class ManualEquipmentCommissioningViewModel : ViewModelBase, IDisp
         }
 
         _sessionCloseRequested = isRequested;
+        OnPropertyChanged(nameof(ManualControlHintText));
         InvalidateCommands();
+    }
+
+    internal void BeginRuntimePreparation()
+    {
+        if (!_isStartingManualControl || _disposed || _sessionCloseRequested) return;
+        _isManualControlAdmissionLocked = true;
+        OnPropertyChanged(nameof(IsManualControlAdmissionLocked));
     }
 
     internal void InvalidateCommands()
@@ -210,7 +267,83 @@ public sealed class ManualEquipmentCommissioningViewModel : ViewModelBase, IDisp
     private bool IsReady => !_disposed && _presentation.HasProjection;
 
     private bool CanExecute(bool presentationGate) =>
-        IsReady && !_sessionCloseRequested && presentationGate;
+        IsReady && !_sessionCloseRequested && !_isStartingManualControl && presentationGate;
+
+    private async Task StartSelectedManualControlAsync()
+    {
+        if (!CanStartManualEquipmentControl) return;
+        var requested = _projectionFactory(null);
+        _manualEntryNotice = null;
+        _isStartingManualControl = true;
+        NotifyManualEntryChanged();
+        try
+        {
+            if (_prepareManualControlAsync is not null && !await _prepareManualControlAsync())
+            {
+                _manualEntryNotice = "Equipment.ManualHint.NotPrepared";
+                return;
+            }
+            if (_disposed || _sessionCloseRequested) return;
+            RefreshProjection();
+            var prepared = _lastProjection!;
+            if (prepared.SelectedComponentId != requested.SelectedComponentId
+                || prepared.SelectedComponentKind != requested.SelectedComponentKind
+                || prepared.Snapshot.ProjectId != requested.Snapshot.ProjectId
+                || !_presentation.CanAcquireManualControl) return;
+
+            bool IsCurrentRuntime()
+            {
+                if (_disposed || _sessionCloseRequested) return false;
+                var current = _projectionFactory(null);
+                return current.Snapshot.ProjectId == prepared.Snapshot.ProjectId
+                    && current.Snapshot.RuntimeGeneration == prepared.Snapshot.RuntimeGeneration
+                    && !current.IsApplyingProject && !current.IsValidationBusy
+                    && !current.IsModeTransitioning;
+            }
+
+            var result = await _commandWorkflow.StartEquipmentControlAsync(IsCurrentRuntime);
+            if (!IsCurrentRuntime()) return;
+            if (result?.IsAccepted != true)
+            {
+                _manualEntryNotice = "Equipment.ManualHint.Rejected";
+                return;
+            }
+            RefreshProjection();
+            var manual = _lastProjection!;
+            var selectionChanged = manual.SelectedComponentId != prepared.SelectedComponentId
+                || manual.SelectedComponentKind != prepared.SelectedComponentKind;
+            if (prepared.SelectedComponentKind != LayoutComponentKind.Camera && !selectionChanged) return;
+            if (manual.ControlOwner != SimulationControlOwner.Manual || manual.IsAutomaticRunActive
+                || manual.ActiveSequenceStatus == OpenVisionLab.Machine.Sequence.Runtime.SequenceExecutionStatus.Running) return;
+            var pause = await _commandWorkflow.PauseManualControlAsync(prepared.SelectedComponentKind);
+            if (!IsCurrentRuntime()) return;
+            if (pause.IsAccepted)
+            {
+                _markManualControlPaused?.Invoke();
+                if (selectionChanged) _manualEntryNotice = "Equipment.ManualHint.SelectionChanged";
+            }
+            else _manualEntryNotice = "Equipment.ManualHint.ManualPauseRejected";
+        }
+        finally
+        {
+            _isStartingManualControl = false;
+            _isManualControlAdmissionLocked = false;
+            if (!_disposed)
+            {
+                if (!_sessionCloseRequested) RefreshProjection();
+                NotifyManualEntryChanged();
+            }
+        }
+    }
+
+    private void NotifyManualEntryChanged()
+    {
+        OnPropertyChanged(nameof(IsStartingManualControl));
+        OnPropertyChanged(nameof(IsManualControlAdmissionLocked));
+        OnPropertyChanged(nameof(CanStartManualEquipmentControl));
+        OnPropertyChanged(nameof(ManualControlHintText));
+        InvalidateCommands();
+    }
 
     private void MarkManualControlStarted(Action callback)
     {
@@ -233,6 +366,8 @@ public sealed class ManualEquipmentCommissioningViewModel : ViewModelBase, IDisp
     private void RaiseModePresentationChanged()
     {
         OnPropertyChanged(nameof(CanStartManualEquipmentControl));
+        OnPropertyChanged(nameof(ManualControlOwnerText));
+        OnPropertyChanged(nameof(ManualControlHintText));
         switch (_lastProjection?.SelectedComponentKind)
         {
             case LayoutComponentKind.DigitalSensor:

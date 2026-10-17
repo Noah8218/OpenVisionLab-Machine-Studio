@@ -35,6 +35,9 @@ public sealed class SimulationSnapshot
     public IReadOnlyList<SimulationFaultSnapshot> Faults { get; }
     public DeterministicConditionScenarioSnapshot ConditionScenario { get; }
     public IReadOnlyList<PickPlaceWorkpieceSnapshot> Workpieces { get; }
+    public IReadOnlyList<UnitMaterialSlotSnapshot> UnitMaterialSlots { get; }
+    public IReadOnlyList<UnitMaterialExitSnapshot> UnitMaterialExits { get; }
+    public UnitMaterialSupplySnapshot? MaterialSupply { get; }
     public IReadOnlyList<LoadLockSnapshot> LoadLocks { get; }
     public IReadOnlyList<WaferHandlerSnapshot> WaferHandlers { get; }
     public IReadOnlyList<InspectionSortRouterSnapshot> InspectionSortRouters { get; }
@@ -150,11 +153,17 @@ public sealed class SimulationSnapshot
         IEnumerable<AnalogSignalSnapshot>? analogSignals = null,
         string? projectId = null,
         long runtimeGeneration = 0,
-        string? resetRetrySequenceId = null)
+        string? resetRetrySequenceId = null,
+        IEnumerable<UnitMaterialSlotSnapshot>? unitMaterialSlots = null,
+        IEnumerable<UnitMaterialExitSnapshot>? unitMaterialExits = null,
+        UnitMaterialSupplySnapshot? materialSupply = null)
     {
+        MaterialSupply = materialSupply;
         ProjectId = projectId;
         RuntimeGeneration = runtimeGeneration;
         ResetRetrySequenceId = resetRetrySequenceId;
+        UnitMaterialSlots = (unitMaterialSlots ?? []).ToImmutableList();
+        UnitMaterialExits = (unitMaterialExits ?? []).ToImmutableList();
         SimulationTime = simulationTime;
         TickIndex = tickIndex;
         RunMode = runMode;

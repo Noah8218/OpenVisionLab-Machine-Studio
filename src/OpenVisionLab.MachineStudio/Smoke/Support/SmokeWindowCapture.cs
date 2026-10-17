@@ -1,7 +1,12 @@
+using System.Diagnostics;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using OpenVisionLab.Machine.Simulation.Snapshots;
+using OpenVisionLab.MachineStudio.View.Shell;
 
 namespace OpenVisionLab.MachineStudio;
 
@@ -13,6 +18,60 @@ internal sealed class SmokeWindowCapture
     private FrameworkElement? _popupContent;
 
     internal void SetPopupContent(FrameworkElement? popup) => _popupContent = popup;
+
+    internal async Task CaptureFramesAsync(Window window, string directory, int seconds, Func<SimulationSnapshot?> snapshotAccessor)
+    {
+        var root = Path.GetFullPath(directory);
+        if (!root.StartsWith("D:\\", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Frame recording must be stored on the D: test-data drive.", nameof(directory));
+        if (seconds is < 1 or > 120)
+            throw new ArgumentOutOfRangeException(nameof(seconds));
+        if (Directory.Exists(root) && Directory.EnumerateFileSystemEntries(root).Any())
+            throw new IOException("Frame recording directory must be empty to preserve prior evidence.");
+
+        Directory.CreateDirectory(root);
+        var frames = new List<object>();
+        var startedAtUtc = DateTimeOffset.UtcNow;
+        var clock = Stopwatch.StartNew();
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        try
+        {
+            while (clock.Elapsed.TotalSeconds < seconds)
+            {
+                var elapsedMs = clock.Elapsed.TotalMilliseconds;
+                var file = $"frame-{frames.Count:D5}.png";
+                var snapshot = snapshotAccessor();
+                Capture(window, Path.Combine(root, file));
+                frames.Add(new
+                {
+                    File = file, ElapsedMs = elapsedMs, SimulationTime = snapshot?.SimulationTime,
+                    TickIndex = snapshot?.TickIndex, RunMode = snapshot?.RunMode,
+                    Sequences = snapshot?.Sequences, Slots = snapshot?.UnitMaterialSlots,
+                    Exits = snapshot?.UnitMaterialExits,
+                    Cameras = snapshot?.Cameras.Select(camera => new
+                    {
+                        camera.Id, camera.State, camera.AcquisitionOrdinal,
+                        camera.CurrentAcquisitionId, camera.Result?.Decision,
+                        camera.Result?.WorkpieceInstanceId, camera.Result?.FrameEvidence
+                    }).ToArray()
+                });
+                await Task.Delay(Math.Max(1, (int)(100 - (clock.Elapsed.TotalMilliseconds - elapsedMs))));
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            }
+        }
+        finally
+        {
+            var report = new
+            {
+                Method = "Actual EXE WPF RenderTargetBitmap; explicit RunCommand; no native pointer/keyboard authoring",
+                StartedAtUtc = startedAtUtc, WallDurationMs = clock.Elapsed.TotalMilliseconds,
+                RequestedSeconds = seconds, TargetIntervalMs = 100,
+                Monitor = SmokeDpiTestHook.CaptureMonitorEvidence(window), BuildIdentity = BuildIdentity.Current,
+                Frames = frames, FinalSnapshot = snapshotAccessor()
+            };
+            File.WriteAllText(Path.Combine(root, "recording.json"), JsonSerializer.Serialize(report, options));
+        }
+    }
 
     internal void Capture(Window window, string path)
     {

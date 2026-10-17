@@ -55,7 +55,8 @@ public sealed class SequenceStepTemplateCatalogTests
         IReadOnlyList<SequenceStepTemplateDefinition> templates =
             _catalog.GetAvailableTemplates(Targets());
 
-        Assert.Equal(6, templates.Count);
+        Assert.Equal(7, templates.Count);
+        Assert.Equal("delay", Assert.Single(_catalog.GetAvailableTemplates(Array.Empty<SequenceAuthoringTarget>())).Id);
         Assert.DoesNotContain(templates, template => template.Id == "trigger-camera");
         Assert.Contains(templates, template => template.Id == "set-output-on");
         Assert.Contains(templates, template => template.Id == "wait-input-on");

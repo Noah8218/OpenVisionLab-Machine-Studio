@@ -66,7 +66,10 @@ internal static class SimulationSnapshotFactory
             analogSignals: signals.AnalogSignals,
             projectId: context.ProjectId,
             runtimeGeneration: context.RuntimeGeneration,
-            resetRetrySequenceId: context.ResetRetrySequenceId);
+            resetRetrySequenceId: context.ResetRetrySequenceId,
+            unitMaterialSlots: context.UnitMaterialFlow?.CaptureSlots(),
+            unitMaterialExits: context.UnitMaterialFlow?.Exits,
+            materialSupply: context.UnitMaterialFlow?.Supply);
     }
 }
 
@@ -88,4 +91,5 @@ internal sealed record SimulationSnapshotFactoryContext(
     SequenceDebugSnapshot SequenceDebug,
     string? ProjectId = null,
     long RuntimeGeneration = 0,
-    string? ResetRetrySequenceId = null);
+    string? ResetRetrySequenceId = null,
+    UnitMaterialFlowRuntime? UnitMaterialFlow = null);

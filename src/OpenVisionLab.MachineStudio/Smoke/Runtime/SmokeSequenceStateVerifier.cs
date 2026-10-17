@@ -29,7 +29,58 @@ internal static class SmokeSequenceStateVerifier
             ?? throw new InvalidOperationException(
                 "The Sequence document tab must be visible for a sequence-state smoke.");
 
-        if (state.StartsWith("subsequence", StringComparison.OrdinalIgnoreCase))
+        if (state.StartsWith("search-", StringComparison.OrdinalIgnoreCase))
+        {
+            var model = viewModel.SequenceEditor;
+            model.StepSearchText = state == "search-disabled" ? "no-such-step-search" : model.Steps.Last().Id;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            var button = editor.FindNextStepButton;
+            if (!editor.StepSearchTextBox.IsVisible || !button.IsVisible || !editor.StepSearchStatus.IsVisible)
+                throw new InvalidOperationException("The step search toolbar was not visible.");
+            if (state == "search-disabled")
+            {
+                if (button.IsEnabled || model.StepSearchMatchCount != 0) throw new InvalidOperationException("Empty search results must disable Find next.");
+            }
+            else if (state == "search-focus")
+            {
+                interaction.ActivateWindow();
+                editor.StepSearchTextBox.Focus();
+                Keyboard.Focus(editor.StepSearchTextBox);
+                if (!editor.StepSearchTextBox.IsKeyboardFocusWithin) throw new InvalidOperationException("Step search did not receive keyboard focus.");
+            }
+            else if (state is "search-hover" or "search-pressed" or "search-mouse-leave")
+            {
+                interaction.ActivateWindow();
+                interaction.MovePointerToCenter(button);
+                await Task.Delay(100);
+                if (!button.IsMouseOver) throw new InvalidOperationException("Find next did not enter hover state.");
+                if (state == "search-pressed")
+                {
+                    interaction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
+                    interaction.MarkSmokePointerHeld();
+                    await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                    if (Mouse.LeftButton != MouseButtonState.Pressed || !button.IsPressed)
+                        throw new InvalidOperationException("Find next did not enter actual pointer-down state.");
+                }
+                else if (state == "search-mouse-leave")
+                {
+                    var outside = window.PointToScreen(new Point(10, 10));
+                    interaction.SetCursorPosition((int)outside.X, (int)outside.Y);
+                    await Task.Delay(100);
+                    if (button.IsMouseOver) throw new InvalidOperationException("Find next did not recover after mouse leave.");
+                }
+            }
+            else if (state == "search-found")
+            {
+                model.FindNextStepCommand.Execute(null);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                if (!ReferenceEquals(editor.StepListDataGrid.SelectedItem, model.Steps.Last()))
+                    throw new InvalidOperationException("The found step did not reach the rendered selection.");
+            }
+            else throw new ArgumentException($"Unsupported step search smoke state: {state}");
+            Console.WriteLine($"Step search state: {state}; matches={model.StepSearchMatchCount}; selected={model.SelectedStep?.Id}; monitor={SmokeDpiTestHook.CaptureMonitorEvidence(window)}");
+        }
+        else if (state.StartsWith("subsequence", StringComparison.OrdinalIgnoreCase))
         {
             var project = viewModel.ProjectTree.Roots.Single().Model as MachineProjectDocument
                 ?? throw new InvalidOperationException("The current machine project was unavailable.");

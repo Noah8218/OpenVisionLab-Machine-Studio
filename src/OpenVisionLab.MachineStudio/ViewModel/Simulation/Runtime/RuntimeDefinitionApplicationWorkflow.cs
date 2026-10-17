@@ -29,19 +29,23 @@ internal sealed class RuntimeDefinitionApplicationWorkflow
 {
     private readonly ISimulationEngine _engine;
     private readonly MachineProjectRuntimeCompiler _compiler;
+    private readonly Func<string?>? _getProjectPath;
+    private readonly string? _buildIdentity;
 
     internal RuntimeDefinitionApplicationWorkflow(
         ISimulationEngine engine,
-        TimeSpan fixedStep)
+        TimeSpan fixedStep, Func<string?>? getProjectPath = null, string? buildIdentity = null)
     {
         _engine = engine ?? throw new ArgumentNullException(nameof(engine));
         _compiler = new MachineProjectRuntimeCompiler(fixedStep);
+        _getProjectPath = getProjectPath;
+        _buildIdentity = buildIdentity;
     }
 
     internal async Task<RuntimeDefinitionApplicationResult> ApplyAsync(
         MachineProjectDocument? project)
     {
-        var compilation = _compiler.Compile(project);
+        var compilation = _compiler.Compile(project, _getProjectPath?.Invoke(), _buildIdentity);
         if (!compilation.IsSuccess)
         {
             return new(

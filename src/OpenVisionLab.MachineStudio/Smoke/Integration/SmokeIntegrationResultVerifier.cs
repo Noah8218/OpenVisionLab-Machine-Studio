@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using OpenVisionLab.MachineStudio.View.Inspector;
 using OpenVisionLab.MachineStudio.View.Shell;
-using OpenVisionLab.MachineStudio.View.Simulation;
+using OpenVisionLab.MachineStudio.View.Mmi;
 using OpenVisionLab.MachineStudio.ViewModel;
 
 namespace OpenVisionLab.MachineStudio;
@@ -46,8 +46,7 @@ internal static class SmokeIntegrationResultVerifier
         MainViewModel viewModel,
         string state,
         string? exchangeRoot,
-        Func<DependencyObject, RightToolRegionView?> findInspector,
-        Func<DependencyObject, SimulationIntegrationWorkspaceView?> findIntegrationWorkspace)
+        Func<DependencyObject, MmiOperatorLayoutView?> findMmi)
     {
         if (!viewModel.IsRunMode)
         {
@@ -125,17 +124,17 @@ internal static class SmokeIntegrationResultVerifier
         }
 
         viewModel.Navigation.IsInspectionWorkspace = true;
-        viewModel.Navigation.SelectedInspectionTabIndex = 1;
+        viewModel.Navigation.SelectedInspectionSettingsTabIndex = 3;
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-        var inspector = findInspector(window)
-            ?? throw new InvalidOperationException("Run inspector was unavailable.");
-        var integrationWorkspace = findIntegrationWorkspace(window)
-            ?? throw new InvalidOperationException("Integration workspace was unavailable.");
+        var mmi = findMmi(window) ?? throw new InvalidOperationException("Integration Mmi view was unavailable.");
+        var inspector = (RightToolRegionView)mmi.FindName("MmiIntegrationSetupView");
+        mmi.IntegrationExchangeDetailsExpanderControl.IsExpanded = true;
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         FrameworkElement target = state switch
         {
-            "result" or "rejected" or "invalid" => integrationWorkspace.IntegrationResultStatusTextBlockControl,
-            "history" => integrationWorkspace.IntegrationTransactionHistoryExpanderControl,
-            "status" => integrationWorkspace.IntegrationWorkspaceStatusTextBlockControl,
+            "result" or "rejected" or "invalid" => mmi.IntegrationResultStatusTextBlockControl,
+            "history" => mmi.IntegrationTransactionHistorySectionControl,
+            "status" => mmi.IntegrationWorkspaceStatusTextBlockControl,
             "tcp" => inspector.IntegrationTcpListenAddressTextBoxControl,
             "tcp-bottom" => inspector.IntegrationTcpTransferStatusTextBlockControl,
             _ => inspector.IntegrationExchangeRootTextBox
@@ -152,47 +151,47 @@ internal static class SmokeIntegrationResultVerifier
                 viewModel.Integration.Setup.ExchangeRoot,
                 Path.GetFullPath(exchangeRoot),
                 StringComparison.OrdinalIgnoreCase));
-        Check("central-workspace-status-rendered",
-            integrationWorkspace.IntegrationWorkspaceStatusTextBlockControl.IsVisible
-            && integrationWorkspace.IntegrationWorkspaceStatusTextBlockControl.ActualWidth > 0
-            && integrationWorkspace.IntegrationWorkspaceStatusTextBlockControl.ActualHeight > 0);
-        Check("central-workspace-status-bound",
+        Check("project-workspace-status-rendered",
+            mmi.IntegrationWorkspaceStatusTextBlockControl.IsVisible
+            && mmi.IntegrationWorkspaceStatusTextBlockControl.ActualWidth > 0
+            && mmi.IntegrationWorkspaceStatusTextBlockControl.ActualHeight > 0);
+        Check("project-workspace-status-bound",
             string.Equals(
-                integrationWorkspace.IntegrationWorkspaceStatusTextBlockControl.Text,
+                mmi.IntegrationWorkspaceStatusTextBlockControl.Text,
                 viewModel.Integration.StatusText,
                 StringComparison.Ordinal));
-        Check("central-handoff-status-bound",
+        Check("project-handoff-status-bound",
             string.Equals(
-                integrationWorkspace.IntegrationHandoffStatusTextBlockControl.Text,
+                mmi.IntegrationHandoffStatusTextBlockControl.Text,
                 viewModel.Integration.HandoffStatusText,
                 StringComparison.Ordinal));
-        Check("central-acknowledgement-status-bound",
+        Check("project-acknowledgement-status-bound",
             string.Equals(
-                integrationWorkspace.IntegrationAcknowledgementStatusTextBlockControl.Text,
+                mmi.IntegrationAcknowledgementStatusTextBlockControl.Text,
                 viewModel.Integration.AcknowledgementStatusText,
                 StringComparison.Ordinal));
-        Check("central-result-status-bound",
+        Check("project-result-status-bound",
             string.Equals(
-                integrationWorkspace.IntegrationResultStatusTextBlockControl.Text,
+                mmi.IntegrationResultStatusTextBlockControl.Text,
                 viewModel.Integration.ResultStatusText,
                 StringComparison.Ordinal));
-        Check("central-projection-status-bound",
+        Check("project-projection-status-bound",
             string.Equals(
-                integrationWorkspace.IntegrationProjectionStatusTextBlockControl.Text,
+                mmi.IntegrationProjectionStatusTextBlockControl.Text,
                 viewModel.Integration.ProjectionStatusText,
                 StringComparison.Ordinal));
-        Check("central-last-transaction-bound",
+        Check("project-last-transaction-bound",
             string.Equals(
-                integrationWorkspace.IntegrationLastTransactionTextBlockControl.Text,
+                mmi.IntegrationLastTransactionTextBlockControl.Text,
                 viewModel.Integration.LastTransactionText,
                 StringComparison.Ordinal));
         Check("setup-workflow-status-rendered",
-            integrationWorkspace.IntegrationSetupWorkflowStatusTextBlockControl.IsVisible
-            && integrationWorkspace.IntegrationSetupWorkflowStatusTextBlockControl.ActualWidth > 0
-            && integrationWorkspace.IntegrationSetupWorkflowStatusTextBlockControl.ActualHeight > 0);
+            mmi.IntegrationSetupWorkflowStatusTextBlockControl.IsVisible
+            && mmi.IntegrationSetupWorkflowStatusTextBlockControl.ActualWidth > 0
+            && mmi.IntegrationSetupWorkflowStatusTextBlockControl.ActualHeight > 0);
         Check("setup-workflow-status-bound",
             string.Equals(
-                integrationWorkspace.IntegrationSetupWorkflowStatusTextBlockControl.Text,
+                mmi.IntegrationSetupWorkflowStatusTextBlockControl.Text,
                 viewModel.Integration.SetupWorkflowStatusText,
                 StringComparison.Ordinal));
         Check("tcp-listen-address-rendered",
@@ -238,11 +237,11 @@ internal static class SmokeIntegrationResultVerifier
             inspector.IntegrationWaitForExternalResultCheckBoxControl.IsChecked
                 == viewModel.Integration.Setup.WaitForExternalResult);
         Check("apply-result-command-rendered",
-            integrationWorkspace.ApplyIntegrationResultToSimulationButtonControl.IsVisible
-            && integrationWorkspace.ApplyIntegrationResultToSimulationButtonControl.ActualWidth > 0
-            && integrationWorkspace.ApplyIntegrationResultToSimulationButtonControl.ActualHeight > 0);
+            mmi.ApplyIntegrationResultToSimulationButtonControl.IsVisible
+            && mmi.ApplyIntegrationResultToSimulationButtonControl.ActualWidth > 0
+            && mmi.ApplyIntegrationResultToSimulationButtonControl.ActualHeight > 0);
         Check("apply-result-command-state-bound",
-            integrationWorkspace.ApplyIntegrationResultToSimulationButtonControl.IsEnabled
+            mmi.ApplyIntegrationResultToSimulationButtonControl.IsEnabled
                 == viewModel.Integration.CanApplyResultToSimulation);
 
         if (state == "result")
@@ -250,10 +249,10 @@ internal static class SmokeIntegrationResultVerifier
             var resultText = viewModel.Integration.ResultStatusText;
             Check("result-apply-disabled-without-current-process-handoff",
                 !viewModel.Integration.CanApplyResultToSimulation
-                && !integrationWorkspace.ApplyIntegrationResultToSimulationButtonControl.IsEnabled);
+                && !mmi.ApplyIntegrationResultToSimulationButtonControl.IsEnabled);
             Check("result-row-binding-current",
                 string.Equals(
-                    integrationWorkspace.IntegrationResultStatusTextBlockControl.Text,
+                    mmi.IntegrationResultStatusTextBlockControl.Text,
                     resultText,
                     StringComparison.Ordinal));
             Check("result-outcome-pass", resultText.Contains("Pass", StringComparison.Ordinal));
@@ -317,19 +316,17 @@ internal static class SmokeIntegrationResultVerifier
         }
         else if (state == "history")
         {
-            integrationWorkspace.IntegrationTransactionHistoryExpanderControl.IsExpanded = true;
-            integrationWorkspace.IntegrationTransactionDiagnosticsExpanderControl.IsExpanded = true;
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            integrationWorkspace.IntegrationTransactionHistoryListControl.BringIntoView();
-            integrationWorkspace.IntegrationTransactionDiagnosticsListControl.BringIntoView();
+            mmi.IntegrationTransactionHistoryListControl.BringIntoView();
+            mmi.IntegrationTransactionDiagnosticsListControl.BringIntoView();
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             Check(
-                "history-expander-expanded",
-                integrationWorkspace.IntegrationTransactionHistoryExpanderControl.IsExpanded);
+                "history-section-visible",
+                mmi.IntegrationTransactionHistorySectionControl.IsVisible);
             Check(
-                "diagnostics-expander-expanded",
-                integrationWorkspace.IntegrationTransactionDiagnosticsExpanderControl.IsExpanded);
-            var diagnosticsFilter = integrationWorkspace.IntegrationTransactionDiagnosticsFilterControl;
+                "diagnostics-section-visible",
+                mmi.IntegrationTransactionDiagnosticsSectionControl.IsVisible);
+            var diagnosticsFilter = mmi.IntegrationTransactionDiagnosticsFilterControl;
             Check(
                 "diagnostics-filter-visible",
                 diagnosticsFilter.IsVisible
@@ -350,7 +347,7 @@ internal static class SmokeIntegrationResultVerifier
             Check("diagnostics-filter-popup-open", diagnosticsFilter.IsDropDownOpen);
             Check("diagnostics-filter-keyboard-focus", diagnosticsFilter.IsKeyboardFocusWithin);
             diagnosticsFilter.IsDropDownOpen = false;
-            var historyFilter = integrationWorkspace.IntegrationTransactionHistoryFilterControl;
+            var historyFilter = mmi.IntegrationTransactionHistoryFilterControl;
             Check(
                 "history-filter-visible",
                 historyFilter.IsVisible
@@ -373,12 +370,12 @@ internal static class SmokeIntegrationResultVerifier
             historyFilter.IsDropDownOpen = false;
             Check(
                 "history-items-present",
-                integrationWorkspace.IntegrationTransactionHistoryListControl.Items.Count > 0
-                && integrationWorkspace.IntegrationTransactionHistoryListControl.Items.Count
+                mmi.IntegrationTransactionHistoryListControl.Items.Count > 0
+                && mmi.IntegrationTransactionHistoryListControl.Items.Count
                     == viewModel.Integration.TransactionHistory.Count
-                && integrationWorkspace.IntegrationTransactionHistoryListControl.Items.Count
+                && mmi.IntegrationTransactionHistoryListControl.Items.Count
                     == viewModel.Integration.TransactionHistoryRows.Count
-                && integrationWorkspace.IntegrationTransactionHistoryListControl.Items.Count
+                && mmi.IntegrationTransactionHistoryListControl.Items.Count
                     == viewModel.Integration.VisibleTransactionHistoryRows.Count);
             Check(
                 "history-status-projection",
@@ -412,7 +409,7 @@ internal static class SmokeIntegrationResultVerifier
                 Check(
                     "history-filter-state-applies",
                     viewModel.Integration.VisibleTransactionHistoryRows.Count > 0
-                    && integrationWorkspace.IntegrationTransactionHistoryListControl.Items.Count
+                    && mmi.IntegrationTransactionHistoryListControl.Items.Count
                         == viewModel.Integration.VisibleTransactionHistoryRows.Count
                     && ReferenceEquals(
                         viewModel.Integration.SelectedTransactionHistoryFilter,
@@ -431,8 +428,8 @@ internal static class SmokeIntegrationResultVerifier
                     "history-filter-empty-state",
                     viewModel.Integration.VisibleTransactionHistoryRows.Count == 0
                     && viewModel.Integration.HasTransactionHistoryEmptyState
-                    && integrationWorkspace.IntegrationTransactionHistoryListControl.Items.Count == 0
-                    && integrationWorkspace.IntegrationTransactionHistoryEmptyTextBlockControl.IsVisible);
+                    && mmi.IntegrationTransactionHistoryListControl.Items.Count == 0
+                    && mmi.IntegrationTransactionHistoryEmptyTextBlockControl.IsVisible);
             }
             else
             {
@@ -443,8 +440,8 @@ internal static class SmokeIntegrationResultVerifier
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             Check(
                 "diagnostics-items-present",
-                integrationWorkspace.IntegrationTransactionDiagnosticsListControl.Items.Count > 0
-                && integrationWorkspace.IntegrationTransactionDiagnosticsListControl.Items.Count
+                mmi.IntegrationTransactionDiagnosticsListControl.Items.Count > 0
+                && mmi.IntegrationTransactionDiagnosticsListControl.Items.Count
                     == viewModel.Integration.TransactionDiagnostics.Count);
             var availableDiagnosticStates = viewModel.Integration.TransactionDiagnostics
                 .Select(diagnostic => diagnostic.State)
@@ -460,7 +457,7 @@ internal static class SmokeIntegrationResultVerifier
                     viewModel.Integration.VisibleTransactionDiagnostics.Count > 0
                     && viewModel.Integration.VisibleTransactionDiagnostics.All(diagnostic =>
                         diagnostic.State == populatedDiagnosticsFilter.State)
-                    && integrationWorkspace.IntegrationTransactionDiagnosticsListControl.Items.Count
+                    && mmi.IntegrationTransactionDiagnosticsListControl.Items.Count
                         == viewModel.Integration.VisibleTransactionDiagnostics.Count);
             }
             else
@@ -477,8 +474,8 @@ internal static class SmokeIntegrationResultVerifier
                     "diagnostics-filter-empty-state",
                     viewModel.Integration.VisibleTransactionDiagnostics.Count == 0
                     && viewModel.Integration.HasTransactionDiagnosticsEmptyState
-                    && integrationWorkspace.IntegrationTransactionDiagnosticsListControl.Items.Count == 0
-                    && integrationWorkspace.IntegrationTransactionDiagnosticsEmptyTextBlockControl.IsVisible);
+                    && mmi.IntegrationTransactionDiagnosticsListControl.Items.Count == 0
+                    && mmi.IntegrationTransactionDiagnosticsEmptyTextBlockControl.IsVisible);
             }
             else
             {
@@ -488,12 +485,12 @@ internal static class SmokeIntegrationResultVerifier
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             Check(
                 "history-item-visible",
-                integrationWorkspace.IntegrationTransactionHistoryListControl.ItemContainerGenerator.ContainerFromIndex(0)
+                mmi.IntegrationTransactionHistoryListControl.ItemContainerGenerator.ContainerFromIndex(0)
                     is FrameworkElement historyItem
                 && historyItem.IsVisible);
             Check(
                 "history-status-rendered",
-                integrationWorkspace.IntegrationTransactionHistoryListControl.ItemContainerGenerator.ContainerFromIndex(0)
+                mmi.IntegrationTransactionHistoryListControl.ItemContainerGenerator.ContainerFromIndex(0)
                     is FrameworkElement historyStatusItem
                 && SmokeVisualTreeQuery.FindVisualDescendant<TextBlock>(
                     historyStatusItem,
@@ -501,28 +498,28 @@ internal static class SmokeIntegrationResultVerifier
                         textBlock.Text,
                         viewModel.Integration.TransactionHistoryRows[0].StatusText,
                         StringComparison.Ordinal)) is not null);
-            var historyContainer = integrationWorkspace.IntegrationTransactionHistoryListControl
+            var historyContainer = mmi.IntegrationTransactionHistoryListControl
                 .ItemContainerGenerator.ContainerFromIndex(0) as FrameworkElement;
             var historyRow = viewModel.Integration.TransactionHistoryRows.FirstOrDefault();
-            var shortTransactionIdBlock = historyRow is { } row && historyContainer is not null
+            var transactionIdBlock = historyRow is { } row && historyContainer is not null
                 ? SmokeVisualTreeQuery.FindVisualDescendant<TextBlock>(
                     historyContainer,
                     textBlock => string.Equals(
                         textBlock.Text,
-                        row.ShortTransactionId,
+                        row.FullTransactionId,
                         StringComparison.Ordinal))
                 : null;
             Check(
-                "history-short-id-rendered",
-                shortTransactionIdBlock is not null
-                && shortTransactionIdBlock.Text.StartsWith("TX-", StringComparison.Ordinal)
-                && shortTransactionIdBlock.Text.Length == 11);
+                "history-full-id-rendered",
+                transactionIdBlock is not null
+                && Guid.TryParseExact(transactionIdBlock.Text, "D", out _)
+                && transactionIdBlock.TextWrapping == TextWrapping.Wrap);
             Check(
                 "history-full-id-tooltip",
-                shortTransactionIdBlock is not null
+                transactionIdBlock is not null
                 && historyRow is { } fullIdRow
                 && string.Equals(
-                    shortTransactionIdBlock.ToolTip as string,
+                    transactionIdBlock.ToolTip as string,
                     fullIdRow.FullTransactionId,
                     StringComparison.Ordinal)
                 && string.Equals(
@@ -531,7 +528,7 @@ internal static class SmokeIntegrationResultVerifier
                     StringComparison.Ordinal));
             Check(
                 "diagnostics-item-visible",
-                integrationWorkspace.IntegrationTransactionDiagnosticsListControl.ItemContainerGenerator.ContainerFromIndex(0)
+                mmi.IntegrationTransactionDiagnosticsListControl.ItemContainerGenerator.ContainerFromIndex(0)
                     is FrameworkElement diagnosticsItem
                 && diagnosticsItem.IsVisible);
             Check(

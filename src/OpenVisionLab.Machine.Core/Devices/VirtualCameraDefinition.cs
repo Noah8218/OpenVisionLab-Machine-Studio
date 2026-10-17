@@ -36,8 +36,16 @@ public sealed class VirtualCameraDefinition
                 "Placeholder inspection decision is not defined.");
     }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("geometry")]
+    public CameraGeometryDefinition? Geometry { get; set; }
+
     [JsonPropertyName("singleImageSource")]
     public VirtualSingleImageSourceDefinition? SingleImageSource { get; set; }
+
+    [JsonPropertyName("numericalInput")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public NumericalCameraSettings? NumericalInput { get; set; }
 }
 
 /// <summary>
@@ -58,3 +66,6 @@ public sealed class VirtualSingleImageSourceDefinition
     [JsonPropertyName("pixelFormat")]
     public string PixelFormat { get; set; } = string.Empty;
 }
+
+/// <summary>Authored virtual-camera geometry, independent of the selected image source.</summary>
+public sealed record CameraGeometryDefinition(double FieldOfViewWidth, double FieldOfViewHeight, int ResolutionWidth, int ResolutionHeight, string? AxisId, double OffsetX, double CenterY);

@@ -16,7 +16,10 @@ public enum LayoutItemKind
     PneumaticCylinder,
     Conveyor,
     Workpiece,
-    Camera
+    Camera,
+    DigitalIo,
+    FeedPosition,
+    ExitPosition
 }
 
 public sealed class LayoutItem : INotifyPropertyChanged
@@ -325,8 +328,11 @@ public sealed class LayoutItem : INotifyPropertyChanged
             LayoutComponentKind.DigitalSensor => LayoutItemKind.DigitalSensor,
             LayoutComponentKind.PneumaticCylinder => LayoutItemKind.PneumaticCylinder,
             LayoutComponentKind.Conveyor => LayoutItemKind.Conveyor,
+            LayoutComponentKind.FeedPosition => LayoutItemKind.FeedPosition,
+            LayoutComponentKind.ExitPosition => LayoutItemKind.ExitPosition,
             LayoutComponentKind.Workpiece => LayoutItemKind.Workpiece,
             LayoutComponentKind.Camera => LayoutItemKind.Camera,
+            LayoutComponentKind.DigitalIo => LayoutItemKind.DigitalIo,
             _ => throw new ArgumentOutOfRangeException(nameof(component), component.Kind, null)
         };
         Model = component;

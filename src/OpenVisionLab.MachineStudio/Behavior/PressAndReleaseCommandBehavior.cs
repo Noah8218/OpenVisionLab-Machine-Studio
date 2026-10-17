@@ -69,15 +69,22 @@ public sealed class PressAndReleaseCommandBehavior : Behavior<ButtonBase>
         AssociatedObject.PreviewKeyDown += OnPreviewKeyDown;
         AssociatedObject.PreviewKeyUp += OnPreviewKeyUp;
         AssociatedObject.LostMouseCapture += OnLostMouseCapture;
+        AssociatedObject.LostKeyboardFocus += OnLostKeyboardFocus;
+        AssociatedObject.IsEnabledChanged += OnIsEnabledChanged;
+        AssociatedObject.Unloaded += OnUnloaded;
     }
 
     protected override void OnDetaching()
     {
+        TryRelease();
         AssociatedObject.PreviewMouseLeftButtonDown -= OnPreviewMouseLeftButtonDown;
         AssociatedObject.PreviewMouseLeftButtonUp -= OnPreviewMouseLeftButtonUp;
         AssociatedObject.PreviewKeyDown -= OnPreviewKeyDown;
         AssociatedObject.PreviewKeyUp -= OnPreviewKeyUp;
         AssociatedObject.LostMouseCapture -= OnLostMouseCapture;
+        AssociatedObject.LostKeyboardFocus -= OnLostKeyboardFocus;
+        AssociatedObject.IsEnabledChanged -= OnIsEnabledChanged;
+        AssociatedObject.Unloaded -= OnUnloaded;
         base.OnDetaching();
     }
 
@@ -120,6 +127,18 @@ public sealed class PressAndReleaseCommandBehavior : Behavior<ButtonBase>
 
     private void OnLostMouseCapture(object sender, MouseEventArgs e) =>
         TryRelease();
+
+    private void OnLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => TryRelease();
+
+    private void OnUnloaded(object sender, RoutedEventArgs e) => TryRelease();
+
+    private void OnIsEnabledChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (!AssociatedObject.IsEnabled)
+        {
+            TryRelease();
+        }
+    }
 
     private bool TryPress()
     {

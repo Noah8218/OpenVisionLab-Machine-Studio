@@ -1,0 +1,413 @@
+<UserControl x:Class="OpenVisionLab.MachineStudio.View.Sequence.SequenceStepInspectorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
+             xmlns:seq="clr-namespace:OpenVisionLab.Machine.Core.Sequences;assembly=OpenVisionLab.Machine.Core"
+             UseLayoutRounding="False" Foreground="{DynamicResource Text.Primary}">
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="StepAccentBrush" Color="{StaticResource Color.Accent.Primary}" />
+        <SolidColorBrush x:Key="Text.Primary" Color="{StaticResource Color.Text.Primary}" />
+        <SolidColorBrush x:Key="Text.Secondary" Color="{StaticResource Color.Text.Secondary}" />
+        <SolidColorBrush x:Key="Text.Faint" Color="{StaticResource Color.Text.Secondary}" />
+        <loc:LocalizedSequenceActionConverter x:Key="StepActionConverter" />
+        <conv:InspectorSelectionValueConverter x:Key="StepSelectionValueConverter" />
+        <conv:KoreanWordWrappingConverter x:Key="TeachingNameWrapping" />
+        <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="LineHeight" Value="17.4" />
+        </Style>
+        <Style x:Key="StepTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="LineHeight" Value="18.85" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsCompactLayout, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                    <Setter Property="FontSize" Value="12.5" />
+                    <Setter Property="LineHeight" Value="18.125" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="StepLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="LineHeight" Value="17.4" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,9,0,3" />
+        </Style>
+        <DataTemplate x:Key="StepTargetTemplate">
+            <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Text.Secondary}" FontFamily="Segoe UI, Malgun Gothic" FontSize="12" LineHeight="17.4" TextWrapping="Wrap" />
+        </DataTemplate>
+        <Style x:Key="NonAxisStepFieldsStyle" TargetType="StackPanel">
+            <Style.Triggers><DataTrigger Binding="{Binding SelectedStepDraft.HasAxisCompletionOption}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="AxisStepFieldEndStyle" TargetType="FrameworkElement">
+            <Style.Triggers><DataTrigger Binding="{Binding SelectedStepDraft.HasAxisCompletionOption}" Value="True"><Setter Property="Margin" Value="0,0,0,3" /></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="StepComboStyle" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Style.Resources>
+                <SolidColorBrush x:Key="ComboBoxBackgroundFocused" Color="{StaticResource Color.Surface.Input}" />
+                <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="{StaticResource Color.Surface.Input}" />
+                <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="{StaticResource Color.Surface.Input}" />
+                <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled" Color="{StaticResource Color.Border.Default}" />
+                <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="{StaticResource Color.Text.Secondary}" />
+                <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="{StaticResource Color.Surface.Input}" />
+                <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="{StaticResource Color.Border.Default}" />
+            </Style.Resources>
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+            <Setter Property="Background" Value="{DynamicResource Surface.Input}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Height" Value="Auto" />
+            <Setter Property="Padding" Value="7,4" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.6" /></Trigger>
+            </Style.Triggers>
+        </Style>
+        <DataTemplate x:Key="StepChoiceTemplate">
+            <TextBlock Text="{Binding Value}" FontFamily="Segoe UI, Malgun Gothic" FontSize="12" LineHeight="17.4" Foreground="{DynamicResource Text.Secondary}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="TextWrapping" Value="Wrap" /><Setter Property="TextTrimming" Value="None" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding TemplatedParent.Tag, RelativeSource={RelativeSource TemplatedParent}}" Value="choiceSelection">
+                                <Setter Property="TextWrapping" Value="NoWrap" /><Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </DataTemplate>
+        <DataTemplate x:Key="StepSignalChoiceTemplate">
+            <TextBlock FontFamily="Segoe UI, Malgun Gothic" FontSize="12" LineHeight="17.4" Foreground="{DynamicResource Text.Secondary}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Text" Value="{Binding}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding}" Value="true"><Setter Property="Text" Value="ON" /></DataTrigger>
+                            <DataTrigger Binding="{Binding}" Value="false"><Setter Property="Text" Value="OFF" /></DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </DataTemplate>
+        <Style x:Key="StepTextStyle" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Style.Resources>
+                <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="{StaticResource Color.Surface.Input}" />
+                <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="{StaticResource Color.Surface.Input}" />
+                <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="{StaticResource Color.Surface.Input}" />
+                <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="{StaticResource Color.Border.Default}" />
+                <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="{StaticResource Color.Text.Secondary}" />
+                <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="{StaticResource Color.Border.Default}" />
+                <SolidColorBrush x:Key="TextControlFocusedBorderBrush" Color="{StaticResource Color.Accent.Primary}" />
+            </Style.Resources>
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+            <Setter Property="Background" Value="{DynamicResource Surface.Input}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="7,4" />
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.6" /></Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="StepButtonStyle" TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="13" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Height" Value="Auto" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="Background" Value="{DynamicResource Surface.Raised}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="InspectorButtonBorder" Padding="{TemplateBinding Padding}" CornerRadius="5"
+                                Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="InspectorButtonBorder" Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="InspectorButtonBorder" Property="Background" Value="{DynamicResource Surface.Pressed}" /></Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="InspectorButtonBorder" Property="BorderBrush" Value="{StaticResource StepAccentBrush}" /></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /><Setter TargetName="InspectorButtonBorder" Property="Background" Value="{DynamicResource Surface.Disabled}" /><Setter TargetName="InspectorButtonBorder" Property="BorderBrush" Value="{DynamicResource Border.Disabled}" /></Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions><Condition Property="Tag" Value="primary" /><Condition Property="IsMouseOver" Value="True" /><Condition Property="IsEnabled" Value="True" /></MultiTrigger.Conditions>
+                                <Setter TargetName="InspectorButtonBorder" Property="Background" Value="{DynamicResource Accent.Hover}" />
+                            </MultiTrigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions><Condition Property="Tag" Value="primary" /><Condition Property="IsEnabled" Value="False" /></MultiTrigger.Conditions>
+                                <Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /><Setter TargetName="InspectorButtonBorder" Property="Background" Value="{DynamicResource Accent.Soft}" /><Setter TargetName="InspectorButtonBorder" Property="BorderBrush" Value="{DynamicResource State.RunningBorder}" />
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ContentTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" TextWrapping="Wrap" TextAlignment="Center" FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=Button}}" FontSize="{Binding FontSize, RelativeSource={RelativeSource AncestorType=Button}}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                            <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="LineHeight" Value="17.4" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" /><Style.Triggers><DataTrigger Binding="{Binding FontSize, RelativeSource={RelativeSource AncestorType=Button}}" Value="13"><Setter Property="LineHeight" Value="18.85" /></DataTrigger><DataTrigger Binding="{Binding FontSize, RelativeSource={RelativeSource AncestorType=Button}}" Value="12.5"><Setter Property="LineHeight" Value="18.125" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                        </TextBlock>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsCompactLayout, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"><Setter Property="FontSize" Value="12.5" /></DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="StepApplyButtonStyle" TargetType="Button" BasedOn="{StaticResource StepButtonStyle}">
+            <Setter Property="Tag" Value="primary" />
+            <Setter Property="Background" Value="{StaticResource StepAccentBrush}" /><Setter Property="BorderBrush" Value="{StaticResource StepAccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.OnAccent}" /><Setter Property="FontWeight" Value="SemiBold" />
+        <Style.Triggers><Trigger Property="IsPressed" Value="True"><Setter Property="Background" Value="{DynamicResource Accent.Pressed}" /></Trigger></Style.Triggers></Style>
+    </UserControl.Resources>
+    <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <Border x:Name="StepIdentityHeader" Padding="12,9" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1" Visibility="{Binding HasSelectedStep, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <Border MinHeight="22" VerticalAlignment="Center" Padding="9,1" Margin="0,0,8,0" BorderBrush="{DynamicResource Accent.Primary}" BorderThickness="1" CornerRadius="12" Background="{DynamicResource Surface.Tinted}">
+                        <TextBlock Text="{Binding SelectedStep.Order}" FontSize="11.5" LineHeight="16.675" Foreground="{DynamicResource Accent.Primary}" VerticalAlignment="Center" />
+                    </Border>
+                    <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock x:Name="StepIdentityName" Foreground="{DynamicResource Text.Primary}" Style="{StaticResource StepTitleStyle}" FontWeight="Bold" Text="{Binding SelectedStep.DisplayName}" TextWrapping="Wrap" />
+                        <TextBlock x:Name="StepIdentityId" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource Text.Faint}" FontSize="11.5" LineHeight="16.675" Text="{Binding SelectedStep.Id}" TextWrapping="Wrap" />
+                    </WrapPanel>
+                    <Border Grid.Column="2" MinHeight="22" VerticalAlignment="Center" Padding="9,1" Margin="8,0,0,0" BorderBrush="{DynamicResource Border.Default}" BorderThickness="1" CornerRadius="12" Background="{DynamicResource Surface.Tinted}">
+                        <TextBlock x:Name="StepIdentityAction" MaxWidth="144" TextWrapping="Wrap" FontSize="11.5" LineHeight="16.675" VerticalAlignment="Center" Foreground="{DynamicResource Text.Primary}">
+                            <TextBlock.Text><Binding Path="SelectedStep.StepListActionText" /></TextBlock.Text>
+                        </TextBlock>
+                    </Border>
+                </Grid>
+                <TextBlock x:Name="StepRoleDescription" Margin="0,6,0,0" FontSize="11.5" LineHeight="16.675" Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap">
+                    <TextBlock.Text><MultiBinding Converter="{StaticResource StepActionConverter}" ConverterParameter="description"><Binding Path="SelectedStep.Action" /><Binding Path="Revision" Source="{x:Static loc:LocExtension.RevisionSource}" /><Binding Path="SelectedStep.WaitForAxisCompletion" /><Binding Path="SelectedStep.Parameter" /></MultiBinding></TextBlock.Text>
+                    <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed" /></Trigger></Style.Triggers></Style></TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+        <ScrollViewer Grid.Row="1" x:Name="StepInspectorScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="12">
+
+
+
+                <TextBlock Text="{loc:Loc Key=Sequence.SelectStepSettingsHint}" Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap">
+                    <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding HasSelectedStep}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                </TextBlock>
+                <StackPanel x:Name="StepDraftFields" IsEnabled="{Binding IsStepDraftEditable}" Visibility="{Binding HasSelectedStep, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock FontWeight="SemiBold" Margin="0,0,0,6" Text="{loc:Loc Key=R24.Inspector.Basic}" />
+                    <StackPanel x:Name="StepNameFields" Style="{StaticResource AxisStepFieldEndStyle}">
+                        <TextBlock Style="{StaticResource StepLabelStyle}" Margin="0,0,0,3" Text="{loc:Loc Key=Sequence.Name}" />
+                        <TextBox x:Name="StepDraftName" Style="{StaticResource StepTextStyle}" Text="{Binding SelectedStepDraft.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{loc:Loc Key=Sequence.Name}" />
+                    </StackPanel>
+                    <StackPanel x:Name="StepTargetFields">
+                        <StackPanel.Style><Style TargetType="StackPanel" BasedOn="{StaticResource AxisStepFieldEndStyle}"><Style.Triggers><DataTrigger Binding="{Binding SelectedStepDraft.UsesWorkpieceAsTarget}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger><DataTrigger Binding="{Binding SelectedStepDraft.Action}" Value="{x:Static seq:SequenceStepAction.Delay}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+                        <TextBlock Style="{StaticResource StepLabelStyle}" Text="{Binding StepTargetCaption}" />
+                        <ComboBox x:Name="StepDraftTarget" Style="{StaticResource StepComboStyle}" ItemTemplate="{StaticResource StepTargetTemplate}" ItemsSource="{Binding SelectedStepDraft.InspectorTargets}" SelectedValuePath="Id" SelectedValue="{Binding SelectedStepDraft.TargetId, Mode=TwoWay, Converter={StaticResource StepSelectionValueConverter}}"  AutomationProperties.Name="{Binding StepTargetCaption}" />
+                    </StackPanel>
+                    <Grid x:Name="StepValueTimeoutFields">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition><ColumnDefinition.Style><Style TargetType="ColumnDefinition"><Setter Property="Width" Value="0" /><Style.Triggers><DataTrigger Binding="{Binding SelectedStepDraft.Action}" Value="{x:Static seq:SequenceStepAction.WaitSignal}"><Setter Property="Width" Value="9" /></DataTrigger></Style.Triggers></Style></ColumnDefinition.Style></ColumnDefinition>
+                            <ColumnDefinition><ColumnDefinition.Style><Style TargetType="ColumnDefinition"><Setter Property="Width" Value="0" /><Style.Triggers><DataTrigger Binding="{Binding SelectedStepDraft.Action}" Value="{x:Static seq:SequenceStepAction.WaitSignal}"><Setter Property="Width" Value="*" /></DataTrigger></Style.Triggers></Style></ColumnDefinition.Style></ColumnDefinition>
+                        </Grid.ColumnDefinitions>
+                    <Grid x:Name="StepParameterTeachingFields">
+                        <Grid.Style><Style TargetType="Grid" BasedOn="{StaticResource AxisStepFieldEndStyle}"><Setter Property="Visibility" Value="{Binding SelectedStepDraft.HasInspectorParameter, Converter={StaticResource BooleanToVisibilityConverter}}" /><Setter Property="Grid.ColumnSpan" Value="3" /><Style.Triggers><DataTrigger Binding="{Binding SelectedStepDraft.Action}" Value="{x:Static seq:SequenceStepAction.WaitSignal}"><Setter Property="Grid.ColumnSpan" Value="1" /></DataTrigger></Style.Triggers></Style></Grid.Style>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition><ColumnDefinition.Style><Style TargetType="ColumnDefinition"><Setter Property="Width" Value="0" /><Style.Triggers><DataTrigger Binding="{Binding SelectedStepDraft.HasAxisCompletionOption}" Value="True"><Setter Property="Width" Value="9" /></DataTrigger></Style.Triggers></Style></ColumnDefinition.Style></ColumnDefinition>
+                            <ColumnDefinition><ColumnDefinition.Style><Style TargetType="ColumnDefinition"><Setter Property="Width" Value="0" /><Style.Triggers><DataTrigger Binding="{Binding SelectedStepDraft.HasAxisCompletionOption}" Value="True"><Setter Property="Width" Value="*" /></DataTrigger></Style.Triggers></Style></ColumnDefinition.Style></ColumnDefinition>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Name="StepParameterCaption" Style="{StaticResource StepLabelStyle}" AutomationProperties.Name="{Binding StepParameterLabel}"><Run Text="{Binding StepParameterCaption, Mode=OneWay}" /><Run Text="{Binding StepParameterUnitText, Mode=OneWay}" FontSize="11" Foreground="{DynamicResource Text.Faint}" /></TextBlock>
+                            <Grid>
+                                <Border x:Name="StepParameterFrame" CornerRadius="4" BorderThickness="1" IsHitTestVisible="False" Opacity="{Binding Opacity, ElementName=StepDraftParameter}">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="{DynamicResource Surface.Input}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsStepParameterInvalid}" Value="True"><Setter Property="Background" Value="{DynamicResource State.FaultSurface}" /><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /></DataTrigger>
+                                                <DataTrigger Binding="{Binding SelectedStepDraft.UsesParameterChoices}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                </Border>
+                                <TextBox x:Name="StepDraftParameter" Text="{Binding SelectedStepDraft.Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding SelectedStepDraft.IsParameterEditable}" AutomationProperties.Name="{Binding StepParameterLabel}">
+                                    <TextBox.Resources>
+                                        <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" /><SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
+                                        <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="Transparent" /><SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="Transparent" />
+                                        <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="Transparent" />
+                                    </TextBox.Resources>
+                                    <TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource StepTextStyle}"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderBrush" Value="Transparent" /><Style.Triggers><DataTrigger Binding="{Binding SelectedStepDraft.UsesParameterChoices}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></TextBox.Style>
+                                </TextBox>
+                                <ComboBox x:Name="StepSignalChoice" ItemTemplate="{StaticResource StepSignalChoiceTemplate}" ItemsSource="{Binding SelectedStepDraft.InspectorParameterOptions}" SelectedItem="{Binding SelectedStepDraft.ParameterChoice, Mode=TwoWay}" AutomationProperties.Name="{Binding StepParameterLabel}">
+                                    <ComboBox.Style><Style TargetType="ComboBox" BasedOn="{StaticResource StepComboStyle}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding SelectedStepDraft.UsesParameterChoices}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></ComboBox.Style>
+                                </ComboBox>
+                            </Grid>
+                            <TextBlock x:Name="StepParameterError" Text="{loc:Loc Key=R24.InvalidNumber}" FontSize="11.5" LineHeight="16.675" Foreground="{DynamicResource State.Fault}" TextWrapping="Wrap" Margin="0,3,0,0" Visibility="{Binding IsStepParameterInvalid, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Visibility="{Binding SelectedStepDraft.HasAxisCompletionOption, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock x:Name="StepTeachingCaption" Style="{StaticResource StepLabelStyle}" Text="{loc:Loc Key=R24.StepTeachingUse}" />
+                            <ComboBox x:Name="StepDraftTeaching" Tag="choiceSelection" Style="{StaticResource StepComboStyle}" ItemTemplate="{StaticResource StepChoiceTemplate}" ItemsSource="{Binding StepTeachingOptions}" SelectedValuePath="Key" SelectedValue="{Binding StepTeachingName, Mode=TwoWay}" AutomationProperties.Name="{loc:Loc Key=R24.StepTeachingUse}">
+                            </ComboBox>
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel x:Name="StepTimeoutFields">
+                        <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="{Binding SelectedStepDraft.HasInspectorTimeout, Converter={StaticResource BooleanToVisibilityConverter}}" /><Setter Property="Grid.Row" Value="1" /><Setter Property="Grid.ColumnSpan" Value="3" /><Style.Triggers><DataTrigger Binding="{Binding SelectedStepDraft.Action}" Value="{x:Static seq:SequenceStepAction.WaitSignal}"><Setter Property="Grid.Row" Value="0" /><Setter Property="Grid.Column" Value="2" /><Setter Property="Grid.ColumnSpan" Value="1" /></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+                        <TextBlock x:Name="StepTimeoutCaption" Style="{StaticResource StepLabelStyle}" AutomationProperties.Name="{loc:Loc Key=Sequence.StepTimeout}"><Run Text="{loc:Loc Key=Sequence.StepTimeout}" /><Run Text=" (s)" FontSize="11" Foreground="{DynamicResource Text.Faint}" /></TextBlock>
+                        <TextBox x:Name="StepDraftTimeout" Style="{StaticResource StepTextStyle}" Text="{Binding StepTimeoutText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding SelectedStepDraft.IsTimeoutEditable}" AutomationProperties.Name="{loc:Loc Key=Sequence.StepTimeout}" />
+                    <TextBlock x:Name="StepTimeoutHint" FontSize="11" Foreground="{DynamicResource Text.Faint}" TextWrapping="Wrap" Text="{Binding StepTimeoutHint}" Visibility="{Binding SelectedStepDraft.HasInspectorTimeout, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+                    </Grid>
+                    <StackPanel x:Name="StepAxisSettingsEntry" Margin="0,8,0,0" Visibility="{Binding SelectedStepDraft.HasAxisCompletionOption, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Button x:Name="OpenStepAxisSettingsButton" Style="{StaticResource StepButtonStyle}" Content="{loc:Loc Key=R40.TeachingOpenAxisSettings}" Command="{Binding DataContext.OpenStepAxisSettingsCommand, RelativeSource={RelativeSource AncestorType=Window}}" AutomationProperties.Name="{loc:Loc Key=R40.TeachingOpenAxisSettings}" />
+                        <TextBlock x:Name="StepAxisSettingsHint" Text="{loc:Loc Key=R40.TeachingAxisSettingsHint}" Foreground="{DynamicResource Text.Secondary}" FontSize="11" TextWrapping="Wrap" Margin="0,5,0,0" />
+                    </StackPanel>
+                    <Expander x:Name="TeachingPositionLookup" Header="{loc:Loc Key=R40.TeachingLookup}" IsExpanded="False" Margin="0,10,0,0" Visibility="{Binding SelectedStepDraft.HasAxisCompletionOption, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel Margin="0,4,0,6">
+                            <TextBlock x:Name="TeachingAxisContext" Text="{Binding TeachingAxisText, Converter={StaticResource TeachingNameWrapping}}" TextWrapping="Wrap" />
+                            <TextBlock Style="{StaticResource StepLabelStyle}" Text="{loc:Loc Key=R40.TeachingSearch}" />
+                            <TextBox x:Name="TeachingPositionSearch" Style="{StaticResource StepTextStyle}" Text="{Binding TeachingSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{loc:Loc Key=R40.TeachingSearch}" />
+                            <TextBlock x:Name="TeachingPositionCount" Text="{Binding TeachingPositionCountText}" Foreground="{DynamicResource Text.Secondary}" Margin="0,5,0,4" />
+                            <ListBox x:Name="TeachingPositionList" ItemsSource="{Binding TeachingPositions}" SelectedValuePath="Key" SelectedValue="{Binding TeachingPreviewName, Mode=TwoWay}" MinHeight="68" MaxHeight="164" BorderThickness="1" BorderBrush="{DynamicResource Border.Default}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto" AutomationProperties.Name="{loc:Loc Key=R40.TeachingLookup}">
+                                <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="4,3">
+                                    <TextBlock Text="{Binding Key, Converter={StaticResource TeachingNameWrapping}}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Value}" Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" />
+                                </StackPanel></DataTemplate></ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock Style="{StaticResource StepLabelStyle}" Text="{loc:Loc Key=R40.TeachingSelected}" />
+                            <TextBlock x:Name="TeachingPreviewName" Text="{Binding TeachingPreviewName, Converter={StaticResource TeachingNameWrapping}}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="TeachingPreviewValue" Text="{Binding TeachingPreviewValue}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="TeachingLookupHint" Text="{loc:Loc Key=R40.TeachingLookupHint}" Foreground="{DynamicResource Text.Secondary}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,7" />
+                            <Button x:Name="CopyTeachingPreviewButton" Style="{StaticResource StepButtonStyle}" Content="{loc:Loc Key=R40.TeachingCopyDraft}" Command="{Binding CopyTeachingPreviewCommand}" AutomationProperties.Name="{loc:Loc Key=R40.TeachingCopyDraft}" />
+                        </StackPanel>
+                    </Expander>
+                    <TextBlock x:Name="StepNextCaption" Style="{StaticResource StepLabelStyle}" Text="{Binding StepNextCaption}" />
+                    <ComboBox x:Name="StepDraftNext" Tag="choiceSelection" Style="{StaticResource StepComboStyle}" ItemTemplate="{StaticResource StepChoiceTemplate}" ItemsSource="{Binding StepNextStepOptions}" SelectedValuePath="Key" SelectedItem="{Binding StepNextStepOption, Mode=TwoWay}" AutomationProperties.Name="{Binding StepNextCaption}" />
+                    <StackPanel x:Name="StepFailureFields" Visibility="{Binding SelectedStepDraft.HasFailureRoute, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Style="{StaticResource StepLabelStyle}" Text="{loc:Loc Key=R24.Inspector.OnNG}" />
+                        <ComboBox x:Name="StepDraftFailure" Tag="choiceSelection" Style="{StaticResource StepComboStyle}" ItemTemplate="{StaticResource StepChoiceTemplate}" ItemsSource="{Binding StepFailureOptions}" SelectedValuePath="Key" SelectedItem="{Binding StepFailureOption, Mode=TwoWay}" AutomationProperties.Name="{loc:Loc Key=R24.Inspector.OnNG}" />
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding SelectedStepDraft.HasWorkpieceTargetOptions, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Style="{StaticResource StepLabelStyle}" Text="{loc:Loc Key=Sequence.WorkpieceTarget}" />
+                        <ComboBox Style="{StaticResource StepComboStyle}" ItemTemplate="{StaticResource StepTargetTemplate}" ItemsSource="{Binding SelectedStepDraft.InspectorWorkpieceTargets}" SelectedValuePath="Id" SelectedValue="{Binding SelectedStepDraft.WorkpieceComponentId, Mode=TwoWay, Converter={StaticResource StepSelectionValueConverter}}" AutomationProperties.Name="{loc:Loc Key=Sequence.WorkpieceTarget}" />
+                    </StackPanel>
+                    <StackPanel x:Name="StepAxisWaitFields" Visibility="{Binding SelectedStepDraft.HasAxisCompletionOption, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <CheckBox Margin="0,10,0,0" Content="{loc:Loc Key=Sequence.WaitForAxisCompletion}" IsChecked="{Binding SelectedStepDraft.WaitForAxisCompletion, Mode=TwoWay}" Visibility="{Binding SelectedStepDraft.HasAxisCompletionOption, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding SelectedStepDraft.HasEjectionDelay, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Style="{StaticResource StepLabelStyle}" Text="{loc:Loc Key=Sequence.EjectionDelay}" />
+                        <TextBox Style="{StaticResource StepTextStyle}" Text="{Binding StepEjectionDelayText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{loc:Loc Key=Sequence.EjectionDelay}" />
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding SelectedStepDraft.HasDestinationUnit, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Style="{StaticResource StepLabelStyle}" Text="{loc:Loc Key=Sequence.DestinationUnit}" />
+                        <ComboBox Style="{StaticResource StepComboStyle}" ItemTemplate="{StaticResource StepTargetTemplate}" ItemsSource="{Binding SelectedStepDraft.InspectorDestinationUnits}" SelectedValuePath="Id" SelectedValue="{Binding SelectedStepDraft.DestinationUnitId, Mode=TwoWay, Converter={StaticResource StepSelectionValueConverter}}" AutomationProperties.Name="{loc:Loc Key=Sequence.DestinationUnit}" />
+                    </StackPanel>
+                    <Expander x:Name="StepAdditionalSettings" Margin="0,12,0,0" IsExpanded="{Binding IsStepAdditionalExpanded, Mode=TwoWay}">
+                        <Expander.Header><WrapPanel><TextBlock FontWeight="SemiBold" Text="{loc:Loc Key=R24.Inspector.Additional}" /><Border Margin="8,0,0,0" Padding="6,1" CornerRadius="8" BorderBrush="{DynamicResource Border.Default}" BorderThickness="1"><TextBlock x:Name="StepAdditionalBadge" FontSize="11" Text="{Binding StepAdditionalStatus}" /></Border></WrapPanel></Expander.Header>
+                        <StackPanel Margin="0,6,0,0">
+                    <StackPanel x:Name="StepActionFields">
+                        <TextBlock Style="{StaticResource StepLabelStyle}" Text="{loc:Loc Key=Sequence.Action}" />
+                        <ComboBox x:Name="StepDraftAction" Style="{StaticResource StepComboStyle}" ItemsSource="{Binding SelectedStepDraft.AvailableActions}" SelectedItem="{Binding SelectedStepDraft.Action, Mode=TwoWay}" AutomationProperties.Name="{loc:Loc Key=Sequence.Action}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock TextWrapping="Wrap">
+                                        <TextBlock.Text>
+                                            <MultiBinding Converter="{StaticResource StepActionConverter}">
+                                                <Binding />
+                                                <Binding Path="Revision" Source="{x:Static loc:LocExtension.RevisionSource}" />
+                                            </MultiBinding>
+                                        </TextBlock.Text>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                    <StackPanel x:Name="StepRouteFailureFields">
+                        <TextBlock Style="{StaticResource StepLabelStyle}" Text="{loc:Loc Key=R24.Inspector.AlarmRoute}" />
+                        <ComboBox x:Name="StepDraftAlarm" Tag="choiceSelection" Style="{StaticResource StepComboStyle}" ItemTemplate="{StaticResource StepChoiceTemplate}" ItemsSource="{Binding StepAlarmOptions}" SelectedValuePath="Key" SelectedItem="{Binding StepAlarmOption, Mode=TwoWay}" AutomationProperties.Name="{loc:Loc Key=R24.Inspector.AlarmRoute}" />
+                        <TextBlock Margin="0,3,0,0" FontSize="11" Foreground="{DynamicResource Text.Faint}" TextWrapping="Wrap" Text="{loc:Loc Key=R24.Inspector.AlarmHint}" />
+                        <StackPanel Visibility="{Binding SelectedStepDraft.HasInvalidFailureRoute, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Style="{StaticResource StepLabelStyle}" Text="{loc:Loc Key=R24.Inspector.LegacyFailure}" />
+                            <TextBox x:Name="StepLegacyFailure" Style="{StaticResource StepTextStyle}" Text="{Binding SelectedStepDraft.FailureStepId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{loc:Loc Key=R24.Inspector.LegacyFailure}" />
+                            <TextBlock FontSize="11" Foreground="{DynamicResource Text.Faint}" TextWrapping="Wrap" Text="{loc:Loc Key=R24.Inspector.LegacyFailureHint}" />
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel x:Name="StepCheckpointFields">
+                        <CheckBox x:Name="StepExpectedCheck" Margin="0,10,0,0" Content="{loc:Loc Key=R24.Inspector.EndStateCheck}" IsChecked="{Binding SelectedStepDraft.HasExpectedState, Mode=TwoWay}" IsEnabled="{Binding SelectedStepDraft.CanEditExpectedState}" />
+                        <TextBlock Margin="0,4,0,0" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource Text.Faint}" Text="{loc:Loc Key=R24.Inspector.DryRunHint}" />
+                        <StackPanel x:Name="StepExpectedInputs" Visibility="{Binding SelectedStepDraft.HasExpectedState, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Style="{StaticResource StepLabelStyle}" Text="{loc:Loc Key=R24.Inspector.CheckTarget}" />
+                        <ComboBox x:Name="StepExpectedTarget" Margin="0,4,0,0" Style="{StaticResource StepComboStyle}" ItemTemplate="{StaticResource StepTargetTemplate}" ItemsSource="{Binding SelectedStepDraft.InspectorExpectedTargets}" SelectedValuePath="Id" SelectedValue="{Binding SelectedStepDraft.ExpectedTargetId, Mode=TwoWay, Converter={StaticResource StepSelectionValueConverter}}" IsEnabled="{Binding SelectedStepDraft.HasExpectedState}" AutomationProperties.Name="{loc:Loc Key=Sequence.ExpectedCheckpoint}" />
+                        <TextBlock Style="{StaticResource StepLabelStyle}" Text="{loc:Loc Key=Sequence.ExpectedState}" />
+                        <ComboBox x:Name="StepExpectedState" Style="{StaticResource StepComboStyle}" ItemsSource="{Binding SelectedStepDraft.InspectorExpectedStates}" SelectedItem="{Binding SelectedStepDraft.ExpectedState, Mode=TwoWay, Converter={StaticResource StepSelectionValueConverter}}" IsEnabled="{Binding SelectedStepDraft.HasExpectedState}" AutomationProperties.Name="{loc:Loc Key=Sequence.ExpectedState}" />
+                        </StackPanel>
+                    </StackPanel>
+                        </StackPanel>
+                    </Expander>
+                </StackPanel>
+                <TextBlock x:Name="StepDraftError" FontSize="11.5" LineHeight="16.675" Margin="0,8,0,0" Foreground="{DynamicResource State.Fault}" Text="{Binding StepDraftErrorText}" TextWrapping="Wrap">
+                    <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}"><Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed" /></Trigger></Style.Triggers></Style></TextBlock.Style>
+                </TextBlock>
+                <TextBlock x:Name="StepValidationState" Text="{Binding SelectedStepDraft.ValidationText}">
+                    <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource StepLabelStyle}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding StepDraftErrorText}" Value=""><Setter Property="Visibility" Value="Visible" /></DataTrigger><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding SelectedStepDraft.HasAxisCompletionOption}" Value="True" /><Condition Binding="{Binding SelectedStepDraft.HasExpectedState}" Value="False" /><Condition Binding="{Binding StepDraftErrorText}" Value="" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Collapsed" /></MultiDataTrigger></Style.Triggers></Style></TextBlock.Style>
+                </TextBlock>
+                <StackPanel Margin="0,12,0,0">
+                    <WrapPanel>
+                        <Button Margin="0,0,6,6" Style="{StaticResource StepButtonStyle}" Content="{loc:Loc Key=R24.StepUp}" Command="{Binding MoveStepUpCommand}" />
+                        <Button Margin="0,0,6,6" Style="{StaticResource StepButtonStyle}" Content="{loc:Loc Key=R24.StepDown}" Command="{Binding MoveStepDownCommand}" />
+                        <Button Margin="0,0,6,6" Style="{StaticResource StepButtonStyle}" Foreground="{DynamicResource State.Fault}" Content="{loc:Loc Key=R24.DeleteStep}" Command="{Binding DeleteStepCommand}" />
+                    </WrapPanel>
+                    <Button HorizontalAlignment="Left" x:Name="TestSelectedStepButton" Margin="0,0,0,6" Style="{StaticResource StepButtonStyle}" Content="{loc:Loc Key=Sequence.TestSelectedStep}" Command="{Binding TestSelectedStepCommand}" AutomationProperties.Name="{loc:Loc Key=Sequence.TestSelectedStep}" />
+                </StackPanel>
+                <TextBlock x:Name="StepTestStatus" Margin="0,6,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{Binding StepTestStatusText}" TextWrapping="Wrap" Visibility="{Binding HasStepTestStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <TextBlock Text="{Binding ValidationSummary}" TextWrapping="Wrap">
+                    <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource StepLabelStyle}"><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding SelectedStepDraft.HasAxisCompletionOption}" Value="True" /><Condition Binding="{Binding ValidationIssues.Count}" Value="0" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Collapsed" /></MultiDataTrigger></Style.Triggers></Style></TextBlock.Style>
+                </TextBlock>
+                <ItemsControl ItemsSource="{Binding ValidationIssues}"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Foreground="{DynamicResource State.Fault}" Text="{Binding DisplayText}" TextWrapping="Wrap" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                <Expander x:Name="SequenceUnitSettings" Header="{loc:Loc Key=Sequence.UnitSettings}" Margin="0,12,0,0" IsExpanded="False" Visibility="{Binding HasSequences, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Margin="0,6,0,10">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="IsEnabled" Value="{Binding IsEditable}" />
+                                <Style.Triggers><DataTrigger Binding="{Binding IsStepTestBusy}" Value="True"><Setter Property="IsEnabled" Value="False" /></DataTrigger></Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Style="{StaticResource StepLabelStyle}" Text="{loc:Loc Key=Sequence.OwnerUnit}" />
+                        <ComboBox x:Name="SequenceOwnerUnit" Style="{StaticResource StepComboStyle}" ItemTemplate="{StaticResource StepTargetTemplate}" ItemsSource="{Binding AvailableUnits}" SelectedValuePath="Id" SelectedValue="{Binding SelectedUnitId, Mode=TwoWay}" AutomationProperties.Name="{loc:Loc Key=Sequence.OwnerUnit}" />
+                        <TextBlock Margin="0,5,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Sequence.UnitSettingsScope}" TextWrapping="Wrap" />
+                        <StackPanel Visibility="{Binding HasSequenceUnit, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Style="{StaticResource StepLabelStyle}" Text="{loc:Loc Key=Sequence.UnitRepeatRange}" />
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="60" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBox x:Name="InspectorUnitRepeatCount" Style="{StaticResource StepTextStyle}" MaxLength="3" Text="{Binding UnitRepeatCount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{loc:Loc Key=Sequence.UnitRepeatRange}" />
+                                <Button x:Name="InspectorApplyUnitRepeat" Grid.Column="1" Margin="6,0,0,0" Style="{StaticResource StepButtonStyle}" Content="{loc:Loc Key=Sequence.ApplyUnitRepeat}" Command="{Binding ApplyUnitRepeatCommand}" AutomationProperties.Name="{loc:Loc Key=Sequence.ApplyUnitRepeat}" />
+                            </Grid>
+                        </StackPanel>
+                        <Button x:Name="InspectorAddUnitSequence" Margin="0,10,0,0" Style="{StaticResource StepButtonStyle}" Content="{loc:Loc Key=Sequence.AddUnitSequence}" Command="{Binding AddUnitSequenceCommand}" AutomationProperties.Name="{loc:Loc Key=Sequence.AddUnitSequence}" />
+                        <TextBlock Margin="0,5,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Sequence.AddUnitSequenceHint}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+        <Border x:Name="StepInspectorFooter" Grid.Row="2" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource Border.Subtle}" Background="{DynamicResource Surface.Tinted}">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <TextBlock VerticalAlignment="Center" FontSize="11.5" LineHeight="16.675" TextWrapping="Wrap">
+                    <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Text.Faint}" /><Setter Property="Text" Value="{loc:Loc Key=R24.NoChanges}" /><Style.Triggers><DataTrigger Binding="{Binding HasPendingStepDraft}" Value="True"><Setter Property="Text" Value="{loc:Loc Key=R24.UnappliedDraft}" /><Setter Property="Foreground" Value="{DynamicResource State.Warning}" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                </TextBlock>
+                <Button x:Name="DiscardStepDraftButton" Grid.Column="1" Margin="6,0,0,0" Style="{StaticResource StepButtonStyle}" Content="{loc:Loc Key=R24.Revert}" Command="{Binding DiscardStepDraftCommand}" AutomationProperties.Name="{loc:Loc Key=R24.Revert}" />
+                <Button x:Name="ApplyStepDraftButton" Grid.Column="2" Margin="6,0,0,0" Style="{StaticResource StepApplyButtonStyle}" Content="{loc:Loc Key=Sequence.ApplyStep}" Command="{Binding ApplyStepDraftCommand}" AutomationProperties.Name="{loc:Loc Key=Sequence.ApplyStep}" />
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

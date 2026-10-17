@@ -96,9 +96,13 @@ public sealed class MachineSceneViewport : FrameworkElement
     private SceneViewportProjection? _viewProjection;
     private Rect? _marqueeBounds;
     private double _zoomFactor = 1d;
+    private double _cameraYaw = SceneViewportProjection.DefaultYawDegrees;
+    private double _cameraPitch = SceneViewportProjection.DefaultPitchDegrees;
     private LayoutTransformHandle? _transformHandle;
     private Point? _libraryDropPreviewPoint;
     private Rect _labelOverlayBounds = Rect.Empty;
+    private Rect _labelHeaderBounds = Rect.Empty;
+    private Rect _labelFooterBounds = Rect.Empty;
 
     public event EventHandler<MachineSceneSelectionRequestedEventArgs>? SelectionRequested;
     public event EventHandler<MachineSceneMoveRequestedEventArgs>? MoveRequested;
@@ -131,6 +135,34 @@ public sealed class MachineSceneViewport : FrameworkElement
             typeof(MachineSceneViewport),
             new PropertyMetadata(null, OnSnapshotSourceChanged));
 
+    public static readonly DependencyProperty EquipmentAxesProperty = DependencyProperty.Register(nameof(EquipmentAxes),
+        typeof(IEnumerable<VirtualAxisDefinition>), typeof(MachineSceneViewport), new PropertyMetadata(null, OnEquipmentPresentationChanged));
+    public static readonly DependencyProperty EquipmentDevicesProperty = DependencyProperty.Register(nameof(EquipmentDevices),
+        typeof(IEnumerable<DeviceDefinition>), typeof(MachineSceneViewport), new PropertyMetadata(null, OnEquipmentPresentationChanged));
+    public IEnumerable<VirtualAxisDefinition>? EquipmentAxes
+    {
+        get => (IEnumerable<VirtualAxisDefinition>?)GetValue(EquipmentAxesProperty);
+        set => SetValue(EquipmentAxesProperty, value);
+    }
+    public IEnumerable<DeviceDefinition>? EquipmentDevices
+    {
+        get => (IEnumerable<DeviceDefinition>?)GetValue(EquipmentDevicesProperty);
+        set => SetValue(EquipmentDevicesProperty, value);
+    }
+
+    public static readonly DependencyProperty ReferenceUnitFramesProperty = DependencyProperty.Register(nameof(ReferenceUnitFrames),
+        typeof(IEnumerable<LayoutItem>), typeof(MachineSceneViewport), new PropertyMetadata(null, (d, _) =>
+        {
+            var viewport = (MachineSceneViewport)d;
+            viewport.ResetViewProjection();
+            viewport.InvalidateScene();
+        }));
+    public IEnumerable<LayoutItem>? ReferenceUnitFrames
+    {
+        get => (IEnumerable<LayoutItem>?)GetValue(ReferenceUnitFramesProperty);
+        set => SetValue(ReferenceUnitFramesProperty, value);
+    }
+
     public static readonly DependencyProperty SelectedItemProperty =
         DependencyProperty.Register(
             nameof(SelectedItem),
@@ -148,12 +180,52 @@ public sealed class MachineSceneViewport : FrameworkElement
             typeof(MachineSceneViewport),
             new PropertyMetadata(true, OnIsDesignModeChanged));
 
+    public static readonly DependencyProperty IsPlacementMoveEnabledProperty = DependencyProperty.Register(
+        nameof(IsPlacementMoveEnabled), typeof(bool), typeof(MachineSceneViewport), new PropertyMetadata(true, OnIsDesignModeChanged));
+
+    public bool IsPlacementMoveEnabled
+    {
+        get => (bool)GetValue(IsPlacementMoveEnabledProperty);
+        set => SetValue(IsPlacementMoveEnabledProperty, value);
+    }
+
     public static readonly DependencyProperty IsObliqueViewProperty =
         DependencyProperty.Register(
             nameof(IsObliqueView),
             typeof(bool),
             typeof(MachineSceneViewport),
             new PropertyMetadata(true, OnIsObliqueViewChanged));
+
+    public static readonly DependencyProperty UseEquipmentPresentationProperty = DependencyProperty.Register(
+        nameof(UseEquipmentPresentation), typeof(bool), typeof(MachineSceneViewport), new PropertyMetadata(false, OnEquipmentPresentationChanged));
+    public static readonly DependencyProperty LabelHeaderElementProperty = DependencyProperty.Register(
+        nameof(LabelHeaderElement), typeof(FrameworkElement), typeof(MachineSceneViewport), new PropertyMetadata(null, OnEquipmentPresentationChanged));
+    public static readonly DependencyProperty LabelFooterElementProperty = DependencyProperty.Register(
+        nameof(LabelFooterElement), typeof(FrameworkElement), typeof(MachineSceneViewport), new PropertyMetadata(null, OnEquipmentPresentationChanged));
+
+    public bool UseEquipmentPresentation
+    {
+        get => (bool)GetValue(UseEquipmentPresentationProperty);
+        set => SetValue(UseEquipmentPresentationProperty, value);
+    }
+    public FrameworkElement? LabelHeaderElement
+    {
+        get => (FrameworkElement?)GetValue(LabelHeaderElementProperty);
+        set => SetValue(LabelHeaderElementProperty, value);
+    }
+    public FrameworkElement? LabelFooterElement
+    {
+        get => (FrameworkElement?)GetValue(LabelFooterElementProperty);
+        set => SetValue(LabelFooterElementProperty, value);
+    }
+
+    private static void OnEquipmentPresentationChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
+    {
+        var viewport = (MachineSceneViewport)element;
+        viewport.OnLabelOverlayLayoutUpdated(null, EventArgs.Empty);
+        viewport.DrawGrid();
+        viewport.InvalidateScene();
+    }
 
     public static readonly DependencyProperty LabelOverlayElementProperty = DependencyProperty.RegisterAttached(
         "LabelOverlayElement", typeof(FrameworkElement), typeof(MachineSceneViewport),
@@ -211,9 +283,10 @@ public sealed class MachineSceneViewport : FrameworkElement
     protected override void OnMouseDown(MouseButtonEventArgs e)
     {
         base.OnMouseDown(e);
-        if (e.ChangedButton != MouseButton.Middle ||
+        if (e.ChangedButton is not (MouseButton.Middle or MouseButton.Right) ||
             _pointerGesture != PointerGesture.None ||
-            CreateCurrentProjection() is not { } projection)
+            CreateCurrentProjection() is not { } projection ||
+            e.ChangedButton == MouseButton.Right && !IsObliqueView)
         {
             return;
         }
@@ -221,7 +294,7 @@ public sealed class MachineSceneViewport : FrameworkElement
         Focus();
         _gestureStart = e.GetPosition(this);
         _gestureProjection = projection;
-        _pointerGesture = PointerGesture.Panning;
+        _pointerGesture = e.ChangedButton == MouseButton.Right ? PointerGesture.Orbiting : PointerGesture.Panning;
         Cursor = Cursors.ScrollAll;
         CaptureMouse();
         e.Handled = true;
@@ -294,9 +367,18 @@ public sealed class MachineSceneViewport : FrameworkElement
         }
 
         var item = HitTestItem(point, SnapshotSource?.Latest);
-        if (!IsDesignMode)
+        if (!IsDesignMode || CreateCurrentProjection() is { CanMapToWorld: false })
         {
-            SetCurrentValue(SelectedItemProperty, item);
+            if (IsObliqueView && CreateCurrentProjection() is { } camera)
+            {
+                _gestureStart = point;
+                _gestureProjection = camera;
+                _pressedItem = item;
+                _pointerGesture = PointerGesture.PendingOrbit;
+                Cursor = Cursors.ScrollAll;
+                CaptureMouse();
+            }
+            else SetCurrentValue(SelectedItemProperty, item);
             e.Handled = true;
             return;
         }
@@ -313,6 +395,12 @@ public sealed class MachineSceneViewport : FrameworkElement
             SetCurrentValue(SelectedItemProperty, item);
         }
 
+        if (item is not null && !IsPlacementMoveEnabled)
+        {
+            e.Handled = true;
+            return;
+        }
+
         _gestureStart = point;
         _pressedItem = item;
         _gestureModifiers = modifiers;
@@ -325,6 +413,23 @@ public sealed class MachineSceneViewport : FrameworkElement
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
+        if (_pointerGesture == PointerGesture.PendingOrbit)
+        {
+            var delta = e.GetPosition(this) - _gestureStart;
+            if (e.LeftButton != MouseButtonState.Pressed
+                || Math.Abs(delta.X) < SystemParameters.MinimumHorizontalDragDistance
+                && Math.Abs(delta.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+            _pointerGesture = PointerGesture.Orbiting;
+        }
+        if (_pointerGesture == PointerGesture.Orbiting)
+        {
+            if (e.RightButton == MouseButtonState.Pressed || e.LeftButton == MouseButtonState.Pressed)
+            {
+                UpdateOrbit(e.GetPosition(this));
+                e.Handled = true;
+            }
+            return;
+        }
         if (_pointerGesture == PointerGesture.Panning)
         {
             if (e.MiddleButton == MouseButtonState.Pressed)
@@ -398,6 +503,10 @@ public sealed class MachineSceneViewport : FrameworkElement
         var point = e.GetPosition(this);
         switch (_pointerGesture)
         {
+            case PointerGesture.Orbiting:
+                UpdateOrbit(point);
+                break;
+            case PointerGesture.PendingOrbit:
             case PointerGesture.PendingMove:
                 SetCurrentValue(SelectedItemProperty, _pressedItem);
                 break;
@@ -430,6 +539,13 @@ public sealed class MachineSceneViewport : FrameworkElement
     protected override void OnMouseUp(MouseButtonEventArgs e)
     {
         base.OnMouseUp(e);
+        if (e.ChangedButton == MouseButton.Right && _pointerGesture == PointerGesture.Orbiting)
+        {
+            UpdateOrbit(e.GetPosition(this));
+            ResetPointerGesture(releaseMouse: true);
+            e.Handled = true;
+            return;
+        }
         if (e.ChangedButton != MouseButton.Middle || _pointerGesture != PointerGesture.Panning)
         {
             return;
@@ -473,6 +589,34 @@ public sealed class MachineSceneViewport : FrameworkElement
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+        if (!e.Handled && IsKeyboardFocused && _pointerGesture == PointerGesture.None)
+        {
+            var cameraKey = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (Keyboard.Modifiers == ModifierKeys.Alt && OrbitBy(cameraKey switch
+            {
+                Key.Left => new Vector(-60, 0), Key.Right => new Vector(60, 0),
+                Key.Up => new Vector(0, -40), Key.Down => new Vector(0, 40), _ => default
+            }))
+            {
+                e.Handled = true;
+                return;
+            }
+            if (Keyboard.Modifiers == ModifierKeys.Control && PanBy(cameraKey switch
+            {
+                Key.Left => new Vector(-30, 0), Key.Right => new Vector(30, 0),
+                Key.Up => new Vector(0, -30), Key.Down => new Vector(0, 30), _ => default
+            }))
+            {
+                e.Handled = true;
+                return;
+            }
+            if (Keyboard.Modifiers == ModifierKeys.None && e.Key is Key.F or Key.Home)
+            {
+                if (e.Key == Key.Home) ResetCamera(); else FitToLayout();
+                e.Handled = true;
+                return;
+            }
+        }
         if (!e.Handled && RequestKeyboardMove(e.Key, Keyboard.Modifiers))
         {
             e.Handled = true;
@@ -493,9 +637,11 @@ public sealed class MachineSceneViewport : FrameworkElement
         {
             RaiseTransform(MachineSceneMoveAction.Cancel, default);
         }
-        else if (_pointerGesture == PointerGesture.Panning)
+        else if (_pointerGesture is PointerGesture.Panning or PointerGesture.Orbiting)
         {
             _viewProjection = _gestureProjection;
+            _cameraYaw = _viewProjection?.YawDegrees ?? _cameraYaw;
+            _cameraPitch = _viewProjection?.PitchDegrees ?? _cameraPitch;
             DrawGrid();
         }
         ResetPointerGesture(releaseMouse: true);
@@ -504,7 +650,7 @@ public sealed class MachineSceneViewport : FrameworkElement
 
     internal bool RequestKeyboardMove(Key key, ModifierKeys modifiers)
     {
-        if (!IsKeyboardFocused || !IsDesignMode || _pointerGesture != PointerGesture.None ||
+        if (!IsKeyboardFocused || !IsDesignMode || !IsPlacementMoveEnabled || _pointerGesture != PointerGesture.None ||
             SelectedItem?.IsSelected != true || SelectedItem.Component is null ||
             (modifiers & ~ModifierKeys.Shift) != ModifierKeys.None)
         {
@@ -526,6 +672,27 @@ public sealed class MachineSceneViewport : FrameworkElement
     }
 
     internal double ZoomFactor => _zoomFactor;
+    internal double ViewYawDegrees => CreateCurrentProjection()?.YawDegrees ?? SceneViewportProjection.DefaultYawDegrees;
+    internal double ViewPitchDegrees => CreateCurrentProjection()?.PitchDegrees ?? SceneViewportProjection.DefaultPitchDegrees;
+
+    internal bool OrbitBy(Vector delta)
+    {
+        if (!IsObliqueView || delta == default || !double.IsFinite(delta.X) || !double.IsFinite(delta.Y) || CreateCurrentProjection() is not { } projection) return false;
+        _viewProjection = OrbitProjection(projection, delta);
+        _cameraYaw = _viewProjection.Value.YawDegrees;
+        _cameraPitch = _viewProjection.Value.PitchDegrees;
+        DrawGrid();
+        InvalidateScene();
+        return true;
+    }
+
+    internal void ResetCamera()
+    {
+        _cameraYaw = SceneViewportProjection.DefaultYawDegrees;
+        _cameraPitch = SceneViewportProjection.DefaultPitchDegrees;
+        _viewProjection = null;
+        FitToLayout();
+    }
 
     internal bool ZoomAt(Point anchor, int wheelDelta)
     {
@@ -598,7 +765,7 @@ public sealed class MachineSceneViewport : FrameworkElement
 
     internal bool RequestSelectionDrag(string itemId, Vector screenDelta)
     {
-        if (!IsDesignMode || CreateCurrentProjection() is not { Scale: > 0 } projection)
+        if (!IsDesignMode || CreateCurrentProjection() is not { Scale: > 0, CanMapToWorld: true } projection)
         {
             return false;
         }
@@ -669,7 +836,7 @@ public sealed class MachineSceneViewport : FrameworkElement
         ModifierKeys modifiers = ModifierKeys.None)
     {
         if (GetTransformHandleCenter(itemId, handle) is null ||
-            CreateCurrentProjection() is not { } projection)
+            CreateCurrentProjection() is not { CanMapToWorld: true } projection)
         {
             return false;
         }
@@ -719,7 +886,7 @@ public sealed class MachineSceneViewport : FrameworkElement
         ModifierKeys modifiers = ModifierKeys.None)
     {
         if (GetSelectionTransformHandleCenter(handle) is null ||
-            CreateCurrentProjection() is not { } projection)
+            CreateCurrentProjection() is not { CanMapToWorld: true } projection)
         {
             return false;
         }
@@ -749,11 +916,11 @@ public sealed class MachineSceneViewport : FrameworkElement
     }
 
     internal Point? GetDropWorldPoint(Point screenPoint) =>
-        CreateDropProjection()?.ToWorld(screenPoint);
+        CreateDropProjection() is { CanMapToWorld: true } projection ? projection.ToWorld(screenPoint) : null;
 
     internal bool RequestLibraryComponentDrop(LayoutComponentKind kind, Point screenPoint)
     {
-        if (!IsDesignMode || CreateDropProjection() is not { } projection)
+        if (!IsDesignMode || CreateDropProjection() is not { CanMapToWorld: true } projection)
         {
             return false;
         }
@@ -768,7 +935,7 @@ public sealed class MachineSceneViewport : FrameworkElement
 
     internal bool ShowLibraryDropPreview(Point screenPoint)
     {
-        if (!IsDesignMode || CreateDropProjection() is null)
+        if (!IsDesignMode || CreateDropProjection() is not { CanMapToWorld: true })
         {
             return false;
         }
@@ -884,6 +1051,8 @@ public sealed class MachineSceneViewport : FrameworkElement
     {
         LayoutUpdated -= OnLabelOverlayLayoutUpdated;
         _labelOverlayBounds = Rect.Empty;
+        _labelHeaderBounds = Rect.Empty;
+        _labelFooterBounds = Rect.Empty;
         OpenVisionLanguageService.LanguageChanged -= OnLanguageChanged;
         ObserveSnapshotSource(SnapshotSource, null);
         ObserveCollection(null);
@@ -892,16 +1061,23 @@ public sealed class MachineSceneViewport : FrameworkElement
 
     private void OnLabelOverlayLayoutUpdated(object? sender, EventArgs e)
     {
-        var bounds = Rect.Empty;
-        if (GetLabelOverlayElement(this) is { IsVisible: true } overlay &&
-            PresentationSource.FromVisual(this) is { } source && ReferenceEquals(source, PresentationSource.FromVisual(overlay)))
-        {
-            bounds = overlay.TransformToVisual(this).TransformBounds(new Rect(overlay.RenderSize));
-            bounds.Intersect(new Rect(RenderSize));
-        }
-        if (bounds == _labelOverlayBounds) return;
+        var bounds = GetVisibleOverlayBounds(GetLabelOverlayElement(this));
+        var header = UseEquipmentPresentation ? GetVisibleOverlayBounds(LabelHeaderElement) : Rect.Empty;
+        var footer = UseEquipmentPresentation ? GetVisibleOverlayBounds(LabelFooterElement) : Rect.Empty;
+        if (bounds == _labelOverlayBounds && header == _labelHeaderBounds && footer == _labelFooterBounds) return;
         _labelOverlayBounds = bounds;
+        _labelHeaderBounds = header;
+        _labelFooterBounds = footer;
         InvalidateScene();
+    }
+
+    private Rect GetVisibleOverlayBounds(FrameworkElement? overlay)
+    {
+        if (overlay is not { IsVisible: true } || PresentationSource.FromVisual(this) is not { } source ||
+            !ReferenceEquals(source, PresentationSource.FromVisual(overlay))) return Rect.Empty;
+        var bounds = overlay.TransformToVisual(this).TransformBounds(new Rect(overlay.RenderSize));
+        bounds.Intersect(new Rect(RenderSize));
+        return bounds;
     }
 
     private static void OnLabelOverlayElementChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
@@ -1035,6 +1211,7 @@ public sealed class MachineSceneViewport : FrameworkElement
         _lastSnapshot = null;
         if (IsLoaded)
         {
+            if (UseEquipmentPresentation) DrawGrid();
             RenderScene(SnapshotSource?.Latest);
         }
     }
@@ -1050,6 +1227,11 @@ public sealed class MachineSceneViewport : FrameworkElement
         context.DrawRectangle(Brushes.Transparent, null, new Rect(RenderSize));
         if (IsObliqueView)
         {
+            if (UseEquipmentPresentation)
+            {
+                // Unit floors are drawn with their equipment geometry below.
+                return;
+            }
             for (double x = 0; x <= ActualWidth; x += 32d)
             {
                 context.DrawLine(_resources.ObliqueGridPen, new Point(x, 0), new Point(x, ActualHeight));
@@ -1062,6 +1244,7 @@ public sealed class MachineSceneViewport : FrameworkElement
             return;
         }
 
+        if (UseEquipmentPresentation) return;
         var projection = CreateCurrentProjection();
         var minorSpacing = projection is { Scale: > 0 }
             ? Math.Clamp(40d * projection.Value.Scale, 16d, 120d)
@@ -1085,6 +1268,27 @@ public sealed class MachineSceneViewport : FrameworkElement
                 : _resources.GridPen;
             context.DrawLine(pen, new Point(0, y), new Point(ActualWidth, y));
         }
+
+    }
+
+    private void DrawEquipmentFloorGrid(DrawingContext context)
+    {
+        if (CreateCurrentProjection() is not { } projection) return;
+        var corners = CreateRenderItems((ReferenceUnitFrames ?? []).Concat(GetAuthoredItems()).ToArray(), null)
+            .SelectMany(item => GetSceneGeometry(item).GetFootprintCorners()).ToArray();
+        if (corners.Length == 0) return;
+        var spacing = Math.Max(40, Math.Max(corners.Max(point => point.X) - corners.Min(point => point.X),
+            corners.Max(point => point.Y) - corners.Min(point => point.Y)) / 48);
+        var left = Math.Floor(corners.Min(point => point.X) / spacing) * spacing - spacing;
+        var right = Math.Ceiling(corners.Max(point => point.X) / spacing) * spacing + spacing;
+        var top = Math.Floor(corners.Min(point => point.Y) / spacing) * spacing - spacing;
+        var bottom = Math.Ceiling(corners.Max(point => point.Y) / spacing) * spacing + spacing;
+        context.PushOpacity(0.35);
+        for (var x = left; x <= right; x += spacing)
+            context.DrawLine(_resources!.ObliqueGridPen, projection.ToScreen(x, top), projection.ToScreen(x, bottom));
+        for (var y = top; y <= bottom; y += spacing)
+            context.DrawLine(_resources!.ObliqueGridPen, projection.ToScreen(left, y), projection.ToScreen(right, y));
+        context.Pop();
     }
 
     private void RenderScene(SimulationSnapshot? snapshot)
@@ -1104,7 +1308,7 @@ public sealed class MachineSceneViewport : FrameworkElement
         LastRenderedTransferOwnershipText = null;
         var items = ItemsSource?.ToArray() ?? Array.Empty<LayoutItem>();
         using var context = _sceneVisual.RenderOpen();
-        if (items.Length == 0)
+        if (items.Length == 0 && !(ReferenceUnitFrames?.Any() ?? false))
         {
             DrawLibraryDropPreview(context);
             return;
@@ -1115,7 +1319,7 @@ public sealed class MachineSceneViewport : FrameworkElement
             .OrderBy(item => item.ZIndex)
             .ThenBy(item => item.Id, StringComparer.Ordinal)
             .ToArray();
-        if (authoredItems.Length > 0)
+        if (authoredItems.Length > 0 || ReferenceUnitFrames?.Any() == true)
         {
             DrawAuthoredLayout(context, authoredItems, snapshot);
             if (_marqueeBounds is { } marquee)
@@ -1193,8 +1397,15 @@ public sealed class MachineSceneViewport : FrameworkElement
     {
         if (_resources is null) return;
 
-        var geometry = CreateRenderItems(items, snapshot);
-        var projection = _gestureProjection ?? CreateProjection(geometry);
+        var authoredGeometry = CreateRenderItems((ReferenceUnitFrames ?? []).Concat(items).ToArray(), snapshot);
+        var geometry = authoredGeometry.Concat(CreateUnitWorkpieceVisuals(authoredGeometry, snapshot)).ToArray();
+        var projection = _pointerGesture is PointerGesture.Panning or PointerGesture.Orbiting
+            ? CreateProjection(geometry) : _gestureProjection ?? CreateProjection(geometry);
+        if (UseEquipmentPresentation)
+        {
+            DrawEquipmentLayout(context, geometry, snapshot, projection);
+            return;
+        }
         if (IsObliqueView)
         {
             DrawObliqueLayout(context, geometry, snapshot, projection);
@@ -1270,6 +1481,11 @@ public sealed class MachineSceneViewport : FrameworkElement
                             9,
                             _resources.TextPrimary);
                     }
+                    break;
+
+                case LayoutItemKind.DigitalIo:
+                    context.DrawRoundedRectangle(componentFill, componentOutline, bounds, 2, 2);
+                    DrawText(context, renderItem.IsDetected == true ? "ON" : "OFF", bounds.Left + 3, bounds.Top + 3, 10, _resources!.TextPrimary);
                     break;
 
                 case LayoutItemKind.DigitalSensor:
@@ -1442,15 +1658,30 @@ public sealed class MachineSceneViewport : FrameworkElement
                     }
                     break;
 
+                case LayoutItemKind.FeedPosition:
+                case LayoutItemKind.ExitPosition:
+                    context.DrawRoundedRectangle(_resources!.ConveyorComponentFill, selected ? _resources.SelectionPen : _resources.AxisPen, bounds, 3, 3);
+                    DrawStatusBadge(context, renderItem.Item.Kind == LayoutItemKind.FeedPosition ? "⇥" : "⇤", bounds.Left + 4, bounds.Top + 3, 14, _resources.TextPrimary);
+                    break;
+
                 case LayoutItemKind.Camera:
                     break;
             }
             context.Pop();
         }
 
-        foreach (var item in geometry.Where(item => item.Item.IsSelected)) DrawSelectedComponentLabel(context, item, projection);
+        foreach (var item in geometry.Where(item => item.Item.IsSelected))
+        {
+            if (UseEquipmentPresentation)
+            {
+                var pen = new Pen(_resources!.AccentBrush, 2 * Math.Min(ActualWidth / 1000d, ActualHeight / 600d)) { DashStyle = new DashStyle([5, 3], 0) };
+                var footprint = GetSceneGeometry(item) with { Width = item.Width + 12, Height = item.Height + 12 };
+                DrawPolygon(context, null, pen, footprint.GetFootprintCorners().Select(point => projection.ToScreen(point.X, point.Y, item.BaseElevation + item.VerticalHeight)).ToArray());
+            }
+            DrawSelectedComponentLabel(context, item, projection);
+        }
 
-        if (!IsDesignMode)
+        if (!IsDesignMode || !IsPlacementMoveEnabled || UseEquipmentPresentation)
         {
             return;
         }
@@ -1466,6 +1697,201 @@ public sealed class MachineSceneViewport : FrameworkElement
         }
     }
 
+    private VirtualAxisDefinition? EquipmentAxis(LayoutRenderItem item) => EquipmentAxes?.FirstOrDefault(axis => axis.Id == item.Item.BehaviorBindingId);
+    private DeviceDefinition? EquipmentDevice(LayoutRenderItem item) => EquipmentDevices?.FirstOrDefault(device => device.Id == item.Item.BehaviorBindingId);
+    private double EquipmentCameraX(LayoutRenderItem item)
+    {
+        var camera = EquipmentDevice(item)?.Camera;
+        var axisId = camera?.Geometry is { } geometry ? geometry.AxisId : camera?.NumericalInput?.AxisId;
+        var mount = GetAuthoredItems().FirstOrDefault(part => part.BehaviorBindingId == axisId && part.Kind == LayoutItemKind.LinearStage);
+        var axis = EquipmentAxes?.FirstOrDefault(axis => axis.Id == axisId);
+        if (mount is null || axis is null) return item.X;
+        var position = SnapshotSource?.Latest?.Axes.FirstOrDefault(snapshot => snapshot.Id == axisId)?.Position ?? axis.HomePosition;
+        return mount.Component!.Transform.X + position + (camera?.Geometry?.OffsetX ?? 0);
+    }
+
+    private SceneViewportGeometry GetEquipmentSceneGeometry(LayoutRenderItem item) => item.Item.Kind switch
+    {
+        LayoutItemKind.Conveyor => new(item.X, item.Y, item.Width, item.Height, 0, 0, 80),
+        LayoutItemKind.LinearStage => new(item.Item.Component!.Transform.X + (EquipmentAxis(item)?.SoftLimitMax ?? item.Width) / 2 + 30, item.Y,
+            (EquipmentAxis(item)?.SoftLimitMax ?? item.Width) + 80, 36, 0, 0, 50),
+        LayoutItemKind.DigitalSensor => new(item.X, item.Y + 9, 18, 18, 0, 0, 104),
+        LayoutItemKind.PneumaticCylinder => new(item.X, item.Y, 48, 60, 0, 78, 34),
+        LayoutItemKind.Camera => new(EquipmentCameraX(item), item.Y, 40, 40, 0, item.BaseElevation + item.VerticalHeight - 36, 36),
+        LayoutItemKind.DigitalIo => new(item.X, item.Y, 24, 24, 0, 0, 150),
+        LayoutItemKind.FeedPosition => new(item.X, item.Y, item.Width, 120, 0, 80, 4),
+        LayoutItemKind.ExitPosition when item.Item.Component?.MaterialRoute == "NG" => new(item.X, item.Y, item.Width, 64, 0, 0, 46),
+        LayoutItemKind.ExitPosition => new(item.X, item.Y, item.Width, 120, 0, 80, 4),
+        _ => GetSceneGeometry(item)
+    };
+
+    private void DrawEquipmentLayout(DrawingContext context, IReadOnlyList<LayoutRenderItem> items, SimulationSnapshot? snapshot, SceneViewportProjection projection)
+    {
+        var pixelScale = Math.Min(ActualWidth / 1000, ActualHeight / 600);
+        var model = items.FirstOrDefault(item => item.Item.Kind == LayoutItemKind.Workpiece);
+        if (model is not null && snapshot is not null)
+        {
+            var samples = snapshot.LayoutComponents.Where(component => component.Id.StartsWith("__manual-sample-", StringComparison.Ordinal) && component.IsWorkpiecePresent == true)
+                .Select(component =>
+                {
+                    var visual = new LayoutComponentDefinition { Id = component.Id, Name = component.WorkpieceInstanceId ?? component.Name, Kind = LayoutComponentKind.Workpiece,
+                        UnitId = model.Item.UnitId, Transform = new Transform2D { X = component.X, Y = component.Y }, Size = new Size2D { Width = component.Width, Height = component.Height },
+                        VerticalEnvelope = new LayoutVerticalEnvelope { BaseElevation = Math.Abs(component.Y) <= 66 ? 80 : 0, Height = model.VerticalHeight } };
+                    return CreateRenderItems(new[] { new LayoutItem(visual, 1, false) }, snapshot)[0];
+                });
+            items = items.Concat(samples).ToArray();
+        }
+        foreach (var group in items.Where(item => item.Item.Kind is not (LayoutItemKind.MachineFrame or LayoutItemKind.Workpiece)).GroupBy(item => item.Item.UnitId))
+        {
+            var footprints = group.SelectMany(item => GetEquipmentSceneGeometry(item).GetFootprintCorners()).ToArray();
+            if (footprints.Length == 0) continue;
+            var left = footprints.Min(point => point.X) - 50;
+            var right = footprints.Max(point => point.X) + 50;
+            var back = footprints.Min(point => point.Y) - 50;
+            var front = footprints.Max(point => point.Y) + 50;
+            Flat(left, back, right, front, 0, _resources!.DeviceFill.ToString(), _resources.TextSecondary.ToString());
+            for (var x = Math.Ceiling(left / 100) * 100; x <= right; x += 100) Segment(x, back, x, front, 0, _resources!.TextSecondary.ToString(), .6);
+            for (var y = Math.Ceiling(back / 100) * 100; y <= front; y += 100) Segment(left, y, right, y, 0, _resources!.TextSecondary.ToString(), .6);
+            var unit = items.FirstOrDefault(item => item.Item.Kind == LayoutItemKind.MachineFrame && item.Item.UnitId == group.Key);
+            if (unit is not null) Label(left + 10, front - 12, 0, unit.Item.Id.StartsWith("__unit-base-", StringComparison.Ordinal) && unit.Item.Name.EndsWith(" 받침대", StringComparison.Ordinal) ? unit.Item.Name[..^4] : unit.Item.Name, _resources!.TextSecondary.ToString(), 12, false, false);
+        }
+        var zonesDrawn = false;
+        foreach (var item in items.Where(item => item.Item.Kind != LayoutItemKind.MachineFrame).OrderBy(Layer).ThenBy(item => item.Y).ThenBy(item => item.X))
+        {
+            if (item.Item.Kind == LayoutItemKind.Workpiece && (snapshot?.LayoutComponents.FirstOrDefault(component => component.Id == item.Item.Id)?.IsWorkpiecePresent == false
+                || EquipmentDevice(item)?.Workpiece?.InitiallyPresent == false && IsDesignMode)) continue;
+            if (!zonesDrawn && Layer(item) >= 3)
+            {
+                DrawSensorZones();
+                zonesDrawn = true;
+            }
+            var g = GetEquipmentSceneGeometry(item);
+            var x0 = g.X - g.Width / 2; var x1 = g.X + g.Width / 2;
+            var y0 = g.Y - g.Height / 2; var y1 = g.Y + g.Height / 2;
+            var top = g.BaseElevation + g.VerticalHeight;
+            switch (item.Item.Kind)
+            {
+                case LayoutItemKind.Conveyor:
+                    foreach (var x in new[] { x0 + Math.Min(30, g.Width / 8), x1 - Math.Min(42, g.Width / 7) })
+                        Box(x, y0 + 12, x + 12, y1 - 12, 0, 60, "#2B4552");
+                    Box(x0, y0, x1, y1, 60, 80, "#3D5A68");
+                    for (var x = x0; x < x1; x += 40) Segment(x, y0 + 5, x, y1 - 5, 80.5, "#64848F");
+                    break;
+                case LayoutItemKind.LinearStage:
+                case LayoutItemKind.RotaryStage:
+                    var axisOrigin = item.Item.Component!.Transform.X;
+                    var axisPosition = SnapshotSource?.Latest?.Axes.FirstOrDefault(axis => axis.Id == item.Item.BehaviorBindingId)?.Position ?? EquipmentAxis(item)?.HomePosition ?? 0;
+                    Box(axisOrigin, item.Y - 14, axisOrigin + (EquipmentAxis(item)?.SoftLimitMax ?? item.Width) + 60, item.Y + 14, 0, 26, "#2F5966");
+                    Box(axisOrigin + axisPosition, item.Y - 18, axisOrigin + axisPosition + 60, item.Y + 18, 26, 50, "#6DC5D6");
+                    break;
+                case LayoutItemKind.DigitalSensor:
+                    Box(item.X - 8, item.Y, item.X + 8, item.Y + 16, 60, 100, item.IsDetected == true ? "#FFD977" : "#8D7A45");
+                    var detectionY = EquipmentDevice(item)?.Sensor?.DetectionCenterY ?? item.Y;
+                    Segment(item.X, item.Y, item.X, detectionY - item.Height / 2, 92, item.IsDetected == true ? "#FFD977" : "#8D7A45", 1, item.IsDetected == true ? null : "3 3");
+                    break;
+                case LayoutItemKind.PneumaticCylinder:
+                    Box(item.X - 20, item.Y - 30, item.X + 20, item.Y + 30, 82, 110, "#70D9C5");
+                    var tip = item.Y + 30 + (item.MotionProgress ?? 0) * (EquipmentDevice(item)?.Cylinder?.Stroke ?? g.Height);
+                    Box(item.X - 5, item.Y + 30, item.X + 5, tip, 90, 98, "#C7D3D8");
+                    Box(item.X - 26, tip, item.X + 26, tip + 6, 84, 106, "#E2C46F");
+                    break;
+                case LayoutItemKind.Camera:
+                    var camera = EquipmentDevice(item)?.Camera;
+                    var cameraX = EquipmentCameraX(item);
+                    var cameraColor = camera?.NumericalInput?.InputKind == NumericalCameraInputKind.HeightMap3D ? "#B48FF0" : "#92A4ED";
+                    var mountedAxisId = camera?.Geometry is { } mountGeometry ? mountGeometry.AxisId : camera?.NumericalInput?.AxisId;
+                    var mountingAxis = items.FirstOrDefault(part => part.Item.Kind == LayoutItemKind.LinearStage && part.Item.BehaviorBindingId == mountedAxisId);
+                    if (mountingAxis is not null)
+                    {
+                        var carriageX = mountingAxis.Item.Component!.Transform.X + (SnapshotSource?.Latest?.Axes.FirstOrDefault(axis => axis.Id == mountedAxisId)?.Position ?? EquipmentAxis(mountingAxis)?.HomePosition ?? 0) + 30;
+                        Box(carriageX - 6, mountingAxis.Y - 6, carriageX + 6, mountingAxis.Y + 6, 50, top + 10, "#4D6F7C");
+                        Box(Math.Min(carriageX, cameraX) - 4, Math.Min(mountingAxis.Y, item.Y) - 4, Math.Max(carriageX, cameraX) + 4, Math.Max(mountingAxis.Y, item.Y) + 4, top + 4, top + 10, "#4D6F7C");
+                    }
+                    else
+                    {
+                        var poleY = item.Y + (item.Y >= 0 ? 95 : -95);
+                        Box(cameraX - 5, poleY - 5, cameraX + 5, poleY + 5, 0, top + 10, "#4D6F7C");
+                        Box(cameraX - 4, Math.Min(poleY, item.Y), cameraX + 4, Math.Max(poleY, item.Y), top + 4, top + 10, "#4D6F7C");
+                    }
+                    Box(cameraX - 18, item.Y - 18, cameraX + 18, item.Y + 18, top - 34, top, cameraColor);
+                    break;
+                case LayoutItemKind.DigitalIo:
+                    Box(item.X - 5, item.Y - 5, item.X + 5, item.Y + 5, 0, 110, "#55707C");
+                    Box(item.X - 10, item.Y - 10, item.X + 10, item.Y + 10, 110, 128, "#3F8F5A");
+                    var on = snapshot?.Signals.FirstOrDefault(signal => signal.Id == item.Item.BehaviorBindingId)?.Value == true;
+                    Box(item.X - 10, item.Y - 10, item.X + 10, item.Y + 10, 128, 146, on ? "#FF6B5E" : "#6A3A36");
+                    break;
+                case LayoutItemKind.FeedPosition:
+                    Flat(x0, -56, x1, 56, 80.8, null, "#C9B46A", "5 4", 1.2); Label(item.X, y0 - 14, 82, OpenVisionLanguageService.T("R24.Feed"), _resources!.TextSecondary.ToString(), 11); break;
+                case LayoutItemKind.ExitPosition:
+                    if (item.Item.Component?.MaterialRoute == "NG") Box(x0, y0, x1, y1, 0, 46, "#5A3B42");
+                    else Flat(x0, -56, x1, 56, 80.8, null, "#7BD88F", "5 4", 1.2);
+                    Label(item.X, item.Item.Component?.MaterialRoute == "NG" ? item.Y + 44 : -70, item.Item.Component?.MaterialRoute == "NG" ? 50 : 82, item.Item.Component?.MaterialRoute == "NG" ? "NG " + OpenVisionLanguageService.T("R24.Box") : "OK " + OpenVisionLanguageService.T("R24.ExitArrow"), item.Item.Component?.MaterialRoute == "NG" ? _resources!.FaultBrush.ToString() : _resources!.SensorOnBrush.ToString(), 11);
+                    break;
+                default:
+                    Box(x0, y0, x1, y1, g.BaseElevation, top, item.Item.Kind == LayoutItemKind.Workpiece ? "#E2C46F" : "#7F9FAE"); break;
+            }
+            if (!IsObliqueView && item.Item.IsSelected) Flat(x0 - 6, y0 - 6, x1 + 6, y1 + 6, top, null, _resources!.AccentBrush.ToString(), "5 3", 2);
+        }
+        if (!zonesDrawn) DrawSensorZones();
+        foreach (var item in items.Where(item => item.Item.Kind == LayoutItemKind.Camera))
+        {
+            var camera = EquipmentDevice(item)?.Camera;
+            var cameraX = EquipmentCameraX(item);
+            var cameraColor = camera?.NumericalInput?.InputKind == NumericalCameraInputKind.HeightMap3D ? "#B48FF0" : "#92A4ED";
+            var fovWidth = camera?.Geometry?.FieldOfViewWidth ?? camera?.NumericalInput?.FieldOfView ?? 120;
+            var fovHeight = camera?.Geometry?.FieldOfViewHeight ?? camera?.NumericalInput?.FieldOfViewHeight ?? fovWidth;
+            var fovY = camera?.Geometry?.CenterY ?? 0;
+            Flat(cameraX - fovWidth / 2, fovY - fovHeight / 2, cameraX + fovWidth / 2, fovY + fovHeight / 2, 81.5, null, cameraColor, "6 4", 1.2);
+            if (IsObliqueView)
+            {
+                SpatialSegment(cameraX, item.Y, item.BaseElevation + item.VerticalHeight - 34, cameraX - fovWidth / 2, fovY - fovHeight / 2, 81.5, cameraColor, .6, "2 4");
+                SpatialSegment(cameraX, item.Y, item.BaseElevation + item.VerticalHeight - 34, cameraX + fovWidth / 2, fovY + fovHeight / 2, 81.5, cameraColor, .6, "2 4");
+            }
+        }
+        foreach (var item in items.Where(item => item.Item.IsSelected && item.Item.Kind != LayoutItemKind.Workpiece)) DrawSelectedComponentLabel(context, item, projection);
+
+        static int Layer(LayoutRenderItem item) => item.Item.Kind switch { LayoutItemKind.LinearStage or LayoutItemKind.RotaryStage or LayoutItemKind.DigitalIo => 0, LayoutItemKind.Conveyor => 1, LayoutItemKind.ExitPosition when item.Item.Component?.MaterialRoute == "NG" => 4, LayoutItemKind.PneumaticCylinder or LayoutItemKind.FeedPosition or LayoutItemKind.ExitPosition => 2, LayoutItemKind.Workpiece => 3, LayoutItemKind.DigitalSensor => 4, LayoutItemKind.Camera => 5, _ => 6 };
+        void DrawSensorZones()
+        {
+            foreach (var sensor in items.Where(item => item.Item.Kind == LayoutItemKind.DigitalSensor))
+            {
+                var center = EquipmentDevice(sensor)?.Sensor?.DetectionCenterY ?? sensor.Y;
+                Flat(sensor.X - sensor.Width / 2, center - sensor.Height / 2, sensor.X + sensor.Width / 2, center + sensor.Height / 2, 81, sensor.IsDetected == true ? "#80FFD977" : null, "#E8C45F", sensor.IsDetected == true ? null : "3 3");
+            }
+        }
+        static Brush Fill(string color) => new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+        Pen Stroke(string color, double width, string? dash = null)
+        {
+            var pen = new Pen(Fill(color), width * pixelScale);
+            if (dash is not null) pen.DashStyle = new DashStyle(dash.Split(' ').Select(value => double.Parse(value, CultureInfo.InvariantCulture) / width), 0);
+            return pen;
+        }
+        void Polygon(Point[] points, string? color, string stroke, double width = 1, string? dash = null) =>
+            DrawPolygon(context, color is null ? null : Fill(color), Stroke(stroke, width, dash), points);
+        void Flat(double left, double back, double right, double front, double z, string? color, string stroke, string? dash = null, double width = 1) =>
+            Polygon([projection.ToScreen(left, back, z), projection.ToScreen(right, back, z), projection.ToScreen(right, front, z), projection.ToScreen(left, front, z)], color, stroke, width, dash);
+        void Box(double left, double back, double right, double front, double bottom, double upper, string color)
+        {
+            var rgb = (Color)ColorConverter.ConvertFromString(color);
+            string Shade(double factor) => Color.FromRgb((byte)Math.Round(rgb.R * factor), (byte)Math.Round(rgb.G * factor), (byte)Math.Round(rgb.B * factor)).ToString();
+            if (IsObliqueView)
+            {
+                Polygon([projection.ToScreen(left, front, bottom), projection.ToScreen(right, front, bottom), projection.ToScreen(right, front, upper), projection.ToScreen(left, front, upper)], Shade(.72), "#06141C", .8);
+                Polygon([projection.ToScreen(right, front, bottom), projection.ToScreen(right, back, bottom), projection.ToScreen(right, back, upper), projection.ToScreen(right, front, upper)], Shade(.56), "#06141C", .8);
+            }
+            Flat(left, back, right, front, upper, color, "#06141C", null, .8);
+        }
+        void Segment(double ax, double ay, double bx, double by, double z, string color, double width = 1, string? dash = null) => context.DrawLine(Stroke(color, width, dash), projection.ToScreen(ax, ay, z), projection.ToScreen(bx, by, z));
+        void SpatialSegment(double ax, double ay, double az, double bx, double by, double bz, string color, double width, string? dash) => context.DrawLine(Stroke(color, width, dash), projection.ToScreen(ax, ay, az), projection.ToScreen(bx, by, bz));
+        void Label(double x, double y, double z, string text, string color, double size, bool bold = false, bool centered = true)
+        {
+            var point = projection.ToScreen(x, y, z);
+            var formatted = GetText(text, size * pixelScale, Fill(color), semiBold: bold);
+            context.DrawText(formatted, new Point(point.X - (centered ? formatted.Width / 2 : 0), point.Y - formatted.Baseline));
+        }
+    }
+
     private void DrawObliqueLayout(
         DrawingContext context,
         IReadOnlyList<LayoutRenderItem> items,
@@ -1473,9 +1899,16 @@ public sealed class MachineSceneViewport : FrameworkElement
         SceneViewportProjection projection)
     {
         var showRuntimeState = !IsDesignMode && snapshot is not null;
-        foreach (var item in items)
+        // ponytail: depth-sorted box faces; use a z-buffer if intersecting authored geometry becomes supported.
+        foreach (var body in GetOrderedSchematicFaces(items, projection))
         {
-            DrawSchematicBody(context, item, projection);
+            var (_, stateOutline) = GetComponentSurfaceStyle(body.Item);
+            var outline = HasCompositeBody(body.Item.Item.Kind)
+                ? body.Item.Item.IsSelected && !UseEquipmentPresentation ? _resources!.SelectionPen : _resources!.SchematicOutlinePen : stateOutline;
+            DrawPolygon(context, body.Face.Horizontal ? body.Fill : _resources!.SideFill(body.Fill), outline, body.Face.Points);
+        }
+        foreach (var item in items.OrderBy(item => projection.Depth(item.X, item.Y, item.BaseElevation + item.VerticalHeight / 2)))
+        {
             var topBounds = GetTopFaceScreenBounds(item, projection);
             if (item.IsVerticalEnvelopeEstimated)
             {
@@ -1496,7 +1929,7 @@ public sealed class MachineSceneViewport : FrameworkElement
 
         foreach (var item in items.Where(item => item.Item.IsSelected)) DrawSelectedComponentLabel(context, item, projection);
 
-        if (!IsDesignMode)
+        if (!IsDesignMode || !IsPlacementMoveEnabled || UseEquipmentPresentation)
         {
             return;
         }
@@ -1513,7 +1946,23 @@ public sealed class MachineSceneViewport : FrameworkElement
     }
 
     private static bool HasCompositeBody(LayoutItemKind kind) => kind is LayoutItemKind.MachineFrame
-        or LayoutItemKind.LinearStage or LayoutItemKind.PneumaticCylinder or LayoutItemKind.Conveyor or LayoutItemKind.Camera;
+        or LayoutItemKind.LinearStage or LayoutItemKind.PneumaticCylinder or LayoutItemKind.Conveyor or LayoutItemKind.Camera
+        or LayoutItemKind.FeedPosition or LayoutItemKind.ExitPosition;
+
+    private IEnumerable<(LayoutRenderItem Item, Brush Fill, (Point[] Points, double Depth, bool Horizontal) Face)> GetOrderedSchematicFaces(
+        IReadOnlyList<LayoutRenderItem> items, SceneViewportProjection projection)
+    {
+        var volumes = items.SelectMany(item => GetSchematicVolumes(item).Select(volume => (Item: item, volume.Geometry, volume.Fill))).ToArray();
+        var frames = volumes.Where(volume => volume.Item.Item.Kind == LayoutItemKind.MachineFrame).ToArray();
+        var components = volumes.Where(volume => volume.Item.Item.Kind != LayoutItemKind.MachineFrame).ToArray();
+        // A floor entirely below the parts cannot occlude them from above. Face-centroid depth alone loses this ordering on a wide table.
+        bool separatedFloor = frames.Length > 0 && components.Length > 0
+            && frames.Max(volume => volume.Geometry.BaseElevation + volume.Geometry.VerticalHeight) <= components.Min(volume => volume.Geometry.BaseElevation);
+        bool floorInFront = projection.PitchDegrees < 0;
+        return volumes.SelectMany(volume => GetVolumeFaces(volume.Geometry, projection).Select(face => (volume.Item, volume.Fill, Face: face)))
+            .OrderBy(body => separatedFloor && (body.Item.Item.Kind == LayoutItemKind.MachineFrame) == floorInFront ? 1 : 0)
+            .ThenBy(body => body.Face.Depth);
+    }
 
     private IEnumerable<(SceneViewportGeometry Geometry, Brush Fill)> GetSchematicVolumes(LayoutRenderItem item)
     {
@@ -1568,36 +2017,49 @@ public sealed class MachineSceneViewport : FrameworkElement
             ? item.Item.IsSelected ? _resources!.SelectionPen : _resources!.SchematicOutlinePen : stateOutline;
         foreach (var (volume, fill) in GetSchematicVolumes(item))
         {
-            var faces = GetVolumeFaces(volume, projection);
-            if (projection.IsObliqueView)
-            {
-                context.PushOpacity(0.72);
-                DrawPolygon(context, fill, outline, faces[0]);
-                context.Pop();
-                context.PushOpacity(0.88);
-                DrawPolygon(context, fill, outline, faces[1]);
-                context.Pop();
-            }
-            DrawPolygon(context, fill, outline, faces[2]);
+            foreach (var face in GetVolumeFaces(volume, projection).OrderBy(face => face.Depth))
+                DrawPolygon(context, face.Horizontal ? fill : _resources!.SideFill(fill), outline, face.Points);
         }
     }
 
-    private static Point[][] GetVolumeFaces(SceneViewportGeometry volume, SceneViewportProjection projection)
+    private static IEnumerable<(Point[] Points, double Depth, bool Horizontal)> GetVolumeFaces(SceneViewportGeometry volume, SceneViewportProjection projection)
     {
         var footprint = volume.GetFootprintCorners();
         var bottom = footprint.Select(point => projection.ToScreen(point.X, point.Y, volume.BaseElevation)).ToArray();
         var top = footprint.Select(point => projection.ToScreen(point.X, point.Y, volume.BaseElevation + volume.VerticalHeight)).ToArray();
-        return [[bottom[0], bottom[1], top[1], top[0]], [bottom[1], bottom[2], top[2], top[1]], top];
+        if (!projection.IsObliqueView)
+        {
+            yield return (top, 0, true);
+            yield break;
+        }
+        var yaw = projection.YawDegrees * Math.PI / 180;
+        var pitch = projection.PitchDegrees * Math.PI / 180;
+        var eyeX = Math.Sin(yaw) * Math.Cos(pitch);
+        var eyeY = Math.Cos(yaw) * Math.Cos(pitch);
+        for (int index = 0; index < 4; index++)
+        {
+            int next = (index + 1) % 4;
+            var edge = footprint[next] - footprint[index];
+            if (edge.Y * eyeX - edge.X * eyeY <= 0.000001) continue;
+            double depth = projection.Depth((footprint[index].X + footprint[next].X) / 2,
+                (footprint[index].Y + footprint[next].Y) / 2, volume.BaseElevation + volume.VerticalHeight / 2);
+            yield return ([bottom[index], bottom[next], top[next], top[index]], depth, false);
+        }
+        if (Math.Sin(pitch) > 0.000001)
+            yield return (top, projection.Depth(volume.X, volume.Y, volume.BaseElevation + volume.VerticalHeight), true);
+        else if (Math.Sin(pitch) < -0.000001)
+            yield return (bottom, projection.Depth(volume.X, volume.Y, volume.BaseElevation), true);
     }
 
     private (Brush Fill, Pen Outline) GetComponentSurfaceStyle(
         LayoutRenderItem item)
     {
-        var selected = item.Item.IsSelected;
+        var selected = item.Item.IsSelected && !UseEquipmentPresentation;
         var surface = item.Item.Kind switch
         {
             LayoutItemKind.MachineFrame => (_resources!.SchematicFrameFill, selected ? _resources.SelectionPen : _resources.FramePen),
             LayoutItemKind.LinearStage or LayoutItemKind.RotaryStage => (_resources!.AxisComponentFill, selected ? _resources.SelectionPen : _resources.AxisPen),
+            LayoutItemKind.DigitalIo => (_resources!.DigitalIoComponentFill, selected ? _resources.SelectionPen : !IsDesignMode && item.IsDetected == true ? _resources.SensorOnPen : _resources.SchematicOutlinePen),
             LayoutItemKind.DigitalSensor when item.IsDetected == true => (_resources!.SensorOnFill, selected ? _resources.SelectionPen : _resources.SensorOnPen),
             LayoutItemKind.DigitalSensor => (_resources!.SensorComponentFill, selected ? _resources.SelectionPen : _resources.VisionPen),
             LayoutItemKind.PneumaticCylinder when item.CylinderState == PneumaticCylinderState.Fault => (_resources!.FaultFill, selected ? _resources.SelectionPen : _resources.FaultPen),
@@ -1638,6 +2100,7 @@ public sealed class MachineSceneViewport : FrameworkElement
                         : $"{axis.Position:F0} {axis.State.ToString().ToUpperInvariant()}";
                 }
                 break;
+            case LayoutItemKind.DigitalIo:
             case LayoutItemKind.DigitalSensor:
                 status = item.IsDetected == true ? "ON" : "OFF";
                 statusBrush = item.IsDetected == true ? _resources.SensorOnBrush : _resources.TextSecondary;
@@ -1694,7 +2157,7 @@ public sealed class MachineSceneViewport : FrameworkElement
 
     private static void DrawPolygon(
         DrawingContext context,
-        Brush fill,
+        Brush? fill,
         Pen outline,
         IReadOnlyList<Point> points) => context.DrawGeometry(fill, outline, CreatePolygon(points));
 
@@ -1769,6 +2232,33 @@ public sealed class MachineSceneViewport : FrameworkElement
         }
     }
 
+    private IEnumerable<LayoutRenderItem> CreateUnitWorkpieceVisuals(IReadOnlyList<LayoutRenderItem> geometry, SimulationSnapshot? snapshot)
+    {
+        if (IsDesignMode || snapshot is null) yield break;
+        foreach (var slot in snapshot.UnitMaterialSlots.Where(slot => slot.InstanceId is not null))
+        {
+            var source = geometry.FirstOrDefault(part => part.Item.UnitId == slot.UnitId && part.Item.Kind == LayoutItemKind.Conveyor)
+                ?? geometry.FirstOrDefault(part => part.Item.UnitId == slot.UnitId && part.Item.Kind == LayoutItemKind.MachineFrame);
+            if (source is null) continue;
+            var destination = geometry.FirstOrDefault(part => part.Item.UnitId == slot.DestinationUnitId && part.Item.Kind == LayoutItemKind.Conveyor);
+            double x = source.X, y = source.Y;
+            if (slot.State == "Moving")
+            {
+                x += ((destination?.X ?? x + source.Width / 2) - x) * slot.TransferProgress;
+                y += ((destination?.Y ?? y) - y) * slot.TransferProgress;
+            }
+            var component = new LayoutComponentDefinition
+            {
+                Id = "__unit-piece-" + slot.UnitId, Name = slot.WorkpieceName + " · " + slot.InstanceId, UnitId = slot.UnitId,
+                Kind = LayoutComponentKind.Workpiece, Transform = new Transform2D { X = x, Y = y },
+                Size = new Size2D { Width = 40, Height = 24 },
+                VerticalEnvelope = new LayoutVerticalEnvelope { BaseElevation = Math.Max(20, source.BaseElevation + source.VerticalHeight + 2), Height = 8 }
+            };
+            var visual = CreateRenderItems(new[] { new LayoutItem(component, 1, false) }, null)[0];
+            yield return visual with { InspectionState = slot.Verdict switch { "OK" => WorkpieceInspectionState.Passed, "NG" => WorkpieceInspectionState.Failed, _ => WorkpieceInspectionState.Pending } };
+        }
+    }
+
     private LayoutRenderItem[] CreateRenderItems(
         IReadOnlyList<LayoutItem> items,
         SimulationSnapshot? snapshot)
@@ -1798,7 +2288,9 @@ public sealed class MachineSceneViewport : FrameworkElement
                     ? verticalEnvelope!.Height
                     : LayoutVerticalEnvelope.GetSchematicHeight(width, height),
                 !hasExplicitVerticalEnvelope,
-                runtime?.IsDetected,
+                item.Kind == LayoutItemKind.DigitalIo
+                    ? snapshot?.Signals.FirstOrDefault(signal => signal.Id == item.BehaviorBindingId)?.Value == true
+                    : runtime?.IsDetected,
                 runtime?.CylinderState,
                 runtime?.MotionProgress,
                 runtime?.ConveyorRunning,
@@ -1825,11 +2317,33 @@ public sealed class MachineSceneViewport : FrameworkElement
 
         var geometry = CreateRenderItems(authoredItems, snapshot);
         var projection = CreateProjection(geometry);
+        if (UseEquipmentPresentation)
+        {
+            foreach (var item in geometry.OrderByDescending(item => item.Item.Kind is LayoutItemKind.Camera or LayoutItemKind.DigitalIo ? 5 : item.Item.Kind == LayoutItemKind.DigitalSensor ? 4 : 2))
+            {
+                var g = GetEquipmentSceneGeometry(item);
+                var corners = g.GetFootprintCorners().SelectMany(corner => new[] { projection.ToScreen(corner.X, corner.Y, g.BaseElevation), projection.ToScreen(corner.X, corner.Y, g.BaseElevation + g.VerticalHeight) }).ToArray();
+                var bounds = Bounds(corners);
+                bounds.Inflate(4 * Math.Min(ActualWidth / 1000, ActualHeight / 600), 4 * Math.Min(ActualWidth / 1000, ActualHeight / 600));
+                if (bounds.Contains(point)) return item.Item;
+            }
+            return null;
+        }
+        if (IsObliqueView && _resources is not null)
+        {
+            var faces = GetOrderedSchematicFaces(geometry, projection).Reverse();
+            foreach (var entry in faces)
+            {
+                var shape = CreatePolygon(entry.Face.Points);
+                if (shape.FillContains(point) || shape.StrokeContains(_resources.SelectionPen, point)) return entry.Item.Item;
+            }
+            return null;
+        }
         foreach (var renderItem in geometry.Reverse())
         {
             if (HasCompositeBody(renderItem.Item.Kind) && _resources is not null)
             {
-                if (GetSchematicVolumes(renderItem).Any(volume => GetVolumeFaces(volume.Geometry, projection).Any(ContainsFace)))
+                if (GetSchematicVolumes(renderItem).Any(volume => GetVolumeFaces(volume.Geometry, projection).Any(face => ContainsFace(face.Points))))
                     return renderItem.Item;
                 continue;
 
@@ -1914,7 +2428,7 @@ public sealed class MachineSceneViewport : FrameworkElement
 
     private LayoutTransformHandle? HitTestTransformHandle(Point point)
     {
-        if (!IsDesignMode)
+        if (!IsDesignMode || !IsPlacementMoveEnabled || CreateCurrentProjection() is not { CanMapToWorld: true })
         {
             return null;
         }
@@ -2090,7 +2604,7 @@ public sealed class MachineSceneViewport : FrameworkElement
     private SceneViewportProjection? CreateCurrentProjection()
     {
         var authoredItems = GetAuthoredItems();
-        if (authoredItems.Length == 0 || ActualWidth < 1 || ActualHeight < 1)
+        if ((authoredItems.Length == 0 && !(ReferenceUnitFrames?.Any() ?? false)) || ActualWidth < 1 || ActualHeight < 1)
         {
             return null;
         }
@@ -2106,7 +2620,7 @@ public sealed class MachineSceneViewport : FrameworkElement
 
         return CreateCurrentProjection()
             ?? _viewProjection
-            ?? SceneViewportProjection.CreateEmpty(ActualWidth, ActualHeight, IsObliqueView);
+            ?? SceneViewportProjection.CreateEmpty(ActualWidth, ActualHeight, IsObliqueView, _cameraYaw, _cameraPitch);
     }
 
     private void UpdateLibraryDrag(DragEventArgs e)
@@ -2140,11 +2654,33 @@ public sealed class MachineSceneViewport : FrameworkElement
             : null;
 
     private SceneViewportProjection CreateProjection(IReadOnlyList<LayoutRenderItem> geometry) =>
-        _viewProjection ??= SceneViewportProjection.Create(
-            geometry.Select(GetSceneGeometry).ToArray(),
+        _viewProjection ??= UseEquipmentPresentation
+            ? SceneViewportProjection.CreateEquipment(geometry.Where(item => item.Item.Kind is not (LayoutItemKind.MachineFrame or LayoutItemKind.Workpiece)).Select(GetEquipmentSceneGeometry).ToArray(), ActualWidth, ActualHeight, IsObliqueView)
+            : SceneViewportProjection.Create(
+            geometry.Concat(CreateRenderItems((ReferenceUnitFrames ?? []).ToArray(), null)).Select(GetSceneGeometry).ToArray(),
             ActualWidth,
             ActualHeight,
-            IsObliqueView);
+            IsObliqueView, _cameraYaw, _cameraPitch);
+
+    private SceneViewportProjection OrbitProjection(SceneViewportProjection projection, Vector delta)
+    {
+        var geometry = CreateRenderItems((ReferenceUnitFrames ?? []).Concat(GetAuthoredItems()).ToArray(), SnapshotSource?.Latest).Select(GetSceneGeometry).ToArray();
+        if (geometry.Length == 0) return projection.OrbitAt(default, 0, delta);
+        double x = (geometry.Min(item => item.X - item.Width / 2) + geometry.Max(item => item.X + item.Width / 2)) / 2;
+        double y = (geometry.Min(item => item.Y - item.Height / 2) + geometry.Max(item => item.Y + item.Height / 2)) / 2;
+        double height = (geometry.Min(item => item.BaseElevation) + geometry.Max(item => item.BaseElevation + item.VerticalHeight)) / 2;
+        return projection.OrbitAt(new Point(x, y), height, delta);
+    }
+
+    private void UpdateOrbit(Point point)
+    {
+        if (_gestureProjection is not { } projection) return;
+        _viewProjection = OrbitProjection(projection, point - _gestureStart);
+        _cameraYaw = _viewProjection.Value.YawDegrees;
+        _cameraPitch = _viewProjection.Value.PitchDegrees;
+        DrawGrid();
+        InvalidateScene();
+    }
 
     private void UpdatePan(Point point)
     {
@@ -2339,6 +2875,11 @@ public sealed class MachineSceneViewport : FrameworkElement
 
     private void DrawSelectedComponentLabel(DrawingContext context, LayoutRenderItem item, SceneViewportProjection projection)
     {
+        if (UseEquipmentPresentation)
+        {
+            DrawEquipmentSelectedComponentLabel(context, item, projection);
+            return;
+        }
         var bounds = GetTopFaceScreenBounds(item, projection);
         var text = $"{item.Item.Name} {item.Item.Id}";
         var formatted = GetText(text, 11, _resources!.AccentBrush, Math.Max(1, ActualWidth - 12));
@@ -2367,6 +2908,24 @@ public sealed class MachineSceneViewport : FrameworkElement
         LastRenderedSelectedLabelBounds = badge;
         context.DrawRoundedRectangle(_resources.StatusBadgeFill, null, badge, 3, 3);
         context.DrawText(formatted, new Point(x + 4, y + 1));
+    }
+
+    private void DrawEquipmentSelectedComponentLabel(DrawingContext context, LayoutRenderItem item, SceneViewportProjection projection)
+    {
+        var pixelScale = Math.Min(ActualWidth / 1000, ActualHeight / 600);
+        var geometry = GetEquipmentSceneGeometry(item);
+        var point = projection.ToScreen(geometry.X, geometry.Y, geometry.BaseElevation + geometry.VerticalHeight + 22);
+        var formatted = GetText($"{item.Item.CurrentName} · {item.Item.Id}", 13 * pixelScale,
+            _resources!.AccentBrush, Math.Max(1, ActualWidth - 8), semiBold: true);
+        var top = _labelHeaderBounds.IsEmpty ? 4 : Math.Max(4, _labelHeaderBounds.Bottom + 4);
+        var bottom = _labelFooterBounds.IsEmpty ? ActualHeight - 4 : Math.Min(ActualHeight - 4, _labelFooterBounds.Top - 4);
+        var origin = new Point(
+            Math.Clamp(point.X - formatted.Width / 2, 4, Math.Max(4, ActualWidth - formatted.Width - 4)),
+            Math.Clamp(point.Y - formatted.Baseline, top, Math.Max(top, bottom - formatted.Height)));
+        LastRenderedSelectedLabelBounds = new Rect(origin, new Size(formatted.Width, formatted.Height));
+        var outline = new Pen(_resources!.DeviceFill, 3 * pixelScale);
+        context.DrawGeometry(null, outline, formatted.BuildGeometry(origin));
+        context.DrawText(formatted, origin);
     }
 
     private void DrawStatusBadge(
@@ -2602,6 +3161,8 @@ public sealed class MachineSceneViewport : FrameworkElement
         PendingMarquee,
         Marquee,
         Panning,
+        PendingOrbit,
+        Orbiting,
         Transforming
     }
 
@@ -2635,9 +3196,9 @@ public sealed class MachineSceneViewport : FrameworkElement
         context.DrawText(GetText(text, fontSize, brush), new Point(x, y));
     }
 
-    private FormattedText GetText(string text, double fontSize, Brush brush, double? maxWidth = null)
+    private FormattedText GetText(string text, double fontSize, Brush brush, double? maxWidth = null, bool semiBold = false)
     {
-        var cacheKey = $"{fontSize:F1}|{brush.GetHashCode()}|{maxWidth}|{text}";
+        var cacheKey = $"{fontSize:F1}|{brush.GetHashCode()}|{maxWidth}|{semiBold}|{text}";
         if (_textCache.TryGetValue(cacheKey, out var cached))
         {
             return cached;
@@ -2653,12 +3214,26 @@ public sealed class MachineSceneViewport : FrameworkElement
             VisualTreeHelper.GetDpi(this).PixelsPerDip);
         LastFormattedTextPixelsPerDip = formatted.PixelsPerDip;
         if (maxWidth is { } width) formatted.MaxTextWidth = width;
+        if (semiBold) formatted.SetFontWeight(FontWeights.SemiBold);
         _textCache[cacheKey] = formatted;
         return formatted;
     }
 
     private sealed class SceneRenderResources
     {
+        private readonly Dictionary<Brush, Brush> _sideFills = new();
+
+        internal Brush SideFill(Brush fill)
+        {
+            if (fill is not SolidColorBrush solid) return fill;
+            if (_sideFills.TryGetValue(fill, out var cached)) return cached;
+            var color = solid.Color;
+            var shaded = new SolidColorBrush(Color.FromArgb(color.A, (byte)(color.R * .76), (byte)(color.G * .76), (byte)(color.B * .76)));
+            shaded.Freeze();
+            _sideFills.Add(fill, shaded);
+            return shaded;
+        }
+
         private SceneRenderResources(FrameworkElement owner)
         {
             TextPrimary = ResolveBrush(owner, "Text.Primary", "#F3F6F9");
@@ -2673,6 +3248,7 @@ public sealed class MachineSceneViewport : FrameworkElement
             AxisComponentFill = ResolveBrush(owner, "Scene.Component.Axis", "#6DC5D6");
             CylinderComponentFill = ResolveBrush(owner, "Scene.Component.Cylinder", "#70D9C5");
             SensorComponentFill = ResolveBrush(owner, "Scene.Component.Sensor", "#F0C76F");
+            DigitalIoComponentFill = ResolveBrush(owner, "Scene.Component.DigitalIo", "#E4AA9D");
             CameraComponentFill = ResolveBrush(owner, "Scene.Component.Camera", "#92A4ED");
             ConveyorComponentFill = ResolveBrush(owner, "Scene.Component.Conveyor", "#88A7B6");
             FrameSupportFill = ResolveBrush(owner, "Scene.Component.FrameSupport", "#537687");
@@ -2769,6 +3345,7 @@ public sealed class MachineSceneViewport : FrameworkElement
         public SolidColorBrush AxisComponentFill { get; }
         public SolidColorBrush CylinderComponentFill { get; }
         public SolidColorBrush SensorComponentFill { get; }
+        public SolidColorBrush DigitalIoComponentFill { get; }
         public SolidColorBrush CameraComponentFill { get; }
         public SolidColorBrush ConveyorComponentFill { get; }
         public SolidColorBrush FrameSupportFill { get; }

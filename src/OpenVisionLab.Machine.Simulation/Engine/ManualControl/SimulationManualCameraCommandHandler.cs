@@ -70,11 +70,19 @@ internal sealed class SimulationManualCameraCommandHandler
                 $"Virtual camera '{triggerCamera.CameraId}' was not found.");
         }
 
+        if (triggerCamera.GeneratesNumericalInput && !camera.HasNumericalInput)
+            return SimulationManualControlCommandHandler.Reject(command, context, SimulationCommandErrorCode.CameraTriggerRejected,
+                "This camera has no confirmed numerical input configuration.");
+        var referenceAxis = camera.ReferenceAxisId is { } axisId ? context.Axes.FirstOrDefault(axis => axis.Id == axisId) : null;
+        if (camera.ReferenceAxisId is not null && referenceAxis is null)
+            return SimulationManualControlCommandHandler.Reject(command, context, SimulationCommandErrorCode.CameraTriggerRejected, "The capture reference axis was not found.");
+
         var trigger = camera.Trigger(
             triggerCamera.RecipeId,
-            triggerCamera.FrameEvidence,
+            triggerCamera.GeneratesNumericalInput ? null : triggerCamera.FrameEvidence,
             triggerCamera.InspectionEvidence,
-            triggerCamera.WaitForExternalResult);
+            triggerCamera.WaitForExternalResult,
+            axisOffset: referenceAxis?.Position ?? 0);
         if (!trigger.IsAccepted || string.IsNullOrWhiteSpace(trigger.AcquisitionId))
         {
             return SimulationManualControlCommandHandler.Reject(
@@ -93,7 +101,7 @@ internal sealed class SimulationManualCameraCommandHandler
                 "CameraTriggered",
                 $"{triggerCamera.CameraId} started {trigger.AcquisitionId} for recipe " +
                 $"'{triggerCamera.RecipeId}' with frame SHA-256 " +
-                $"{triggerCamera.FrameEvidence.ContentSha256}" +
+                $"{camera.CaptureSnapshot().FrameEvidence?.ContentSha256}" +
                 (triggerCamera.InspectionEvidence is null
                     ? "."
                     : $" and inspection {triggerCamera.InspectionEvidence.InspectionId}.")));

@@ -8,6 +8,46 @@ namespace OpenVisionLab.MachineStudio.Tests;
 public sealed class MachineIntegrationTcpOperationOwnerTests
 {
     [Fact]
+    public async Task InFlightObservationConsumesItsCompletionBeforeTheNextObservation()
+    {
+        using var owner = CreateOwner();
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var operation = owner.TrackAsync("Waiting", _ => release.Task);
+        var observation = owner.ObserveAsync(TimeSpan.FromSeconds(1));
+        Assert.False(observation.IsCompleted);
+        release.SetResult();
+        Assert.Equal(MachineIntegrationParticipantOutcome.Completed, (await observation).Outcome);
+        await operation;
+        Assert.Equal(MachineIntegrationParticipantOutcome.Idle, (await owner.ObserveAsync(TimeSpan.FromSeconds(1))).Outcome);
+    }
+
+    [Theory]
+    [InlineData("Completed")]
+    [InlineData("Failed")]
+    [InlineData("Cancelled")]
+    public async Task FinishedOperationIsObservedOnceBeforeReturningIdle(string outcome)
+    {
+        using var owner = CreateOwner();
+        var expected = Enum.Parse<MachineIntegrationParticipantOutcome>(outcome);
+        var operation = owner.TrackAsync("Starting", _ => expected switch
+        {
+            MachineIntegrationParticipantOutcome.Failed => Task.FromException(new InvalidOperationException("fast failure")),
+            MachineIntegrationParticipantOutcome.Cancelled => Task.FromException(new OperationCanceledException()),
+            _ => Task.CompletedTask
+        });
+        var completed = await operation;
+        Assert.False(owner.IsBusy);
+
+        var observed = await owner.ObserveAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(expected, observed.Outcome);
+        Assert.Equal(MachineIntegrationOperationKind.Tcp, observed.Kind);
+        Assert.Same(completed.Exception, observed.Exception);
+        Assert.Equal(MachineIntegrationParticipantOutcome.Idle, (await owner.ObserveAsync(TimeSpan.FromSeconds(1))).Outcome);
+        Assert.Equal(MachineIntegrationParticipantOutcome.Completed, (await owner.TrackAsync("Next", _ => Task.CompletedTask)).Outcome);
+    }
+
+    [Fact]
     public async Task TrackAsyncPublishesBusyStatusAndCompletion()
     {
         var busyStates = new List<bool>();

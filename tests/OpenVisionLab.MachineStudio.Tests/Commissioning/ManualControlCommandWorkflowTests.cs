@@ -24,6 +24,7 @@ public sealed class ManualControlCommandWorkflowTests
         {
             LayoutComponentKind.LinearStage,
             LayoutComponentKind.RotaryStage,
+            LayoutComponentKind.Camera,
             LayoutComponentKind.DigitalSensor,
             LayoutComponentKind.PneumaticCylinder,
             LayoutComponentKind.Conveyor
@@ -110,6 +111,41 @@ public sealed class ManualControlCommandWorkflowTests
                 Assert.True(conveyor.Running);
                 Assert.Equal(ConveyorDirection.Reverse, conveyor.Direction);
             });
+    }
+
+    [Fact]
+    public async Task AStaleAcceptedRequestDoesNotCommitTheManualControlCallback()
+    {
+        using var engine = new RecordingSimulationEngine(acceptCommands: true);
+        var started = 0;
+        var workflow = CreateWorkflow(engine, new ManualEquipmentPresentation(), () => LayoutComponentKind.LinearStage, () => started++);
+        var result = await workflow.StartEquipmentControlAsync(() => false);
+        Assert.True(result?.IsAccepted);
+        Assert.IsType<StartManualControlCommand>(Assert.Single(engine.Commands));
+        Assert.Equal(0, started);
+    }
+
+    [Theory]
+    [InlineData(LayoutComponentKind.LinearStage, "Motion")]
+    [InlineData(LayoutComponentKind.RotaryStage, "Motion")]
+    [InlineData(LayoutComponentKind.Camera, "Camera")]
+    [InlineData(LayoutComponentKind.DigitalSensor, "Sensor")]
+    [InlineData(LayoutComponentKind.PneumaticCylinder, "Cylinder")]
+    [InlineData(LayoutComponentKind.Conveyor, "Conveyor")]
+    public async Task ManualPauseRetainsThePreparedComponentCategoryAndDoesNotStartAgain(LayoutComponentKind kind, string category)
+    {
+        using var engine = new RecordingSimulationEngine(acceptCommands: true);
+        string? loggedCategory = null;
+        var workflow = new ManualControlCommandWorkflow(
+            new EquipmentCommandDispatcher(engine, _ => { }, (actualCategory, _) => loggedCategory = actualCategory),
+            new ManualEquipmentPresentation(), () => null,
+            () => throw new InvalidOperationException("Pause must not start control"));
+
+        var result = await workflow.PauseManualControlAsync(kind);
+
+        Assert.True(result.IsAccepted);
+        Assert.IsType<PauseCommand>(Assert.Single(engine.Commands));
+        Assert.Equal(category, loggedCategory);
     }
 
     private static ManualControlCommandWorkflow CreateWorkflow(

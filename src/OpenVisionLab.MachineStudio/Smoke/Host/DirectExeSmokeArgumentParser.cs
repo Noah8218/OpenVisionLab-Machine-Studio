@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace OpenVisionLab.MachineStudio;
@@ -42,6 +43,8 @@ internal static class DirectExeSmokeArgumentParser
                 max: 1000),
             SmokePerfReportPath = GetArgumentValue(args, "--smoke-perf-report"),
             ScreenshotPath = GetArgumentValue(args, "--smoke-screenshot"),
+            FrameRecordingPath = GetArgumentValue(args, "--smoke-record-frames"),
+            FrameRecordingSeconds = ParseIntArgument(GetArgumentValue(args, "--smoke-record-seconds"), "--smoke-record-seconds", 30, 1, 120),
             LayoutReportPath = GetArgumentValue(args, "--smoke-layout-report"),
             SizeArgument = sizeArgument,
             WindowSize = ParseSize(sizeArgument),
@@ -249,6 +252,14 @@ internal static class DirectExeSmokeArgumentParser
 
     public static void ValidateSmokeArguments(IReadOnlyList<string> args)
     {
+        if (GetArgumentValue(args, "--smoke-record-frames") is { } recordingPath)
+        {
+            if (!Path.GetFullPath(recordingPath).StartsWith("D:\\", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Frame recording must be stored on the D: test-data drive.");
+            if (!HasArgument(args, "--smoke-start-simulation") || string.IsNullOrWhiteSpace(GetArgumentValue(args, "--smoke-project")))
+                throw new ArgumentException("Frame recording requires --smoke-project and --smoke-start-simulation.");
+        }
+
         var commandTracePath = GetArgumentValue(args, "--smoke-command-trace");
         var globalCommandState = GetArgumentValue(args, "--smoke-command-state");
         var globalCommandStateScreenshotPath = GetArgumentValue(args, "--smoke-command-state-screenshot");
@@ -322,7 +333,7 @@ internal static class DirectExeSmokeArgumentParser
         var mmiOperatorReportPath = GetArgumentValue(args, "--smoke-mmi-operator-report");
 
         var capturesTopCommandPressed = globalCommandState is not null
-            && new[] { "undo-pressed", "redo-pressed", "save-pressed" }
+            && new[] { "undo-pressed", "redo-pressed", "save-pressed", "fault-chip-pressed", "target-chip-pressed", "run-options-pressed", "workspace-tab-pressed", "outline-unit-pressed", "outline-device-pressed", "outline-scope-pressed", "outline-part-pressed", "outline-clear-pressed", "scene-fit-pressed", "scene-zoom-in-pressed", "scene-zoom-out-pressed", "scene-inspector-pressed", "scene-plan-pressed", "scene-oblique-pressed", "scene-slot-pressed", "scene-slot-toggle-pressed", "scene-manual-pressed", "scene-references-pressed", "scene-menu-pressed" }
                 .Contains(globalCommandState, StringComparer.OrdinalIgnoreCase);
         if (capturesTopCommandPressed != !string.IsNullOrWhiteSpace(globalCommandStateScreenshotPath))
         {

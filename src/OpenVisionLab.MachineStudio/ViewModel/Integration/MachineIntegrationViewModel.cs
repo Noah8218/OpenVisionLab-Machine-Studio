@@ -6,9 +6,12 @@ using OpenVisionLab;
 using OpenVisionLab.Integration.Contracts;
 using OpenVisionLab.Machine.Infrastructure.Integration;
 using OpenVisionLab.Machine.Simulation.Commands;
+using OpenVisionLab.Machine.Simulation.Camera;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Snapshots;
 using OpenVisionLab.MachineStudio.View.Dialogs;
+using OpenVisionLab.Machine.Core.History;
+using System.Text.Json;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
@@ -36,6 +39,60 @@ public sealed record MachineIntegrationTransactionHistoryItem(
     public string ShortTransactionId => $"TX-{Handoff.TransactionId.ToString("N")[..8].ToUpperInvariant()}";
 
     public string FullTransactionId => Handoff.TransactionId.ToString("D");
+    public string BottomStatusText { get; init; } = StatusText;
+    public string StatusTone { get; init; } = "warn";
+    public bool HasAcknowledgement { get; init; }
+    public bool HasValidatedResult { get; init; }
+    public bool HasReceivedAcknowledgement { get; init; }
+    public bool HasReceivedResult { get; init; }
+    public bool? IsAutomaticRequest { get; init; }
+    public bool IsResultApplied { get; init; }
+    public bool IsLateResult { get; init; }
+    public string LateResultText { get; init; } = string.Empty;
+    public bool HasKnownPurpose => IsAutomaticRequest.HasValue;
+    public bool HasApplicationStatus => IsResultApplied || HasKnownPurpose && HasValidatedResult && !IsLateResult;
+    public string PurposeText => IsAutomaticRequest switch
+    {
+        true => L("RequestPurposeBranch", "결과로 분기", "Branch on result"),
+        false => L("RequestPurposeManual", "수동 재검사", "Manual reinspection"),
+        _ => string.Empty
+    };
+    public string ApplicationText => !HasApplicationStatus ? string.Empty : IsResultApplied
+        ? L("RequestApplied", "현재 운전에 반영됨", "Applied to current run")
+        : L("RequestDisplayOnly", "표시만 (미반영)", "Display only (not applied)");
+    public bool InspectionCompleted { get; init; }
+    public bool HasTerminalError => StatusTone == "bad";
+    public bool ShowTransferStage => true;
+    public bool ShowAcknowledgementStage => HasReceivedAcknowledgement;
+    public bool ShowResultStage => HasReceivedResult;
+    public bool IsPending { get; init; }
+    public string ErrorText { get; init; } = string.Empty;
+    public string MetricsText { get; init; } = string.Empty;
+    public string HistoryText { get; init; } = string.Empty;
+    public string ConsumerText => Handoff.Context.ConsumerBuild.ApplicationId switch
+    {
+        IntegrationApplicationIds.TwoDStudio => "2D Studio",
+        IntegrationApplicationIds.ThreeDStudio => "3D Studio",
+        _ => Handoff.Context.ConsumerBuild.ApplicationId
+    };
+    public string ContextText => $"{Handoff.Context.ProjectId} · {Handoff.Context.SequenceId} · {Handoff.Context.CameraId} · {Handoff.Context.StepId} · {L("RequestImage", "이미지", "Image")} {Handoff.Context.AcquisitionId} · {Handoff.Context.FrameId} · {Handoff.Context.Unit}";
+    public string PublishedCameraName { get; init; } = string.Empty;
+    public string PublishedStepName { get; init; } = string.Empty;
+    public bool HasPublishedSourceNames => !string.IsNullOrWhiteSpace(PublishedCameraName) || !string.IsNullOrWhiteSpace(PublishedStepName);
+    public string SourceIdentityText => $"{Handoff.Context.ProjectId} · {Handoff.Context.SequenceId} · {(string.IsNullOrWhiteSpace(PublishedCameraName) ? Handoff.Context.CameraId : PublishedCameraName)} · {(string.IsNullOrWhiteSpace(PublishedStepName) ? Handoff.Context.StepId : PublishedStepName)}";
+    public string InspectionSourcePath => Handoff.Context.Artifacts.FirstOrDefault(artifact => artifact.Role == IntegrationArtifactRoles.InspectionSource)?.RelativePath ?? string.Empty;
+    public string InspectionRecipePath => Handoff.Context.Artifacts.FirstOrDefault(artifact => artifact.Role == IntegrationArtifactRoles.InspectionRecipe)?.RelativePath ?? string.Empty;
+    public string ImageCaption => L("RequestImage", "이미지", "Image");
+    public string HistoryDetailText => string.IsNullOrEmpty(HistoryText) ? ContextText : HistoryText + Environment.NewLine + ContextText;
+    public string SentCaption => L("RequestSent", "전송됨", "Sent");
+    public string AcknowledgementCaption => L("RequestAcknowledgement", "수신 확인", "Acknowledged");
+    public string WaitingCaption => L("RequestWaitingConsumer", "검사 실행 대기", "Waiting for inspection");
+    public string RunningCaption => L("RequestRunning", "검사 중", "Inspecting");
+    public string ExecutionStatusHint => L("RequestExecutionStatusHint", "검사 실행 상태는 외부 검사 프로그램에서 확인하세요.", "Check inspection execution status in the external inspection program.");
+    public string ResultCaption => L("RequestResultReceived", "결과 수신", "Result received");
+    public string CancelCaption => L("RequestCancel", "요청 취소", "Cancel request");
+    public string HistoryCaption => L("RequestHistory", "이력", "History");
+    private static string L(string key, string korean, string english) => OpenVisionLanguageService.T($"R24.Bottom.{key}", korean, english);
 }
 
 /// <summary>
@@ -48,6 +105,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     private readonly Func<string, IntegrationApplicationIdentity, MachineInspectionHandoffRequest?> _requestFactory;
     private readonly Func<string, IntegrationApplicationIdentity, bool> _canBuildRequest;
     private readonly Func<string?> _projectIdProvider;
+    private readonly MachineIntegrationGeneratedSourceStore _generatedSourceStore = new();
     private readonly Func<MachineIntegrationRequestContext>? _requestContextProvider;
     private string? _requestContextKey;
     private readonly Func<Func<Task>, Task> _invokeOnUiThreadAsync;
@@ -66,6 +124,10 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     private MachineIntegrationTransactionHistoryState? _selectedTransactionHistoryState;
     private bool _automaticExternalRunActive;
     private Guid? _automaticExternalTransactionId;
+    private readonly Dictionary<(Guid TransactionId, Guid HandoffMessageId), (bool Automatic, bool Applied, IntegrationInspectionOutcome? LateOutcome)> _requestDisplayEvidence = [];
+    private readonly Dictionary<(Guid TransactionId, Guid HandoffMessageId), (string CameraName, string StepName)> _requestSourceNames = [];
+    private readonly Dictionary<(Guid TransactionId, Guid HandoffMessageId), (bool Acknowledgement, bool Result)> _observedRequestStages = [];
+    private volatile int _requestDisplayGeneration;
 
     // Main supplies facts; this owner prepares requests and tracks its own refresh identity.
     internal MachineIntegrationViewModel(
@@ -77,7 +139,8 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
         Action<Exception>? handleException = null,
         Func<SimulationSnapshot>? simulationSnapshotProvider = null,
         Func<SimulationCommand, Task<SimulationCommandResult>>? dispatchSimulationCommandAsync = null,
-        Func<Task>? abortAutomaticExternalInspectionAsync = null)
+        Func<Task>? abortAutomaticExternalInspectionAsync = null,
+        Func<bool>? useGeneratedHeightMap = null)
         : this(
             new MachineIntegrationRequestWorkflow(),
             requestContextProvider,
@@ -88,7 +151,8 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             handleException,
             simulationSnapshotProvider,
             dispatchSimulationCommandAsync,
-            abortAutomaticExternalInspectionAsync)
+            abortAutomaticExternalInspectionAsync,
+            useGeneratedHeightMap)
     {
     }
 
@@ -102,10 +166,12 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
         Action<Exception>? handleException,
         Func<SimulationSnapshot>? simulationSnapshotProvider,
         Func<SimulationCommand, Task<SimulationCommandResult>>? dispatchSimulationCommandAsync,
-        Func<Task>? abortAutomaticExternalInspectionAsync)
+        Func<Task>? abortAutomaticExternalInspectionAsync,
+        Func<bool>? useGeneratedHeightMap)
         : this(
             (path, consumer) => workflow.TryCreate(requestContextProvider(), path, producerIdentityProvider(), consumer),
-            (path, consumer) => workflow.TryCreate(requestContextProvider(), path, producerIdentityProvider(), consumer) is not null,
+            (path, consumer) => workflow.TryCreate(requestContextProvider(), path, producerIdentityProvider(), consumer) is not null
+                || workflow.CanPrepareGenerated(requestContextProvider(), path, producerIdentityProvider(), consumer),
             projectIdProvider,
             settingsPath,
             MachineIntegrationFileDialogHost.SelectExchangeRoot,
@@ -115,7 +181,8 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             simulationSnapshotProvider,
             dispatchSimulationCommandAsync,
             abortAutomaticExternalInspectionAsync,
-            MachineIntegrationFileDialogHost.SelectHeightMapSource)
+            MachineIntegrationFileDialogHost.SelectHeightMapSource,
+            useGeneratedHeightMap)
     {
         _requestContextProvider = requestContextProvider;
     }
@@ -148,7 +215,8 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
         Func<SimulationSnapshot>? simulationSnapshotProvider = null,
         Func<SimulationCommand, Task<SimulationCommandResult>>? dispatchSimulationCommandAsync = null,
         Func<Task>? abortAutomaticExternalInspectionAsync = null,
-        Func<string, string?>? selectHeightMapSource = null)
+        Func<string, string?>? selectHeightMapSource = null,
+        Func<bool>? useGeneratedHeightMap = null)
     {
         _requestFactory = requestFactory ?? throw new ArgumentNullException(nameof(requestFactory));
         _canBuildRequest = canBuildRequest ?? throw new ArgumentNullException(nameof(canBuildRequest));
@@ -180,7 +248,8 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             () => !IsDisposed && (tcpControl?.CanEditTcpSetup ?? true),
             status => TryPublish(() => StatusText = status),
             () => tcpControl?.SetSessionSharedKey(null),
-            selectHeightMapSource);
+            selectHeightMapSource,
+            useGeneratedHeightMap);
         _resultObservation = new(
             () => Setup.ExchangeRoot,
             _projectIdProvider,
@@ -209,6 +278,11 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             _ => CanPublishTwoDImageHandoff,
             HandleCommandException,
             useCommandManagerRequery: false);
+        PublishInspectionHandoffCommand = new AsyncRelayCommand(
+            _ => PublishInspectionHandoffAsync(),
+            _ => CanPublishInspectionHandoff,
+            HandleCommandException,
+            useCommandManagerRequery: false);
         RefreshResultsCommand = new AsyncRelayCommand(
             _ => RefreshResultsAsync(),
             _ => CanRefreshResults,
@@ -229,6 +303,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
 
     public MachineIntegrationSetupViewModel Setup { get; }
     public AsyncRelayCommand PublishTwoDImageHandoffCommand { get; }
+    public AsyncRelayCommand PublishInspectionHandoffCommand { get; }
     public AsyncRelayCommand RefreshResultsCommand { get; }
     public AsyncRelayCommand ApplyResultToSimulationCommand { get; }
     public RelayCommand SetSessionSharedKeyCommand { get; }
@@ -263,8 +338,8 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             var readiness = Setup.Readiness;
             if (!readiness.IsExchangeRootAvailable)
             {
-                return L(
-                    "SetupStepExchange",
+                return OpenVisionLanguageService.T(
+                    "Integration.SetupStepExchange",
                     "1/6 교환 폴더를 선택하고 설정을 저장하세요.",
                     "1/6 Choose the exchange folder and save setup.");
             }
@@ -273,9 +348,9 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             {
                 if (!Setup.IsThreeDAutomaticSetupReady)
                 {
-                    return L(
-                        "SetupStepThreeD",
-                        "2/6 3D HeightMap source, c3d recipe, consumer identity와 Sequence/device binding을 저장하세요.",
+                    return OpenVisionLanguageService.T(
+                        "Integration.SetupStepThreeD",
+                        "2/6 3D 높이 원본, c3d 레시피, 검사 프로그램 버전·source commit과 시퀀스·장치 연결을 저장하세요.",
                         "2/6 Save the 3D HeightMap source, c3d recipe, consumer identity, and Sequence/device binding.");
                 }
             }
@@ -283,48 +358,80 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             if (!Setup.UseThreeDHeightMap
                 && (!readiness.IsInspectionRecipeAvailable || !readiness.IsInspectionRecipeSupportedByTwoD))
             {
-                return L(
-                    "SetupStepRecipe",
+                return OpenVisionLanguageService.T(
+                    "Integration.SetupStepRecipe",
                     "2/6 사용할 2D 검사 레시피를 선택하세요.",
                     "2/6 Choose the 2D inspection recipe to use.");
             }
 
             if (!Setup.UseThreeDHeightMap && Setup.TwoDConsumerIdentity is null)
             {
-                return L(
-                    "SetupStepConsumer",
-                    "3/6 2D 소비자 버전과 40자리 source commit을 입력하세요.",
+                return OpenVisionLanguageService.T(
+                    "Integration.SetupStepConsumer",
+                    "3/6 2D 검사 프로그램 버전과 40자리 source commit을 입력하세요.",
                     "3/6 Enter the 2D consumer version and 40-character source commit.");
             }
 
             if (!HasValidTcpEndpoints())
             {
-                return L(
-                    "SetupStepTcp",
+                return OpenVisionLanguageService.T(
+                    "Integration.SetupStepTcp",
                     "4/6 TCP 수신·상대 주소와 포트를 확인하세요.",
                     "4/6 Check the TCP listen/peer addresses and ports.");
             }
 
             if (!IsSharedKeyReady)
             {
-                return L(
-                    "SetupStepKey",
+                return OpenVisionLanguageService.T(
+                    "Integration.SetupStepKey",
                     "5/6 세션 공유 키를 입력하거나 허용된 환경 변수를 준비하세요.",
                     "5/6 Enter a session shared key or prepare the approved environment variable.");
             }
 
             if (Setup.HasUnsavedChanges)
             {
-                return L(
-                    "SetupStepSave",
-                    "6/6 변경 사항을 저장한 뒤 명시적 연결 또는 Handoff를 실행하세요.",
+                return OpenVisionLanguageService.T(
+                    "Integration.SetupStepSave",
+                    "6/6 변경 사항을 저장한 뒤 명시적 연결 또는 검사 요청을 실행하세요.",
                     "6/6 Save the changes before an explicit connection or Handoff.");
             }
 
-            return L(
-                "SetupReady",
-                "설정 준비 완료. 수신 시작, 상대 Ping 또는 명시적 Handoff 중 하나를 선택하세요.",
-                "Setup ready. Choose Start listening, Ping peer, or an explicit Handoff.");
+            return OpenVisionLanguageService.T(
+                "Integration.SetupReady",
+                "설정 준비 완료. 수신 시작, 상대 Ping 또는 명시적 검사 요청 중 하나를 선택하세요.",
+                "Setup ready. Choose Start listening, Ping peer, or an explicit Handoff.")
+                + (string.IsNullOrWhiteSpace(HandoffReadinessText) ? string.Empty : "\n" + HandoffReadinessText);
+        }
+    }
+
+    public string HandoffReadinessText
+    {
+        get
+        {
+            var context = _requestContextProvider?.Invoke();
+            if (context is null) return string.Empty;
+            if (!context.IsExactCommit)
+                return L("HandoffBuildRequired", "검사 전송 대기: 소스 커밋과 일치하는 clean 빌드가 필요합니다.", "Handoff pending: a clean build matching its source commit is required.");
+            if (string.IsNullOrWhiteSpace(context.ProjectPath))
+                return L("HandoffSaveProject", "검사 전송 대기: 레시피를 프로젝트 파일로 저장하세요.", "Handoff pending: save the recipe as a project file.");
+            if (context.CurrentCamera?.NumericalInput is { IsExternalInspection: false })
+                return L("HandoffGeneratedRun", "내부 수치 모의 판정입니다. 외부 결과 대기를 켠 뒤 새로 촬영하거나 자동 시퀀스를 실행하세요.", "This is a local numerical mock decision. Enable external-result waiting, then capture again or run the automatic sequence.");
+            if (context.CurrentCamera?.FrameEvidence is null && context.CurrentCamera?.Result?.FrameEvidence is null)
+                return L("HandoffCaptureRequired", "검사 전송 대기: 촬영 단계를 실행해 현재 원본을 생성하세요.", "Handoff pending: execute the capture step to generate the current input.");
+            if (context.CurrentCamera.State is not (VirtualCameraState.FrameReady or VirtualCameraState.AwaitingExternalResult))
+                return L("HandoffCapturePending", "검사 전송 대기: 현재 촬영이 끝나야 합니다.", "Handoff pending: the current capture must finish.");
+            try
+            {
+                var recipe = Setup.UseThreeDHeightMap ? Setup.ThreeDInspectionRecipePath : Setup.InspectionRecipePath;
+                var consumer = Setup.ActiveConsumerIdentity;
+                if (consumer is null || !_canBuildRequest(recipe, consumer))
+                    return L("HandoffSourceMismatch", "검사 전송 대기: 현재 원본 파일·해시, 촬영 레시피, 검사 종류와 시퀀스 연결을 확인하세요.", "Handoff pending: check the current source file/hash, capture recipe, inspection mode, and sequence binding.");
+            }
+            catch (IntegrationContractException)
+            {
+                return L("HandoffBuildRequired", "검사 전송 대기: 소스 커밋과 일치하는 clean 빌드가 필요합니다.", "Handoff pending: a clean build matching its source commit is required.");
+            }
+            return L("HandoffInputReady", "현재 원본과 검사 연결이 준비되었습니다. 전송과 검사는 명시적으로 실행하세요.", "Current input and inspection binding are ready. Explicitly send the handoff and run inspection.");
         }
     }
 
@@ -367,6 +474,26 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public string PublishInspectionHandoffCaption => Setup.UseThreeDHeightMap
+        ? L("CreateThreeDRequest", "3D 검사 요청 만들기", "Create 3D inspection request")
+        : OpenVisionLanguageService.T("Integration.MmiCreateTwoDRequest");
+
+    public string PublishInspectionHandoffTooltip => Setup.UseThreeDHeightMap
+        ? L("CreateThreeDRequestTooltip", "현재 높이 원본을 3D 검사 요청으로 저장합니다. 실제 검사는 3D Studio에서 별도로 실행합니다.", "Save the current height input as a 3D inspection request. Run inspection separately in 3D Studio.")
+        : OpenVisionLanguageService.T("Integration.MmiCreateTwoDRequestTooltip");
+
+    public bool CanPublishInspectionHandoff
+    {
+        get
+        {
+            if (!Setup.UseThreeDHeightMap) return CanPublishTwoDImageHandoff;
+            if (IsDisposed || !_integrationParticipant.CanStart || !Setup.Readiness.IsExchangeRootAvailable
+                || !Setup.IsThreeDAutomaticSetupReady || Setup.ThreeDConsumerIdentity is not { } consumer) return false;
+            try { return _canBuildRequest(Setup.NormalizePath(Setup.ActiveInspectionRecipePath), consumer); }
+            catch (IntegrationContractException) { return false; }
+        }
+    }
+
     public bool CanRefreshResults =>
         !IsDisposed
         && _integrationParticipant.CanStart
@@ -376,6 +503,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     internal bool CanPrepareAutomaticExternalInspection =>
         !IsDisposed
         && Setup.WaitForExternalResult
+        && _requestContextProvider?.Invoke().IsExactCommit != false
         && _integrationParticipant.CanStart
         && Setup.ActiveConsumerIdentity is not null
         && Setup.Readiness.IsExchangeRootAvailable
@@ -396,6 +524,25 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
 
     public IReadOnlyList<MachineIntegrationTransactionSummary> TransactionHistory =>
         _resultObservation.CurrentTransactions;
+
+    internal IReadOnlyList<RunInspectionRecord> CaptureRunInspections(MachineRunRecord record)
+    {
+        var acquisitions = record.Captures.Select(capture => capture.AcquisitionId).ToHashSet(StringComparer.Ordinal);
+        var inspections = record.Captures.Where(capture => capture.ResultJson is not null)
+            .Select(capture => new RunInspectionRecord(capture.AcquisitionId, capture.FrameId, null, capture.ResultJson)).ToList();
+        foreach (var transaction in _resultObservation.CurrentTransactions)
+        {
+            if (transaction.Handoff.Context.ProjectId != record.RecipeId || !acquisitions.Contains(transaction.Handoff.Context.AcquisitionId)
+                || transaction.Handoff.CreatedAtUtc < record.StartedAtUtc || transaction.Handoff.CreatedAtUtc > record.EndedAtUtc) continue;
+            _resultObservation.ValidatedResultsByTransaction.TryGetValue(transaction.Handoff.TransactionId, out var result);
+            inspections.Add(new(transaction.Handoff.TransactionId.ToString("D"), transaction.Handoff.Context.AcquisitionId,
+                JsonSerializer.Serialize(transaction.Handoff), result is null ? null : JsonSerializer.Serialize(result.Result)));
+        }
+        return inspections;
+    }
+
+    public int PendingInspectionRequestCount => _resultObservation.CurrentTransactions.Count(transaction =>
+        GetTransactionHistoryState(transaction) is MachineIntegrationTransactionHistoryState.PendingReview or MachineIntegrationTransactionHistoryState.Reviewed);
 
     public IReadOnlyList<MachineIntegrationTransactionHistoryItem> TransactionHistoryRows =>
         _resultObservation.CurrentTransactions
@@ -512,12 +659,12 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     public string? TransactionDiagnosticReadError => _resultObservation.DiagnosticReadError;
 
     public string HandoffStatusText => _resultObservation.LatestTransaction is null
-        ? L("NoHandoff", "현재 프로젝트의 Handoff가 없습니다.", "No Handoff exists for the current project.")
+        ? OpenVisionLanguageService.T("Integration.RequestNone", "현재 프로젝트의 검사 요청이 없습니다.", "No Handoff exists for the current project.")
         : string.Format(
             System.Globalization.CultureInfo.CurrentCulture,
-            L(
-                "HandoffStatus",
-                "최근 Handoff: {0}/{1} · {2}",
+            OpenVisionLanguageService.T(
+                "Integration.RequestStatusFormat",
+                "최근 검사 요청: {0}/{1} · {2}",
                 "Latest Handoff: {0}/{1} · {2}"),
             _resultObservation.LatestTransaction.Handoff.Context.Modality,
             _resultObservation.LatestTransaction.Handoff.Context.InputKind,
@@ -526,47 +673,47 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     public string AcknowledgementStatusText => _resultObservation.LatestAcknowledgement is not null
         ? string.Format(
             System.Globalization.CultureInfo.CurrentCulture,
-            L(
-                "AcknowledgementStatus",
-                "최근 Acknowledgement: {0}",
+            OpenVisionLanguageService.T(
+                "Integration.ReceiptStatusFormat",
+                "최근 수신 확인: {0}",
                 "Latest Acknowledgement: {0}"),
-            _resultObservation.LatestAcknowledgement.Status)
+            GetReceiptStatusCaption(_resultObservation.LatestAcknowledgement.Status))
         : _resultObservation.AcknowledgementReadError is not null
             ? string.Format(
                 System.Globalization.CultureInfo.CurrentCulture,
-                L(
-                    "AcknowledgementReadFailed",
-                    "Acknowledgement 읽기 실패: {0}",
+                OpenVisionLanguageService.T(
+                    "Integration.ReceiptReadFailed",
+                    "수신 확인 읽기 실패: {0}",
                     "Acknowledgement read failed: {0}"),
                 _resultObservation.AcknowledgementReadError)
             : _resultObservation.LatestAcknowledgementTransaction is null
-                ? L(
-                    "NoAcknowledgement",
-                    "현재 프로젝트의 Acknowledgement가 없습니다.",
+                ? OpenVisionLanguageService.T(
+                    "Integration.ReceiptNone",
+                    "현재 프로젝트의 수신 확인이 없습니다.",
                     "No Acknowledgement exists for the current project.")
-                : L(
-                    "AcknowledgementPendingValidation",
-                    "Acknowledgement를 아직 검증하지 못했습니다.",
+                : OpenVisionLanguageService.T(
+                    "Integration.ReceiptPendingValidation",
+                    "수신 확인을 아직 검증하지 못했습니다.",
                     "Acknowledgement has not been validated yet.");
 
     public string ResultStatusText => _resultObservation.LatestResult is not null
         ? string.Format(
             System.Globalization.CultureInfo.CurrentCulture,
-            L(
-                "ResultStatus",
-                "최근 Result: {0} · {1} · Run {2}",
+            OpenVisionLanguageService.T(
+                "Integration.ResultStatusFormat",
+                "최근 검사 결과: {0} · {1} · 운전 {2}",
                 "Latest Result: {0} · {1} · Run {2}"),
-            _resultObservation.LatestResult.Outcome,
-            _resultObservation.LatestResult.Status,
+            GetResultOutcomeCaption(_resultObservation.LatestResult.Outcome),
+            GetResultStatusCaption(_resultObservation.LatestResult.Status),
             _resultObservation.LatestResult.RunId)
         : _resultObservation.ResultReadError is not null
             ? string.Format(
                 System.Globalization.CultureInfo.CurrentCulture,
-                L("ResultReadFailed", "Result 읽기 실패: {0}", "Result read failed: {0}"),
+                OpenVisionLanguageService.T("Integration.ResultReadFailed", "검사 결과 읽기 실패: {0}", "Result read failed: {0}"),
                 _resultObservation.ResultReadError)
             : _resultObservation.LatestResultTransaction is null
-                ? L("NoResult", "아직 검증된 Result가 없습니다.", "No validated Result is available yet.")
-                : L("ResultPending", "Result 파일이 있지만 전체 순서를 아직 검증하지 못했습니다.", "A Result file exists, but the complete sequence is not validated yet.");
+                ? OpenVisionLanguageService.T("Integration.ResultNone", "아직 검증된 검사 결과가 없습니다.", "No validated Result is available yet.")
+                : OpenVisionLanguageService.T("Integration.ResultPendingValidation", "결과 파일이 있지만 요청·수신 확인·결과의 순서를 아직 검증하지 못했습니다.", "A Result file exists, but the complete sequence is not validated yet.");
 
     /// <summary>
     /// States which decision source Machine Studio is configured to use. This is
@@ -709,6 +856,11 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     {
         if (_resultObservation.RefreshContext())
         {
+            TryPublish(() =>
+            {
+                _observedRequestStages.Clear();
+                _requestDisplayGeneration++;
+            });
             _simulationWorkflow?.Clear();
             _automaticExternalRunActive = false;
             _automaticExternalTransactionId = null;
@@ -799,6 +951,14 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
             () => PublishTwoDImageHandoffCoreAsync(consumer, automatic: false));
     }
 
+    internal Task<MachineIntegrationOperationObservation> PublishInspectionHandoffAsync()
+    {
+        if (!CanPublishInspectionHandoff || Setup.ActiveConsumerIdentity is not { } consumer || !_integrationParticipant.CanStart)
+            return Task.FromResult(new MachineIntegrationOperationObservation(MachineIntegrationOperationKind.PublishHandoff, MachineIntegrationParticipantOutcome.Idle));
+        return _integrationParticipant.TrackAsync(MachineIntegrationOperationKind.PublishHandoff,
+            () => PublishTwoDImageHandoffCoreAsync(consumer, automatic: false));
+    }
+
     internal Task<MachineIntegrationOperationObservation> PublishAutomaticExternalInspectionAsync()
     {
         if (!CanPrepareAutomaticExternalInspection
@@ -850,15 +1010,32 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
         IntegrationApplicationIdentity consumer,
         bool automatic)
     {
+        var displayGeneration = _requestDisplayGeneration;
         try
         {
             var publishRuntimeContext = _simulationWorkflow?.CapturePublishContext();
+            var captureContext = _requestContextProvider?.Invoke();
+            if (captureContext?.CurrentCamera is { NumericalInput: { IsExternalInspection: true } generated } camera)
+            {
+                if (!captureContext.IsExactCommit || !_canBuildRequest(Setup.ActiveInspectionRecipePath, consumer)
+                    || captureContext.ProjectPath is null || generated.Frame.FrameId != camera.CurrentAcquisitionId)
+                    throw new InvalidOperationException("The generated capture is not eligible for this inspection handoff.");
+                var contextKey = MachineIntegrationRequestWorkflow.CreateRefreshKey(captureContext);
+                var frame = generated.Frame;
+                await _generatedSourceStore.WriteAsync(captureContext.ProjectPath,
+                    new(frame.FrameId, frame.SourceRelativePath, frame.ContentSha256, frame.ContentLength),
+                    generated.CopyInspectionBytes()).ConfigureAwait(true);
+                if (IsDisposed || _requestContextProvider is null
+                    || contextKey != MachineIntegrationRequestWorkflow.CreateRefreshKey(_requestContextProvider()))
+                    throw new InvalidOperationException("The recipe or capture changed while preparing the generated input.");
+            }
             var request = _requestFactory(Setup.NormalizePath(Setup.ActiveInspectionRecipePath), consumer)
                 ?? throw new InvalidOperationException(
                     L(
                         "ContextNotReady",
                         "저장된 프로젝트에서 완료된 가상 카메라 프레임을 먼저 준비하세요.",
                         "Prepare a completed virtual-camera frame from a saved project first."));
+            var sourceNames = CapturePublishedSourceNames(captureContext, request);
             var handoff = await MachineIntegrationHandoffPublisher.PublishAsync(
                     Setup.NormalizePath(Setup.ExchangeRoot),
                     request)
@@ -875,6 +1052,13 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
 
             TryPublish(() =>
             {
+                if (displayGeneration == _requestDisplayGeneration)
+                {
+                    var key = (handoff.TransactionId, handoff.MessageId);
+                    _requestDisplayEvidence[key] = (automatic, false, null);
+                    if (sourceNames is { } names && string.Equals(_projectIdProvider(), handoff.Context.ProjectId, StringComparison.Ordinal))
+                        _requestSourceNames[key] = names;
+                }
                 _resultObservation.RecordPublishedHandoff(handoff);
                 _automaticExternalRunActive = automatic;
                 _automaticExternalTransactionId = automatic ? handoff.TransactionId : null;
@@ -911,6 +1095,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     private async Task<MachineIntegrationOperationObservation> ApplyResultToSimulationCoreAsync(
         MachineIntegrationValidatedResult validatedResult)
     {
+        var displayGeneration = _requestDisplayGeneration;
         try
         {
             var result = await _simulationWorkflow!.ApplyAsync(validatedResult).ConfigureAwait(true);
@@ -926,6 +1111,9 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
 
             TryPublish(() =>
             {
+                var key = (validatedResult.Handoff.TransactionId, validatedResult.Handoff.MessageId);
+                if (displayGeneration == _requestDisplayGeneration && _requestDisplayEvidence.TryGetValue(key, out var display))
+                    _requestDisplayEvidence[key] = (display.Automatic, true, null);
                 _simulationWorkflow.RefreshRuntimeState();
                 _automaticExternalRunActive = false;
                 _automaticExternalTransactionId = null;
@@ -954,6 +1142,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
 
     private async Task<MachineIntegrationOperationObservation> RefreshResultsCoreAsync()
     {
+        var displayGeneration = _requestDisplayGeneration;
         try
         {
             var transactionCount = await _resultObservation.RefreshAsync().ConfigureAwait(true);
@@ -966,6 +1155,19 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
 
             TryPublish(() =>
             {
+                if (displayGeneration == _requestDisplayGeneration)
+                {
+                    foreach (var transaction in _resultObservation.CurrentTransactions)
+                    {
+                        if (!string.Equals(transaction.Handoff.Context.ProjectId, _projectIdProvider(), StringComparison.Ordinal)) continue;
+                        var key = (transaction.Handoff.TransactionId, transaction.Handoff.MessageId);
+                        _observedRequestStages.TryGetValue(key, out var observed);
+                        _resultObservation.ValidatedResultsByTransaction.TryGetValue(key.TransactionId, out var validated);
+                        var acknowledgement = validated?.Acknowledgement
+                            ?? (_resultObservation.LatestAcknowledgement?.TransactionId == key.TransactionId ? _resultObservation.LatestAcknowledgement : null);
+                        _observedRequestStages[key] = (observed.Acknowledgement || acknowledgement is not null, observed.Result || validated is not null);
+                    }
+                }
                 RaiseProjectionChanged();
                 StatusText = string.Format(
                     System.Globalization.CultureInfo.CurrentCulture,
@@ -1006,6 +1208,9 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
                         _automaticExternalTransactionId = null;
                         TryPublish(() =>
                         {
+                            var key = (automaticResult.Handoff.TransactionId, automaticResult.Handoff.MessageId);
+                            if (displayGeneration == _requestDisplayGeneration && _requestDisplayEvidence.TryGetValue(key, out var display))
+                                _requestDisplayEvidence[key] = (display.Automatic, false, automaticResult.Result.Outcome);
                             RaiseProjectionChanged();
                             StatusText = string.Format(
                                 System.Globalization.CultureInfo.CurrentCulture,
@@ -1043,9 +1248,99 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
         && _resultObservation.LatestAcknowledgement?.TransactionId == transactionId
         && _resultObservation.LatestAcknowledgement.Status == IntegrationAcknowledgementStatus.Rejected;
 
-    private MachineIntegrationTransactionHistoryItem CreateTransactionHistoryRow(
-        MachineIntegrationTransactionSummary transaction) =>
-        new(transaction.Handoff, GetTransactionState(transaction));
+    private static (string CameraName, string StepName)? CapturePublishedSourceNames(
+        MachineIntegrationRequestContext? context, MachineInspectionHandoffRequest request)
+    {
+        var camera = context?.CurrentCamera;
+        var frame = camera?.Result?.FrameEvidence ?? camera?.FrameEvidence;
+        if (context is null || camera is null || frame is null
+            || !string.Equals(context.ProjectId, request.ProjectId, StringComparison.Ordinal)
+            || !string.Equals(context.CameraId, request.CameraId, StringComparison.Ordinal)
+            || !string.Equals(camera.Id, request.CameraId, StringComparison.Ordinal)
+            || !string.Equals(camera.CurrentAcquisitionId, request.AcquisitionId, StringComparison.Ordinal)
+            || !string.Equals(frame.FrameId, request.FrameId, StringComparison.Ordinal))
+            return null;
+
+        var step = context.Sequences.FirstOrDefault(sequence => sequence.Id == request.SequenceId)?.Steps.FirstOrDefault(item => item.Id == request.StepId);
+        return step is null ? null : (camera.Name, step.Name);
+    }
+
+    private MachineIntegrationTransactionHistoryItem CreateTransactionHistoryRow(MachineIntegrationTransactionSummary transaction)
+    {
+        var id = transaction.Handoff.TransactionId;
+        (bool Automatic, bool Applied, IntegrationInspectionOutcome? LateOutcome) display;
+        bool hasDisplayEvidence;
+        (string CameraName, string StepName) sourceNames;
+        (bool Acknowledgement, bool Result) observedStages;
+        lock (_lifetimeGate)
+        {
+            hasDisplayEvidence = _requestDisplayEvidence.TryGetValue((id, transaction.Handoff.MessageId), out display);
+            _requestSourceNames.TryGetValue((id, transaction.Handoff.MessageId), out sourceNames);
+            _observedRequestStages.TryGetValue((id, transaction.Handoff.MessageId), out observedStages);
+        }
+        _resultObservation.ValidatedResultsByTransaction.TryGetValue(id, out var validated);
+        var result = validated?.Result;
+        var acknowledgement = validated?.Acknowledgement
+            ?? (_resultObservation.LatestAcknowledgement?.TransactionId == id ? _resultObservation.LatestAcknowledgement : null);
+        var state = GetTransactionHistoryState(transaction);
+        var readError = (_resultObservation.LatestResultTransaction?.Handoff.TransactionId == id ? _resultObservation.ResultReadError : null)
+            ?? (_resultObservation.LatestAcknowledgementTransaction?.Handoff.TransactionId == id ? _resultObservation.AcknowledgementReadError : null);
+        var hasReplyReadError = !string.IsNullOrWhiteSpace(readError) || transaction.HasResult && result is null;
+        var hasAcceptedAcknowledgement = acknowledgement?.Status == IntegrationAcknowledgementStatus.Accepted;
+        var error = result?.Error?.Message ?? acknowledgement?.Error?.Message ?? readError;
+        if (hasReplyReadError && string.IsNullOrWhiteSpace(error))
+            error = L("RequestResultVerificationError", "검사 결과를 검증하지 못했습니다.", "The inspection result could not be validated.");
+        var bottomStatus = hasReplyReadError
+            ? L("RequestProcessingError", "처리오류", "Processing error")
+            : result is not null
+                ? (result.Status switch
+                {
+                    IntegrationResultStatus.Completed => L("RequestResultReceived", "결과 수신", "Result received"),
+                    IntegrationResultStatus.Failed => L("RequestProcessingError", "처리오류", "Processing error"),
+                    _ => GetResultStatusCaption(result.Status)
+                }) + " · " + GetResultOutcomeCaption(result.Outcome)
+                : acknowledgement?.Status == IntegrationAcknowledgementStatus.Rejected
+                    ? GetReceiptStatusCaption(IntegrationAcknowledgementStatus.Rejected)
+                    : hasAcceptedAcknowledgement
+                        ? L("RequestAcknowledgement", "수신 확인", "Acknowledged")
+                        : L("RequestSent", "전송됨", "Sent");
+        var tone = hasReplyReadError || state == MachineIntegrationTransactionHistoryState.Rejected
+            || result?.Status is IntegrationResultStatus.Failed or IntegrationResultStatus.Cancelled
+            ? "bad"
+            : result?.Status == IntegrationResultStatus.Completed ? "ok" : "warn";
+        var history = new List<string> { $"{transaction.Handoff.CreatedAtUtc.ToLocalTime():HH:mm:ss} {L("RequestSent", "전송됨", "Sent")}" };
+        if (acknowledgement is not null)
+        {
+            var acknowledgementCaption = hasAcceptedAcknowledgement
+                ? L("RequestAcknowledgement", "수신 확인", "Acknowledged")
+                : GetReceiptStatusCaption(acknowledgement.Status);
+            history.Add($"{acknowledgement.CreatedAtUtc.ToLocalTime():HH:mm:ss} {acknowledgementCaption}");
+        }
+        if (result is not null) history.Add($"{result.CreatedAtUtc.ToLocalTime():HH:mm:ss} {bottomStatus}");
+        return new(transaction.Handoff, GetTransactionState(transaction))
+        {
+            BottomStatusText = bottomStatus,
+            PublishedCameraName = sourceNames.CameraName ?? string.Empty,
+            PublishedStepName = sourceNames.StepName ?? string.Empty,
+            StatusTone = tone,
+            HasAcknowledgement = hasAcceptedAcknowledgement,
+            HasValidatedResult = validated is not null,
+            HasReceivedAcknowledgement = observedStages.Acknowledgement,
+            HasReceivedResult = observedStages.Result,
+            IsAutomaticRequest = hasDisplayEvidence ? display.Automatic : null,
+            IsResultApplied = hasDisplayEvidence && display.Applied,
+            IsLateResult = hasDisplayEvidence && display.LateOutcome is not null,
+            LateResultText = hasDisplayEvidence && display.LateOutcome is { } lateOutcome
+                ? string.Format(CultureInfo.CurrentCulture, L("RequestLateResult", "지연 수신 {0} · 미반영", "Late result {0} · not applied"), GetResultOutcomeCaption(lateOutcome)) : string.Empty,
+            InspectionCompleted = result?.Status == IntegrationResultStatus.Completed,
+            IsPending = state is MachineIntegrationTransactionHistoryState.PendingReview or MachineIntegrationTransactionHistoryState.Reviewed,
+            ErrorText = error ?? string.Empty,
+            MetricsText = result is null ? string.Empty : string.Join(" · ", result.Metrics.Select(metric =>
+                string.Join(" ", new[] { metric.Name, metric.Unit, metric.Value.ToString(CultureInfo.InvariantCulture) }
+                    .Where(value => !string.IsNullOrWhiteSpace(value))))),
+            HistoryText = string.Join(Environment.NewLine, history)
+        };
+    }
 
     private MachineIntegrationTransactionHistoryState GetTransactionHistoryState(
         MachineIntegrationTransactionSummary transaction)
@@ -1073,26 +1368,59 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
                 : MachineIntegrationTransactionHistoryState.PendingReview;
     }
 
+    private static string GetReceiptStatusCaption(IntegrationAcknowledgementStatus value) => value switch
+    {
+        IntegrationAcknowledgementStatus.Accepted => OpenVisionLanguageService.T("Integration.ReceiptAccepted", "수신 확인됨", "Accepted"),
+        IntegrationAcknowledgementStatus.Rejected => OpenVisionLanguageService.T("Integration.ReceiptRejected", "거부됨", "Rejected"),
+        _ => value.ToString()
+    };
+
+    private static string GetResultOutcomeCaption(IntegrationInspectionOutcome value) => value switch
+    {
+        IntegrationInspectionOutcome.Pass => OpenVisionLanguageService.T("Integration.OutcomePass", "OK", "Pass"),
+        IntegrationInspectionOutcome.Ng => OpenVisionLanguageService.T("Integration.OutcomeNg", "NG", "Ng"),
+        IntegrationInspectionOutcome.NotMeasured => OpenVisionLanguageService.T("Integration.OutcomeNotMeasured", "측정 안 됨", "NotMeasured"),
+        IntegrationInspectionOutcome.Indeterminate => OpenVisionLanguageService.T("Integration.OutcomeIndeterminate", "판정불가", "Indeterminate"),
+        IntegrationInspectionOutcome.CorrelationMismatch => OpenVisionLanguageService.T("Integration.OutcomeCorrelationMismatch", "요청-응답 불일치", "CorrelationMismatch"),
+        IntegrationInspectionOutcome.Tampered => OpenVisionLanguageService.T("Integration.OutcomeTampered", "데이터 무결성 오류", "Tampered"),
+        IntegrationInspectionOutcome.ExecutionError => OpenVisionLanguageService.T("Integration.OutcomeExecutionError", "처리 오류", "ExecutionError"),
+        _ => value.ToString()
+    };
+
+    private static string GetResultStatusCaption(IntegrationResultStatus value) => value switch
+    {
+        IntegrationResultStatus.Completed => OpenVisionLanguageService.T("Integration.ResultCompleted", "완료", "Completed"),
+        IntegrationResultStatus.Failed => OpenVisionLanguageService.T("Integration.ResultFailed", "처리 오류", "Failed"),
+        IntegrationResultStatus.Cancelled => OpenVisionLanguageService.T("Integration.ResultCancelled", "취소됨", "Cancelled"),
+        _ => value.ToString()
+    };
+
     private string GetTransactionState(MachineIntegrationTransactionSummary transaction) =>
         GetTransactionHistoryState(transaction) switch
         {
             MachineIntegrationTransactionHistoryState.ResultReadFailed =>
-                L("ResultReadFailedState", "결과 읽기 실패", "Result read failed"),
+                OpenVisionLanguageService.T("Integration.TransactionHistoryFilterResultReadFailed", "결과 읽기 실패", "Result read failed"),
             MachineIntegrationTransactionHistoryState.ResultPublished =>
-                L("ResultPublished", "결과 게시됨", "Result published"),
+                OpenVisionLanguageService.T("Integration.TransactionHistoryFilterPublished", "결과 수신", "Result published"),
             MachineIntegrationTransactionHistoryState.Rejected =>
-                L("Rejected", "거절됨", "Rejected"),
+                OpenVisionLanguageService.T("Integration.TransactionHistoryFilterRejected", "거부됨", "Rejected"),
             MachineIntegrationTransactionHistoryState.Reviewed =>
-                L("Reviewed", "검토됨", "Reviewed"),
-            _ => L("PendingReview", "검토 대기", "Pending review")
+                OpenVisionLanguageService.T("Integration.TransactionHistoryFilterReviewed", "수신 확인됨", "Reviewed"),
+            _ => OpenVisionLanguageService.T("Integration.TransactionHistoryFilterPendingReview", "수신 확인 대기", "Pending review")
         };
 
     private void RefreshCommandState()
     {
         OnPropertyChanged(nameof(CanPublishTwoDImageHandoff));
+        OnPropertyChanged(nameof(CanPublishInspectionHandoff));
+        OnPropertyChanged(nameof(PublishInspectionHandoffCaption));
+        OnPropertyChanged(nameof(PublishInspectionHandoffTooltip));
+        OnPropertyChanged(nameof(HandoffReadinessText));
+        OnPropertyChanged(nameof(SetupWorkflowStatusText));
         OnPropertyChanged(nameof(CanRefreshResults));
         OnPropertyChanged(nameof(CanApplyResultToSimulation));
         PublishTwoDImageHandoffCommand.RaiseCanExecuteChanged();
+        PublishInspectionHandoffCommand.RaiseCanExecuteChanged();
         RefreshResultsCommand.RaiseCanExecuteChanged();
         ApplyResultToSimulationCommand.RaiseCanExecuteChanged();
         Setup.RefreshCommandState();
@@ -1155,6 +1483,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
 
     private void RaiseTransactionHistoryProjectionChanged()
     {
+        OnPropertyChanged(nameof(PendingInspectionRequestCount));
         OnPropertyChanged(nameof(VisibleTransactionHistoryRows));
         OnPropertyChanged(nameof(HasVisibleTransactionHistoryRows));
         OnPropertyChanged(nameof(HasTransactionHistoryEmptyState));
@@ -1199,17 +1528,17 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     {
         _transactionHistoryFilters =
         [
-            new(null, L("TransactionHistoryFilterAll", "전체 상태", "All states")),
+            new(null, OpenVisionLanguageService.T("Integration.TransactionHistoryFilterAll", "전체 상태", "All states")),
             new(MachineIntegrationTransactionHistoryState.PendingReview,
-                L("TransactionHistoryFilterPendingReview", "검토 대기", "Pending review")),
+                OpenVisionLanguageService.T("Integration.TransactionHistoryFilterPendingReview", "수신 확인 대기", "Pending review")),
             new(MachineIntegrationTransactionHistoryState.Reviewed,
-                L("TransactionHistoryFilterReviewed", "검토됨", "Reviewed")),
+                OpenVisionLanguageService.T("Integration.TransactionHistoryFilterReviewed", "수신 확인됨", "Reviewed")),
             new(MachineIntegrationTransactionHistoryState.Rejected,
-                L("TransactionHistoryFilterRejected", "거절됨", "Rejected")),
+                OpenVisionLanguageService.T("Integration.TransactionHistoryFilterRejected", "거부됨", "Rejected")),
             new(MachineIntegrationTransactionHistoryState.ResultPublished,
-                L("TransactionHistoryFilterPublished", "결과 게시됨", "Result published")),
+                OpenVisionLanguageService.T("Integration.TransactionHistoryFilterPublished", "결과 수신", "Result published")),
             new(MachineIntegrationTransactionHistoryState.ResultReadFailed,
-                L("TransactionHistoryFilterResultReadFailed", "결과 읽기 실패", "Result read failed"))
+                OpenVisionLanguageService.T("Integration.TransactionHistoryFilterResultReadFailed", "결과 읽기 실패", "Result read failed"))
         ];
     }
 
@@ -1235,6 +1564,14 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
 
         TryPublish(() =>
         {
+            if (args.PropertyName == nameof(MachineIntegrationSetupViewModel.ExchangeRoot))
+            {
+                _requestDisplayEvidence.Clear();
+                _requestSourceNames.Clear();
+                _observedRequestStages.Clear();
+                _requestDisplayGeneration++;
+                RaiseProjectionChanged();
+            }
             RefreshCommandState();
             OnPropertyChanged(nameof(SetupWorkflowStatusText));
             OnPropertyChanged(nameof(InspectionExecutionModeText));
@@ -1255,6 +1592,10 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
     {
         TryPublish(() =>
         {
+            _requestDisplayEvidence.Clear();
+            _requestSourceNames.Clear();
+            _observedRequestStages.Clear();
+            _requestDisplayGeneration++;
             _resultObservation.Reset();
             _simulationWorkflow?.Clear();
             _automaticExternalRunActive = false;
@@ -1481,6 +1822,10 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
                 return;
             }
 
+            _requestDisplayEvidence.Clear();
+            _requestSourceNames.Clear();
+            _observedRequestStages.Clear();
+            _requestDisplayGeneration++;
             _disposed = true;
         }
 
@@ -1493,6 +1838,7 @@ public sealed class MachineIntegrationViewModel : ViewModelBase, IDisposable
         _tcpControl.Dispose();
         Setup.Dispose();
         PublishTwoDImageHandoffCommand.RaiseCanExecuteChanged();
+        PublishInspectionHandoffCommand.RaiseCanExecuteChanged();
         RefreshResultsCommand.RaiseCanExecuteChanged();
         ApplyResultToSimulationCommand.RaiseCanExecuteChanged();
         SetSessionSharedKeyCommand.RaiseCanExecuteChanged();

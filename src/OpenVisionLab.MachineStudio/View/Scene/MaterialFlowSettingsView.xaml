@@ -1,0 +1,70 @@
+<UserControl x:Class="OpenVisionLab.MachineStudio.View.Scene.MaterialFlowSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
+             Visibility="{Binding IsOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+    <UserControl.InputBindings><KeyBinding Key="Escape" Command="{Binding CancelCommand}" /></UserControl.InputBindings>
+    <Grid Background="Transparent" KeyboardNavigation.TabNavigation="Cycle">
+        <Border Background="{DynamicResource Surface.Root}" Opacity="0.7" />
+        <Border Margin="16" Padding="20" MaxWidth="700" HorizontalAlignment="Center" VerticalAlignment="Center"
+                Background="{DynamicResource Surface.Raised}" BorderBrush="{DynamicResource Border.Default}" BorderThickness="1" CornerRadius="8">
+            <DockPanel MaxHeight="710">
+                <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+                    <TextBlock Text="{Binding ValidationText}" TextWrapping="Wrap" Margin="0,0,0,4" Foreground="{DynamicResource Text.Primary}" AutomationProperties.Name="{Binding ValidationText}" />
+                <WrapPanel HorizontalAlignment="Right">
+                    <Button Content="{loc:Loc Shell.Defaults}" Command="{Binding ResetCommand}" Style="{StaticResource GlobalCommandButtonStyle}" Margin="0,0,6,4" />
+                    <Button Content="{loc:Loc Project.Cancel}" Command="{Binding CancelCommand}" Style="{StaticResource GlobalCommandButtonStyle}" Margin="0,0,6,4" />
+                    <Button Content="{loc:Loc MaterialFlow.Apply}" Command="{Binding ApplyCommand}" Style="{StaticResource PrimaryCommandButtonStyle}" Margin="0,0,0,4" AutomationProperties.Name="{loc:Loc MaterialFlow.ApplySettings}" />
+                </WrapPanel>
+                </StackPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,14,0">
+                <StackPanel IsEnabled="{Binding CanEdit}">
+                    <TextBlock Text="{loc:Loc MaterialFlow.SettingsTitle}" FontSize="19" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" />
+                    <TextBlock Text="{loc:Loc MaterialFlow.SaveHint}" TextWrapping="Wrap" Margin="0,8,0,16" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBlock Text="{loc:Loc MaterialFlow.ProductName}" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBox x:Name="MaterialWorkpieceNameTextBox" Text="{Binding WorkpieceName, UpdateSourceTrigger=PropertyChanged}" MaxLength="60" MinHeight="36" Margin="0,5,0,12" AutomationProperties.Name="{loc:Loc MaterialFlow.ProductName}" />
+                    <CheckBox Content="{loc:Loc MaterialFlow.EnableTransfer}" IsChecked="{Binding Enabled}" Margin="0,0,0,14" AutomationProperties.Name="{loc:Loc MaterialFlow.EnableTransfer}" />
+                    <TextBlock Text="{loc:Loc MaterialFlow.CurrentUnit}" Foreground="{DynamicResource Text.Secondary}" />
+                    <ComboBox ItemsSource="{Binding Units}" SelectedItem="{Binding SelectedUnit}" MinHeight="36" Margin="0,5,0,12" AutomationProperties.Name="{loc:Loc MaterialFlow.SlotUnit}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate><TextBlock Text="{Binding Name}" TextWrapping="Wrap" /></DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <TextBlock Text="{loc:Loc MaterialFlow.SlotName}" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBox Text="{Binding SlotName, UpdateSourceTrigger=PropertyChanged}" MaxLength="60" MinHeight="36" Margin="0,5,0,12" AutomationProperties.Name="{loc:Loc MaterialFlow.SlotName}" />
+                    <TextBlock Text="{loc:Loc MaterialFlow.RepeatCountHint}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBox Text="{Binding RepeatCount, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding UsesLegacyRepeats}" MaxLength="3" MinHeight="36" Margin="0,5,0,12" AutomationProperties.Name="{loc:Loc MaterialFlow.RepeatCount}" />
+                    <CheckBox Content="{loc:Loc MaterialFlow.UseTotalSupply}" IsChecked="{Binding UseTotalFeedCount}" Margin="0,8,0,8" AutomationProperties.Name="{loc:Loc MaterialFlow.UseTotalSupply}" />
+                    <TextBlock Text="{loc:Loc MaterialFlow.TotalSupply}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBox Text="{Binding TotalFeedCount, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding UseTotalFeedCount}" MaxLength="3" MinHeight="36" Margin="0,5,0,8" AutomationProperties.Name="{loc:Loc MaterialFlow.TotalSupply}" />
+                    <TextBlock Text="{loc:Loc MaterialFlow.SupplyCompletionHint}" TextWrapping="Wrap" Margin="0,0,0,12" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBlock Text="{loc:Loc MaterialFlow.OkRoute}" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBox Text="{Binding OkRoute, UpdateSourceTrigger=PropertyChanged}" MaxLength="60" MinHeight="36" Margin="0,5,0,8" AutomationProperties.Name="{loc:Loc MaterialFlow.OkRoute}" />
+                    <TextBlock Text="{loc:Loc MaterialFlow.NgRoute}" Foreground="{DynamicResource Text.Secondary}" />
+                    <TextBox Text="{Binding NgRoute, UpdateSourceTrigger=PropertyChanged}" MaxLength="60" MinHeight="36" Margin="0,5,0,12" AutomationProperties.Name="{loc:Loc MaterialFlow.NgRoute}" />
+                    <ItemsControl ItemsSource="{Binding Positions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="12" Margin="0,0,0,10" BorderBrush="{DynamicResource Border.Default}" BorderThickness="1" CornerRadius="4">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{loc:Loc MaterialFlow.PositionUnit}" Foreground="{DynamicResource Text.Secondary}" Margin="0,8,0,0" />
+                                        <ComboBox ItemsSource="{Binding Units}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding UnitId}" MinHeight="36" Margin="0,4,0,8" AutomationProperties.Name="{loc:Loc MaterialFlow.PositionUnit}" />
+                                        <TextBlock Text="{loc:Loc MaterialFlow.PositionConveyor}" Foreground="{DynamicResource Text.Secondary}" />
+                                        <ComboBox ItemsSource="{Binding Conveyors}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding ConveyorId}" MinHeight="36" Margin="0,4,0,8" AutomationProperties.Name="{loc:Loc MaterialFlow.PositionConveyor}" />
+                                        <StackPanel Visibility="{Binding IsExit, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <TextBlock Text="{loc:Loc MaterialFlow.ExitRoute}" Foreground="{DynamicResource Text.Secondary}" />
+                                            <ComboBox ItemsSource="{Binding Routes}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding Route}" MinHeight="36" Margin="0,4,0,0" AutomationProperties.Name="{loc:Loc MaterialFlow.ExitRoute}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{loc:Loc MaterialFlow.SequenceHint}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

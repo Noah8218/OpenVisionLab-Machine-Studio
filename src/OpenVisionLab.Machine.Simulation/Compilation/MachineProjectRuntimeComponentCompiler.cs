@@ -78,7 +78,7 @@ internal sealed class MachineProjectRuntimeComponentCompiler
                 case LayoutComponentKind.DigitalSensor:
                     DeviceDefinition device = devicesById[component.BehaviorBindingId!];
                     DigitalSensorDefinition sensor = device.Sensor!;
-                    if (!activeComponentIds.Contains(sensor.TargetComponentId))
+                    if (sensor.DetectAllProducts != true && !activeComponentIds.Contains(sensor.TargetComponentId))
                     {
                         errors.Add(Error(
                             MachineProjectRuntimeCompilationErrorCode.LayoutTargetOutsideActiveLayout,
@@ -95,6 +95,12 @@ internal sealed class MachineProjectRuntimeComponentCompiler
                         sensor.OffDelayMilliseconds,
                         allowZero: true,
                         out int offDelayTicks);
+                    if (sensor.UseMillisecondDelays == true && sensor.OnDelayMilliseconds >= 0 && sensor.OffDelayMilliseconds >= 0)
+                    {
+                        onDelayTicks = (int)Math.Ceiling(sensor.OnDelayMilliseconds / _delayConverter.FixedStep.TotalMilliseconds);
+                        offDelayTicks = (int)Math.Ceiling(sensor.OffDelayMilliseconds / _delayConverter.FixedStep.TotalMilliseconds);
+                        onValid = offValid = true;
+                    }
                     if (!onValid || !offValid)
                     {
                         errors.Add(Error(
@@ -112,7 +118,9 @@ internal sealed class MachineProjectRuntimeComponentCompiler
                         onDelayTicks,
                         offDelayTicks,
                         transform,
-                        size));
+                        size,
+                        sensor.DetectAllProducts == true,
+                        sensor.DetectionCenterY));
                     break;
 
                 case LayoutComponentKind.PneumaticCylinder:

@@ -1,0 +1,164 @@
+<UserControl x:Class="OpenVisionLab.MachineStudio.View.Simulation.ExperimentWorkspaceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+             xmlns:behavior="clr-namespace:OpenVisionLab.MachineStudio.Behavior"
+             xmlns:inspector="clr-namespace:OpenVisionLab.MachineStudio.View.Inspector"
+             xmlns:shell="clr-namespace:OpenVisionLab.MachineStudio.View.Shell"
+             xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
+    <UserControl.Resources>
+        <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <conv:KoreanWordWrappingConverter x:Key="KoreanWordWrappingConverter" />
+        <conv:NumericalFramePreviewConverter x:Key="NumericalFramePreviewConverter" />
+        <conv:ProjectImageSourceConverter x:Key="ProjectImageSourceConverter" />
+        <Style x:Key="ExperimentButton" TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
+            <Setter Property="MinHeight" Value="32" /><Setter Property="Height" Value="Auto" /><Setter Property="Padding" Value="9,5" /><Setter Property="Margin" Value="5,2,0,2" />
+        </Style>
+        <Style x:Key="ExperimentText" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" /><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Setter Property="Margin" Value="0,3,0,0" />
+        </Style>
+    </UserControl.Resources>
+    <Grid Background="{DynamicResource Surface.Root}">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+        <Border Padding="12,9" Background="{DynamicResource Surface.Raised}" BorderBrush="{DynamicResource Border.Default}" BorderThickness="0,0,0,1">
+            <DockPanel LastChildFill="True">
+                <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <Button x:Name="ExperimentScenarioButton" Content="{loc:Loc Key=Experiment.ScenarioSetup}" Command="{Binding Navigation.OpenTestScenarioCommand}" Style="{StaticResource ExperimentButton}" />
+                    <Button Content="{loc:Loc Key=SimObservation.History}" Command="{Binding Navigation.OpenResultsWorkspaceCommand}" Style="{StaticResource ExperimentButton}" />
+                </WrapPanel>
+                <StackPanel Margin="0,0,10,0" VerticalAlignment="Center">
+                    <TextBlock Text="{loc:Loc Key=Experiment.Workspace}" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="{loc:Loc Key=Experiment.SetupHint}" Style="{StaticResource ExperimentText}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+        <TabControl x:Name="ExperimentTabs" Grid.Row="1" SelectedIndex="{Binding Navigation.SelectedExperimentTabIndex, Mode=TwoWay}">
+            <TabItem Header="{loc:Loc Key=Experiment.Conditions}">
+                <Grid Margin="12">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                    <StackPanel Margin="0,0,0,9">
+                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <TextBlock Text="{loc:Loc Key=Camera.CaptureStation}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                        <ComboBox x:Name="ExperimentCameraSelector" Grid.Column="1" MaxWidth="480" HorizontalAlignment="Left" MinWidth="180" MinHeight="32" Height="Auto"
+                                  ItemsSource="{Binding Camera.VirtualCameras}" IsEnabled="{Binding Camera.HasVirtualCamera}" SelectedValuePath="Id"
+                                  SelectedValue="{Binding Camera.SelectedCameraId, Mode=OneWay}" AutomationProperties.Name="{loc:Loc Key=Camera.CaptureStation}">
+                            <ComboBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="Wrap"><TextBlock.Text><MultiBinding StringFormat="{}{0} / {1}"><Binding Path="Name" /><Binding Path="Id" /></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate>
+                            <b:Interaction.Behaviors><behavior:ComboBoxSelectionCommandBehavior Command="{Binding Camera.SelectCameraCommand}" /></b:Interaction.Behaviors>
+                        </ComboBox>
+                    </Grid>
+                    <WrapPanel Margin="0,6,0,0" Visibility="{Binding Camera.HasVirtualCamera, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}">
+                        <TextBlock Text="{loc:Loc Key=Experiment.NoCamera}" Style="{StaticResource ExperimentText}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <Button x:Name="ExperimentOpenEquipmentButton" Content="{loc:Loc Key=Experiment.OpenEquipment}" Command="{Binding Navigation.OpenEquipmentWorkspaceCommand}" Style="{StaticResource ExperimentButton}" />
+                    </WrapPanel>
+                    </StackPanel>
+                    <TabControl x:Name="ExperimentCaptureSections" Grid.Row="1" SelectedIndex="{Binding Navigation.SelectedExperimentCaptureSectionIndex, Mode=TwoWay}">
+                        <TabItem Header="{loc:Loc Key=Camera.CaptureSetup}"><inspector:CameraImageSourceView DataContext="{Binding Camera}" CaptureSection="0" Margin="10" /></TabItem>
+                        <TabItem Header="{loc:Loc Key=Camera.Variation}"><inspector:CameraImageSourceView x:Name="ExperimentVariationEditor" DataContext="{Binding Camera}" CaptureSection="1" Margin="10" /></TabItem>
+                        <TabItem Header="{loc:Loc Key=Camera.GenerateInput}"><inspector:CameraImageSourceView DataContext="{Binding Camera}" CaptureSection="2" Margin="10" /></TabItem>
+                    </TabControl>
+                    <Border x:Name="ExperimentPreparationPanel">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource InspectorCardStyle}">
+                                <Setter Property="Grid.Column" Value="1" /><Setter Property="Grid.RowSpan" Value="2" />
+                                <Setter Property="Width" Value="300" /><Setter Property="Margin" Value="12,0,0,0" /><Setter Property="Padding" Value="12" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
+                                        <Setter Property="Grid.Column" Value="0" /><Setter Property="Grid.Row" Value="2" />
+                                        <Setter Property="Grid.ColumnSpan" Value="2" /><Setter Property="Grid.RowSpan" Value="1" />
+                                        <Setter Property="Width" Value="Auto" /><Setter Property="MaxHeight" Value="180" /><Setter Property="Margin" Value="0,10,0,0" /><Setter Property="Padding" Value="8" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <Expander x:Name="ExperimentPreparation" Header="{loc:Loc Key=R40.Experiment.Summary}" VerticalAlignment="Top">
+                            <Expander.Style>
+                                <Style TargetType="Expander" BasedOn="{StaticResource {x:Type Expander}}">
+                                    <Setter Property="IsExpanded" Value="True" />
+                                    <Style.Triggers><DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True"><Setter Property="IsExpanded" Value="False" /></DataTrigger></Style.Triggers>
+                                </Style>
+                            </Expander.Style>
+                        <ScrollViewer x:Name="ExperimentPreparationScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=R40.Experiment.AppliedSettings}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="{loc:Loc Key=R40.Experiment.CameraScope}" Style="{StaticResource ExperimentText}" />
+                                <TextBlock x:Name="ExperimentNoAppliedCamera" Text="{loc:Loc Key=Experiment.NoCamera}" Style="{StaticResource ExperimentText}"
+                                           Visibility="{Binding Camera.HasVirtualCamera, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" />
+                                <StackPanel x:Name="ExperimentAppliedCamera" Visibility="{Binding Camera.HasVirtualCamera, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <TextBlock x:Name="ExperimentAppliedCameraName" Text="{Binding Camera.SelectedVirtualCamera.Name, Converter={StaticResource KoreanWordWrappingConverter}}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,9,0,0" />
+                                    <TextBlock x:Name="ExperimentAppliedCameraId" Text="{Binding Camera.SelectedCameraId}" Style="{StaticResource ExperimentText}" />
+                                    <TextBlock Text="{loc:Loc Key=R40.Experiment.AppliedSource}" Style="{StaticResource ExperimentText}" Margin="0,10,0,0" />
+                                    <TextBlock x:Name="ExperimentAppliedSource" Text="{Binding Camera.CurrentCameraInputKindText, Converter={StaticResource KoreanWordWrappingConverter}}" Style="{StaticResource ExperimentText}" />
+                                    <TextBlock Text="{loc:Loc Key=R40.Experiment.FullDraftApply}" Style="{StaticResource ExperimentText}" Margin="0,8,0,0" />
+                                </StackPanel>
+                                <Separator Margin="0,14,0,12" />
+                                <TextBlock Text="{loc:Loc Key=R40.Experiment.ScenarioConfiguration}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="{loc:Loc Key=R40.Experiment.ScenarioScope}" Style="{StaticResource ExperimentText}" />
+                                <TextBlock x:Name="ExperimentScenarioSummary" Text="{Binding SimulationWorkspace.ScenarioSummary, Converter={StaticResource KoreanWordWrappingConverter}}" Style="{StaticResource ExperimentText}" Margin="0,8,0,0" />
+                                <TextBlock Text="{loc:Loc Key=Simulation.RuntimeTarget}" Style="{StaticResource ExperimentText}" Margin="0,8,0,0" />
+                                <TextBlock x:Name="ExperimentScenarioTarget" Text="{Binding SimulationWorkspace.ScenarioTargetId, TargetNullValue=—}" Style="{StaticResource ExperimentText}" />
+                                <TextBlock Text="{loc:Loc Key=Simulation.RepetitionCount}" Style="{StaticResource ExperimentText}" Margin="0,8,0,0" />
+                                <TextBlock x:Name="ExperimentRepetitions" Text="{Binding SimulationWorkspace.BatchRepetitionCount}" Style="{StaticResource ExperimentText}" />
+                                <TextBlock Text="{loc:Loc Key=R40.Experiment.CurrentValidation}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,14,0,0" />
+                                <TextBlock x:Name="ExperimentScenarioState" Text="{Binding ConditionScenarioStateText}" Style="{StaticResource ExperimentText}" />
+                                <TextBlock x:Name="ExperimentBatchState" Text="{Binding BatchStatusText}" Style="{StaticResource ExperimentText}" />
+                            </StackPanel>
+                        </ScrollViewer>
+                        </Expander>
+                    </Border>
+                </Grid>
+            </TabItem>
+            <TabItem Header="{loc:Loc Key=Shell.EquipmentFaults}">
+                <shell:FaultSimulationPanelView x:Name="ExperimentFaultEditor" DataContext="{Binding FaultManager}" IsEmbedded="True" MaxWidth="1100" HorizontalAlignment="Stretch" />
+            </TabItem>
+            <TabItem Header="{loc:Loc Key=Experiment.CaptureData}">
+                <Grid Margin="12">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <StackPanel Margin="0,0,0,9">
+                        <TextBlock Text="{Binding Camera.CurrentInputSummaryText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{loc:Loc Key=Experiment.CurrentDataHint}" Style="{StaticResource ExperimentText}" />
+                    </StackPanel>
+                    <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                                <TextBlock x:Name="ExperimentInputsEmpty" Text="{loc:Loc Key=Camera.InputNotAcquired}" Style="{StaticResource ExperimentText}"
+                                           Visibility="{Binding Camera.HasCurrentCameraInputs, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" />
+                                <ItemsControl x:Name="ExperimentInputCards" ItemsSource="{Binding Camera.CurrentCameraInputs}">
+                                    <ItemsControl.ItemTemplate><DataTemplate>
+                                        <Button Command="{Binding DataContext.Camera.SelectCameraCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding Id}"
+                                                AutomationProperties.Name="{Binding Name}" Margin="0,0,0,7" Padding="10,7" Height="Auto" HorizontalContentAlignment="Stretch" Style="{StaticResource GlobalCommandButtonStyle}">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Name, Converter={StaticResource KoreanWordWrappingConverter}}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding Id}" Style="{StaticResource ExperimentText}" />
+                                                <TextBlock Text="{Binding StateText, Converter={StaticResource KoreanWordWrappingConverter}}" Style="{StaticResource ExperimentText}" />
+                                                <TextBlock Text="{Binding ContextText, Converter={StaticResource KoreanWordWrappingConverter}}" Style="{StaticResource ExperimentText}" />
+                                                <TextBlock Text="{Binding StepContextText, Converter={StaticResource KoreanWordWrappingConverter}}" Style="{StaticResource ExperimentText}" />
+                                                <TextBlock Text="{Binding AcquisitionText}" Style="{StaticResource ExperimentText}" FontSize="11" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate></ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                        <Grid Grid.Column="2"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                            <TextBlock Text="{Binding Camera.CurrentCameraName}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,7" />
+                            <Border Grid.Row="1" Background="{DynamicResource Surface.Panel}" BorderBrush="{DynamicResource Border.Default}" BorderThickness="1" ClipToBounds="True">
+                                <Grid>
+                                    <TextBlock Text="{loc:Loc Key=Camera.InputNotAcquired}" Style="{StaticResource ExperimentText}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="{Binding Camera.HasSelectedCameraInput, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" />
+                                    <Image x:Name="ExperimentFilePreview" Stretch="Uniform" Source="{Binding Camera.CurrentInputImagePath, Converter={StaticResource ProjectImageSourceConverter}}">
+                                        <Image.Style><Style TargetType="Image"><Style.Triggers><DataTrigger Binding="{Binding Camera.HasCurrentNumericalInput}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></Image.Style>
+                                    </Image>
+                                    <Image x:Name="ExperimentNumericalPreview" Stretch="Uniform" Source="{Binding Camera.CurrentNumericalInput, Converter={StaticResource NumericalFramePreviewConverter}}" />
+                                </Grid>
+                            </Border>
+                            <Button x:Name="ExperimentOpenInputButton" Grid.Row="2" Content="{loc:Loc Key=Experiment.OpenCapture}" HorizontalAlignment="Right" Margin="0,9,0,0"
+                                    Command="{Binding OpenExperimentCameraInputCommand}" CommandParameter="{Binding Camera.SelectedExecutionInput}" Style="{StaticResource ExperimentButton}" />
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</UserControl>

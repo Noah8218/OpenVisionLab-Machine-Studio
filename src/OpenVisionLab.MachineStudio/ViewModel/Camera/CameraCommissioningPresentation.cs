@@ -2,11 +2,24 @@ using System.Globalization;
 using System.IO;
 using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Devices;
+using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Core.Sequences;
 using OpenVisionLab.Machine.Sequence.Runtime;
 using OpenVisionLab.Machine.Simulation.Camera;
 using OpenVisionLab.Machine.Simulation.Engine;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
+
+public sealed record CameraExecutionInputItem(
+    string Id,
+    string Name,
+    int InputCount,
+    string StateText,
+    string ContextText,
+    string StepContextText,
+    string AcquisitionText,
+    string? ProjectId = null,
+    long RuntimeGeneration = 0);
 
 internal sealed record CameraCommissioningProjection(
     VirtualCameraSnapshot? Snapshot,
@@ -24,7 +37,8 @@ internal sealed record CameraCommissioningProjection(
     bool IsRunning,
     SimulationControlOwner ControlOwner,
     bool IsAutomaticRunActive,
-    SequenceExecutionStatus? ActiveSequenceStatus);
+    SequenceExecutionStatus? ActiveSequenceStatus,
+    NumericalCameraSettings? NumericalInput = null);
 
 /// <summary>
 /// Projects the selected virtual-camera snapshot into the existing
@@ -33,6 +47,64 @@ internal sealed record CameraCommissioningProjection(
 /// </summary>
 internal sealed class CameraCommissioningPresentation
 {
+    internal static IReadOnlyList<CameraExecutionInputItem> CreateExecutionInputs(MachineProjectDocument project, IEnumerable<VirtualCameraSnapshot> cameras, long runtimeGeneration = 0)
+    {
+        var snapshots = cameras.ToDictionary(camera => camera.Id, StringComparer.Ordinal);
+        return project.Devices.Where(device => device.Kind == DeviceKind.Camera).Select(device =>
+        {
+            snapshots.TryGetValue(device.Id, out var snapshot);
+            var result = snapshot?.Result;
+            bool hasInput = snapshot?.CurrentAcquisitionId is not null
+                && (snapshot.State == VirtualCameraState.AwaitingExternalResult && snapshot.FrameEvidence is not null
+                    || snapshot.State == VirtualCameraState.FrameReady && result?.AcquisitionId == snapshot.CurrentAcquisitionId
+                        && (snapshot.FrameEvidence is not null || result?.FrameEvidence is not null || result?.NumericalInput is not null));
+            string decision = result?.Decision switch
+            {
+                PlaceholderInspectionDecision.Pass => OpenVisionLanguageService.T("Shell.ResultPass"),
+                PlaceholderInspectionDecision.Fail => OpenVisionLanguageService.T("Shell.ResultFail"),
+                _ => "—"
+            };
+            string state = snapshot?.State switch
+            {
+                VirtualCameraState.Faulted => OpenVisionLanguageService.T("Camera.InputFaulted"),
+                VirtualCameraState.Exposing or VirtualCameraState.Transferring => OpenVisionLanguageService.T("Camera.InputAcquiring"),
+                VirtualCameraState.AwaitingExternalResult when hasInput => OpenVisionLanguageService.T("Camera.InputAwaitingResult"),
+                VirtualCameraState.AwaitingExternalResult => OpenVisionLanguageService.T("Camera.InputAcquiring"),
+                VirtualCameraState.FrameReady when hasInput => Format("Camera.InputReady", decision),
+                VirtualCameraState.FrameReady when result is not null => Format("Camera.InputOnlyMockResult", decision),
+                _ => OpenVisionLanguageService.T("Camera.InputNotAcquired")
+            };
+            string? workpieceId = result?.WorkpieceComponentId;
+            string? workpieceName = project.Layouts.SelectMany(layout => layout.Components).FirstOrDefault(component => component.Id == workpieceId)?.Name
+                ?? project.Stations.SelectMany(station => station.Units).FirstOrDefault(unit => unit.Id == workpieceId)?.Name;
+            string workpiece = DisplayName(workpieceName, workpieceId);
+            if (result?.WorkpieceInstanceId is { } instanceId) workpiece += $" · {instanceId}";
+            var correlation = (snapshot?.ExternalResultEvidence ?? result?.ExternalResultEvidence)?.Correlation;
+            string stepContext;
+            if (correlation is not null && correlation.ProjectId == project.Id && correlation.CameraId == device.Id
+                && correlation.AcquisitionId == snapshot?.CurrentAcquisitionId)
+            {
+                var sequence = project.Sequences.FirstOrDefault(candidate => candidate.Id == correlation.SequenceId);
+                var step = sequence?.Steps.FirstOrDefault(candidate => candidate.Id == correlation.StepId);
+                stepContext = Format("Camera.InputRecordedStep", $"{DisplayName(sequence?.Name, correlation.SequenceId)} / {DisplayName(step?.Name, correlation.StepId)}");
+            }
+            else
+            {
+                var linkedSteps = project.Sequences.SelectMany(sequence => sequence.Steps
+                    .Where(step => step.Action == SequenceStepAction.TriggerCamera && step.TargetId == device.Id && step.Parameter == snapshot?.CurrentRecipeId)
+                    .Select(step => $"{DisplayName(sequence.Name, sequence.Id)} / {DisplayName(step.Name, step.Id)}")).ToArray();
+                stepContext = linkedSteps.Length == 0 ? OpenVisionLanguageService.T("Camera.InputUnrecordedStep") : Format("Camera.InputLinkedSteps", string.Join(" · ", linkedSteps));
+            }
+            return new CameraExecutionInputItem(device.Id, device.Name, hasInput ? 1 : 0, state,
+                Format("Camera.InputContext", workpiece, snapshot?.CurrentRecipeId ?? "—"), stepContext,
+                Format("Camera.InputAcquisition", snapshot?.CurrentAcquisitionId ?? "—", snapshot?.AcquisitionOrdinal ?? 0), project.Id, runtimeGeneration);
+        }).ToArray();
+    }
+
+    private static string DisplayName(string? name, string? id) => string.IsNullOrWhiteSpace(name) ? id ?? "—" : $"{name} ({id})";
+
+    private static string Format(string key, params object[] arguments) => string.Format(CultureInfo.CurrentCulture, OpenVisionLanguageService.T(key), arguments);
+
     private CameraCommissioningProjection? _projection;
 
     internal void ApplyProjection(CameraCommissioningProjection projection)
@@ -230,18 +302,20 @@ internal sealed class CameraCommissioningPresentation
 
     internal bool HasUsableCameraImageSource => !string.IsNullOrWhiteSpace(Projection.ProjectPath)
         && !string.IsNullOrWhiteSpace(Projection.SelectedCameraRecipe)
-        && Projection.ImageSource is
+        && (Projection.NumericalInput is { } settings && settings.Validate() is null && settings.ConfirmedVersion == settings.Version
+            && settings.RecipeName == Projection.SelectedCameraRecipe
+            || Projection.ImageSource is
         {
             SourceRelativePath.Length: > 0,
             Width: > 0,
             Height: > 0,
             PixelFormat.Length: > 0
-        };
+        });
 
     internal string CameraCommissioningHintText => !Projection.HasCameraDefinition
         ? OpenVisionLanguageService.T("Camera.NoCameraHint")
         : !HasUsableCameraImageSource
-            ? OpenVisionLanguageService.T("Camera.ConfigureSourceHint")
+            ? OpenVisionLanguageService.T(Projection.NumericalInput is not null ? "Camera.ConfigureNumericalSourceHint" : "Camera.ConfigureSourceHint")
             : Projection.ControlOwner == SimulationControlOwner.Manual
                 ? Projection.IsRunning
                     ? OpenVisionLanguageService.T("Camera.PauseBeforeTriggerHint")
@@ -303,7 +377,8 @@ internal sealed class CameraCommissioningPresentation
         var snapshot = Projection.Snapshot;
         if (snapshot is null
             || snapshot.CurrentAcquisitionId is null
-            || snapshot.State == VirtualCameraState.Faulted
+            || snapshot.State is not (VirtualCameraState.FrameReady or VirtualCameraState.AwaitingExternalResult)
+            || snapshot.NumericalInput is not null
             || string.IsNullOrWhiteSpace(Projection.ProjectPath))
         {
             return null;

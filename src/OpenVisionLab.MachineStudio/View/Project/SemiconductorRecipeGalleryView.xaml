@@ -19,11 +19,11 @@
     <Grid>
         <Rectangle Fill="{DynamicResource Surface.Root}" Opacity="0.88" />
 
-        <Border Margin="18"
+        <Border x:Name="GalleryPanel" Margin="18"
                 Padding="0"
                 MaxWidth="1060"
-                MaxHeight="590"
-                HorizontalAlignment="Center"
+                MaxHeight="700"
+                HorizontalAlignment="Stretch"
                 VerticalAlignment="Center"
                 Background="{DynamicResource Surface.Panel}"
                 BorderBrush="{DynamicResource Border.Default}"
@@ -31,9 +31,9 @@
                 CornerRadius="8">
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="76" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
-                    <RowDefinition Height="64" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <Border Grid.Row="0"
@@ -53,7 +53,7 @@
                                        Text="{loc:Loc Key=Gallery.Title}" />
                             <TextBlock Margin="0,4,0,0"
                                        Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{loc:Loc Key=Gallery.Subtitle}" />
+                                       Text="{loc:Loc Key=Gallery.Subtitle}" TextWrapping="Wrap" />
                         </StackPanel>
                         <Button Grid.Column="1"
                                 Width="34"
@@ -79,7 +79,7 @@
                         </Style>
                     </Grid.Style>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="390" />
+                        <ColumnDefinition Width="360" />
                         <ColumnDefinition Width="14" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
@@ -89,10 +89,31 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="6">
-                        <ListBox ItemsSource="{Binding SemiconductorRecipes.Items}"
+                        <Grid>
+                        <ListBox x:Name="GalleryList" ItemsSource="{Binding SemiconductorRecipes.Items}"
                                  SelectedItem="{Binding SemiconductorRecipes.SelectedItem, Mode=TwoWay}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <ListBox.Style>
+                                <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBox">
+                                                <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                                                    <ScrollViewer Padding="{TemplateBinding Padding}" Focusable="False" CanContentScroll="True">
+                                                        <ItemsPresenter />
+                                                    </ScrollViewer>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SemiconductorRecipes.IsBusy}" Value="True">
+                                            <Setter Property="IsEnabled" Value="False" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ListBox.Style>
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
                                     <Setter Property="Padding" Value="10,3" />
@@ -128,6 +149,14 @@
                                                         <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource Surface.Panel}" />
                                                         <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
                                                     </Trigger>
+                                                    <MultiTrigger>
+                                                        <MultiTrigger.Conditions>
+                                                            <Condition Property="IsEnabled" Value="False" />
+                                                            <Condition Property="IsSelected" Value="True" />
+                                                        </MultiTrigger.Conditions>
+                                                        <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource Surface.Selected}" />
+                                                        <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+                                                    </MultiTrigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
                                         </Setter.Value>
@@ -139,30 +168,17 @@
                                         </Trigger>
                                         <Trigger Property="IsEnabled" Value="False">
                                             <Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" />
-                                            <Setter Property="Opacity" Value="0.55" />
                                         </Trigger>
                                     </Style.Triggers>
                                 </Style>
                             </ListBox.ItemContainerStyle>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                        </Grid.RowDefinitions>
-                                        <TextBlock FontWeight="SemiBold"
-                                                   Text="{Binding DisplayName}"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Grid.Column="1"
-                                                   Margin="8,0,0,0"
-                                                   FontSize="10.5"
-                                                   FontWeight="SemiBold"
-                                                   Text="{Binding ValidationStatusText}">
+                                    <StackPanel>
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding DisplayName}" TextWrapping="Wrap" />
+                                        <TextBlock Margin="0,3,0,0" Foreground="{DynamicResource Text.Secondary}" FontSize="10.5" Text="{Binding FileName}" TextWrapping="Wrap" />
+                                        <TextBlock Margin="0,3,0,0" Foreground="{DynamicResource Text.Secondary}" FontSize="10.5" Text="{Binding TopologySummary}" TextWrapping="Wrap" />
+                                        <TextBlock Margin="0,3,0,0" FontSize="10.5" FontWeight="SemiBold" Text="{Binding ValidationStatusText}">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
@@ -180,28 +196,23 @@
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
-                                         <TextBlock Grid.Row="1"
-                                                    Margin="0,2,0,0"
-                                                   Foreground="{DynamicResource Text.Secondary}"
-                                                   FontFamily="{StaticResource Typography.Telemetry}"
-                                                   FontSize="10.5"
-                                                   Text="{Binding TopologySummary}"
-                                                    TextTrimming="CharacterEllipsis"
-                                                    ToolTip="{Binding EquipmentFocus}" />
-                                         <TextBlock Grid.Row="1"
-                                                    Grid.Column="1"
-                                                    Margin="8,2,0,0"
-                                                    HorizontalAlignment="Right"
-                                                    Foreground="{DynamicResource Text.Secondary}"
-                                                    FontFamily="{StaticResource Typography.Telemetry}"
-                                                    FontSize="9.5"
-                                                    Text="{Binding ValidationContextCompactText}"
-                                                    TextTrimming="CharacterEllipsis"
-                                                    ToolTip="{Binding ValidationContextDetailText}" />
-                                    </Grid>
+                                    </StackPanel>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
+                        <TextBlock Margin="16" Text="{loc:Loc Key=Gallery.Empty}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SemiconductorRecipes.HasItems}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        </Grid>
                     </Border>
 
                     <Border Grid.Column="2"
@@ -210,7 +221,8 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="6">
-                        <Grid>
+                        <ScrollViewer x:Name="GalleryDetail" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                        <Grid Margin="0,0,12,0">
                             <Grid.RowDefinitions>
                                          <RowDefinition Height="Auto" />
                                          <RowDefinition Height="Auto" />
@@ -219,7 +231,7 @@
                                 <RowDefinition Height="16" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="16" />
-                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <TextBlock FontSize="17"
@@ -230,7 +242,7 @@
                                        Margin="0,5,0,0"
                                        Foreground="{DynamicResource Text.Secondary}"
                                        FontFamily="{StaticResource Typography.Telemetry}"
-                                       Text="{Binding SemiconductorRecipes.SelectedItem.FileName}" />
+                                       Text="{Binding SemiconductorRecipes.SelectedItem.FileName}" TextWrapping="Wrap" />
 
                             <Border Grid.Row="3"
                                     Padding="12"
@@ -254,7 +266,7 @@
                                     </Grid.RowDefinitions>
 
                                     <TextBlock Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Gallery.Sequence}" />
-                                    <TextBlock Grid.Column="1" Margin="14,0,0,0" Text="{Binding SemiconductorRecipes.SelectedItem.SequenceName}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1" Margin="14,0,0,0" Text="{Binding SemiconductorRecipes.SelectedItem.SequenceName}" TextWrapping="Wrap" />
                                     <TextBlock Grid.Row="1" Margin="0,7,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Gallery.EquipmentFocus}" />
                                     <TextBlock Grid.Row="1" Grid.Column="1" Margin="14,7,0,0" Text="{Binding SemiconductorRecipes.SelectedItem.EquipmentFocus}" TextWrapping="Wrap" ToolTip="{Binding SemiconductorRecipes.SelectedItem.EquipmentFocus}" />
                                     <TextBlock Grid.Row="2" Margin="0,7,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Gallery.Axes}" />
@@ -272,7 +284,7 @@
                                      <TextBlock Grid.Row="8" Margin="0,7,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Gallery.ValidatedBuild}" />
                                      <TextBlock Grid.Row="8" Grid.Column="1" Margin="14,7,0,0"
                                                 Text="{Binding SemiconductorRecipes.SelectedItem.ValidationBuildIdentity}"
-                                                TextTrimming="CharacterEllipsis"
+                                                TextWrapping="Wrap"
                                                 ToolTip="{Binding SemiconductorRecipes.SelectedItem.ValidationContextDetailText}" />
                                 </Grid>
                             </Border>
@@ -310,23 +322,10 @@
                                                Text="{loc:Loc Key=Gallery.SafePreview}"
                                                TextWrapping="Wrap" />
                                 </Border>
-                                <TextBlock Margin="0,9,0,0"
-                                           Foreground="{DynamicResource State.Fault}"
-                                           Text="{Binding SemiconductorRecipes.ErrorMessage}"
-                                           TextWrapping="Wrap">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding SemiconductorRecipes.HasError}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
+
                             </StackPanel>
                         </Grid>
+                        </ScrollViewer>
                     </Border>
                 </Grid>
 
@@ -354,27 +353,27 @@
                             CornerRadius="6">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="1.2*" />
+                                <ColumnDefinition Width="1.8*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock FontSize="16"
                                            FontWeight="SemiBold"
-                                           Text="{loc:Loc Key=Gallery.ComparisonTitle}" />
+                                           Text="{loc:Loc Key=Gallery.ComparisonTitle}" TextWrapping="Wrap" />
                                 <TextBlock Margin="0,4,0,0"
                                            Foreground="{DynamicResource Text.Secondary}"
-                                           Text="{Binding SemiconductorRecipes.ComparisonSummary}" />
+                                           Text="{Binding SemiconductorRecipes.ComparisonSummary}" TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Margin="20,0,0,0" HorizontalAlignment="Right">
                                 <TextBlock HorizontalAlignment="Right"
                                            Foreground="{DynamicResource Text.Secondary}"
                                            FontFamily="{StaticResource Typography.Telemetry}"
-                                           Text="{Binding SemiconductorRecipes.BaselineReportText}" />
+                                           Text="{Binding SemiconductorRecipes.BaselineReportText}" TextWrapping="Wrap" />
                                 <TextBlock Margin="0,3,0,0"
                                            HorizontalAlignment="Right"
                                            Foreground="{DynamicResource Text.Secondary}"
                                            FontFamily="{StaticResource Typography.Telemetry}"
-                                           Text="{Binding SemiconductorRecipes.CurrentReportText}" />
+                                           Text="{Binding SemiconductorRecipes.CurrentReportText}" TextWrapping="Wrap" />
                                 <TextBlock Margin="0,3,0,0"
                                            HorizontalAlignment="Right"
                                            FontFamily="{StaticResource Typography.Telemetry}"
@@ -440,12 +439,12 @@
                                                 <StackPanel>
                                                     <TextBlock FontWeight="SemiBold"
                                                                Text="{Binding DisplayName}"
-                                                               TextTrimming="CharacterEllipsis" />
+                                                               TextWrapping="Wrap" />
                                                     <TextBlock Margin="0,2,0,0"
                                                                Foreground="{DynamicResource Text.Secondary}"
                                                                FontFamily="{StaticResource Typography.Telemetry}"
                                                                FontSize="10.5"
-                                                               Text="{Binding FileName}" />
+                                                               Text="{Binding FileName}" TextWrapping="Wrap" />
                                                 </StackPanel>
                                                 <TextBlock Grid.Column="1"
                                                            Margin="12,0"
@@ -498,7 +497,7 @@
                                                                FontFamily="{StaticResource Typography.Telemetry}"
                                                                FontSize="10.5"
                                                                Text="{Binding BuildChangeText}"
-                                                               TextTrimming="CharacterEllipsis"
+                                                               TextWrapping="Wrap"
                                                                ToolTip="{Binding BuildChangeDetailText}">
                                                         <TextBlock.Style>
                                                             <Style TargetType="TextBlock">
@@ -528,6 +527,11 @@
                         BorderThickness="0,1,0,0"
                         CornerRadius="0,0,8,8">
                     <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <StackPanel VerticalAlignment="Center">
                             <StackPanel.Style>
                                 <Style TargetType="StackPanel">
@@ -540,7 +544,7 @@
                                 </Style>
                             </StackPanel.Style>
                             <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{loc:Loc Key=Gallery.CopyHint}" />
+                                       Text="{loc:Loc Key=Gallery.CopyHint}" TextWrapping="Wrap" />
                              <TextBlock Margin="0,2,0,0"
                                        Foreground="{DynamicResource State.Running}"
                                        FontFamily="{StaticResource Typography.Telemetry}"
@@ -562,9 +566,26 @@
                                  </Style>
                              </TextBlock.Style>
                          </TextBlock>
-                         <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-                             <StackPanel.Style>
-                                 <Style TargetType="StackPanel">
+                        <ScrollViewer Grid.Row="1" MaxHeight="90" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                <TextBlock x:Name="GalleryError" Margin="0,4,0,0"
+                                           Foreground="{DynamicResource State.Fault}"
+                                           Text="{Binding SemiconductorRecipes.ErrorMessage}"
+                                           TextWrapping="Wrap">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SemiconductorRecipes.HasError}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                        </ScrollViewer>
+                         <WrapPanel x:Name="GalleryActions" Grid.Row="2" Margin="0,8,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+                             <WrapPanel.Style>
+                                 <Style TargetType="WrapPanel">
                                      <Setter Property="Visibility" Value="Visible" />
                                      <Style.Triggers>
                                          <DataTrigger Binding="{Binding SemiconductorRecipes.IsComparisonOpen}" Value="True">
@@ -572,20 +593,18 @@
                                          </DataTrigger>
                                      </Style.Triggers>
                                  </Style>
-                             </StackPanel.Style>
-                             <Button Command="{Binding SemiconductorRecipes.CompareCompatibilityReportsCommand}"
-                                     AutomationProperties.Name="{loc:Loc Key=Gallery.CompareCompatibilityReports}"
-                                     Style="{StaticResource QuietCommandButtonStyle}"
-                                     ToolTip="{loc:Loc Key=Gallery.CompareCompatibilityReportsTooltip}">
-                                 <StackPanel Orientation="Horizontal">
-                                     <ui:SymbolIcon Symbol="FolderOpen24"
-                                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                     <TextBlock Margin="6,0,0,0"
-                                                VerticalAlignment="Center"
-                                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                Text="{loc:Loc Key=Gallery.CompareCompatibilityReports}" />
-                                 </StackPanel>
-                             </Button>
+                             </WrapPanel.Style>
+                             <Button Margin="8,0,0,0"
+                                    Command="{Binding SemiconductorRecipes.CreateCopyCommand}"
+                                    AutomationProperties.Name="{loc:Loc Key=Gallery.CreateCopy}"
+                                    Style="{StaticResource PrimaryCommandButtonStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="Add24" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                    <TextBlock Margin="6,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="{loc:Loc Key=Gallery.CreateCopy}" />
+                                </StackPanel>
+                            </Button>
                             <Button Command="{Binding SemiconductorRecipes.ValidateAllCommand}"
                                     Margin="8,0,0,0"
                                     AutomationProperties.Name="{loc:Loc Key=Gallery.ValidateAll}"
@@ -600,7 +619,7 @@
                                                Text="{loc:Loc Key=Gallery.ValidateAll}" />
                                 </StackPanel>
                              </Button>
-                             <Button Margin="8,0,0,0"
+                            <Button Margin="8,0,0,0"
                                      Command="{Binding SemiconductorRecipes.SaveCompatibilityReportCommand}"
                                      AutomationProperties.Name="{loc:Loc Key=Gallery.SaveCompatibilityReport}"
                                      Style="{StaticResource QuietCommandButtonStyle}"
@@ -614,24 +633,26 @@
                                                 Text="{loc:Loc Key=Gallery.SaveCompatibilityReport}" />
                                  </StackPanel>
                              </Button>
-                             <Button Command="{Binding SemiconductorRecipes.CloseCommand}"
+                            <Button Command="{Binding SemiconductorRecipes.CompareCompatibilityReportsCommand}"
+                                     AutomationProperties.Name="{loc:Loc Key=Gallery.CompareCompatibilityReports}"
+                                     Style="{StaticResource QuietCommandButtonStyle}"
+                                     ToolTip="{loc:Loc Key=Gallery.CompareCompatibilityReportsTooltip}">
+                                 <StackPanel Orientation="Horizontal">
+                                     <ui:SymbolIcon Symbol="FolderOpen24"
+                                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                     <TextBlock Margin="6,0,0,0"
+                                                VerticalAlignment="Center"
+                                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                Text="{loc:Loc Key=Gallery.CompareCompatibilityReports}" />
+                                 </StackPanel>
+                             </Button>
+                            <Button Command="{Binding SemiconductorRecipes.CloseCommand}"
                                     Margin="8,0,0,0"
                                     AutomationProperties.Name="{loc:Loc Key=Gallery.Close}"
                                     Style="{StaticResource QuietCommandButtonStyle}"
                                     Content="{loc:Loc Key=Gallery.Close}" />
-                            <Button Margin="8,0,0,0"
-                                    Command="{Binding SemiconductorRecipes.CreateCopyCommand}"
-                                    AutomationProperties.Name="{loc:Loc Key=Gallery.CreateCopy}"
-                                    Style="{StaticResource PrimaryCommandButtonStyle}">
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
-                                    <TextBlock Margin="6,0,0,0"
-                                               VerticalAlignment="Center"
-                                               Text="{loc:Loc Key=Gallery.CreateCopy}" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                        </WrapPanel>
+                        <StackPanel Grid.Row="2" Margin="0,8,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
                             <StackPanel.Style>
                                 <Style TargetType="StackPanel">
                                     <Setter Property="Visibility" Value="Collapsed" />

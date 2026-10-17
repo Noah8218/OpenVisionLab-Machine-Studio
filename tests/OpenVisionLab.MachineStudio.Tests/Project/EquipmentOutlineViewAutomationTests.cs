@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
@@ -21,6 +22,66 @@ public sealed class EquipmentOutlineViewAutomationTests
     private readonly StudioUiTestHost _ui;
 
     public EquipmentOutlineViewAutomationTests(StudioUiTestHost ui) => _ui = ui;
+
+    [Fact]
+    public async Task FocusedSearchUsesProductAccentAndRestoresTheNormalBorder()
+    {
+        var result = await _ui.InvokeAsync(() =>
+        {
+            using var layout = CreateLayout();
+            var view = CreateView(layout);
+            var window = new Window
+            {
+                Width = 520,
+                Height = 900,
+                ShowInTaskbar = false,
+                ShowActivated = false,
+                WindowStyle = WindowStyle.None,
+                Content = view
+            };
+            window.Show();
+            try
+            {
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                var search = Descendants(view).OfType<TextBox>().Single(textBox => textBox.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path.Path == "Layout.EquipmentOutlineSearchText");
+                var border = Assert.IsType<Border>(search.Template.FindName("AccentBorder", search));
+                var normalColor = Assert.IsType<SolidColorBrush>(border.BorderBrush).Color;
+                search.Text = "camera-01";
+                Assert.Same(search, Keyboard.Focus(search));
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                var focusedColor = Assert.IsType<SolidColorBrush>(border.BorderBrush).Color;
+                var expectedColor = Assert.IsType<SolidColorBrush>(search.FindResource("Accent.Primary")).Color;
+                var width = (int)Math.Ceiling(search.ActualWidth);
+                var height = (int)Math.Ceiling(search.ActualHeight);
+                var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+                var drawing = new DrawingVisual();
+                using (var context = drawing.RenderOpen()) context.DrawRectangle(new VisualBrush(search), null, new Rect(0, 0, width, height));
+                bitmap.Render(drawing);
+                var pixels = new byte[width * height * 4];
+                bitmap.CopyPixels(pixels, width * 4, 0);
+                var offset = ((height - 1) * width + width / 2) * 4;
+                var renderedColor = Color.FromArgb(pixels[offset + 3], pixels[offset + 2], pixels[offset + 1], pixels[offset]);
+                var part = Descendants(view).OfType<Button>().Single(button => button.DataContext is EquipmentOutlinePartItem item && item.Item.Id == "camera-01");
+                Assert.Same(part, Keyboard.Focus(part));
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                var restoredColor = Assert.IsType<SolidColorBrush>(border.BorderBrush).Color;
+                search.IsEnabled = false;
+                window.UpdateLayout();
+                var disabledColor = Assert.IsType<SolidColorBrush>(border.BorderBrush).Color;
+                var expectedDisabledColor = Assert.IsType<SolidColorBrush>(search.FindResource("TextControlBorderBrushDisabled")).Color;
+                return (focusedColor, expectedColor, renderedColor, normalColor, restoredColor,
+                    disabledColor, expectedDisabledColor, query: layout.EquipmentOutlineSearchText);
+            }
+            finally { window.Close(); }
+        });
+
+        Assert.Equal(Color.FromRgb(0x08, 0x7F, 0x73), result.expectedColor);
+        Assert.Equal(result.expectedColor, result.focusedColor);
+        Assert.Equal(result.expectedColor, result.renderedColor);
+        Assert.Equal(result.normalColor, result.restoredColor);
+        Assert.Equal(result.expectedDisabledColor, result.disabledColor);
+        Assert.Equal("camera-01", result.query);
+    }
 
     [Fact]
     public async Task OutlineControlsExposeLocalizedNamesAndAreKeyboardReachable()
@@ -72,9 +133,10 @@ public sealed class EquipmentOutlineViewAutomationTests
                         == "Layout.EquipmentOutlineSearchText");
                     var part = controls.OfType<Button>().Single(button =>
                         button.DataContext is EquipmentOutlinePartItem item && item.Item.Id == "camera-01");
-                    var selection = controls.OfType<CheckBox>().Single(checkBox =>
+                    var selection = ReadSelectionControls(view, keepOpen: true).Single(checkBox =>
                         checkBox.DataContext is EquipmentOutlinePartItem item && item.Item.Id == "camera-01");
 
+                    part.ContextMenu!.IsOpen = false;
                     Assert.Same(search, Keyboard.Focus(search));
                     var reachedPart = false;
                     var reachedSelection = false;
@@ -83,18 +145,21 @@ public sealed class EquipmentOutlineViewAutomationTests
                     {
                         if (Keyboard.FocusedElement is not UIElement focusedElement || !visited.Add(focusedElement)) break;
                         reachedPart |= ReferenceEquals(focusedElement, part);
-                        reachedSelection |= ReferenceEquals(focusedElement, selection);
                         if (!focusedElement.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next))) break;
                         window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
                     }
 
+                    part.ContextMenu!.PlacementTarget = part;
+                    part.ContextMenu.IsOpen = true;
+                    window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                    reachedSelection = ReferenceEquals(selection, Keyboard.Focus(selection));
                     var toggleCommandBound = ReferenceEquals(selection.Command, layout.ToggleEquipmentOutlinePartCommand);
                     var togglePattern = Assert.IsAssignableFrom<IToggleProvider>(
                         UIElementAutomationPeer.CreatePeerForElement(selection)?.GetPattern(PatternInterface.Toggle));
                     togglePattern.Toggle();
                     window.Dispatcher.Invoke(DispatcherPriority.DataBind, new Action(() => { }));
                     window.UpdateLayout();
-                    var selectedControl = Descendants(view).OfType<CheckBox>().Single(checkBox =>
+                    var selectedControl = ReadSelectionControls(view, keepOpen: true).Single(checkBox =>
                         checkBox.DataContext is EquipmentOutlinePartItem item && item.Item.Id == "camera-01");
                     var selectedStateBound = selectedControl.IsChecked == true
                         && layout.SelectionCount == 1 && layout.SelectedItem?.Id == "camera-01";
@@ -104,7 +169,7 @@ public sealed class EquipmentOutlineViewAutomationTests
                     selectedTogglePattern.Toggle();
                     window.Dispatcher.Invoke(DispatcherPriority.DataBind, new Action(() => { }));
                     window.UpdateLayout();
-                    var deselectedControl = Descendants(view).OfType<CheckBox>().Single(checkBox =>
+                    var deselectedControl = ReadSelectionControls(view, keepOpen: true).Single(checkBox =>
                         checkBox.DataContext is EquipmentOutlinePartItem item && item.Item.Id == "camera-01");
                     var deselectedStateBound = deselectedControl.IsChecked == false && layout.SelectionCount == 0;
 
@@ -150,8 +215,8 @@ public sealed class EquipmentOutlineViewAutomationTests
             }
         });
 
-        Assert.Equal(("검사 카메라 / camera-01 / 카메라", "camera-01 선택", "검사 유닛 / 부품 수: 1", "빈 유닛 / 부품 수: 0"), result.koreanNames);
-        Assert.Equal(("검사 카메라 / camera-01 / Camera", "Select camera-01", "검사 유닛 / component count: 1", "빈 유닛 / component count: 0"), result.englishNames);
+        Assert.Equal(("검사 카메라 / camera-01 / 2D 카메라", "camera-01 선택", "검사 유닛 / 장치 수: 1", "빈 유닛 / 장치 수: 0"), result.koreanNames);
+        Assert.Equal(("검사 카메라 / camera-01 / 2D camera", "Select camera-01", "검사 유닛 / component count: 1", "빈 유닛 / component count: 0"), result.englishNames);
         Assert.Equal((string.Empty, string.Empty), result.koreanInactiveUnitStatus);
         Assert.Equal(("현재 유닛", string.Empty), result.koreanActiveUnitStatus);
         Assert.Equal((string.Empty, string.Empty), result.englishInactiveUnitStatus);
@@ -186,7 +251,7 @@ public sealed class EquipmentOutlineViewAutomationTests
             try
             {
                 window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
-                var selection = Descendants(view).OfType<CheckBox>().Single(checkBox =>
+                var selection = ReadSelectionControls(view, keepOpen: true).Single(checkBox =>
                     checkBox.DataContext is EquipmentOutlinePartItem item && item.Item.Id == "camera-01");
                 selection.IsEnabled = false;
                 var togglePattern = Assert.IsAssignableFrom<IToggleProvider>(
@@ -209,7 +274,7 @@ public sealed class EquipmentOutlineViewAutomationTests
     }
 
     [Fact]
-    public async Task UnitRemovalButtonInvokesTheMainViewModelCommandAndUsesTheUnitName()
+    public async Task UnitRemovalMenuInvokesTheMainViewModelCommandAndUsesTheUnitName()
     {
         var result = await _ui.InvokeAsync(() =>
         {
@@ -250,8 +315,13 @@ public sealed class EquipmentOutlineViewAutomationTests
                 try
                 {
                     window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
-                    var deleteButton = Descendants(view).OfType<Button>().Single(button =>
-                        ReferenceEquals(button.Command, viewModel.RemoveEquipmentUnitCommand));
+                    var unitButton = Descendants(view).OfType<Button>().Single(button =>
+                        button.DataContext is EquipmentOutlineUnitItem item && item.UnitId == unit.Id);
+                    unitButton.ContextMenu!.PlacementTarget = unitButton;
+                    unitButton.ContextMenu.IsOpen = true;
+                    window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                    var deleteButton = Assert.IsType<MenuItem>(unitButton.ContextMenu.Items[0]);
+                    Assert.Same(viewModel.RemoveEquipmentUnitCommand, deleteButton.Command);
                     var automationName = UIElementAutomationPeer.CreatePeerForElement(deleteButton)?.GetName() ?? string.Empty;
                     var commandEnabled = deleteButton.IsEnabled;
                     var invoke = Assert.IsAssignableFrom<IInvokeProvider>(
@@ -278,6 +348,106 @@ public sealed class EquipmentOutlineViewAutomationTests
         Assert.Equal(0, result.Count);
         Assert.Null(result.ActiveUnitId);
         Assert.True(result.HasUnsavedChanges);
+    }
+
+    [Theory]
+    [InlineData(215)]
+    [InlineData(240)]
+    [InlineData(300)]
+    public async Task EquipmentHeaderKeepsAddActionsTogetherAboveSearch(int width)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var previousLanguage = OpenVisionLanguageService.CurrentLanguage;
+            OpenVisionLanguageService.SetLanguage(OpenVisionLanguage.Korean, save: false);
+            try
+            {
+                using var main = new MainViewModel(new MachineProjectDocument());
+                var view = new LeftToolRegionView { DataContext = main };
+                view.Measure(new Size(width, 800));
+                view.Arrange(new Rect(0, 0, width, 800));
+                view.UpdateLayout();
+                var addUnit = Descendants(view).OfType<Button>().Single(button => button.Name == "OutlineAddUnitButton");
+                var addDevice = Descendants(view).OfType<Button>().Single(button => button.Name == "OutlineAddDeviceButton");
+                var search = Descendants(view).OfType<TextBox>().Single(textBox => textBox.Name == "OutlineSearchTextBox");
+                var title = Descendants(view).OfType<TextBlock>().Single(block => block.Name == "EquipmentOutlineTitle");
+                Assert.Equal("장비", title.Text);
+                Assert.Equal("Segoe UI, Malgun Gothic", title.FontFamily.Source);
+                Assert.Equal(13, title.FontSize);
+                Assert.Equal(FontWeights.Bold, title.FontWeight);
+                Assert.Equal(18.85, title.LineHeight);
+                foreach (var button in new[] { addUnit, addDevice })
+                {
+                    Assert.Equal("Segoe UI, Malgun Gothic", button.FontFamily.Source);
+                    Assert.Equal(13, button.FontSize);
+                    Assert.Equal(FontWeights.Normal, button.FontWeight);
+                    var caption = Assert.IsType<TextBlock>(button.Content);
+                    Assert.Equal(button.Name == "OutlineAddUnitButton" ? "+ 유닛" : "+ 장치", caption.Text);
+                    Assert.Equal("Segoe UI, Malgun Gothic", caption.FontFamily.Source);
+                    Assert.Equal(13, caption.FontSize);
+                }
+                Assert.Equal("Segoe UI, Malgun Gothic", search.FontFamily.Source);
+                Assert.Equal("장치 검색", AutomationProperties.GetName(search));
+                var unitTop = addUnit.TranslatePoint(new Point(), view).Y;
+                var deviceTop = addDevice.TranslatePoint(new Point(), view).Y;
+                Assert.Equal(unitTop, deviceTop, precision: 2);
+                Assert.True(search.TranslatePoint(new Point(), view).Y >= unitTop + addUnit.ActualHeight);
+                // R24 Wide input is 28.84375 CSS px, rounded to 29 native WPF px.
+                Assert.Equal(29, search.ActualHeight);
+                Assert.True(addUnit.TranslatePoint(new Point(addUnit.ActualWidth, 0), view).X <= width);
+                Assert.True(addDevice.TranslatePoint(new Point(addDevice.ActualWidth, 0), view).X <= width);
+                Assert.Same(main.OpenStationUnitEditorCommand, addUnit.Command);
+                Assert.Same(main.OpenEquipmentComponentLibraryDialogCommand, addDevice.Command);
+                return true;
+            }
+            finally { OpenVisionLanguageService.SetLanguage(previousLanguage, save: false); }
+        });
+    }
+
+
+    [Fact]
+    public async Task OutlineRendersProposalTypographyAndQueryInBothLanguages()
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+            try
+            {
+                using var layout = CreateLayout();
+                var view = CreateView(layout);
+                foreach (var language in new[] { OpenVisionLanguage.Korean, OpenVisionLanguage.English })
+                {
+                    OpenVisionLanguageService.SetLanguage(language, save: false);
+                    layout.RefreshLocalization();
+                    Arrange(view);
+                    var blocks = Descendants(view).OfType<TextBlock>().ToArray();
+                    foreach (var caption in new[] { "검사 카메라", "검사 유닛", "Main", OpenVisionLanguageService.T("Equipment.OverviewButton") })
+                    {
+                        var block = Assert.Single(blocks, block => block.Text == caption);
+                        Assert.Equal("Segoe UI, Malgun Gothic", block.FontFamily.Source);
+                        Assert.Equal(13, block.FontSize);
+                        Assert.Equal(FontWeights.Normal, block.FontWeight);
+                        Assert.Equal(18.85, block.LineHeight);
+                        Assert.True(block.ActualHeight >= block.LineHeight);
+                    }
+                    var detail = Assert.Single(blocks, block => block.Text.StartsWith("camera-01 · ", StringComparison.Ordinal));
+                    Assert.Equal("Segoe UI, Malgun Gothic", detail.FontFamily.Source);
+                    Assert.Equal(10.5, detail.FontSize);
+                    Assert.Equal(FontWeights.Normal, detail.FontWeight);
+                    Assert.Equal(15.225, detail.LineHeight);
+                    layout.EquipmentOutlineSearchText = "absent";
+                    Arrange(view);
+                    var empty = Assert.Single(Descendants(view).OfType<TextBlock>(), block => block.Text == "\"absent\" " + OpenVisionLanguageService.T("Equipment.OutlineNoMatches"));
+                    Assert.Equal(11.5, empty.FontSize);
+                    Assert.Equal(16.675, empty.LineHeight);
+                    layout.ClearEquipmentOutlineSearchCommand.Execute(null);
+                    Arrange(view);
+                    Assert.Contains(Descendants(view).OfType<TextBlock>(), block => block.Text == "검사 카메라" && block.FontSize == 13);
+                }
+                return true;
+            }
+            finally { OpenVisionLanguageService.SetLanguage(originalLanguage, save: false); }
+        });
     }
 
     private static MachineLayoutViewModel CreateLayout()
@@ -313,14 +483,14 @@ public sealed class EquipmentOutlineViewAutomationTests
         var descendants = Descendants(view).ToArray();
         var part = descendants.OfType<Button>().Single(button =>
             button.DataContext is EquipmentOutlinePartItem item && item.Item.Id == "camera-01");
-        var selection = descendants.OfType<CheckBox>().Single(checkBox =>
+        var selection = ReadSelectionControls(view).Single(checkBox =>
             checkBox.DataContext is EquipmentOutlinePartItem item && item.Item.Id == "camera-01");
         var unit = descendants.OfType<Button>().Single(button =>
             button.DataContext is EquipmentOutlineUnitItem item && item.UnitId == "unit-inspection"
-            && button.Content is DockPanel);
+            && button.Content is Grid);
         var emptyUnit = descendants.OfType<Button>().Single(button =>
             button.DataContext is EquipmentOutlineUnitItem item && item.UnitId == "unit-empty"
-            && button.Content is DockPanel);
+            && button.Content is Grid);
         return (
             UIElementAutomationPeer.CreatePeerForElement(part)?.GetName() ?? string.Empty,
             UIElementAutomationPeer.CreatePeerForElement(selection)?.GetName() ?? string.Empty,
@@ -333,13 +503,32 @@ public sealed class EquipmentOutlineViewAutomationTests
         var descendants = Descendants(view).ToArray();
         var unit = descendants.OfType<Button>().Single(button =>
             button.DataContext is EquipmentOutlineUnitItem item && item.UnitId == "unit-inspection"
-            && button.Content is DockPanel);
+            && button.Content is Grid);
         var emptyUnit = descendants.OfType<Button>().Single(button =>
             button.DataContext is EquipmentOutlineUnitItem item && item.UnitId == "unit-empty"
-            && button.Content is DockPanel);
+            && button.Content is Grid);
         return (
             UIElementAutomationPeer.CreatePeerForElement(unit)?.GetItemStatus() ?? string.Empty,
             UIElementAutomationPeer.CreatePeerForElement(emptyUnit)?.GetItemStatus() ?? string.Empty);
+    }
+
+    private static IEnumerable<CheckBox> ReadSelectionControls(EquipmentOutlineView view, bool keepOpen = false)
+    {
+        foreach (var part in Descendants(view).OfType<Button>().Where(button => button.DataContext is EquipmentOutlinePartItem))
+        {
+            var menu = part.ContextMenu!;
+            menu.PlacementTarget = part;
+            menu.IsOpen = true;
+            menu.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(menu.UpdateLayout));
+            try
+            {
+                yield return Assert.IsType<EquipmentOutlineSelectionCheckBox>(Assert.IsType<MenuItem>(menu.Items[0]).Header);
+            }
+            finally
+            {
+                if (!keepOpen) menu.IsOpen = false;
+            }
+        }
     }
 
     private static void Arrange(FrameworkElement view)

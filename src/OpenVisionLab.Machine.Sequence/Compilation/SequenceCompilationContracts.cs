@@ -73,6 +73,8 @@ public sealed class SequenceCompilationTargets
     private readonly HashSet<string> _cameraIds;
     private readonly HashSet<string> _sequenceIds;
     private readonly HashSet<string> _workpieceComponentIds;
+    private readonly HashSet<string> _unitIds;
+    private readonly HashSet<string> _conveyorIds;
 
     public SequenceCompilationTargets(
         IReadOnlyDictionary<string, ChannelKind> channels,
@@ -94,7 +96,9 @@ public sealed class SequenceCompilationTargets
         IEnumerable<string> axisIds,
         IEnumerable<string> cameraIds,
         IEnumerable<string> sequenceIds,
-        IEnumerable<string>? workpieceComponentIds = null)
+        IEnumerable<string>? workpieceComponentIds = null,
+        IEnumerable<string>? unitIds = null,
+        IEnumerable<string>? conveyorIds = null)
     {
         ArgumentNullException.ThrowIfNull(channels);
         ArgumentNullException.ThrowIfNull(axisIds);
@@ -105,6 +109,8 @@ public sealed class SequenceCompilationTargets
         _axisIds = new HashSet<string>(axisIds, StringComparer.Ordinal);
         _cameraIds = new HashSet<string>(cameraIds, StringComparer.Ordinal);
         _sequenceIds = new HashSet<string>(sequenceIds, StringComparer.Ordinal);
+        _unitIds = new HashSet<string>(unitIds ?? [], StringComparer.Ordinal);
+        _conveyorIds = new HashSet<string>(conveyorIds ?? [], StringComparer.Ordinal);
         _workpieceComponentIds = workpieceComponentIds is null
             ? new HashSet<string>(StringComparer.Ordinal)
             : new HashSet<string>(workpieceComponentIds, StringComparer.Ordinal);
@@ -129,6 +135,9 @@ public sealed class SequenceCompilationTargets
     {
         return _sequenceIds.Contains(id);
     }
+
+    internal bool ContainsUnit(string id) => _unitIds.Contains(id);
+    internal bool ContainsConveyor(string id) => _conveyorIds.Contains(id);
 
     internal bool ContainsWorkpieceComponent(string id)
     {

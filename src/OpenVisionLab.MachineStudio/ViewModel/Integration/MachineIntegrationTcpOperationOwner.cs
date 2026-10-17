@@ -134,12 +134,11 @@ internal sealed class MachineIntegrationTcpOperationOwner : IDisposable
         Task<MachineIntegrationOperationObservation>? task;
         lock (_gate)
         {
-            if (_operationTask?.IsCompleted == true)
+            task = _operationTask;
+            if (task?.IsCompleted == true)
             {
                 _operationTask = null;
             }
-
-            task = _operationTask;
         }
 
         return task is null ? Task.FromResult(CreateIdleObservation()) : ObserveTaskAsync(task, timeout);
@@ -208,7 +207,7 @@ internal sealed class MachineIntegrationTcpOperationOwner : IDisposable
 
                 if (ReferenceEquals(_operationTask, completion.Task))
                 {
-                    _operationTask = null;
+                    _operationTask = Task.FromResult(result);
                 }
             }
 
@@ -219,13 +218,22 @@ internal sealed class MachineIntegrationTcpOperationOwner : IDisposable
         }
     }
 
-    private static async Task<MachineIntegrationOperationObservation> ObserveTaskAsync(
+    private async Task<MachineIntegrationOperationObservation> ObserveTaskAsync(
         Task<MachineIntegrationOperationObservation> task,
         TimeSpan timeout)
     {
         try
         {
-            return await task.WaitAsync(timeout);
+            var result = await task.WaitAsync(timeout);
+            lock (_gate)
+            {
+                if (_operationTask is { IsCompletedSuccessfully: true } currentTask && ReferenceEquals(currentTask.Result, result))
+                {
+                    _operationTask = null;
+                }
+            }
+
+            return result;
         }
         catch (OperationCanceledException exception)
         {

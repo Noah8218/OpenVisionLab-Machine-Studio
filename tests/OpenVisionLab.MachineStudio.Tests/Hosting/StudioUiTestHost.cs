@@ -68,7 +68,7 @@ public sealed class StudioUiTestHost : IAsyncLifetime
         {
             var application = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
             // Match App.xaml's resources without registering its interactive Startup handler.
-            application.Resources.MergedDictionaries.Add(new global::Wpf.Ui.Markup.ThemesDictionary { Theme = global::Wpf.Ui.Appearance.ApplicationTheme.Dark });
+            application.Resources.MergedDictionaries.Add(new global::Wpf.Ui.Markup.ThemesDictionary { Theme = global::Wpf.Ui.Appearance.ApplicationTheme.Light });
             application.Resources.MergedDictionaries.Add(new global::Wpf.Ui.Markup.ControlsDictionary());
             application.Resources.MergedDictionaries.Add(new ResourceDictionary
             {

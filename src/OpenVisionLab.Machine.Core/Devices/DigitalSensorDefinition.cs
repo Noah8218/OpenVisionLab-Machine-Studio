@@ -10,6 +10,18 @@ public sealed class DigitalSensorDefinition
     [JsonPropertyName("targetComponentId")]
     public string TargetComponentId { get; set; } = string.Empty;
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("detectAllProducts")]
+    public bool? DetectAllProducts { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("useMillisecondDelays")]
+    public bool? UseMillisecondDelays { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("detectionCenterY")]
+    public double? DetectionCenterY { get; set; }
+
     [JsonPropertyName("onDelayMilliseconds")]
     public int OnDelayMilliseconds { get; set; }
 

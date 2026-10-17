@@ -39,6 +39,98 @@ public sealed class LayoutStartupViewModelTests
         "R19InspectionFlow.ovmachine");
 
     [Fact]
+    public void EquipmentSearchKeepsRealProductsEmptyGroupsAndSelectionWithoutAuthoring()
+    {
+        var project = new ProjectDocumentStore().Load(File.ReadAllText(InspectionSamplePath));
+        var station = Assert.Single(project.Stations);
+        station.Units.Add(new MachineUnitDefinition { Id = "empty-unit-0613", Name = "Empty inspection unit" });
+        project.Stations.Add(new MachineStationDefinition { Id = "empty-station-0613", Name = "Empty station" });
+        using var main = new MainViewModel(project);
+        var original = new ProjectDocumentStore().SerializeForEvidence(project);
+        main.Layout.SelectEquipmentOutlinePartCommand.Execute(main.Layout.Items.Single(item => item.Id == "camera-top-2d"));
+        Assert.True(main.Navigation.IsInspectorOpen);
+        Assert.Equal("camera-top-2d", main.Layout.SelectedComponentEditor?.Id);
+        main.Layout.EquipmentOutlineSearchText = "empty-station-0613";
+        Assert.False(main.Layout.EquipmentOutlineHasNoMatches);
+        Assert.Equal("empty-station-0613", Assert.Single(main.Layout.EquipmentOutlineStations).Id);
+        main.Layout.EquipmentOutlineSearchText = "empty-unit-0613";
+        Assert.False(main.Layout.EquipmentOutlineHasNoMatches);
+        Assert.Equal("empty-unit-0613", Assert.Single(main.Layout.EquipmentOutlineUnits).UnitId);
+        main.Layout.EquipmentOutlineSearchText = "not-a-real-equipment-id";
+        Assert.True(main.Layout.EquipmentOutlineHasNoMatches);
+        Assert.Empty(main.Layout.EquipmentOutlineProducts);
+        Assert.Empty(main.Layout.EquipmentOutlineStations);
+        main.Layout.ClearEquipmentOutlineSearchCommand.Execute(null);
+        Assert.Equal(project.Stations.Count, main.Layout.EquipmentOutlineStations.Count);
+        Assert.Equal(project.Layouts.SelectMany(layout => layout.Components).Count(item => item.Kind == LayoutComponentKind.Workpiece), main.Layout.EquipmentOutlineProducts.Count);
+        Assert.DoesNotContain(main.Layout.EquipmentOutlineUnits.SelectMany(unit => unit.Parts), part => part.Item.Component!.Kind == LayoutComponentKind.Workpiece);
+        Assert.Equal("camera-top-2d", main.Layout.SelectedItem?.Id);
+        Assert.Equal("camera-top-2d", main.Layout.SelectedComponentEditor?.Id);
+        Assert.False(main.HasUnsavedChanges);
+        Assert.False(main.IsRunMode);
+        Assert.Equal(original, new ProjectDocumentStore().SerializeForEvidence(project));
+    }
+
+    [Theory]
+    [InlineData(NumericalCameraInputKind.Image2D, "▣")]
+    [InlineData(NumericalCameraInputKind.HeightMap3D, "▤")]
+    public void EquipmentCameraOutlineUsesTypedInputAndExistingKindIcons(NumericalCameraInputKind inputKind, string symbol)
+    {
+        var project = new ProjectDocumentStore().Load(File.ReadAllText(InspectionSamplePath));
+        var camera = project.Devices.Single(device => device.Id == "device.camera-1");
+        camera.Camera!.NumericalInput = new NumericalCameraSettings { InputKind = inputKind };
+        using var main = new MainViewModel(project);
+        var row = main.Layout.EquipmentOutlineUnits.SelectMany(unit => unit.Parts).Single(part => part.Item.Id == "camera-top-2d");
+        Assert.Equal(symbol, row.Symbol);
+        Assert.Equal(inputKind == NumericalCameraInputKind.HeightMap3D, row.IsHeightMapCamera);
+        Assert.False(main.HasUnsavedChanges || main.IsRunMode);
+    }
+
+    [Fact]
+    public void EquipmentScopeNavigationHonorsDraftCancelAndDisplaysTheActualScope()
+    {
+        var project = new ProjectDocumentStore().Load(File.ReadAllText(InspectionSamplePath));
+        var station = Assert.Single(project.Stations);
+        var unit = Assert.Single(station.Units);
+        var emptyStation = new MachineStationDefinition { Id = "station-empty", Name = "Empty station" };
+        project.Stations.Add(emptyStation);
+        using var main = new MainViewModel(project);
+        var axisItem = main.Layout.Items.Single(item => item.Id == "wafer-stage");
+        main.Layout.SelectEquipmentOutlinePartCommand.Execute(axisItem);
+        var editor = Assert.IsType<LayoutComponentEditorViewModel>(main.Layout.SelectedComponentEditor);
+        var x = axisItem.CurrentX;
+        editor.DraftXText = (x + 20).ToString(CultureInfo.InvariantCulture);
+        main.PlacementDraftPrompt = () => PlacementDraftDecision.Cancel;
+        main.ShowEquipmentStationCommand.Execute(station.Id);
+        Assert.Same(editor, main.Layout.SelectedComponentEditor);
+        Assert.Null(main.Layout.ActiveStationId);
+        Assert.True(editor.HasPendingPlacementDraft);
+        Assert.Equal(x, axisItem.CurrentX);
+        main.PlacementDraftPrompt = () => PlacementDraftDecision.Discard;
+        main.ShowEquipmentStationCommand.Execute(station.Id);
+        Assert.Equal(station.Id, main.Layout.ActiveStationId);
+        Assert.Null(main.Layout.ActiveUnitId);
+        Assert.Empty(main.Layout.SelectedItems);
+        Assert.Equal(project.Layouts.SelectMany(layout => layout.Components).Where(item => item.UnitId == unit.Id).Select(item => item.Id).Order(), main.Layout.SceneItems.Select(item => item.Id).Order());
+        Assert.Contains(main.Properties.Items, property => property.Value == station.Name);
+        Assert.True(main.Navigation.IsInspectorOpen);
+        main.ShowEquipmentStationCommand.Execute(emptyStation.Id);
+        Assert.Empty(main.Layout.SceneItems);
+        Assert.Contains(main.Properties.Items, property => property.Value == emptyStation.Name);
+        main.ShowEquipmentUnitCommand.Execute(unit.Id);
+        Assert.Null(main.Layout.ActiveStationId);
+        Assert.Equal(unit.Id, main.Layout.ActiveUnitId);
+        Assert.Contains(main.Properties.Items, property => property.Value == unit.Name);
+        main.ShowEquipmentOverviewCommand.Execute(null);
+        Assert.Null(main.Layout.ActiveStationId);
+        Assert.Null(main.Layout.ActiveUnitId);
+        Assert.Equal(main.Layout.Items.Count, main.Layout.SceneItems.Count());
+        Assert.True(main.Layout.IsEquipmentOverviewActive);
+        Assert.False(main.HasUnsavedChanges);
+        Assert.False(main.IsRunMode);
+    }
+
+    [Fact]
     public void RejectedStartupDoesNotLeaveLanguageCallbacksOnPartiallyInitializedShell()
     {
         var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
@@ -373,7 +465,7 @@ public sealed class LayoutStartupViewModelTests
     }
 
     [Fact]
-    public void BlankStartIsOneChoiceAndOpensTheLibrary()
+    public void BlankStartIsOneChoiceAndOpensEquipmentAuthoring()
     {
         using var viewModel = new MainViewModel(startupSamplePath: SamplePath);
 
@@ -383,8 +475,143 @@ public sealed class LayoutStartupViewModelTests
         viewModel.StartBlankLayoutCommand.Execute(null);
 
         Assert.False(viewModel.IsStartupChoiceVisible);
-        Assert.Equal(1, viewModel.SelectedLeftToolTabIndex);
+        Assert.True(viewModel.Navigation.IsEquipmentWorkspace);
+        Assert.Equal(0, viewModel.SelectedLeftToolTabIndex);
         Assert.False(viewModel.HasUnsavedChanges);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task NewRecipeSuccessEntersEquipmentAuthoringFromEveryWorkspace(int workspaceIndex)
+    {
+        await RunOnStaAsync(async () =>
+        {
+            using var viewModel = new MainViewModel(new MachineProjectDocument { Name = "Previous recipe" });
+            viewModel.Navigation.SelectedWorkspaceIndex = workspaceIndex;
+            viewModel.Navigation.SelectedLeftToolTabIndex = 1;
+            viewModel.Navigation.IsInspectorOpen = true;
+            viewModel.Navigation.IsEvidenceExpanded = true;
+
+            viewModel.NewProjectCommand.Execute(null);
+            viewModel.NewProjectNameDraft = "New authoring recipe";
+            Assert.True(await viewModel.ConfirmNewProjectNameAsync().WaitAsync(TimeSpan.FromSeconds(10)));
+
+            Assert.True(viewModel.Navigation.IsEquipmentWorkspace);
+            Assert.Equal(0, viewModel.Navigation.SelectedDocumentContentIndex);
+            Assert.Equal(0, viewModel.Navigation.SelectedLeftToolTabIndex);
+            Assert.False(viewModel.Navigation.IsInspectorOpen || viewModel.Navigation.IsEvidenceExpanded);
+            Assert.Equal("New authoring recipe", viewModel.ProjectTree.Roots.Single().DisplayName);
+            Assert.Null(viewModel.CurrentProjectPath);
+            Assert.True(viewModel.IsDesignMode);
+            Assert.False(viewModel.IsRunning || viewModel.HasUnsavedChanges);
+            Assert.Empty(viewModel.Layout.Items);
+
+            viewModel.OpenEquipmentComponentLibraryDialogCommand.Execute(null);
+            Assert.True(viewModel.IsStationUnitEditorOpen);
+            Assert.False(viewModel.IsEquipmentComponentLibraryDialogOpen);
+            viewModel.CancelStationUnitEditorCommand.Execute(null);
+            Assert.False(viewModel.IsStationUnitEditorOpen || viewModel.HasUnsavedChanges);
+            return true;
+        });
+    }
+
+    [Fact]
+    public async Task CancelledNewOrCopyPreservesThePreviousWorkspaceAndDraftDocument()
+    {
+        var directory = Path.Combine(TestStorage.RootPath, "recipe-entry-cancel", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await RunOnStaAsync(async () =>
+            {
+                var project = new MachineProjectDocument { Name = "Previous authored recipe" };
+                using var viewModel = new MainViewModel(project);
+                Assert.True(viewModel.TryAddLayoutComponent(LayoutComponentKind.MachineFrame));
+                var authored = new ProjectDocumentStore().Serialize(project);
+                viewModel.Navigation.IsInspectionWorkspace = true;
+                viewModel.Navigation.SelectedLeftToolTabIndex = 2;
+                viewModel.Navigation.IsInspectorOpen = true;
+                viewModel.Navigation.IsEvidenceExpanded = true;
+                viewModel.UnsavedProjectPrompt = () => UnsavedProjectDecision.Cancel;
+
+                viewModel.NewProjectCommand.Execute(null);
+                viewModel.NewProjectNameDraft = "   ";
+                Assert.False(await viewModel.ConfirmNewProjectNameAsync());
+                viewModel.NewProjectNameDraft = "Canceled recipe";
+                Assert.False(await viewModel.ConfirmNewProjectNameAsync().WaitAsync(TimeSpan.FromSeconds(10)));
+                Assert.True(viewModel.IsNewProjectNameDialogOpen);
+                viewModel.CancelNewProjectNameCommand.Execute(null);
+
+                viewModel.SemiconductorRecipes.Open();
+                var copyPath = Path.Combine(directory, "canceled.ovmachine");
+                Assert.False(await viewModel.SemiconductorRecipes.CreateCopyToAsync(copyPath).WaitAsync(TimeSpan.FromSeconds(10)));
+                Assert.False(File.Exists(copyPath));
+                Assert.True(viewModel.SemiconductorRecipes.IsOpen);
+                Assert.True(viewModel.Navigation.IsInspectionWorkspace);
+                Assert.Equal(2, viewModel.Navigation.SelectedLeftToolTabIndex);
+                Assert.True(viewModel.Navigation.IsInspectorOpen && viewModel.Navigation.IsEvidenceExpanded);
+                Assert.True(viewModel.HasUnsavedChanges);
+                Assert.Equal(authored, new ProjectDocumentStore().Serialize(project));
+                Assert.False(viewModel.IsRunning);
+                return true;
+            });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task GalleryCopyFailureKeepsContextAndValidRetryEntersEquipmentAuthoring()
+    {
+        var directory = Path.Combine(TestStorage.RootPath, "recipe-entry-copy-recovery", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var blockingFile = Path.Combine(directory, "not-a-directory");
+            File.WriteAllText(blockingFile, "Owned isolated copy-failure input.");
+            await RunOnStaAsync(async () =>
+            {
+                var project = new MachineProjectDocument { Name = "Previous saved recipe" };
+                using var viewModel = new MainViewModel(project);
+                viewModel.Navigation.IsInspectionWorkspace = true;
+                viewModel.Navigation.SelectedLeftToolTabIndex = 2;
+                viewModel.Navigation.IsInspectorOpen = true;
+                viewModel.Navigation.IsEvidenceExpanded = true;
+                var previousTitle = viewModel.Title;
+                viewModel.SemiconductorRecipes.Open();
+
+                Assert.False(await viewModel.SemiconductorRecipes.CreateCopyToAsync(Path.Combine(blockingFile, "copy.ovmachine")));
+                Assert.NotEmpty(viewModel.SemiconductorRecipes.ErrorMessage);
+                Assert.True(viewModel.SemiconductorRecipes.IsOpen);
+                Assert.True(viewModel.Navigation.IsInspectionWorkspace);
+                Assert.True(viewModel.Navigation.IsInspectorOpen && viewModel.Navigation.IsEvidenceExpanded);
+                Assert.Equal(previousTitle, viewModel.Title);
+                Assert.False(viewModel.IsRunning || viewModel.HasUnsavedChanges);
+
+                var copyPath = Path.Combine(directory, "copy.ovmachine");
+                Assert.True(await viewModel.SemiconductorRecipes.CreateCopyToAsync(copyPath).WaitAsync(TimeSpan.FromSeconds(10)));
+                Assert.True(File.Exists(copyPath));
+                Assert.Equal(Path.GetFullPath(copyPath), viewModel.CurrentProjectPath);
+                Assert.True(viewModel.Navigation.IsEquipmentWorkspace);
+                Assert.Equal(0, viewModel.Navigation.SelectedLeftToolTabIndex);
+                Assert.False(viewModel.Navigation.IsInspectorOpen || viewModel.Navigation.IsEvidenceExpanded);
+                Assert.False(viewModel.SemiconductorRecipes.IsOpen);
+                Assert.Empty(viewModel.SemiconductorRecipes.ErrorMessage);
+                Assert.NotEmpty(viewModel.Layout.Items);
+                Assert.True(viewModel.IsDesignMode);
+                Assert.False(viewModel.IsRunning || viewModel.HasUnsavedChanges);
+                return true;
+            });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact]
@@ -804,6 +1031,8 @@ public sealed class LayoutStartupViewModelTests
         Assert.True(viewModel.HasUnsavedChanges);
         Assert.Equal(TreeNodeKind.Unit, viewModel.ProjectTree.SelectedNode?.Kind);
         Assert.Equal(unit.Id, viewModel.ProjectTree.SelectedNode?.Id);
+        Assert.True(viewModel.Navigation.IsInspectorOpen);
+        Assert.Contains(viewModel.Properties.Items, item => item.Value == unit.Id);
 
         viewModel.AddLayoutComponentCommand.Execute(LayoutComponentKind.MachineFrame);
 
@@ -1167,7 +1396,8 @@ public sealed class LayoutStartupViewModelTests
         Assert.False(viewModel.IsEquipmentComponentLibraryDialogOpen);
         Assert.Equal(before, store.Serialize(project));
         Assert.Equal(unit.Id, viewModel.Layout.ActiveUnitId);
-        Assert.Equal(8, viewModel.Layout.LibraryItems.Count);
+        Assert.Equal(9, viewModel.Layout.LibraryItems.Count);
+        Assert.Contains(viewModel.Layout.LibraryItems, item => item.Kind == LayoutComponentKind.DigitalIo);
     }
 
     [Fact]
@@ -1182,26 +1412,30 @@ public sealed class LayoutStartupViewModelTests
         var unit = Assert.Single(Assert.Single(project.Stations).Units);
         viewModel.ShowEquipmentUnitCommand.Execute(unit.Id);
         viewModel.OpenEquipmentComponentLibraryDialogCommand.Execute(null);
-        viewModel.Layout.LibrarySearchText = "Camera";
+        viewModel.Layout.LibrarySearchText = OpenVisionLanguageService.T("Equipment.LibraryCamera2D");
 
-        Assert.Single(viewModel.Layout.FilteredLibraryItems);
+        Assert.Single(viewModel.EquipmentComponentLibraryItems);
         Assert.True(viewModel.AddEquipmentComponentFromLibraryCommand.CanExecute(LayoutComponentKind.Camera));
         Assert.False(viewModel.AddEquipmentComponentFromLibraryCommand.CanExecute((LayoutComponentKind)int.MaxValue));
-        var projectBeforeUnavailableCamera = new ProjectDocumentStore().Serialize(project);
         viewModel.AddEquipmentComponentFromLibraryCommand.Execute(LayoutComponentKind.Camera);
-        Assert.True(viewModel.IsEquipmentComponentLibraryDialogOpen);
-        Assert.Equal(OpenVisionLanguageService.T("Layout.Add.CameraDeviceRequired"), viewModel.EquipmentComponentLibraryDialogStatusText);
-        Assert.Equal(projectBeforeUnavailableCamera, new ProjectDocumentStore().Serialize(project));
+        viewModel.AddEquipmentComponentFromLibraryCommand.Execute(LayoutComponentKind.Camera);
+        Assert.False(viewModel.IsEquipmentComponentLibraryDialogOpen);
+        var camera = Assert.Single(project.Layouts.SelectMany(layout => layout.Components));
+        Assert.Equal(LayoutComponentKind.Camera, camera.Kind);
+        Assert.Equal(unit.Id, camera.UnitId);
+        Assert.Equal(camera.BehaviorBindingId, Assert.Single(project.Devices).Id);
+        Assert.Empty(project.Sequences);
 
-        viewModel.Layout.LibrarySearchText = "MachineFrame";
-        Assert.Single(viewModel.Layout.FilteredLibraryItems);
+        viewModel.OpenEquipmentComponentLibraryDialogCommand.Execute(null);
+        viewModel.Layout.LibrarySearchText = OpenVisionLanguageService.T("Layout.Library.MachineFrame.Name");
+        Assert.Single(viewModel.EquipmentComponentLibraryItems);
         Assert.True(viewModel.AddEquipmentComponentFromLibraryCommand.CanExecute(LayoutComponentKind.MachineFrame));
 
         var componentCount = project.Layouts.Sum(layout => layout.Components.Count);
         viewModel.AddEquipmentComponentFromLibraryCommand.Execute(LayoutComponentKind.MachineFrame);
         viewModel.AddEquipmentComponentFromLibraryCommand.Execute(LayoutComponentKind.MachineFrame);
 
-        var added = Assert.Single(project.Layouts.SelectMany(layout => layout.Components));
+        var added = Assert.Single(project.Layouts.SelectMany(layout => layout.Components).Where(component => component.Kind == LayoutComponentKind.MachineFrame));
         Assert.Equal(componentCount + 1, project.Layouts.Sum(layout => layout.Components.Count));
         Assert.Equal(LayoutComponentKind.MachineFrame, added.Kind);
         Assert.Equal(unit.Id, added.UnitId);
@@ -1247,21 +1481,22 @@ public sealed class LayoutStartupViewModelTests
             var unit = Assert.Single(Assert.Single(project.Stations).Units);
             viewModel.ShowEquipmentUnitCommand.Execute(unit.Id);
             viewModel.OpenEquipmentComponentLibraryDialogCommand.Execute(null);
-            viewModel.Layout.LibrarySearchText = "Camera";
+            viewModel.Layout.LibrarySearchText = OpenVisionLanguageService.T("Layout.Library.Workpiece.Name");
 
             var projectBeforeRejectedAdd = new ProjectDocumentStore().Serialize(project);
-            viewModel.AddEquipmentComponentFromLibraryCommand.Execute(LayoutComponentKind.Camera);
+            viewModel.AddEquipmentComponentFromLibraryCommand.Execute(LayoutComponentKind.Workpiece);
             Assert.Equal(
-                OpenVisionLanguageService.T("Layout.Add.CameraDeviceRequired"),
+                OpenVisionLanguageService.T("Layout.Add.WorkpieceCarrierRequired"),
                 viewModel.EquipmentComponentLibraryDialogStatusText);
             Assert.True(viewModel.IsEquipmentComponentLibraryDialogOpen);
             Assert.Equal(projectBeforeRejectedAdd, new ProjectDocumentStore().Serialize(project));
 
             OpenVisionLanguageService.SetLanguage(OpenVisionLanguage.English, save: false);
-            viewModel.AddEquipmentComponentFromLibraryCommand.Execute(LayoutComponentKind.Camera);
+            viewModel.Layout.LibrarySearchText = OpenVisionLanguageService.T("Layout.Library.Workpiece.Name");
+            viewModel.AddEquipmentComponentFromLibraryCommand.Execute(LayoutComponentKind.Workpiece);
 
             Assert.Equal(
-                OpenVisionLanguageService.T("Layout.Add.CameraDeviceRequired"),
+                OpenVisionLanguageService.T("Layout.Add.WorkpieceCarrierRequired"),
                 viewModel.EquipmentComponentLibraryDialogStatusText);
             Assert.True(viewModel.IsEquipmentComponentLibraryDialogOpen);
             Assert.Equal(projectBeforeRejectedAdd, new ProjectDocumentStore().Serialize(project));
@@ -1281,6 +1516,53 @@ public sealed class LayoutStartupViewModelTests
         {
             OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
         }
+    }
+
+    [Fact]
+    public void EquipmentLibraryRecoversFromMissingCarrierWithoutStartingAnAutomaticRun()
+    {
+        var project = new MachineProjectDocument { Name = "Library dependency recovery" };
+        using var model = new MainViewModel(project);
+        model.OpenStationUnitEditorCommand.Execute(null);
+        model.StationNameDraft = "Inspection";
+        model.UnitNameDraft = "Transfer";
+        model.AddStationUnitCommand.Execute(null);
+        var unit = Assert.Single(Assert.Single(project.Stations).Units);
+        model.ShowEquipmentUnitCommand.Execute(unit.Id);
+        model.OpenEquipmentComponentLibraryDialogCommand.Execute(null);
+        model.Layout.LibrarySearchText = OpenVisionLanguageService.T("Layout.Library.Workpiece.Name");
+        var before = new ProjectDocumentStore().SerializeForEvidence(project);
+
+        model.AddEquipmentComponentFromLibraryCommand.Execute(LayoutComponentKind.Workpiece);
+
+        Assert.True(model.IsEquipmentComponentLibraryDialogOpen);
+        Assert.Equal(before, new ProjectDocumentStore().SerializeForEvidence(project));
+        Assert.Equal(OpenVisionLanguageService.T("Layout.Add.WorkpieceCarrierRequired"), model.EquipmentComponentLibraryDialogStatusText);
+        model.CloseEquipmentComponentLibraryDialogCommand.Execute(null);
+        model.OpenEquipmentComponentLibraryDialogCommand.Execute(null);
+        model.Layout.LibrarySearchText = OpenVisionLanguageService.T("Layout.Library.Workpiece.Name");
+        model.AddEquipmentComponentFromLibraryCommand.Execute(LayoutComponentKind.Workpiece);
+        Assert.True(model.IsEquipmentComponentLibraryDialogOpen);
+        Assert.Equal(before, new ProjectDocumentStore().SerializeForEvidence(project));
+        Assert.Equal(OpenVisionLanguageService.T("Layout.Add.WorkpieceCarrierRequired"), model.EquipmentComponentLibraryDialogStatusText);
+        model.Layout.LibrarySearchText = OpenVisionLanguageService.T("Layout.Library.Conveyor.Name");
+        model.AddEquipmentComponentFromLibraryCommand.Execute(LayoutComponentKind.Conveyor);
+        Assert.False(model.IsEquipmentComponentLibraryDialogOpen);
+        var conveyor = Assert.Single(project.Layouts.SelectMany(layout => layout.Components));
+        Assert.Equal(unit.Id, conveyor.UnitId);
+        model.OpenEquipmentComponentLibraryDialogCommand.Execute(null);
+        Assert.Equal(string.Empty, model.EquipmentComponentLibraryDialogStatusText);
+        model.Layout.LibrarySearchText = OpenVisionLanguageService.T("Layout.Library.Workpiece.Name");
+        model.AddEquipmentComponentFromLibraryCommand.Execute(LayoutComponentKind.Workpiece);
+        var workpiece = Assert.Single(project.Layouts.SelectMany(layout => layout.Components).Where(component => component.Kind == LayoutComponentKind.Workpiece));
+
+        Assert.False(model.IsEquipmentComponentLibraryDialogOpen);
+        Assert.Equal(unit.Id, workpiece.UnitId);
+        Assert.Equal(workpiece.Id, model.Layout.SelectedItem?.Id);
+        Assert.Equal(conveyor.Id, Assert.Single(project.Devices.Where(device => device.Id == workpiece.BehaviorBindingId)).Workpiece?.ConveyorComponentId);
+        Assert.True(model.HasUnsavedChanges && model.IsDesignMode);
+        Assert.False(model.IsRunning);
+        Assert.Empty(project.Sequences);
     }
 
     [Fact]
@@ -1404,7 +1686,7 @@ public sealed class LayoutStartupViewModelTests
     }
 
     [Fact]
-    public void EquipmentOverviewCommandClearsSelectionAndClosesInspectorWithoutChangingProject()
+    public void EquipmentOverviewCommandClearsSelectionAndDisplaysProjectWithoutChangingProject()
     {
         var unit = new MachineUnitDefinition { Id = "unit-press", Name = "Press" };
         var component = new LayoutComponentDefinition
@@ -1448,7 +1730,7 @@ public sealed class LayoutStartupViewModelTests
 
         Assert.Equal(unit.Id, viewModel.Layout.ActiveUnitId);
         Assert.Equal([component.Id], viewModel.Layout.SceneItems.Select(item => item.Id));
-        Assert.False(viewModel.Navigation.IsInspectorOpen);
+        Assert.True(viewModel.Navigation.IsInspectorOpen);
 
         viewModel.ShowEquipmentOverviewCommand.Execute(null);
         viewModel.ShowEquipmentOverviewCommand.Execute(null);
@@ -1459,7 +1741,7 @@ public sealed class LayoutStartupViewModelTests
         Assert.Null(viewModel.Layout.SelectedItem);
         Assert.Null(viewModel.Layout.ActiveUnitId);
         Assert.Equal([component.Id], viewModel.Layout.SceneItems.Select(item => item.Id));
-        Assert.False(viewModel.Navigation.IsInspectorOpen);
+        Assert.True(viewModel.Navigation.IsInspectorOpen);
         Assert.Equal(serializedBeforeSelection, new ProjectDocumentStore().Serialize(project));
         Assert.False(viewModel.HasUnsavedChanges);
     }
@@ -1682,7 +1964,8 @@ public sealed class LayoutStartupViewModelTests
                 Assert.Equal(originalX, component.Transform.X);
                 Assert.True(main.HasUnsavedChanges);
                 Assert.Equal(1, main.Layout.EquipmentOutlineUnits.Single(unit => unit.UnitId == target.Id).ComponentCount);
-                Assert.Equal(9, main.Layout.EquipmentOutlineUnits.Single(unit => unit.UnitId == originalUnit.Id).ComponentCount);
+                Assert.Equal(8, main.Layout.EquipmentOutlineUnits.Single(unit => unit.UnitId == originalUnit.Id).ComponentCount);
+                Assert.Single(main.Layout.EquipmentOutlineProducts);
 
                 main.PlacementDraftPrompt = () => PlacementDraftDecision.Cancel;
                 main.ShowEquipmentUnitCommand.Execute(target.Id);
@@ -1831,10 +2114,11 @@ public sealed class LayoutStartupViewModelTests
             var definition = viewModel.Layout.Definition;
 
             Assert.Equal(
-                ["머신 프레임", "리니어 스테이지", "로터리 스테이지", "디지털 센서", "공압 실린더", "컨베이어", "워크피스", "카메라"],
+                ["머신 프레임", "리니어 축", "로터리 스테이지", "디지털 센서", "공압 실린더", "컨베이어", "제품", "디지털 I/O", "카메라"],
                 viewModel.Layout.LibraryItems.Select(item => item.Name));
             Assert.Equal("기구", viewModel.Layout.LibraryItems[0].Category);
             Assert.Equal("장비 셀의 고정 구조와 시각적 경계를 정의합니다.", viewModel.Layout.LibraryItems[0].Description);
+            Assert.Equal("디지털 채널과 연결된 I/O 모듈", viewModel.Layout.LibraryItems[^2].Description);
             Assert.Equal("비전", viewModel.Layout.LibraryItems[^1].Category);
             Assert.Equal("레이아웃에서 가상 카메라의 위치를 표시합니다. 이미지를 생성하지 않습니다.", viewModel.Layout.LibraryItems[^1].Description);
 
@@ -1842,10 +2126,11 @@ public sealed class LayoutStartupViewModelTests
                 option.Language == OpenVisionLanguage.English);
 
             Assert.Equal(
-                ["Machine Frame", "Linear Stage", "Rotary Stage", "Digital Sensor", "Pneumatic Cylinder", "Conveyor", "Workpiece", "Camera"],
+                ["Machine Frame", "Linear Stage", "Rotary Stage", "Digital Sensor", "Pneumatic Cylinder", "Conveyor", "Workpiece", "Digital I/O", "Camera"],
                 viewModel.Layout.LibraryItems.Select(item => item.Name));
             Assert.Equal("Mechanics", viewModel.Layout.LibraryItems[0].Category);
             Assert.Equal("Static cell structure and visual boundary", viewModel.Layout.LibraryItems[0].Description);
+            Assert.Equal("I/O module bound to a digital channel", viewModel.Layout.LibraryItems[^2].Description);
             Assert.Equal("Vision", viewModel.Layout.LibraryItems[^1].Category);
             Assert.Equal("Shows a virtual camera position in the layout; does not generate images", viewModel.Layout.LibraryItems[^1].Description);
             Assert.Same(definition, viewModel.Layout.Definition);
@@ -2167,7 +2452,7 @@ public sealed class LayoutStartupViewModelTests
             OpenVisionLanguageService.SetLanguage(OpenVisionLanguage.Korean, save: false);
             var korean = MainMessageDialogHost.CreateLayoutRemovalDialogOptions([component], [impact]);
             Assert.Contains("1개", korean.Title, StringComparison.Ordinal);
-            Assert.Contains("영향받는 동작 연결", korean.Message, StringComparison.Ordinal);
+            Assert.Contains("영향받는 시퀀스 연결", korean.Message, StringComparison.Ordinal);
             Assert.Contains(component.Id, korean.Message, StringComparison.Ordinal);
             Assert.Equal("삭제", korean.PrimaryButtonText);
             Assert.Equal("취소", korean.SecondaryButtonText);

@@ -1,4 +1,5 @@
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Core.Devices;
 
 namespace OpenVisionLab.Machine.Core.Layouts;
 
@@ -31,7 +32,8 @@ public enum LayoutComponentRemovalFailureKind
 {
     NotFound,
     SensorDependency,
-    WorkpieceDependency
+    WorkpieceDependency,
+    MaterialPositionDependency
 }
 
 public sealed record LayoutComponentRemovalResult(
@@ -80,9 +82,13 @@ public sealed class LayoutComponentAuthoringService
         string? selectedComponentId = null,
         double? worldX = null,
         double? worldY = null,
-        string? unitId = null)
+        string? unitId = null,
+        NumericalCameraInputKind? cameraInputKind = null)
     {
         ArgumentNullException.ThrowIfNull(project);
+
+        if (cameraInputKind is { } inputKind && (kind != LayoutComponentKind.Camera || !Enum.IsDefined(inputKind)))
+            return new(null, null, new(LayoutComponentAuthoringFailureKind.UnsupportedComponentKind));
 
         if (worldX.HasValue != worldY.HasValue ||
             worldX is { } x && !double.IsFinite(x) ||
@@ -108,7 +114,8 @@ public sealed class LayoutComponentAuthoringService
             layout,
             kind,
             selectedComponentId,
-            out var componentFailure);
+            out var componentFailure,
+            cameraInputKind);
         if (component is null)
         {
             RollBackAddition(
@@ -126,9 +133,13 @@ public sealed class LayoutComponentAuthoringService
                 componentFailure ?? new(LayoutComponentAuthoringFailureKind.UnsupportedComponentKind));
         }
 
+        bool useUnitDefault = false;
         if (unitId is not null)
         {
             component.UnitId = unitId;
+            if (!worldX.HasValue && project.Stations.SelectMany(station => station.Units).FirstOrDefault(unit => unit.Id == unitId)?.BaseOrigin is { } origin)
+                useUnitDefault = _placementService.ApplyUnitDefault(component, origin)
+                    && !layout.Components.Any(existing => existing.UnitId == unitId && existing.Kind == kind);
         }
 
         if (worldX is { } dropX && worldY is { } dropY)
@@ -137,8 +148,8 @@ public sealed class LayoutComponentAuthoringService
         }
         else if (_placementService.UsesIndependentDefaultPlacement(component.Kind))
         {
-            var position = _placementService.FindNearestAvailablePosition(layout, component);
-            _placementService.Place(project, layout, component, position.X, position.Y);
+            var position = useUnitDefault ? (X: component.Transform.X, Y: component.Transform.Y) : _placementService.FindNearestAvailablePosition(layout, component);
+            _placementService.Place(project, layout, component, position.X, position.Y, snapToGrid: !useUnitDefault);
         }
 
         layout.Components.Add(component);
@@ -288,6 +299,11 @@ public sealed class LayoutComponentAuthoringService
                 dependentWorkpiece.Component,
                 LayoutComponentRemovalFailureKind.WorkpieceDependency);
         }
+
+        var dependentPosition = project.Layouts.SelectMany(candidate => candidate.Components)
+            .FirstOrDefault(component => !ids.Contains(component.Id) && component.MaterialConveyorId is { } conveyorId && ids.Contains(conveyorId));
+        if (dependentPosition is not null)
+            return new(Array.Empty<LayoutComponentDefinition>(), dependentPosition, LayoutComponentRemovalFailureKind.MaterialPositionDependency);
 
         layout.Components.RemoveAll(component => ids.Contains(component.Id));
         return new(components, null, null);

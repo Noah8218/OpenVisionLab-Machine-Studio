@@ -22,6 +22,9 @@ internal sealed class MainWpfInteractionHost
 
     internal async Task CommitFocusedEditorAsync()
     {
+        var previousFocus = Keyboard.FocusedElement;
+        if (previousFocus is DependencyObject focusedObject)
+            FocusManager.SetFocusedElement(FocusManager.GetFocusScope(focusedObject), null);
         Keyboard.ClearFocus();
         if (GetDispatcher() is { } dispatcher
             && !dispatcher.HasShutdownStarted
@@ -31,6 +34,8 @@ internal sealed class MainWpfInteractionHost
                 () => { },
                 DispatcherPriority.DataBind);
         }
+        if (previousFocus is UIElement { IsVisible: true, IsEnabled: true } element)
+            element.Focus();
     }
 
     internal async Task DispatchAsync(Action action)

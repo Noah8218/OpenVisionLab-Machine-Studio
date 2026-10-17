@@ -107,14 +107,14 @@ internal static class MachineLayoutRuntimeConfigurationValidator
 
         foreach (var sensor in componentsById.Values.OfType<DigitalSensorRuntimeConfiguration>())
         {
-            if (!componentsById.ContainsKey(sensor.TargetComponentId))
+            if (!sensor.DetectAllProducts && !componentsById.ContainsKey(sensor.TargetComponentId))
             {
                 throw new ArgumentException(
                     $"Sensor '{sensor.Id}' target component '{sensor.TargetComponentId}' was not found.",
                     nameof(components));
             }
 
-            if (string.Equals(sensor.Id, sensor.TargetComponentId, StringComparison.Ordinal))
+            if (!sensor.DetectAllProducts && string.Equals(sensor.Id, sensor.TargetComponentId, StringComparison.Ordinal))
             {
                 throw new ArgumentException(
                     $"Sensor '{sensor.Id}' cannot target itself.",

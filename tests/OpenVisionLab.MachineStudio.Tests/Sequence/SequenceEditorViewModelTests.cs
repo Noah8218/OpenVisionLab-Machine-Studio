@@ -1,11 +1,13 @@
 using System.Windows.Input;
 using OpenVisionLab.Machine.Core.Axes;
+using OpenVisionLab.Machine.Core.Channels;
 using OpenVisionLab.Machine.Core.Devices;
 using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Core.Sequences;
 using OpenVisionLab.Machine.Sequence.Authoring;
 using OpenVisionLab.Machine.Sequence.Compilation;
+using OpenVisionLab.MachineStudio.Model;
 using OpenVisionLab.MachineStudio.ViewModel;
 using Xunit;
 
@@ -13,6 +15,208 @@ namespace OpenVisionLab.MachineStudio.Tests;
 
 public sealed class SequenceEditorViewModelTests
 {
+    [Fact]
+    public void StepSearchPreservesOrderSelectionInvalidDraftAndOnlyExplicitFindNavigates()
+    {
+        var project = SearchProject();
+        var store = new ProjectDocumentStore();
+        string original = store.Serialize(project);
+        var editor = new SequenceEditorViewModel();
+        editor.Load(project);
+        var selected = editor.SelectedStep;
+        var draft = editor.SelectedStepDraft!;
+        draft.Parameter = "invalid";
+        int changes = 0;
+        editor.DefinitionChanged += (_, _) => changes++;
+        editor.StepSearchText = "  PROBE  ";
+        Assert.Equal(2, editor.StepSearchMatchCount);
+        Assert.Equal(new[] { "idle", "probe-1", "probe-2", "complete" }, editor.Steps.Select(step => step.Id));
+        Assert.Same(selected, editor.SelectedStep);
+        Assert.Same(draft, editor.SelectedStepDraft);
+        editor.StepSearchText = "nothing-matches";
+        Assert.Equal(0, editor.StepSearchMatchCount);
+        Assert.False(editor.FindNextStepCommand.CanExecute(null));
+        editor.FindNextStepCommand.Execute(null);
+        Assert.Same(selected, editor.SelectedStep);
+        Assert.Equal("invalid", editor.SelectedStepDraft!.Parameter);
+        editor.StepSearchText = "probe";
+        editor.PendingStepDraftPrompt = () => PlacementDraftDecision.Apply;
+        editor.FindNextStepCommand.Execute(null);
+        Assert.Same(selected, editor.SelectedStep);
+        Assert.True(editor.HasPendingStepDraft);
+        editor.PendingStepDraftPrompt = () =>
+        {
+            Assert.False(editor.ClearStepSearchCommand.CanExecute(null));
+            Assert.False(editor.FindNextStepCommand.CanExecute(null));
+            editor.ClearStepSearchCommand.Execute(null);
+            editor.StepSearchText = "different";
+            Assert.Equal("probe", editor.StepSearchText);
+            return PlacementDraftDecision.Cancel;
+        };
+        editor.FindNextStepCommand.Execute(null);
+        Assert.Same(selected, editor.SelectedStep);
+        Assert.Equal(original, store.Serialize(project));
+        Assert.Equal(0, changes);
+        editor.SelectedStepDraft!.Parameter = "2";
+        editor.PendingStepDraftPrompt = () => PlacementDraftDecision.Apply;
+        editor.FindNextStepCommand.Execute(null);
+        Assert.Equal("probe-1", editor.SelectedStep?.Id);
+        Assert.Equal("2", project.Sequences[0].Steps[0].Parameter);
+        editor.FindNextStepCommand.Execute(null);
+        Assert.Equal("probe-2", editor.SelectedStep?.Id);
+        editor.FindNextStepCommand.Execute(null);
+        Assert.Equal("probe-1", editor.SelectedStep?.Id);
+        var reopened = store.Load(store.Serialize(project));
+        Assert.Equal("2", reopened.Sequences[0].Steps[0].Parameter);
+        Assert.Equal("1", reopened.Sequences[0].Steps[1].Parameter);
+        editor.ClearStepSearchCommand.Execute(null);
+        Assert.Empty(editor.StepSearchText);
+        Assert.Empty(editor.StepSearchStatusText);
+        Assert.All(editor.Steps, step => Assert.False(step.IsSearchMatch));
+        Assert.Equal("probe-1", editor.SelectedStep?.Id);
+        editor.Dispose();
+    }
+
+    [Fact]
+    public void StepSearchUpdatesAfterApplySupportsReadOnlyAndResetsAtDocumentLifetime()
+    {
+        var editor = new SequenceEditorViewModel();
+        editor.Load(SearchProject());
+        editor.StepSearchText = "probe";
+        editor.FindNextStepCommand.Execute(null);
+        editor.SelectedStepDraft!.Name = "renamed";
+        Assert.True(editor.TryApplyStepDraft());
+        Assert.Equal(2, editor.StepSearchMatchCount); // Stable IDs remain searchable after a rename.
+        editor.StepSearchText = "renamed";
+        Assert.Equal(1, editor.StepSearchMatchCount);
+        editor.IsEditable = false;
+        editor.StepSearchText = "probe-2";
+        editor.FindNextStepCommand.Execute(null);
+        Assert.Equal("probe-2", editor.SelectedStep?.Id);
+        Assert.False(editor.IsStepDraftEditable);
+        editor.Load(SearchProject());
+        Assert.Empty(editor.StepSearchText);
+        Assert.Equal(0, editor.StepSearchMatchCount);
+        Assert.False(editor.FindNextStepCommand.CanExecute(null));
+        editor.Dispose();
+        editor.StepSearchText = "probe";
+        Assert.Empty(editor.StepSearchText);
+        Assert.False(editor.ClearStepSearchCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void StepSearchMatchesTargetIdentityAndKoreanNameWithoutSearchingValues()
+    {
+        var project = SearchProject();
+        project.Axes.Add(new VirtualAxisDefinition { Id = "transfer-axis", Name = "이송 축" });
+        project.Sequences[0].Steps[1].Action = SequenceStepAction.MoveAxis;
+        project.Sequences[0].Steps[1].TargetId = "transfer-axis";
+        project.Sequences[0].Steps[1].Parameter = "12.75";
+        var editor = new SequenceEditorViewModel();
+        editor.Load(project);
+        editor.StepSearchText = "이송 축";
+        Assert.Equal(1, editor.StepSearchMatchCount);
+        editor.StepSearchText = "TRANSFER-AXIS";
+        Assert.Equal(1, editor.StepSearchMatchCount);
+        editor.FindNextStepCommand.Execute(null);
+        Assert.Equal("probe-1", editor.SelectedStep?.Id);
+        editor.RefreshLocalization();
+        Assert.Equal("TRANSFER-AXIS", editor.StepSearchText);
+        Assert.Equal(1, editor.StepSearchMatchCount);
+        editor.StepSearchText = "12.75";
+        Assert.Equal(0, editor.StepSearchMatchCount);
+        Assert.Equal("probe-1", editor.SelectedStep?.Id);
+        editor.Dispose();
+    }
+
+    private static MachineProjectDocument SearchProject() => new()
+    {
+        Sequences = [new() { Id = "search", Steps = [
+            new() { Id = "idle", Name = "대기", Action = SequenceStepAction.Delay, Parameter = "1", NextStepId = "probe-1" },
+            new() { Id = "probe-1", Name = "첫 위치 대기", Action = SequenceStepAction.Delay, Parameter = "1", NextStepId = "probe-2" },
+            new() { Id = "probe-2", Name = "둘째 위치 대기", Action = SequenceStepAction.Delay, Parameter = "1", NextStepId = "complete" },
+            new() { Id = "complete", Action = SequenceStepAction.Complete }
+        ] }]
+    };
+
+    [Theory]
+    [InlineData("move-axis-home", "axis")]
+    [InlineData("set-output-on", "output")]
+    [InlineData("wait-input-on", "input")]
+    [InlineData("trigger-camera", "camera")]
+    [InlineData("transfer-unit", "conveyor")]
+    public void NewStepsPreferTheirUnitDevicesAndRetainExplicitCrossUnitTargets(string templateId, string targetPrefix)
+    {
+        var project = new MachineProjectDocument
+        {
+            Simulation = new SimulationDefinition { ActiveLayoutId = "layout" },
+            Layouts = [new MachineLayoutDefinition { Id = "layout" }],
+            Stations = [new MachineStationDefinition { Id = "station" }]
+        };
+        for (int unit = 1; unit <= 2; unit++)
+        {
+            string unitId = $"unit-{unit}";
+            project.Stations[0].Units.Add(new MachineUnitDefinition { Id = unitId });
+            project.Axes.Add(new VirtualAxisDefinition { Id = $"axis-{unit}" });
+            project.Channels.Add(new ChannelDefinition { Id = $"output-{unit}", Kind = ChannelKind.DigitalOutput });
+            project.Channels.Add(new ChannelDefinition { Id = $"input-{unit}", Kind = ChannelKind.DigitalInput });
+            project.Devices.Add(new DeviceDefinition { Id = $"cylinder-{unit}", Kind = DeviceKind.Cylinder, ChannelIds = [$"output-{unit}", $"input-{unit}"] });
+            project.Devices.Add(new DeviceDefinition { Id = $"camera-{unit}", Kind = DeviceKind.Camera });
+            project.Layouts[0].Components.AddRange(
+            [
+                new LayoutComponentDefinition { Id = $"stage-{unit}", UnitId = unitId, Kind = LayoutComponentKind.LinearStage, BehaviorBindingId = $"axis-{unit}" },
+                new LayoutComponentDefinition { Id = $"cylinder-{unit}", UnitId = unitId, Kind = LayoutComponentKind.PneumaticCylinder, BehaviorBindingId = $"cylinder-{unit}" },
+                new LayoutComponentDefinition { Id = $"camera-{unit}", UnitId = unitId, Kind = LayoutComponentKind.Camera, BehaviorBindingId = $"camera-{unit}" },
+                new LayoutComponentDefinition { Id = $"conveyor-{unit}", UnitId = unitId, Kind = LayoutComponentKind.Conveyor }
+            ]);
+            var sequence = CompleteSequence($"sequence-{unit}");
+            sequence.UnitId = unitId;
+            project.Sequences.Add(sequence);
+        }
+
+        var editor = new SequenceEditorViewModel();
+        editor.Load(project);
+        editor.SelectedSequence = project.Sequences[1];
+        editor.SelectedTemplate = editor.Templates.Single(template => template.Id == templateId);
+        editor.AddStepCommand.Execute(null);
+        Assert.Equal($"{targetPrefix}-2", editor.SelectedStep!.TargetId);
+        Assert.Contains(editor.SelectedStep.AvailableTargets, target => target.Id == $"{targetPrefix}-1");
+        Assert.Single(project.Sequences[0].Steps);
+        editor.SelectedStep.TargetId = $"{targetPrefix}-1";
+        var reopened = new ProjectDocumentStore().Load(new ProjectDocumentStore().Serialize(project));
+        Assert.Equal($"{targetPrefix}-1", reopened.Sequences[1].Steps[0].TargetId);
+        editor.SelectedSequence = project.Sequences[0];
+        editor.SelectedTemplate = editor.Templates.Single(template => template.Id == templateId);
+        editor.AddStepCommand.Execute(null);
+        Assert.Equal($"{targetPrefix}-1", editor.SelectedStep!.TargetId);
+        editor.Dispose();
+    }
+
+    [Fact]
+    public void AutomaticValidationPreservesNewStepAndDraftWhileExplicitIssueSelectionNavigates()
+    {
+        var project = new MachineProjectDocument
+        {
+            Devices = [new() { Id = "camera", Kind = DeviceKind.Camera }],
+            Sequences = [new() { Id = "sequence", Steps = [new() { Id = "inspect", Action = SequenceStepAction.WaitVisionResult, TargetId = "camera", TimeoutMs = 3000, NextStepId = "complete" }, new() { Id = "complete", Action = SequenceStepAction.Complete }] }]
+        };
+        var editor = new SequenceEditorViewModel();
+        editor.Load(project);
+        editor.SelectedTemplate = editor.Templates.Single(template => template.Id == "delay");
+        editor.AddStepCommand.Execute(null);
+        var added = editor.SelectedStep!;
+        Assert.Equal(SequenceStepAction.Delay, added.Action);
+        Assert.Null(editor.SelectedValidationIssue);
+        added.Parameter = "2";
+        Assert.Same(added, editor.SelectedStep);
+        editor.SelectedValidationIssue = editor.ValidationIssues.Single(issue => issue.Code == SequenceCompilationErrorCode.FailureStepRequired);
+        Assert.Equal("inspect", editor.SelectedStep?.Id);
+        editor.SelectedStep = added;
+        added.Parameter = "3";
+        Assert.Same(added, editor.SelectedStep);
+        Assert.Equal("3", project.Sequences[0].Steps.Single(step => step.Id == added.Id).Parameter);
+    }
+
     [Fact]
     public void TargetStepCanBeAddedToStrictSequenceAndRoundTrips()
     {
@@ -572,6 +776,44 @@ public sealed class SequenceEditorViewModelTests
             }
         ]
     };
+
+    [Fact]
+    public void UnitRepeatDraftAppliesOnlyToItsOwnerAndSurvivesSaveReloadWithoutExecution()
+    {
+        var project = new MachineProjectDocument
+        {
+            Stations = [new MachineStationDefinition { Id = "station", Name = "Station", Units = [new MachineUnitDefinition { Id = "a", Name = "A" }, new MachineUnitDefinition { Id = "b", Name = "B" }] }],
+            Sequences = [CompleteSequence("a-sequence"), CompleteSequence("b-sequence")]
+        };
+        project.Sequences[0].UnitId = "a";
+        project.Sequences[1].UnitId = "b";
+        var editor = new SequenceEditorViewModel();
+        editor.Load(project);
+        int changes = 0;
+        editor.DefinitionChanged += (_, _) => changes++;
+        editor.UnitRepeatCount = "0";
+        editor.ApplyUnitRepeatCommand.Execute(null);
+        Assert.Equal(1, project.Stations[0].Units[0].RepeatCount);
+        Assert.Equal(0, changes);
+        editor.UnitRepeatCount = "3";
+        editor.ApplyUnitRepeatCommand.Execute(null);
+        Assert.Equal(3, project.Stations[0].Units[0].RepeatCount);
+        Assert.Equal(1, project.Stations[0].Units[1].RepeatCount);
+        Assert.Equal(1, changes);
+        editor.SelectedSequence = project.Sequences[1];
+        Assert.Equal("1", editor.UnitRepeatCount);
+        editor.IsEditable = false;
+        editor.UnitRepeatCount = "2";
+        editor.ApplyUnitRepeatCommand.Execute(null);
+        Assert.Equal(1, project.Stations[0].Units[1].RepeatCount);
+        var store = new ProjectDocumentStore();
+        var reopened = store.Load(store.Serialize(project));
+        editor.Load(reopened);
+        editor.SelectedSequence = reopened.Sequences[0];
+        Assert.Equal("3", editor.UnitRepeatCount);
+        Assert.Equal(1, changes);
+        editor.Dispose();
+    }
 
     private static SequenceDefinition CompleteSequence(string id) => new()
     {

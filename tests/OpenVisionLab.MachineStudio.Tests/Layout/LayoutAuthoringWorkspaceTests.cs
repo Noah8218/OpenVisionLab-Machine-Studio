@@ -10,8 +10,40 @@ using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
 
+[Collection(LayoutStartupTestCollection.Name)]
 public sealed class LayoutAuthoringWorkspaceTests
 {
+    [Fact]
+    public void MaterialSetupApplyUndoRedoRestoresOneRecipeSettingsTransaction()
+    {
+        using var fixture = new Fixture();
+        fixture.Project.Stations.Add(new() { Id = "s", Units = [new() { Id = "u", Name = "Unit", RepeatCount = 7, SlotName = "Original" }] });
+        var settings = new MaterialFlowSettingsViewModel(() => fixture.Project, () => "u", () => fixture.IsEditable,
+            () => { }, fixture.Workspace.TryApplyDefinitionChange);
+        settings.OpenCommand.Execute(null);
+        settings.Enabled = true;
+        settings.UseTotalFeedCount = true;
+        settings.TotalFeedCount = "2";
+        settings.SlotName = "Applied";
+        fixture.CanExecuteSessionCommand = false;
+        settings.ApplyCommand.Execute(null);
+        Assert.True(settings.IsOpen);
+        Assert.Null(fixture.Project.MaterialFlow.TotalFeedCount);
+        fixture.CanExecuteSessionCommand = true;
+        settings.ApplyCommand.Execute(null);
+        Assert.False(settings.IsOpen);
+        Assert.Equal(2, fixture.Project.MaterialFlow.TotalFeedCount);
+        fixture.Workspace.UndoLayoutEditCommand.Execute(null);
+        Assert.Null(fixture.Project.MaterialFlow.TotalFeedCount);
+        Assert.Equal("Original", fixture.Project.Stations[0].Units[0].SlotName);
+        Assert.Equal(7, fixture.Project.Stations[0].Units[0].RepeatCount);
+        fixture.Workspace.RedoLayoutEditCommand.Execute(null);
+        Assert.Equal(2, fixture.Project.MaterialFlow.TotalFeedCount);
+        Assert.Equal("Applied", fixture.Project.Stations[0].Units[0].SlotName);
+        Assert.Equal(7, fixture.Project.Stations[0].Units[0].RepeatCount);
+        Assert.Null(fixture.Project.Simulation.AutomaticRun);
+    }
+
     [Fact]
     public void ConstructionAndResetDoNotEditTheProjectOrDispatchAnAction()
     {
@@ -45,7 +77,7 @@ public sealed class LayoutAuthoringWorkspaceTests
         Assert.Equal(componentId, fixture.Layout.SelectedItem?.Id);
         Assert.Equal(1, fixture.MarkCount);
         Assert.Equal(1, fixture.RefreshCount);
-        Assert.Equal($"Added {component.Name}", fixture.StatusMessages[^1]);
+        Assert.Equal(OpenVisionLanguageService.T("Layout.AddedStatus").Replace("{0}", component.Name, StringComparison.Ordinal), fixture.StatusMessages[^1]);
         Assert.True(workspace.UndoLayoutEditCommand.CanExecute(null));
 
         workspace.UndoLayoutEditCommand.Execute(null);
@@ -92,6 +124,43 @@ public sealed class LayoutAuthoringWorkspaceTests
         fixture.ResolveDraft = true;
         workspace.UndoLayoutEditCommand.Execute(null);
         Assert.Empty(fixture.Layout.Definition!.Components);
+    }
+
+    [Fact]
+    public void RemovalPromptIncludesEveryReferenceRoleAndKeepsCancelAsDefault()
+    {
+        var previousLanguage = OpenVisionLanguageService.CurrentLanguage;
+        try
+        {
+            var name = new string('장', 80);
+            var component = new LayoutComponentDefinition { Id = "referenced", Name = name };
+            var impacts = new[]
+            {
+                new LayoutComponentRemovalImpact("cycle", "Cycle", "move", "Move", component.Id, LayoutComponentRemovalReferenceKind.Target),
+                new LayoutComponentRemovalImpact("cycle", "Cycle", "inspect", "Inspect", component.Id, LayoutComponentRemovalReferenceKind.Workpiece),
+                new LayoutComponentRemovalImpact("cycle", "Cycle", "wait", "Wait", component.Id, LayoutComponentRemovalReferenceKind.ExpectedTarget)
+            };
+            OpenVisionLanguageService.SetLanguage(OpenVisionLanguage.Korean, save: false);
+            var korean = MainMessageDialogHost.CreateLayoutRemovalDialogOptions([component], impacts);
+            Assert.Equal("선택 장치 1개를 삭제할까요?", korean.Title);
+            Assert.Equal(WpfMessageDialogResult.No, korean.DefaultResult);
+            Assert.Contains("시퀀스와 장비 정의의 연결은 자동으로 지워지지 않습니다", korean.Message);
+            Assert.Contains("대상: " + name, korean.Message);
+            Assert.Contains("제품: " + name, korean.Message);
+            Assert.Contains("기대 대상: " + name, korean.Message);
+            Assert.DoesNotContain("부품", korean.Message);
+            Assert.DoesNotContain("작업물", korean.Message);
+            foreach (var impact in impacts) Assert.Contains($"{impact.SequenceName} / {impact.StepName}", korean.Message);
+
+            OpenVisionLanguageService.SetLanguage(OpenVisionLanguage.English, save: false);
+            var english = MainMessageDialogHost.CreateLayoutRemovalDialogOptions([component], impacts);
+            Assert.Equal("Delete 1 selected component?", english.Title);
+            Assert.Contains("Affected sequence connections (3)", english.Message);
+            Assert.Contains("Workpiece: " + name, english.Message);
+            Assert.Equal("Cancel", english.SecondaryButtonText);
+            Assert.Equal(WpfMessageDialogResult.No, english.DefaultResult);
+        }
+        finally { OpenVisionLanguageService.SetLanguage(previousLanguage, save: false); }
     }
 
     [Fact]

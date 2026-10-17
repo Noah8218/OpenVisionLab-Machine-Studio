@@ -9,7 +9,17 @@ using OpenVisionLab.MachineStudio.Model;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
-public sealed record EquipmentUnitSlotItem(string UnitId, string Name, string CapacityText, string InstanceId, string StateText, string ActivityText = "");
+public sealed record EquipmentUnitSlotItem(string UnitId, string Name, string CapacityText, string InstanceId, string StateText, string ActivityText = "")
+{
+    public string InstanceLabel
+    {
+        get
+        {
+            var runOffset = InstanceId.IndexOf("/unit-run", StringComparison.Ordinal);
+            return runOffset >= 0 ? InstanceId[(runOffset + 1)..] : InstanceId;
+        }
+    }
+}
 public sealed record EquipmentUnitActivityItem(string UnitId, string Name, string StateText);
 
 /// <summary>Projects one slot per unit from assigned workpiece snapshots; never owns material or execution state.</summary>
@@ -25,7 +35,8 @@ public sealed class EquipmentMaterialFlowViewModel : ViewModelBase
     public void Update(MachineProjectDocument project, IEnumerable<LayoutItem> items, SimulationSnapshot snapshot)
     {
         var layoutItems = items.ToArray();
-        var units = project.Stations.SelectMany(station => station.Units).ToArray();
+        var units = project.Stations.SelectMany(station => station.Units)
+            .OrderBy(unit => unit.BaseOrigin?.X ?? 0).ThenBy(unit => unit.BaseOrigin?.Y ?? 0).ToArray();
         var partsByUnit = layoutItems.ToLookup(item => item.UnitId, StringComparer.Ordinal);
         var unitActivities = units.Select(unit =>
         {
@@ -33,11 +44,11 @@ public sealed class EquipmentMaterialFlowViewModel : ViewModelBase
             var targets = snapshot.Sequences.Select(sequence => (Sequence: sequence, Step: project.Sequences
                 .FirstOrDefault(definition => definition.Id == (sequence.ActiveSequenceId ?? sequence.SequenceId))?.Steps
                 .FirstOrDefault(step => step.Id == sequence.CurrentStepId)))
-                .Where(entry => entry.Step is not null && parts.Any(part => (!string.IsNullOrWhiteSpace(entry.Step.TargetId) && entry.Step.TargetId is { } target
+                .Where(entry => entry.Step is not null && (entry.Sequence.UnitId == unit.Id || parts.Any(part => (!string.IsNullOrWhiteSpace(entry.Step.TargetId) && entry.Step.TargetId is { } target
                     && (part.Id == target || part.BehaviorBindingId == target))
-                    || (entry.Step.WorkpieceComponentId is { } workpiece && part.Id == workpiece)))
+                    || (entry.Step.WorkpieceComponentId is { } workpiece && part.Id == workpiece))))
                 .Select(entry => Format("Equipment.UnitCurrentTarget", string.IsNullOrWhiteSpace(entry.Step!.Name) ? entry.Step.Id : entry.Step.Name,
-                    OpenVisionLanguageService.T($"Equipment.State.{entry.Sequence.Status}"))).ToArray();
+                    OpenVisionLanguageService.T($"Equipment.State.{entry.Sequence.Status}") + (entry.Sequence.UnitId is null ? "" : $" · {entry.Sequence.CompletedCycles}/{entry.Sequence.RepeatCount}회"))).ToArray();
             var equipment = parts.Where(part => part.Kind is LayoutItemKind.LinearStage or LayoutItemKind.RotaryStage
                     or LayoutItemKind.PneumaticCylinder or LayoutItemKind.Conveyor)
                 .Select(part => EquipmentStatusPresentation.Create(part, snapshot, project))
@@ -59,8 +70,24 @@ public sealed class EquipmentMaterialFlowViewModel : ViewModelBase
         var components = snapshot.LayoutComponents.ToDictionary(component => component.Id, StringComparer.Ordinal);
         var steps = project.Sequences.SelectMany(sequence => sequence.Steps).ToArray();
         var workpieces = layoutItems.Where(item => item.Kind == LayoutItemKind.Workpiece).ToLookup(item => item.UnitId, StringComparer.Ordinal);
-        var slots = units.Where(_ => workpieces.Count > 0).Select(unit =>
+        var slots = units.Where(_ => project.MaterialFlow.Enabled || workpieces.Count > 0).Select(unit =>
         {
+            if (project.MaterialFlow.Enabled)
+            {
+                var slot = snapshot.UnitMaterialSlots.FirstOrDefault(slot => slot.UnitId == unit.Id);
+                string slotState = slot?.State switch
+                {
+                    "Moving" => "이송 중 → " + (units.FirstOrDefault(target => target.Id == slot.DestinationUnitId)?.SlotName ?? slot.DestinationUnitId),
+                    "Reserved" => "작업물 도착 대기",
+                    "Occupied" when slot.Verdict is not null => "최종 " + slot.Verdict,
+                    "Occupied" when slot.RequiredInspectionCount > 0 => $"검사 {slot.InspectionCount}/{slot.RequiredInspectionCount}",
+                    "Occupied" => "작업물 있음",
+                    _ => OpenVisionLanguageService.T("Equipment.SlotEmpty")
+                };
+                return new EquipmentUnitSlotItem(unit.Id, string.IsNullOrWhiteSpace(unit.SlotName) ? unit.Name + " 자리" : unit.SlotName,
+                    OpenVisionLanguageService.T("Equipment.SlotCapacity"), slot?.InstanceId ?? "—", slotState,
+                    unitActivities.First(activity => activity.UnitId == unit.Id).StateText);
+            }
             var positions = workpieces[unit.Id].Select(item => components.GetValueOrDefault(item.Id)).ToArray();
             var occupied = positions.Where(position => position?.IsWorkpiecePresent == true).ToArray();
             var name = Format("Equipment.MaterialSlot", unit.Name);

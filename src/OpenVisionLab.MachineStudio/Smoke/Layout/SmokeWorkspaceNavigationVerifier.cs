@@ -39,8 +39,8 @@ internal static class SmokeWorkspaceNavigationVerifier
         if (string.IsNullOrWhiteSpace(reportPath))
         {
             if (sequenceWorkspace) viewModel.Navigation.SelectedExecutionTabIndex = 1;
-            if (testWorkspace) viewModel.Navigation.SelectedExecutionTabIndex = 2;
-            if (integrationWorkspace) viewModel.Navigation.SelectedInspectionTabIndex = 1;
+            if (testWorkspace) viewModel.Navigation.OpenTestScenarioCommand.Execute(null);
+            if (target == 2 && !integrationWorkspace) viewModel.Navigation.OpenRecipeConnectionsCommand.Execute(null);
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             var sceneDocument = SmokeVisualTreeQuery.FindVisualDescendant<SceneDocumentView>(window);
             var inspection = SmokeVisualTreeQuery.FindVisualDescendant<MmiOperatorLayoutView>(window);
@@ -49,16 +49,16 @@ internal static class SmokeWorkspaceNavigationVerifier
                 && SmokeVisualTreeQuery.FindVisualDescendant<ScrollViewer>(sceneDocument,
                     view => view.Name == "LargeOverviewScrollViewer")?.IsVisible == true;
             var sequenceVisible = sceneDocument?.SequenceWorkspaceTab.IsSelected == true;
-            var testsVisible = sceneDocument?.TestScenarioWorkspaceTab.IsSelected == true;
+            var testsVisible = window.TestScenarioOverlay.IsVisible && viewModel.Navigation.IsTestScenarioOpen;
             var connectionsVisible = SmokeVisualTreeQuery.FindVisualDescendant<RecipeConnectionWorkbenchView>(window)?.IsVisible == true;
             if (sceneDocument is null
                 || sceneVisible != (target == 0 && !viewModel.Layout.IsLargeOverview
-                    || target == 1 && !sequenceWorkspace && !testWorkspace)
+                    || target == 1 && !sequenceWorkspace)
                 || overviewVisible != (target == 0 && viewModel.Layout.IsLargeOverview)
                 || sequenceVisible != sequenceWorkspace
                 || testsVisible != testWorkspace
                 || connectionsVisible != (target == 2 && !integrationWorkspace)
-                || (inspection?.IsVisible ?? false) != integrationWorkspace
+                || (inspection?.IsVisible ?? false) != (target == 2 && integrationWorkspace)
                 || sceneDocument.ResultsWorkspacePanel.IsVisible != (target == 3))
             {
                 throw new InvalidOperationException("R19 workspace content did not match the selected route.");
@@ -67,7 +67,7 @@ internal static class SmokeWorkspaceNavigationVerifier
                 .Any(text => text.IsVisible && System.Text.RegularExpressions.Regex.IsMatch(
                     text.Text, @"\bMMI\b(?![-\\/])", System.Text.RegularExpressions.RegexOptions.IgnoreCase)))
                 throw new InvalidOperationException("A retired product label is still visible.");
-            if (target == 1 && viewModel.Navigation.SelectedExecutionTabIndex == 0)
+            if (target == 1 && !testWorkspace && viewModel.Navigation.SelectedExecutionTabIndex == 0)
             {
                 var selector = SmokeVisualTreeQuery.FindVisualDescendant<ComboBox>(sceneDocument,
                     control => control.Name == "SimulationUnitSelector");
@@ -197,12 +197,11 @@ internal static class SmokeWorkspaceNavigationVerifier
                     "Equipment and simulation did not retain the shared scene route.");
                 Require(document.SequenceWorkspaceTab.IsSelected == (index == 1 && simulationTab == 1),
                     "Sequence editor tab selection disagrees.");
-                Require(document.TestScenarioWorkspaceTab.IsSelected == (index == 1 && simulationTab == 2),
-                    "Simulation test tab selection disagrees.");
+                Require(!viewModel.Navigation.IsTestScenarioOpen, "Workspace navigation opened the test scenario overlay.");
                 var inspection = SmokeVisualTreeQuery.FindVisualDescendant<MmiOperatorLayoutView>(document);
-                var connectionWorkbench = SmokeVisualTreeQuery.FindVisualDescendant<RecipeConnectionWorkbenchView>(document);
-                Require((inspection?.IsVisible ?? false) == (index == 2 && viewModel.Navigation.SelectedInspectionTabIndex == 1)
-                    && (connectionWorkbench?.IsVisible ?? false) == (index == 2 && viewModel.Navigation.SelectedInspectionTabIndex == 0),
+                var connectionWorkbench = window.RecipeConnectionsOverlay;
+                Require((inspection?.IsVisible ?? false) == (index == 2)
+                    && !connectionWorkbench.IsVisible,
                     "Inspection settings and status routes disagree.");
                 if (index == 1 && simulationTab == 0)
                 {
@@ -291,15 +290,14 @@ internal static class SmokeWorkspaceNavigationVerifier
                 "Space-key workspace selection failed.");
             capture.Capture(window, Path.Combine(directory, "workspace-keyboard.png"));
             passed.Add("VM-to-control binding, Right-arrow focus and Space selection");
-            viewModel.Navigation.SelectedInspectionTabIndex = 1;
             viewModel.Navigation.IsResultsWorkspace = true;
             viewModel.Navigation.IsInspectionWorkspace = true;
-            Require(viewModel.SelectedDocumentTabIndex == 1 && viewModel.Navigation.SelectedInspectionTabIndex == 1,
-                "Inspection subtab was not retained.");
+            Require(viewModel.SelectedDocumentTabIndex == 1 && document.InspectionWorkspaceView.IsVisible,
+                "Inspection image workspace was not retained.");
             viewModel.SelectedDocumentTabIndex = 2;
             Require(viewModel.Navigation.IsSimulationWorkspace && viewModel.Navigation.SelectedExecutionTabIndex == 1,
                 "Sequence entry did not route through the simulation workspace.");
-            passed.Add("Sequence and inspection routes retain their selected subtabs");
+            passed.Add("Sequence and direct inspection routes retain their selected workspaces");
             if (sequenceWorkspace)
             {
                 viewModel.Navigation.IsSimulationWorkspace = true;
@@ -327,25 +325,22 @@ internal static class SmokeWorkspaceNavigationVerifier
             }
             if (testWorkspace)
             {
-                viewModel.Navigation.IsSimulationWorkspace = true;
-                viewModel.Navigation.SelectedExecutionTabIndex = 0;
-                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                var tab = document.TestScenarioWorkspaceTab;
+                var menu = SmokeVisualTreeQuery.FindVisualDescendant<MainMenuView>(window)
+                    ?? throw new InvalidOperationException("Main menu was unavailable.");
+                var item = (MenuItem)menu.FindName("TestScenarioMenuItem");
+                var owner = (MenuItem)ItemsControl.ItemsControlFromItemContainer(item);
                 input.ActivateWindow(window);
-                input.MovePointerToCenter(tab);
-                await Task.Delay(100);
-                Require(input.CheckPointerOwnership(window).IsOwned && tab.IsMouseOver, "Test tab hover missing.");
-                capture.Capture(window, Path.Combine(directory, "tests-hover.png"));
+                input.MovePointerToCenter(owner);
                 input.PressLeftButton();
-                input.MarkPointerHeld();
-                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                capture.Capture(window, Path.Combine(directory, "tests-pointer-down.png"));
                 input.SendMouseEvent(0x0004, 0, 0, 0, UIntPtr.Zero);
-                await Task.Delay(100);
-                input.ReleasePointer();
-                Require(tab.IsSelected && viewModel.Navigation.SelectedExecutionTabIndex == 2, "Test tab click failed.");
-                var tests = SmokeVisualTreeQuery.FindVisualDescendant<SimulationTestWorkspaceView>(document)
-                    ?? throw new InvalidOperationException("Test workspace was not rendered.");
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Require(owner.IsSubmenuOpen && item.IsEnabled, "View menu did not expose the test scenario command.");
+                input.MovePointerToCenter(item);
+                input.PressLeftButton();
+                input.SendMouseEvent(0x0004, 0, 0, 0, UIntPtr.Zero);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var tests = window.TestScenarioOverlay;
+                Require(viewModel.Navigation.IsTestScenarioOpen && tests.IsVisible, "View menu did not open the scenario overlay.");
                 Require(viewModel.IsRunning == running && viewModel.TickStatusText == stoppedTick
                     && viewModel.HasUnsavedChanges == dirty, "Opening tests mutated runtime or project.");
                 var originalSeed = viewModel.SimulationWorkspace.ScenarioSeed;
@@ -354,43 +349,31 @@ internal static class SmokeWorkspaceNavigationVerifier
                 Require(tests.ScenarioSeedTextBox.IsKeyboardFocused, "Seed input focus missing.");
                 Require(input.CheckPointerOwnership(window).IsOwned, "Seed input lost window ownership.");
                 input.SendKey(0x39);
-                await Task.Delay(100);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 Require(tests.ScenarioSeedTextBox.Text == "9" && viewModel.SimulationWorkspace.ScenarioSeed == 9,
                     "Keyboard seed edit did not reach the settings owner.");
                 capture.Capture(window, Path.Combine(directory, "tests-input-focused.png"));
-                viewModel.Navigation.IsEquipmentWorkspace = true;
+                input.SendKey(0x1B);
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                Require(document.ExecutionWorkspaceTabs.SelectedIndex == 0, "Equipment workspace retained tests.");
-                viewModel.Navigation.IsResultsWorkspace = true;
-                viewModel.Navigation.IsSimulationWorkspace = true;
+                Require(!viewModel.Navigation.IsTestScenarioOpen && !tests.IsVisible, "Escape did not close the test scenario overlay.");
+                viewModel.Navigation.OpenTestScenarioCommand.Execute(null);
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                Require(document.ExecutionWorkspaceTabs.SelectedIndex == 2 && tests.ScenarioSeedTextBox.Text == "9",
-                    "Workspace round trip lost the test tab or draft.");
+                Require(ReferenceEquals(tests, window.TestScenarioOverlay) && tests.ScenarioSeedTextBox.Text == "9",
+                    "Close/reopen lost the scenario view or draft.");
                 viewModel.SimulationWorkspace.ScenarioSeed = originalSeed;
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 Require(tests.ScenarioSeedTextBox.Text == originalSeed.ToString(), "VM-to-control seed binding failed.");
-                tab.Focus();
-                Require(input.CheckPointerOwnership(window).IsOwned, "Scenario keyboard input lost window ownership.");
-                input.SendKey(0x25);
-                await Task.Delay(100);
-                Require(document.ExecutionWorkspaceTabs.SelectedIndex == 1, "Left arrow did not select sequence editing.");
-                Require(input.CheckPointerOwnership(window).IsOwned, "Scenario keyboard input lost window ownership.");
-                input.SendKey(0x27);
-                await Task.Delay(100);
-                Require(document.ExecutionWorkspaceTabs.SelectedIndex == 2, "Right arrow did not restore tests.");
-                input.MovePointerToCenter(window.SimulationWorkspaceButton);
-                await Task.Delay(100);
-                Require(!tab.IsMouseOver && viewModel.IsRunning == running && viewModel.TickStatusText == stoppedTick,
-                    "Test navigation did not recover pointer state or changed runtime.");
-                capture.Capture(window, Path.Combine(directory, "tests-selected.png"));
-                passed.Add("Test tab pointer/keyboard selection, seed binding both directions, draft retention, no implicit run");
+                capture.Capture(window, Path.Combine(directory, "tests-reopened.png"));
+                viewModel.Navigation.CloseTestScenarioCommand.Execute(null);
+                Require(viewModel.IsRunning == running && viewModel.TickStatusText == stoppedTick,
+                    "Scenario navigation changed runtime.");
+                passed.Add("View menu scenario overlay, Escape, seed binding both directions, same-view draft retention, no implicit run");
             }
             if (integrationWorkspace)
             {
                 viewModel.Navigation.IsInspectionWorkspace = true;
-                viewModel.Navigation.SelectedInspectionTabIndex = 0;
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                var tab = document.IntegrationWorkspaceTab;
+                var tab = window.InspectionWorkspaceButton;
                 var integration = SmokeVisualTreeQuery.FindVisualDescendant<SimulationIntegrationWorkspaceView>(document)
                     ?? throw new InvalidOperationException("Integration workspace was not rendered.");
                 input.ActivateWindow(window);
@@ -407,13 +390,12 @@ internal static class SmokeWorkspaceNavigationVerifier
                 await Task.Delay(100);
                 input.ReleasePointer();
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                Require(tab.IsSelected && integration.IsVisible
-                    && viewModel.Navigation.SelectedInspectionTabIndex == 1,
+                Require(tab.IsChecked == true && integration.IsVisible,
                     "Integration tab click or content visibility failed.");
                 Require(viewModel.IsRunning == running && viewModel.TickStatusText == stoppedTick
                     && viewModel.HasUnsavedChanges == dirty,
                     "Opening integration workspace mutated runtime or project.");
-                input.MovePointerToCenter(window.InspectionWorkspaceButton);
+                input.MovePointerToCenter(window.ResultsWorkspaceButton);
                 await Task.Delay(100);
                 Require(!tab.IsMouseOver && !integration.IsMouseOver,
                     "Integration tab pointer leave did not recover.");

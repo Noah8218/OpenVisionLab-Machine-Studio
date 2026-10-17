@@ -29,9 +29,26 @@ public sealed class TriggerVirtualCameraCommand : SimulationCommand
         WaitForExternalResult = waitForExternalResult;
     }
 
+    private TriggerVirtualCameraCommand(string cameraId, string recipeId, string projectId, long runtimeGeneration, bool waitForExternalResult)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(recipeId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectId);
+        CameraId = cameraId;
+        RecipeId = recipeId;
+        ProjectId = projectId;
+        RuntimeGeneration = runtimeGeneration;
+        WaitForExternalResult = waitForExternalResult;
+        GeneratesNumericalInput = true;
+    }
+
+    public static TriggerVirtualCameraCommand CreateNumerical(string cameraId, string recipeId, string projectId, long runtimeGeneration, bool waitForExternalResult = false) =>
+        new(cameraId, recipeId, projectId, runtimeGeneration, waitForExternalResult);
+
+    public bool GeneratesNumericalInput { get; }
     public string CameraId { get; }
     public string RecipeId { get; }
-    public VirtualCameraFrameEvidence FrameEvidence { get; }
+    public VirtualCameraFrameEvidence? FrameEvidence { get; }
     public VirtualCameraInspectionEvidence? InspectionEvidence { get; }
     public string? ProjectId { get; }
     public long? RuntimeGeneration { get; }

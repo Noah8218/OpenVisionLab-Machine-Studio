@@ -369,4 +369,33 @@ public sealed class DeterministicMachineLayoutTests
 
     private static AxisSnapshot Axis(string id, double position) =>
         new(id, id, AxisState.Idle, position, 0);
+    [Fact]
+    public void InspectorAllProductsSensorIgnoresAbsentProductsAndManualSamplesAreRuntimeOnly()
+    {
+        var hub = DeterministicSignalHub.Create(new[] { Channel("run", ChannelKind.DigitalOutput), Channel("reverse", ChannelKind.DigitalOutput), Channel("det", ChannelKind.DigitalInput) }).Hub!;
+        var belt = new ConveyorRuntimeConfiguration("belt", "Belt", "run", "reverse", 100, .005, Transform(100, 0), Size(400, 80));
+        var first = new WorkpieceRuntimeConfiguration("a", "A", "sample", belt.Id, OpenVisionLab.Machine.Core.Devices.WorkpieceInspectionState.Pending, Transform(0, 0), Size(10, 10), initiallyPresent: false);
+        var second = new WorkpieceRuntimeConfiguration("b", "B", "sample", belt.Id, OpenVisionLab.Machine.Core.Devices.WorkpieceInspectionState.Pending, Transform(200, 0), Size(10, 10));
+        var sensor = new DigitalSensorRuntimeConfiguration("sensor", "Sensor", "det", "", 0, 0, Transform(200, 0), Size(12, 12), detectAllProducts: true);
+        var runtime = new DeterministicMachineLayout(CreateLayout(belt, first, second, sensor), hub);
+        Assert.True(SensorSnapshot(runtime.Tick(Axes())).IsDetected);
+        Assert.True(runtime.TrySetManualSample(0, 0, true, "manual"));
+        Assert.False(SensorSnapshot(runtime.Tick(Axes())).IsDetected);
+        Assert.False(runtime.TrySetManualSample(double.NaN, 0, false, "invalid"));
+        Assert.True(runtime.TrySetManualSample(200, 0, false, "manual"));
+        Assert.True(SensorSnapshot(runtime.Tick(Axes())).IsDetected);
+        Assert.True(runtime.TrySetManualSample(20, 0, false, "manual-2"));
+        Assert.False(runtime.TrySetManualSample(30, 0, false, "manual-2"));
+        Assert.Equal(2, runtime.CaptureSnapshots().Count(component => component.Id.StartsWith("__manual-sample-", StringComparison.Ordinal)));
+        Assert.True(hub.SetDigitalOutput("run", true, SignalWriteOwner.Manual).IsAccepted);
+        var moved = runtime.Tick(Axes()).Components.Single(component => component.WorkpieceInstanceId == "manual-2");
+        Assert.True(moved.X > 20);
+        runtime.Reset();
+        Assert.DoesNotContain(runtime.CaptureSnapshots(), component => component.Id.StartsWith("__manual-sample-", StringComparison.Ordinal));
+        Assert.False(runtime.CaptureSnapshots().Single(component => component.Id == "a").IsWorkpiecePresent);
+        Assert.True(runtime.CaptureSnapshots().Single(component => component.Id == "b").IsWorkpiecePresent);
+        Assert.Equal(0, first.BaseTransform.X);
+        Assert.Equal(200, second.BaseTransform.X);
+    }
+
 }

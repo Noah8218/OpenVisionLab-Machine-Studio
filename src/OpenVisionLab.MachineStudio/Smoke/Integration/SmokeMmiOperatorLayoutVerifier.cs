@@ -85,8 +85,7 @@ internal static class SmokeMmiOperatorLayoutVerifier
 
         viewModel.Navigation.IsInspectionSettingsExpanded = false;
         viewModel.Navigation.IsInspectionWorkspace = true;
-        viewModel.Navigation.SelectedInspectionTabIndex = 1;
-        viewModel.Navigation.SelectedInspectionSettingsTabIndex = 1;
+        viewModel.Navigation.SelectedInspectionSettingsTabIndex = 3;
         await IdleAsync(window);
         var mmi = SmokeVisualTreeQuery.FindVisualDescendant<MmiOperatorLayoutView>(window);
         Check("run-mode", viewModel.IsRunMode);
@@ -113,32 +112,37 @@ internal static class SmokeMmiOperatorLayoutVerifier
             "mmi-preview-scroll-container",
             mmiScroll is { IsVisible: true, ActualWidth: > 0, ActualHeight: > 0 }
             && mmiScroll.VerticalScrollBarVisibility == ScrollBarVisibility.Auto);
-        if (mmiScroll is not null)
+        var externalScroll = Find<ScrollViewer>(mmi, "MmiExternalImagesScrollViewer");
+        if (externalScroll is not null)
         {
-            mmiScroll.ScrollToBottom();
+            externalScroll.ScrollToBottom();
             await IdleAsync(window);
             var resultText = Find<TextBlock>(mmi, "MmiThreeDResultStatusTextBlock");
-            var resultBounds = resultText?.TransformToAncestor(mmiScroll).TransformBounds(new Rect(resultText.RenderSize));
-            Check("mmi-preview-scroll-reaches-result", resultText is { IsVisible: true }
-                && resultBounds is { } bounds && bounds.Top >= 0 && bounds.Bottom <= mmiScroll.ViewportHeight + 1);
-            mmiScroll.ScrollToTop();
+            var resultBounds = resultText?.TransformToAncestor(externalScroll).TransformBounds(new Rect(resultText.RenderSize));
+            Check("mmi-external-scroll-reaches-result", resultText is { IsVisible: true }
+                && resultBounds is { } bounds && bounds.Top >= 0 && bounds.Bottom <= externalScroll.ViewportHeight + 1);
+            externalScroll.ScrollToTop();
             await IdleAsync(window);
         }
-        else Check("mmi-preview-scroll-reaches-result", false);
+        else Check("mmi-external-scroll-reaches-result", false);
         foreach (var actionName in new[] { "MmiPublishButton", "MmiRefreshButton", "MmiApplyResultButton" })
         {
             var action = Find<Button>(mmi, actionName);
+            if (actionName != "MmiPublishButton") mmi.IntegrationExchangeDetailsExpanderControl.IsExpanded = true;
+            action?.BringIntoView();
+            await IdleAsync(window);
             var actionBounds = action?.TransformToAncestor(mmi).TransformBounds(new Rect(action.RenderSize));
-            Check($"{actionName}-anchored-in-visible-workspace", action is { IsVisible: true }
+            Check($"{actionName}-reachable-in-visible-workspace", action is { IsVisible: true }
                 && actionBounds is { } bounds && new Rect(mmi.RenderSize).Contains(bounds));
         }
+        mmi.IntegrationExchangeDetailsExpanderControl.IsExpanded = false;
+        externalScroll?.ScrollToTop();
+        await IdleAsync(window);
         var cameraImageFrame = Find<Border>(mmi, "MmiVirtualCameraImageFrame");
-        var expectedCameraImageFrameMaximumHeight = viewModel.Navigation.IsNarrowLayout || viewModel.Navigation.IsCompactLayout ? 180 : 260;
         Check(
-            "camera-input-preview-matches-r19-density",
+            "camera-input-preview-uses-available-height",
             cameraImageFrame is { IsVisible: true, ActualWidth: > 0, ActualHeight: > 0 }
-            && Math.Abs(cameraImageFrame.MaxHeight - expectedCameraImageFrameMaximumHeight) <= 1.0
-            && cameraImageFrame.ActualHeight <= expectedCameraImageFrameMaximumHeight + 1.0
+            && double.IsPositiveInfinity(cameraImageFrame.MaxHeight)
             && mmiScroll is not null
             && new Rect(0, 0, mmiScroll.ViewportWidth, mmiScroll.ViewportHeight).Contains(
                 cameraImageFrame.TransformToAncestor(mmiScroll).TransformBounds(new Rect(cameraImageFrame.RenderSize))));
@@ -146,41 +150,35 @@ internal static class SmokeMmiOperatorLayoutVerifier
         var previewPanel = Find<Border>(mmi, "MmiInspectionPreviewPanel");
         var setupPanel = Find<Grid>(mmi, "MmiInspectionSetupPanel");
         var externalSettingsGrid = Find<Grid>(mmi, "MmiExternalInspectionSettingsGrid");
-        var headerActions = Find<StackPanel>(mmi, "MmiInspectionHeaderActions");
+        var headerActions = Find<WrapPanel>(mmi, "MmiInspectionHeaderActions");
         var statusPill = Find<Border>(mmi, "MmiInspectionStatusPill");
         var settingsToggle = Find<ToggleButton>(mmi, "MmiInspectionSettingsToggle");
         var isNarrowLayout = viewModel.Navigation.IsNarrowLayout;
-        var expectedInspectionGap = isNarrowLayout
-            ? 0.0
-            : viewModel.Navigation.IsCompactLayout
-                ? 12.0
-                : 18.0;
-        var expectedSetupColumnWidth = inspectionLayout is null || isNarrowLayout
-            ? 0
-            : viewModel.Navigation.IsCompactLayout
-                ? 330.0
-                : Math.Max(310.0, (inspectionLayout.ActualWidth - expectedInspectionGap) * 0.375);
+        var expectedInspectionGap = isNarrowLayout ? 0.0 : 5.0;
+        var expectedSetupColumnWidth = isNarrowLayout ? 0.0 : 360.0;
         var expectedSetupPanelWidth = isNarrowLayout && inspectionLayout is not null
             ? inspectionLayout.ColumnDefinitions[0].ActualWidth
             : expectedSetupColumnWidth;
         Check(
-            "inspection-responsive-layout-matches-r19-breakpoints",
+            "inspection-responsive-layout-matches-r24-composition",
             inspectionLayout is { IsVisible: true, ColumnDefinitions.Count: 3, RowDefinitions.Count: 5 }
             && previewPanel is { IsVisible: true, ActualWidth: >= 300 }
-            && setupPanel is { IsVisible: true, ActualWidth: > 0 }
+            && (isNarrowLayout ? setupPanel is { Visibility: Visibility.Collapsed } : setupPanel is { IsVisible: true, ActualWidth: > 0 })
             && headerActions is { IsVisible: true }
             && statusPill is { IsVisible: true }
             && settingsToggle is { IsVisible: true, IsChecked: false }
             && Grid.GetColumn(previewPanel) == 0
-            && Grid.GetRow(previewPanel) == 2
+            && Grid.GetRow(previewPanel) == 0
+            && Grid.GetRowSpan(previewPanel) == 4
             && Grid.GetColumn(setupPanel) == (isNarrowLayout ? 0 : 2)
-            && Grid.GetRow(setupPanel) == (isNarrowLayout ? 3 : 2)
-            && Grid.GetColumn(headerActions) == (isNarrowLayout ? 0 : 2)
-            && Grid.GetRow(headerActions) == (isNarrowLayout ? 1 : 0)
+            && Grid.GetRow(setupPanel) == 0
+                    && Grid.GetRowSpan(setupPanel) == 5
+            && Grid.GetColumn(headerActions) == 0
+            && Grid.GetRow(headerActions) == 0
             && Math.Abs(previewPanel.ActualWidth - inspectionLayout.ColumnDefinitions[0].ActualWidth) <= 1.0
             && Math.Abs(inspectionLayout.ColumnDefinitions[1].ActualWidth - expectedInspectionGap) <= 1.0
             && Math.Abs(inspectionLayout.ColumnDefinitions[2].ActualWidth - expectedSetupColumnWidth) <= 1.0
-            && Math.Abs(setupPanel.ActualWidth - expectedSetupPanelWidth) <= 1.0);
+            && (isNarrowLayout || Math.Abs(setupPanel.ActualWidth - expectedSetupPanelWidth) <= 1.0));
 
         var settingsToggleInitialText = settingsToggle?.Content?.ToString();
         var recipeBeforeToggle = viewModel.Integration.Setup.SelectedRecipe;
@@ -201,36 +199,36 @@ internal static class SmokeMmiOperatorLayoutVerifier
                     viewModel.Navigation.IsInspectionSettingsExpanded);
                 Check("inspection-wide-mode-toggle-checked", settingsToggle.IsChecked == true);
                 Check(
-                    "inspection-wide-mode-hides-input",
-                    previewPanel?.Visibility == Visibility.Collapsed);
+                    "inspection-wide-mode-preserves-input",
+                    previewPanel is { Visibility: Visibility.Visible, IsVisible: true });
                 Check(
                     "inspection-wide-mode-expands-setup",
                     setupPanel is { IsVisible: true } && externalSettingsGrid is { ColumnDefinitions.Count: 2 }
                     && inspectionLayout is not null
-                    && Math.Abs(setupPanel.ActualWidth - inspectionLayout.ActualWidth) <= 1.0
-                    && Grid.GetColumn(setupPanel) == 0
-                    && Grid.GetColumnSpan(setupPanel) == 3);
+                    && Math.Abs(setupPanel.ActualWidth - inspectionLayout.ColumnDefinitions[2].ActualWidth) <= 1.0
+                    && Grid.GetColumn(setupPanel) == 2
+                    && Grid.GetColumnSpan(setupPanel) == 1);
                 Check(
-                    "inspection-wide-mode-two-column-settings",
+                    "inspection-wide-mode-one-column-settings",
                     settingsColumns is { Count: 2 }
-                    && settingsColumns[1].ActualWidth >= 220
-                    && settingsColumns[0].ActualWidth > settingsColumns[1].ActualWidth);
+                    && settingsColumns[1].ActualWidth == 0
+                    && settingsColumns[0].ActualWidth > 0);
                 Check(
                     "inspection-wide-mode-machine-state-card-position",
                     machineStateCard is { IsVisible: true }
                     && Grid.GetRow(machineStateCard) == 0
-                    && Grid.GetColumn(machineStateCard) == 1);
+                    && Grid.GetColumn(machineStateCard) == 0);
                 Check(
                     "inspection-wide-mode-recipe-card-position",
                     recipeCard is { IsVisible: true }
-                    && Grid.GetRow(recipeCard) == 0
+                    && Grid.GetRow(recipeCard) == 1
                     && Grid.GetColumn(recipeCard) == 0
-                    && Grid.GetRowSpan(recipeCard) == 2);
+                    && Grid.GetRowSpan(recipeCard) == 1);
                 Check(
                     "inspection-wide-mode-result-card-position",
                     resultCard is { IsVisible: true }
-                    && Grid.GetRow(resultCard) == 1
-                    && Grid.GetColumn(resultCard) == 1);
+                    && Grid.GetRow(resultCard) == 2
+                    && Grid.GetColumn(resultCard) == 0);
                 Check(
                     "inspection-wide-toggle-label-updates",
                     !string.Equals(settingsToggleInitialText, settingsToggle.Content?.ToString(), StringComparison.Ordinal));
@@ -247,10 +245,11 @@ internal static class SmokeMmiOperatorLayoutVerifier
                     !viewModel.Navigation.IsInspectionSettingsExpanded
                     && settingsToggle.IsChecked == false
                     && previewPanel is { Visibility: Visibility.Visible, IsVisible: true }
-                    && setupPanel is { IsVisible: true }
+                    && (isNarrowLayout ? setupPanel is { Visibility: Visibility.Collapsed } : setupPanel is { IsVisible: true })
                     && Grid.GetColumn(setupPanel) == (isNarrowLayout ? 0 : 2)
-                    && Grid.GetRow(setupPanel) == (isNarrowLayout ? 3 : 2)
-                    && externalSettingsGrid?.ColumnDefinitions[1].ActualWidth == 0
+                    && Grid.GetRow(setupPanel) == 0
+                    && Grid.GetRowSpan(setupPanel) == 5
+                    && (isNarrowLayout ? externalSettingsGrid?.ColumnDefinitions[1].Width.Value == 0 : externalSettingsGrid?.ColumnDefinitions[1].ActualWidth == 0)
                     && settingsToggle.Content?.ToString() == settingsToggleInitialText
                     && viewModel.Integration.Setup.SelectedRecipe == recipeBeforeToggle
                     && viewModel.Integration.Setup.InspectionRecipePath == setupPathBeforeToggle
@@ -268,9 +267,9 @@ internal static class SmokeMmiOperatorLayoutVerifier
         {
             Check("inspection-wide-mode-state-bound", false);
             Check("inspection-wide-mode-toggle-checked", false);
-            Check("inspection-wide-mode-hides-input", false);
+            Check("inspection-wide-mode-preserves-input", false);
             Check("inspection-wide-mode-expands-setup", false);
-            Check("inspection-wide-mode-two-column-settings", false);
+            Check("inspection-wide-mode-one-column-settings", false);
             Check("inspection-wide-mode-machine-state-card-position", false);
             Check("inspection-wide-mode-recipe-card-position", false);
             Check("inspection-wide-mode-result-card-position", false);

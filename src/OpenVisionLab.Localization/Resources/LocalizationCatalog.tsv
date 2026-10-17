@@ -1,15 +1,27 @@
 Key	Korean	English
+Equipment.LibraryTargetUnit	놓을 유닛	Target unit
+Equipment.LibraryTypeSearch	종류 검색	Search types
+Equipment.LibrarySearchPlaceholder	예: 센서, 카메라, 배출	e.g. sensor, camera, exit
+Equipment.LibraryCamera2DHint	촬영 스텝에서 2D 이미지(Mono8)를 만듭니다.	Acquisition steps produce a 2D image (Mono8).
+Equipment.LibraryCamera3DHint	촬영 스텝에서 높이맵(Float32, mm)을 만듭니다.	Acquisition steps produce a height map (Float32, mm).
+Equipment.LibraryTargetRequired	놓을 유닛을 다시 선택하세요.	Select a target unit again.
+Equipment.LibraryAddHint	장치 종류를 누르면 선택한 유닛에 바로 추가됩니다.	Choose a device type to add it to the selected unit.
+Equipment.LibraryReadOnlyHint	현재 장비 구성은 읽기 전용입니다. 편집 상태로 돌아온 뒤 추가하세요.	Device additions are unavailable. Return to edit mode to add a device.
+Equipment.LibraryCamera2D	2D 카메라	2D camera
+Equipment.LibraryCamera3D	3D 센서(높이 측정)	3D height sensor
+Equipment.LibraryCamera2DDescription	촬영 스텝에서 기존 합성 이미지 소스로 2D 이미지(Mono8)를 만듭니다.	Acquisition steps produce a Mono8 image using the numerical image source.
+Equipment.LibraryCamera3DDescription	촬영 스텝에서 기존 합성 이미지 소스로 높이맵(Float32, mm)을 만듭니다.	Acquisition steps produce a Float32 height map in mm using the numerical image source.
 Camera.CaptureSetup	촬영 구성	Capture setup
-Simulation.ScheduledFaultRecovery	예약 장애 및 복구	Scheduled fault and recovery
+Simulation.ScheduledFaultRecovery	예약 고장 및 복구	Scheduled fault and recovery
 Simulation.ScheduledFaultRecoveryHint	선언한 Tick에 선택한 장애를 주입하고 해제한 뒤 같은 엔진에서 복구합니다.	Inject the selected fault at the authored tick, clear it, and recover in the same engine.
-Simulation.EnableScheduledFault	예약 장애 사용	Enable scheduled fault
-Simulation.FaultKind	장애 종류	Fault type
-Simulation.FaultTarget	장애 대상	Fault target
+Simulation.EnableScheduledFault	예약 고장 사용	Enable scheduled fault
+Simulation.FaultKind	고장 종류	Fault type
+Simulation.FaultTarget	고장 대상	Fault target
 Simulation.StuckInputForceOn	입력을 ON으로 고정	Force stuck input ON
 Simulation.ScheduledFaultScheduleSummary	{0} · {1} · Tick {2} 주입 · {3} Tick 유지 · {4}	{0} · {1} · inject at tick {2} · hold {3} ticks · {4}
 Simulation.FaultInjectTick	주입 Tick	Inject tick
 Simulation.FaultHoldTicks	유지 Tick	Hold ticks
-Simulation.RestartSequence	장애 해제 후 시퀀스 재시작	Restart sequence after clear
+Simulation.RestartSequence	고장 해제 후 시퀀스 재시작	Restart sequence after clear
 Simulation.RecoverySequence	복구 시퀀스	Recovery sequence
 Simulation.FaultScheduleDisabled	예약 장애 사용 안 함	Scheduled fault disabled
 Simulation.FaultScheduleInvalid	장애 주입 및 해제 Tick은 시나리오 기간 내에 있어야 하며 복구 대상을 선택해야 합니다.	Injection and clear ticks must fit within the scenario, and a recovery target must be selected.
@@ -21,33 +33,34 @@ Shell.Redo	다시 실행	Redo
 Shell.Copy	복사	Copy
 Shell.Duplicate	복제	Duplicate
 Shell.Delete	삭제	Delete
-Gallery.Open	반도체 레시피 갤러리...	Semiconductor recipe gallery...
+Gallery.Open	예제 레시피…	Example recipes…
 Gallery.OpenTooltip	10개 반도체 장비 레시피에서 시작합니다.	Start from 10 semiconductor equipment recipes.
 Gallery.CommandLabel	레시피	Recipes
-Gallery.Title	반도체 레시피 갤러리	Semiconductor recipe gallery
-Gallery.Subtitle	장비 구성을 한눈에 비교하고 복사본을 만들어 편집하십시오.	Compare equipment configurations at a glance, then create an editable copy.
+Gallery.Title	예제 레시피	Example recipes
+Gallery.Subtitle	예제를 선택하고 복사본을 만들어 편집하세요.	Select an example and create a copy to edit.
+Gallery.Empty	사용할 수 있는 예제가 없습니다.	No examples are available.
 Gallery.Close	닫기	Close
 Gallery.CreateCopy	복사본 만들기	Create a copy
-Gallery.CopyHint	원본 템플릿은 변경되지 않습니다.	The original template remains unchanged.
-Gallery.SafePreview	레시피를 선택해도 시뮬레이션은 시작되지 않습니다. 복사본은 설계 모드로 열립니다.	Selecting a recipe does not start simulation. The copy opens in Design mode.
-Gallery.ValidateAll	10개 모두 검증	Validate all 10
-Gallery.ValidateAllTooltip	내장 레시피 10개를 순서대로 컴파일하고 격리 드라이런합니다.	Compile and isolated-dry-run all 10 bundled recipes in order.
-Gallery.ValidationPending	대기	Pending
+Gallery.CopyHint	원본 예제는 변경되지 않습니다.	The original example remains unchanged.
+Gallery.SafePreview	선택만으로 운전이 시작되지 않습니다. 복사본을 만들어 편집하세요.	Selection does not start a run. Create a copy to edit.
+Gallery.ValidateAll	전체 검증	Validate all
+Gallery.ValidateAllTooltip	예제의 구성과 운전 순서를 점검합니다.	Check the examples’ configuration and run sequence.
+Gallery.ValidationPending	검증 전	Not validated
 Gallery.ValidationRunning	검증 중	Validating
 Gallery.ValidationPassed	통과	Passed
 Gallery.ValidationFailed	실패	Failed
 Gallery.ValidationProgressFormat	레시피 검증 {0}/{1}	Recipe validation {0}/{1}
 Gallery.ValidationPassedSummaryFormat	{0}/{1}개 레시피가 컴파일과 격리 드라이런을 모두 통과했습니다.	{0}/{1} recipes passed compilation and isolated dry run.
-Gallery.ValidationFailedSummaryFormat	{0}개 실패 · 첫 실패: {1} · 단계 {2} · {3}	{0} failed · First failure: {1} · Step {2} · {3}
+Gallery.ValidationFailedSummaryFormat	{0}개 실패 · 첫 실패: {1} · 스텝 {2} · {3}	{0} failed · First failure: {1} · Step {2} · {3}
 Gallery.ValidationCompileStage	컴파일	Compile
 Gallery.ValidationLoadStage	불러오기	Load
-Gallery.ValidationSequenceMissing	자동 실행 시퀀스가 구성되지 않았습니다.	No automatic-run sequence is configured.
-Gallery.ProjectSchema	프로젝트 스키마	Project schema
+Gallery.ValidationSequenceMissing	자동 운전 시퀀스가 구성되지 않았습니다.	No automatic-run sequence is configured.
+Gallery.ProjectSchema	레시피 형식	Recipe format
 Gallery.ProjectSchemaFormat	스키마 {0}	Schema {0}
 Gallery.ValidatedBuild	검증 빌드	Validated build
 Gallery.ValidationContextFormat	스키마 {0} · 빌드 {1}	Schema {0} · Build {1}
-Gallery.SaveCompatibilityReport	호환성 보고서 저장	Save compatibility report
-Gallery.SaveCompatibilityReportTooltip	각 레시피의 스키마, 검증 결과, 실행 빌드와 커밋을 JSON으로 저장합니다.	Save each recipe schema, validation result, executable build, and commit as JSON.
+Gallery.SaveCompatibilityReport	검증 보고서 저장	Save validation report
+Gallery.SaveCompatibilityReportTooltip	각 레시피의 스키마, 검증 결과, 프로그램 빌드와 커밋을 JSON으로 저장합니다.	Save each recipe schema, validation result, executable build, and commit as JSON.
 Gallery.CompatibilityReportRequiresValidation	10개 레시피 검증을 완료한 뒤 보고서를 저장하십시오.	Complete validation of all 10 recipes before saving the report.
 Gallery.CompareCompatibilityReports	보고서 비교	Compare reports
 Gallery.CompareCompatibilityReportsTooltip	저장된 기준 보고서와 현재 보고서를 불러와 레시피 호환성 변화를 비교합니다.	Load a saved baseline and current report to compare recipe compatibility changes.
@@ -70,25 +83,25 @@ Gallery.Comparison.OutcomeFormat	결과 {0} → {1}	Outcome {0} → {1}
 Gallery.Comparison.SchemaFormat	스키마 {0} → {1}	Schema {0} → {1}
 Gallery.Comparison.BuildFormat	빌드 {0} → {1}	Build {0} → {1}
 Gallery.Comparison.NotPresent	없음	Not present
-Gallery.Comparison.SafeHint	보고서 비교는 프로젝트를 열거나 레시피를 실행·저장하지 않습니다.	Comparing reports does not open a project or run or save a recipe.
+Gallery.Comparison.SafeHint	보고서 비교는 프로젝트를 열거나 레시피를 운전·저장하지 않습니다.	Comparing reports does not open a project or run or save a recipe.
 Gallery.CloseComparison	비교 닫기	Close comparison
 Gallery.Sequence	시퀀스	Sequence
-Gallery.EquipmentFocus	고유 장비	Distinctive equipment
-Gallery.TopologySummaryCompact	축 {0} · 센서 {1} · 실린더 {2} · 컨베이어 {3} · 워크 {4}	Axes {0} · Sensors {1} · Cyl {2} · Conv {3} · Wafers {4}
+Gallery.EquipmentFocus	주요 장치	Key components
+Gallery.TopologySummaryCompact	축 {0} · 센서 {1} · 실린더 {2} · 컨베이어 {3} · 제품 {4}	Axes {0} · Sensors {1} · Cyl {2} · Conv {3} · Wafers {4}
 Gallery.Axes	축	Axes
 Gallery.Devices	장치	Devices
 Gallery.Channels	I/O 채널	I/O channels
 Gallery.Components	레이아웃 구성요소	Layout components
-Gallery.Steps	시퀀스 단계	Sequence steps
+Gallery.Steps	시퀀스 스텝	Sequence steps
 Gallery.LoadFailed	내장 반도체 레시피를 불러오지 못했습니다.	The bundled semiconductor recipes could not be loaded.
 Gallery.TemplateOverwriteRejected	내장 원본 레시피는 덮어쓸 수 없습니다. 다른 위치에 복사본을 저장하십시오.	The bundled recipe cannot be overwritten. Save the copy to another location.
 Gallery.CopySucceeded	'{0}' 복사본을 설계 모드로 열었습니다.	Opened a copy of '{0}' in Design mode.
 Connections.Tab	연결	Connections
 Connections.Title	레시피 연결	Recipe connections
-Connections.InputOverview	촬영 입력 정보	Capture input information
-Connections.ConnectionOverview	검사 연결 요약	Inspection connection summary
-Connections.QuickAddTitle	구성요소 추가 및 자동 연결	Add and connect equipment
-Connections.QuickAddHint	기존 프로젝트 모델에 축·장치·I/O가 함께 생성됩니다. 센서는 스테이지 또는 워크피스 카드를 먼저 선택하면 해당 대상을 연결하며, 상세 연결은 오른쪽 속성에서 편집합니다.	Axis, device, and I/O definitions are created together in the existing project model. For a sensor, first select its stage or workpiece target; edit detailed links in Properties.
+Connections.InputOverview	촬영 이미지 정보	Capture input information
+Connections.ConnectionOverview	검사 연동 요약	Inspection connection summary
+Connections.QuickAddTitle	장치 추가	Add devices
+Connections.QuickAddHint	축·장치·I/O를 함께 추가합니다. 센서는 스테이지 또는 제품을 먼저 선택하면 해당 대상에 연결됩니다. 상세 연결은 장치를 선택한 뒤 속성에서 편집하세요.	Add axes, devices, and I/O together. Select a stage or product before adding a sensor to link it to that target. Select a device to edit its detailed links in Properties.
 Connections.CreateVirtualCameraWorkflow	카메라 검사 추가	Add camera inspection
 Connections.CreateVirtualCameraWorkflowTooltip	가상 카메라, 기본 검사 레시피와 TriggerCamera → WaitVisionResult 시퀀스를 현재 프로젝트에 추가합니다. 실행은 시작하지 않습니다.	Add a virtual camera, default inspection recipe, and TriggerCamera → WaitVisionResult sequence to the current project. This does not start a run.
 Connections.VirtualCameraWorkflowCreatedStatus	가상 카메라 검사 구성을 추가했습니다. 실행은 시작되지 않았으며 저장하면 현재 프로젝트에 유지됩니다.	Added the virtual-camera inspection workflow. No run started; save to retain it in the current project.
@@ -325,13 +338,13 @@ Connections.AddStageTooltip	새 가상 선형축과 연결된 스테이지를 �
 Connections.AddRotaryStage	회전축 + 스테이지	Rotary axis + stage
 Connections.AddRotaryStageTooltip	새 가상 회전축과 연결된 회전 스테이지를 추가합니다.	Add a new virtual rotary axis and its connected rotary stage.
 Connections.AddSensor	센서	Sensor
-Connections.AddSensorTooltip	선택한 스테이지 또는 워크피스를 감지하는 DI 센서를 추가합니다.	Add a DI sensor that detects the selected stage or workpiece.
+Connections.AddSensorTooltip	선택한 스테이지 또는 제품를 감지하는 DI 센서를 추가합니다.	Add a DI sensor that detects the selected stage or workpiece.
 Connections.AddCylinder	실린더	Cylinder
 Connections.AddCylinderTooltip	명령 DO와 확장/복귀 DI가 연결된 실린더를 추가합니다.	Add a cylinder connected to command DO and extended/retracted DI.
 Connections.AddConveyor	컨베이어	Conveyor
 Connections.AddConveyorTooltip	운전/역방향 DO가 연결된 컨베이어를 추가합니다.	Add a conveyor connected to run and reverse DO.
-Connections.AddWorkpiece	워크피스	Workpiece
-Connections.AddWorkpieceTooltip	프로젝트의 컨베이어에 연결된 워크피스를 추가합니다.	Add a workpiece connected to a project conveyor.
+Connections.AddWorkpiece	제품	Workpiece
+Connections.AddWorkpieceTooltip	프로젝트의 컨베이어에 연결된 제품을 추가합니다.	Add a workpiece connected to a project conveyor.
 Connections.SummaryFormat	구성요소 {0}개 · 유효 연결 {1}개 · 시퀀스 사용 {2}건	{0} components · {1} valid connections · {2} sequence uses
 Connections.CheckpointCoverageFormat	종료 상태 검증 {0:N0}/{1:N0}단계	End-state checks {0:N0}/{1:N0} steps
 Connections.CheckpointCoverageTooltip	드라이런에서 단계 종료 상태를 확인하도록 설정된 단계 수입니다.	Steps configured to validate equipment state at the end of the step during dry run.
@@ -359,43 +372,43 @@ Connections.CheckpointTemplateNoChangesStatus	적용할 새 대표 검증점이 
 Connections.ValidationPassed	모든 연결 유효	All connections valid
 Connections.ValidationErrors	연결 확인 필요	Check connections
 Connections.ValidationIssueLocationFormat	레이아웃 {0} · 구성요소 {1} · 대상 {2} · 속성 {3}	Layout {0} · component {1} · target {2} · property {3}
-Connections.ValidationSequenceLocationFormat	시퀀스 {0} · 단계 {1}	sequence {0} · step {1}
+Connections.ValidationSequenceLocationFormat	시퀀스 {0} · 스텝 {1}	sequence {0} · step {1}
 Connections.ValidationTargetSelectedStatus	오류 대상 '{0}'을(를) 선택했습니다. 수정 후 준비 확인을 다시 실행하십시오.	Selected validation target '{0}'. Correct it, then run readiness again.
 Connections.ValidationTargetUnavailableStatus	오류 대상 '{0}'을(를) 찾을 수 없습니다. 프로젝트를 다시 불러오고 준비 확인을 다시 실행하십시오.	Validation target '{0}' is unavailable. Reload the project and run readiness again.
 Connections.Valid	유효	Valid
 Connections.CheckRequired	확인 필요	Check required
-Connections.Behavior	동작 바인딩	Behavior binding
+Connections.Behavior	동작 연결	Action links
 Connections.IoAndTarget	I/O 및 대상	I/O and target
-Connections.SequenceUse	시퀀스 사용	Sequence use
+Connections.SequenceUse	사용하는 스텝	Used by steps
 Connections.None	연결 없음	No binding
 Connections.NotApplicable	런타임 연결 없음	No runtime link
 Connections.MissingAxis	축 연결 누락	Missing axis binding
 Connections.MissingDevice	장치 연결 누락	Missing device binding
 Connections.StaticComponent	정적 구성요소	Static component
-Connections.NoSequenceUse	직접 사용하는 단계 없음	No directly linked step
+Connections.NoSequenceUse	사용하는 스텝 없음	No steps use this device
 Connections.StageLinkFormat	스테이지 {0} → 축 {1}	Stage {0} → axis {1}
 Connections.SensorLinkFormat	DI {0} → 감지 대상 {1}	DI {0} → target {1}
 Connections.CylinderLinkFormat	확장 DO {0} · 확장 DI {1} · 복귀 DI {2}	Extend DO {0} · extended DI {1} · retracted DI {2}
 Connections.ConveyorLinkFormat	운전 DO {0} · 역방향 DO {1}	Run DO {0} · reverse DO {1}
 Connections.WorkpieceLinkFormat	이송 컨베이어 {0}	Carrier conveyor {0}
-Connections.CheckReadiness	시뮬레이션 준비 확인	Check simulation readiness
-Connections.CheckReadinessTooltip	현재 프로젝트 전체를 컴파일해 실행 가능 여부를 확인하며 시뮬레이션은 시작하지 않습니다.	Compile the current project to check whether it can run without starting simulation.
+Connections.CheckReadiness	운전 조건 점검	Check run conditions
+Connections.CheckReadinessTooltip	장치 연결과 시퀀스 설정을 확인합니다. 시뮬레이션은 시작하지 않습니다.	Check device connections and sequence settings without starting simulation.
 Connections.ReadinessNotChecked	미확인	Not checked
 Connections.ReadinessPassed	실행 준비 완료	Ready to run
 Connections.ReadinessFailed	실행 준비 오류	Not ready
-Connections.ReadinessStale	만료됨	Stale
-Connections.ReadinessNotCheckedDetail	운전 전에 시뮬레이션 준비 확인을 실행하십시오.	Check simulation readiness before Run.
-Connections.ReadinessPassedDetail	현재 연결과 시퀀스가 컴파일되었습니다. 이 확인은 시뮬레이션을 시작하지 않습니다.	The current connections and sequence compile successfully. This check does not start simulation.
+Connections.ReadinessStale	다시 점검 필요	Check again
+Connections.ReadinessNotCheckedDetail	운전 전에 운전 조건 점검을 실행하세요.	Check run conditions before Run.
+Connections.ReadinessPassedDetail	장치 연결과 시퀀스 설정에 문제가 없습니다. 시뮬레이션은 시작하지 않았습니다.	Device connections and sequence settings passed the check. Simulation has not started.
 Connections.ReadinessFailedDetail	실행할 수 없습니다: {0}	Cannot run: {0}
-Connections.ReadinessStaleDetail	프로젝트 revision이 {0}에서 {1}(으)로 변경되어 준비 확인이 만료되었습니다. 다시 준비 확인을 실행하십시오.	Readiness is stale because the project revision changed from {0} to {1}. Run readiness again.
-Connections.ReadinessPassedStatus	시뮬레이션 준비 확인을 통과했습니다. 시뮬레이션은 시작되지 않았습니다.	Simulation readiness passed. Simulation was not started.
-Connections.ReadinessFailedStatus	시뮬레이션 준비 확인에서 오류가 발견되었습니다.	Simulation readiness found an error.
-Connections.ReadinessComparisonInitial	이번 준비 확인 결과를 기준으로 삼았습니다.	This readiness result is the baseline.
-Connections.ReadinessComparisonUnchanged	이전 준비 확인과 동일합니다.	Readiness is unchanged from the previous check.
-Connections.ReadinessComparisonImproved	이전 준비 확인보다 개선되었습니다.	Readiness improved from the previous check.
-Connections.ReadinessComparisonRegressed	이전 준비 확인보다 악화되었습니다.	Readiness regressed from the previous check.
-Connections.ReadinessComparisonChanged	준비 확인 결과가 변경되었습니다.	Readiness result changed.
-Connections.ReadinessComparisonRerunRequired	편집 후 준비 확인을 다시 실행해야 합니다.	Run readiness again after editing.
+Connections.ReadinessStaleDetail	점검 후 레시피가 변경되었습니다. 운전 조건을 다시 점검하세요.	The recipe changed after the check. Check run conditions again.
+Connections.ReadinessPassedStatus	운전 조건 점검을 통과했습니다. 시뮬레이션은 시작되지 않았습니다.	Simulation readiness passed. Simulation was not started.
+Connections.ReadinessFailedStatus	운전 조건 점검에서 오류가 발견되었습니다.	Simulation readiness found an error.
+Connections.ReadinessComparisonInitial	첫 점검 결과입니다.	This is the first check result.
+Connections.ReadinessComparisonUnchanged	이전 점검 결과와 같습니다.	The result matches the previous check.
+Connections.ReadinessComparisonImproved	이전 점검의 오류가 해결되었습니다.	Errors from the previous check have been resolved.
+Connections.ReadinessComparisonRegressed	이전 점검과 달리 오류가 확인되었습니다.	Errors were found after the previous check passed.
+Connections.ReadinessComparisonChanged	점검 결과가 바뀌었습니다.	The check result has changed.
+Connections.ReadinessComparisonRerunRequired	설정이 바뀌었습니다. 운전 조건을 다시 점검하세요.	Settings changed. Check run conditions again.
 Connections.PreviewStep	단계 미리보기	Preview step
 Connections.PreviewStepTooltip	준비 확인을 통과한 뒤 이 단계만 격리된 고정 스텝 시뮬레이션으로 실행합니다.	After readiness passes, run only this step in an isolated fixed-step simulation.
 Connections.PreviewCompleted	미리보기 완료	Preview completed
@@ -502,11 +515,11 @@ Connections.OhtLoadPortReady	준비	Ready
 Connections.OhtLoadPortNotReady	미준비	Not ready
 Connections.DryRunCompletedStatus	격리된 전체 레시피 검증이 완료되었습니다. 메인 시뮬레이션은 변경되지 않았습니다.	The isolated recipe dry run completed. The main simulation was unchanged.
 Connections.DryRunStoppedStatus	격리된 전체 레시피 검증이 완료되지 않았습니다. 결과의 최초 문제를 확인하십시오.	The isolated recipe dry run did not complete. Check its first issue.
-Connections.OpenStep	단계 열기	Open step
-Connections.OpenStepTooltip	이 연결을 사용하는 첫 번째 시퀀스 단계를 선택합니다.	Select the first sequence step that uses this connection.
-Connections.OpenStepStatus	시퀀스 단계 '{0}'을(를) 열었습니다.	Opened sequence step '{0}'.
-Connections.OpenStepRejectedStatus	연결된 시퀀스 단계를 찾을 수 없습니다.	The linked sequence step could not be found.
-Connections.ReturnToProcessPlan	공정 계획으로 돌아가기	Return to process plan
+Connections.OpenStep	스텝 열기	Open step
+Connections.OpenStepTooltip	이 연결을 사용하는 첫 번째 시퀀스 스텝을 선택합니다.	Select the first sequence step that uses this connection.
+Connections.OpenStepStatus	시퀀스 스텝 '{0}'을(를) 열었습니다.	Opened sequence step '{0}'.
+Connections.OpenStepRejectedStatus	연결된 시퀀스 스텝을 찾을 수 없습니다.	The linked sequence step could not be found.
+Connections.ReturnToProcessPlan	공정 설정으로 돌아가기	Return to process setup
 Connections.ReturnToProcessPlanTooltip	열어 둔 공정 계획의 같은 단계 카드로 돌아갑니다.	Return to the same step card in the open process plan.
 Connections.ReturnToProcessPlanHint	이 단계를 조정한 뒤 같은 공정 카드 위치로 돌아갑니다.	Return to the same process card after tuning this step.
 Connections.ReturnToProcessPlanStatus	공정 계획의 '{0}' 단계로 돌아왔습니다.	Returned to process plan step '{0}'.
@@ -547,13 +560,13 @@ UserText.sequence.auto-transfer-cycle.step.conveyor-direction-home.name	컨베�
 UserText.sequence.auto-transfer-cycle.step.cycle-active-off.name	사이클 비활성화	Cycle Active Off
 Shell.File	파일	File
 Shell.Simulation	시뮬레이션	Simulation
-Shell.New	새 프로젝트	New
+Shell.New	새 레시피	New
 Shell.Open	열기	Open
 Shell.Save	저장	Save
 Shell.SaveAs	다른 이름으로 저장	Save As
-Shell.NewTooltip	새 프로젝트를 만듭니다. (Ctrl+N)	Create a new project (Ctrl+N)
-Shell.OpenTooltip	프로젝트를 엽니다. (Ctrl+O)	Open a project (Ctrl+O)
-Shell.SaveTooltip	프로젝트를 저장합니다. (Ctrl+S)	Save the project (Ctrl+S)
+Shell.NewTooltip	새 레시피를 만듭니다. (Ctrl+N)	Create a new project (Ctrl+N)
+Shell.OpenTooltip	레시피를 엽니다. (Ctrl+O)	Open a project (Ctrl+O)
+Shell.SaveTooltip	레시피를 저장합니다. (Ctrl+S)	Save the project (Ctrl+S)
 Shell.Exit	종료	Exit
 Shell.Design	설계	Design
 Shell.Run	운전	Run
@@ -564,24 +577,24 @@ Shell.DesignTransitionTimeout	설계 모드 전환 실패: 시뮬레이션 일�
 Shell.DesignTransitionFailed	설계 모드 전환 실패: 일시정지 중 오류가 발생했습니다.	Design mode transition failed: the pause operation raised an error.
 Shell.DesignTransitionCompleted	시뮬레이션이 일시정지되어 설계 모드로 전환되었습니다.	The simulation is paused and Design mode is ready.
 Shell.DesignTransitionCanceled	설계 모드 요청이 취소되었습니다. 시뮬레이션은 일시정지 상태입니다.	The Design mode request was canceled. The simulation is paused.
-Shell.SimulationOn	시뮬레이션 시작	Simulation ON
-Shell.SimulationOnTooltip	작성한 머신을 빌드하고 자동 시뮬레이션을 시작합니다. (F5)	Build the authored machine and start automatic simulation (F5)
+Shell.SimulationOn	운전 시작	Simulation ON
+Shell.SimulationOnTooltip	적용된 장비 구성으로 자동 운전을 시작합니다. (F5)	Build the authored machine and start automatic simulation (F5)
 Shell.Pause	일시정지	Pause
 Shell.PauseTooltip	시뮬레이션을 일시정지합니다. (F6)	Pause simulation (F6)
-Shell.ContinueRun	계속 운전	Continue run
-Shell.ContinueRunTooltip	현재 실행을 초기화하지 않고 이어서 실행합니다. (F5)	Continue the current run without resetting it (F5)
-Shell.AbortSequence	시퀀스 중단	Abort sequence
-Shell.AbortSequenceTooltip	활성 시퀀스를 중단합니다. Reset 후 다시 시작할 수 있습니다.	Abort the active sequence. Reset is required before starting again.
-Shell.SequenceAbortedStatus	시퀀스가 중단되었습니다. Reset 후 다시 시작할 수 있습니다.	The sequence was aborted. Reset is required before starting again.
-Shell.SequenceAbortRejectedStatus	시퀀스 중단이 거부되었습니다.	Sequence abort was rejected.
+Shell.ContinueRun	운전 재개	Continue run
+Shell.ContinueRunTooltip	현재 운전을 초기화하지 않고 이어서 운전합니다. (F5)	Continue the current run without resetting it (F5)
+Shell.AbortSequence	시퀀스 정지	Abort sequence
+Shell.AbortSequenceTooltip	활성 시퀀스를 정지합니다. 초기화 후 다시 시작할 수 있습니다. 전체 운전 정지와 구분합니다.	Abort the active sequence. Reset is required before starting again.
+Shell.SequenceAbortedStatus	시퀀스가 정지되었습니다. 초기화 후 다시 시작할 수 있습니다.	The sequence was aborted. Reset is required before starting again.
+Shell.SequenceAbortRejectedStatus	시퀀스 정지가 거부되었습니다.	Sequence abort was rejected.
 Shell.RetrySequence	시퀀스 재시도	Retry sequence
-Shell.RetrySequenceTooltip	오류 원인을 해제한 뒤 시퀀스를 처음부터 재시도합니다. 자동 반복은 다시 시작되지 않습니다.	Retry the faulted sequence from its entry step after clearing the cause. Automatic continuation remains stopped.
+Shell.RetrySequenceTooltip	알람 원인을 해제한 뒤 시퀀스를 처음부터 재시도합니다. 자동 반복은 다시 시작되지 않습니다.	Retry the faulted sequence from its entry step after clearing the cause. Automatic continuation remains stopped.
 Shell.SequenceRetriedStatus	시퀀스를 재시도했습니다. 자동 반복은 중지된 상태입니다.	The sequence was retried from its entry step. Automatic continuation remains stopped.
 Shell.SequenceRetryRejectedStatus	시퀀스 재시도가 거부되었습니다.	Sequence retry was rejected.
-Shell.Step	단계 실행	Step
+Shell.Step	1틱 진행	Step
 Shell.AdvancedDebugging	상세 디버깅	Advanced debugging
-Shell.SingleTick	1 Tick 진행	Advance one tick
-Shell.StepTooltip	5 ms 단위로 한 Tick 진행합니다. (F10)	Advance one 5 ms tick (F10)
+Shell.SingleTick	1틱 진행	Advance one tick
+Shell.StepTooltip	5 ms 단위로 1틱 진행합니다. (F10)	Advance one 5 ms tick (F10)
 Shell.Reset	초기화	Reset
 Shell.ResetTooltip	시뮬레이션을 초기화합니다.	Reset simulation
 Shell.CycleStart	사이클 시작	Cycle Start
@@ -597,43 +610,50 @@ Layout.Library.Category.Mechanics	기구	Mechanics
 Layout.Library.Category.Motion	모션	Motion
 Layout.Library.Category.Sensors	센서	Sensors
 Layout.Add.ActiveLayoutNotFoundFormat	활성 레이아웃 '{0}'을(를) 찾을 수 없습니다	Active layout '{0}' was not found
-Layout.Add.ActiveLayoutRequired	부품을 추가하기 전에 활성 레이아웃을 선택하세요	Select an active layout before adding components
-Layout.Add.SensorTargetRequired	디지털 센서를 추가하기 전에 워크피스 또는 스테이지를 추가하세요	Add a Workpiece or Stage before adding a Digital Sensor
-Layout.Add.WorkpieceCarrierRequired	워크피스를 추가하기 전에 컨베이어를 추가하세요	Add a Conveyor before adding a Workpiece
+Layout.Add.ActiveLayoutRequired	장치를 추가하기 전에 활성 레이아웃을 선택하세요	Select an active layout before adding components
+Layout.Add.SensorTargetRequired	디지털 센서를 추가하기 전에 제품 또는 리니어 축을 추가하세요	Add a Workpiece or Stage before adding a Digital Sensor
+Layout.Add.WorkpieceCarrierRequired	제품을 추가하기 전에 컨베이어를 추가하세요	Add a Conveyor before adding a Workpiece
 Layout.Add.CameraDeviceRequired	배치하기 전에 카메라 장치를 추가하세요	Add a Camera device before placing it in the layout
-Layout.Add.InvalidDefinition	정의가 올바르지 않아 부품을 추가하지 못했습니다	Component was not added because its definition is invalid
+Layout.Add.InvalidDefinition	정의가 올바르지 않아 장치를 추가하지 못했습니다	Component was not added because its definition is invalid
+Layout.AddedStatus	{0} 추가됨	Added {0}
+Layout.RemovalSensorDependency	'{1}' 삭제 전에 센서 '{0}'을(를) 삭제하세요	Remove sensor '{0}' before removing {1}
+Layout.RemovalWorkpieceDependency	'{1}' 삭제 전에 제품 '{0}'을(를) 삭제하세요	Remove workpiece '{0}' before removing {1}
+Layout.RemovedDeviceRetainedStatus	{0} 삭제됨. 장치·채널 정의는 유지됩니다	Removed {0}; its device and channel definitions were retained
+Layout.RemovedStatus	{0} 삭제됨	Removed {0}
+Layout.RemovedComponentsRetainedStatus	장치 {0}개 삭제됨. 장치 정의와 시퀀스는 유지됩니다	Removed {0} components; device and sequence definitions were retained
 Layout.Library.Category.Vision	비전	Vision
 Layout.Library.Camera.Description	레이아웃에서 가상 카메라의 위치를 표시합니다. 이미지를 생성하지 않습니다.	Shows a virtual camera position in the layout; does not generate images
 Layout.Library.Camera.Name	카메라	Camera
 Layout.Library.Category.Transport	이송	Transport
-Layout.Library.Conveyor.Description	운전 및 방향 출력에 따라 연결된 워크피스를 일정 속도로 이송합니다.	Run and direction outputs move bound workpieces at fixed speed
+Layout.Library.Conveyor.Description	운전 및 방향 출력에 따라 연결된 제품을 일정 속도로 이송합니다.	Run and direction outputs move bound workpieces at fixed speed
 Layout.Library.Conveyor.Name	컨베이어	Conveyor
+Layout.Library.DigitalIo.Description	디지털 채널과 연결된 I/O 모듈	I/O module bound to a digital channel
 Layout.Library.DigitalSensor.Description	감지 영역의 상태를 시뮬레이션 디지털 입력에 기록합니다.	Detection area that writes a simulated digital input
 Layout.Library.DigitalSensor.Name	디지털 센서	Digital Sensor
 Layout.Library.LinearStage.Description	모션 축 위치를 따라 움직이는 스테이지입니다.	Axis-bound stage whose runtime pose follows motion
-Layout.Library.LinearStage.Name	리니어 스테이지	Linear Stage
+Layout.Library.LinearStage.Name	리니어 축	Linear Stage
 Layout.Library.MachineFrame.Description	장비 셀의 고정 구조와 시각적 경계를 정의합니다.	Static cell structure and visual boundary
 Layout.Library.MachineFrame.Name	머신 프레임	Machine Frame
 Layout.Library.PneumaticCylinder.Description	출력으로 동작하며 종단 위치 피드백을 결정적으로 제공합니다.	Output-driven actuator with deterministic end-position feedback
 Layout.Library.PneumaticCylinder.Name	공압 실린더	Pneumatic Cylinder
 Layout.Library.RotaryStage.Description	모션 축 각도를 따라 회전하는 스테이지입니다.	Rotary-axis stage whose runtime angle follows motion
 Layout.Library.RotaryStage.Name	로터리 스테이지	Rotary Stage
-Layout.Library.Workpiece.Description	명시적으로 연결된 컨베이어가 이송하는 유형 지정 부품입니다.	Typed part transported by an explicitly bound conveyor
-Layout.Library.Workpiece.Name	워크피스	Workpiece
-Shell.Runtime	실행 상태	Runtime
-Shell.ProjectStatus	프로젝트: {0}	Project: {0}
-Shell.ProjectStatusUnsaved	프로젝트: {0} · 미저장	Project: {0} · Unsaved
-Project.UnsavedTitle	저장하지 않은 프로젝트	Unsaved project
-Project.UnsavedMessage	현재 프로젝트의 변경 내용을 저장하시겠습니까?	Save changes to the current project?
+Layout.Library.Workpiece.Description	명시적으로 연결된 컨베이어가 이송하는 제품입니다.	Typed part transported by an explicitly bound conveyor
+Layout.Library.Workpiece.Name	제품	Workpiece
+Shell.Runtime	운전 상태	Runtime
+Shell.ProjectStatus	레시피: {0} · 저장됨	Project: {0}
+Shell.ProjectStatusUnsaved	레시피: {0} · 저장 안 됨	Project: {0} · Unsaved
+Project.UnsavedTitle	저장 안 된 레시피	Unsaved project
+Project.UnsavedMessage	현재 레시피의 변경 내용을 저장하시겠습니까?	Save changes to the current project?
 Project.Save	저장	Save
 Project.DontSave	저장 안 함	Don't save
 Project.Cancel	취소	Cancel
 Project.NewRecipeTitle	새 레시피	New recipe
 Project.NewRecipeNameLabel	레시피 이름	Recipe name
 Project.NewRecipeDefaultName	새 장비	New equipment
-Project.NewRecipeEmptyHint	빈 장비에서 스테이션과 부품을 추가합니다.	Start from an empty machine and add stations and components.
-Project.NewRecipeNameRequired	레시피 이름을 입력하세요.	Enter a recipe name.
-Project.NewRecipeNameTooLong	레시피 이름은 60자 이하여야 합니다.	Recipe name must be 60 characters or fewer.
+Project.NewRecipeEmptyHint	빈 장비에서 스테이션과 장치를 추가합니다.	Start from an empty machine and add stations and components.
+Project.NewRecipeNameRequired	이름을 1~60자로 입력하세요.	Enter a recipe name.
+Project.NewRecipeNameTooLong	이름을 1~60자로 입력하세요.	Recipe name must be 60 characters or fewer.
 Project.Create	만들기	Create
 Project.OpenFailedStatus	프로젝트를 열지 못했습니다	The project could not be opened
 Project.OpenFailedTitle	프로젝트 열기 실패	Project open failed
@@ -696,7 +716,7 @@ Shell.SelectionMultiple	{0}개 선택 · 기준: {1}	{0} selected · reference: 
 Shell.SelectionNone	선택됨: 없음	Selected: None
 Shell.SimulationStatus	시뮬레이션 {0:hh\:mm\:ss\.fff}	Sim {0:hh\:mm\:ss\.fff}
 Shell.TickStatus	틱 {0}	Tick {0}
-Shell.ControlOwnerAutomatic	시뮬레이션 시작 시 자동 시퀀스를 시작하고 반복합니다.	Simulation ON starts and repeats the authored automatic sequence.
+Shell.ControlOwnerAutomatic	운전 시작 시 자동 시퀀스를 시작하고 반복합니다.	Simulation ON starts and repeats the authored automatic sequence.
 Shell.ControlOwnerSequence	운전 모드에서 내장 시퀀스가 모션과 출력을 제어합니다.	The embedded sequence owns motion and outputs in Run mode.
 Shell.ControlOwnerManual	수동 모션 명령은 운전 모드에서만 사용할 수 있습니다.	Manual motion commands are enabled only in Run mode.
 Shell.ControlOwnerLabel.Definition	정의	Definition
@@ -723,14 +743,15 @@ Scene.StartExampleTooltip	웨이퍼 이송과 카메라 예제를 시뮬레이�
 Scene.StartSampleReadyHint	예제는 자동으로 실행되지 않습니다. 준비가 되면 직접 실행하세요.	The example does not run automatically. Start it when you are ready.
 Scene.EmptyTitle	첫 장비를 배치하세요	Place your first component
 Scene.EmptyHint	왼쪽 라이브러리에서 장비를 클릭하거나 캔버스로 끌어 배치하세요.	Click a component in the library or drag it onto the canvas.
-Scene.EquipmentEditHint	부품 선택 → 설정·단품 확인 / 끌어서 이동	Select a part → properties or individual check / drag to move
-Scene.EquipmentRunHint	상태 관찰 중 / 편집하려면 실행을 종료하세요.	Viewing run state / end the run to edit.
+Scene.EmptyEquipmentHint	스테이션·유닛을 만든 뒤, 선택한 유닛에 장치를 추가하세요.	Add a station and unit, then add components to the selected unit.
+Scene.EquipmentEditHint	장치 선택·끌어서 이동 / 회전: 우클릭 끌기 · 장면 이동: 가운데 버튼 · 확대: 휠 · 화면 맞춤: Home	Select or drag a device / orbit: right drag · pan: middle button · zoom: wheel · fit: Home
+Scene.EquipmentRunHint	조회·선택 가능 / 편집하려면 운전을 정지하세요.	Viewing and selection available / stop the run to edit.
 Scene.LegendAxis	▰ 축	▰ Axis
 Scene.LegendCylinder	⇥ 실린더	⇥ Cylinder
 Scene.LegendSensor	◉ 센서	◉ Sensor
-Scene.LegendCamera	▣ 촬영부	▣ Camera
+Scene.LegendCamera	▣ 카메라	▣ Camera
 Scene.LegendUnit	LU / 유닛 좌표	LU / unit coordinates
-Scene.BlankLayoutReadyStatus	빈 레이아웃을 만들었습니다. 라이브러리에서 첫 장비를 선택하세요.	Blank layout ready. Choose the first component from the library.
+Scene.BlankLayoutReadyStatus	빈 레이아웃을 만들었습니다. 스테이션·유닛을 추가한 뒤 부품을 추가하세요.	Blank layout ready. Add a station and unit, then add components.
 Scene.SampleOpenedStatus	자동 이송 셀 샘플을 열었습니다. 파일 저장 전까지 원본 샘플은 변경되지 않습니다.	Opened the automatic transfer cell sample. The bundled sample remains unchanged until you save a project file.
 Scene.ExampleOpenedStoppedStatus	자동 이송 셀 예제를 정지 상태로 열었습니다. 파일 저장 전까지 원본 예제는 변경되지 않습니다.	Opened the automatic transfer cell example in a stopped state. The bundled example remains unchanged until you save a project file.
 Scene.GripperClosed	그리퍼 닫힘	GRIPPER CLOSED
@@ -749,7 +770,7 @@ Shell.ResultFail	실패	FAIL
 Shell.ResultPending	대기	PENDING
 Shell.AutomaticRunNotConfigured	설정되지 않음	Not configured
 Shell.AutomaticRunWaiting	재시작 대기 중 ({0}틱)	Waiting to restart ({0} ticks)
-Shell.AutomaticRunRunning	자동 사이클 실행 중	Automatic cycle running
+Shell.AutomaticRunRunning	자동 사이클 운전 중	Automatic cycle running
 Shell.AutomaticRunReady	준비	Ready
 Shell.Project	프로젝트	Project
 ProjectTree.SearchLabel	프로젝트 검색	Search project
@@ -765,9 +786,9 @@ Shell.Evidence	증거	Evidence
 Shell.EvidenceDrawer	이벤트 증거 펼치기 또는 접기	Expand or collapse event evidence
 Shell.EvidenceDrawerHint	결정적 시뮬레이션 이벤트 증거를 표시하거나 숨깁니다.	Show or hide deterministic simulation event evidence.
 Diagnostics.Title	실행 기록	Run records
-Diagnostics.Toggle	실행 기록 펼치기 또는 접기	Expand or collapse run records
+Diagnostics.Toggle	현재 세션 기록 펼치기 또는 접기	Expand or collapse run records
 Diagnostics.Hint	시간축, 현재 알람과 I/O, 상세 로그를 확인합니다.	Inspect the timeline, current alarms and I/O, and detailed logs.
-Diagnostics.Resize	실행 기록 높이 조절	Resize run records
+Diagnostics.Resize	현재 세션 기록 높이 조절	Resize run records
 Diagnostics.Timeline	시간축	Timeline
 Diagnostics.Alarms	현재 알람	Current alarms
 Diagnostics.Io	현재 I/O	Current I/O
@@ -796,12 +817,15 @@ Shell.Selected	선택됨	Selected
 Shell.None	없음	None
 Shell.Paused	일시정지	PAUSED
 Shell.Editing	편집 중	Editing
-Shell.RunTarget	전체 장비 실행: {0} / {1}	Whole-machine run: {0} / {1}
+Shell.RunTarget	전체 운전: {0} / {1}	Whole-machine run: {0} / {1}
 Shell.ManualRunTarget	수동 시운전	Manual commissioning
 Shell.SingleRunTarget	반복 없음	No repeat
+Shell.UnitSequencesRunTarget	유닛 시퀀스 {0}개	{0} unit sequences
+Shell.UnitRepeatRunTarget	유닛별 {0}회	{0} cycles per unit
+Shell.MixedUnitRepeatRunTarget	유닛별 설정 횟수	Per-unit cycles
 Shell.RepeatRunTarget	자동 반복 / 대기 {0} ms	Automatic repeat / delay {0} ms
-Shell.Running	실행 중	RUNNING
-Shell.FixedStep	고정 5 ms	Fixed 5 ms
+Shell.Running	운전 중	RUNNING
+Shell.FixedStep	고정 틱 5 ms	Fixed 5 ms
 Shell.Tick	틱	Tick
 Shell.SimulationShort	시뮬레이션	Sim
 Shell.Control	제어	Control
@@ -838,7 +862,7 @@ Left.SelectEquipmentHint	머신 장면에서 장비를 선택하면 실시간 �
 Left.RemoveSelected	선택 항목 제거	Remove selected
 Inspector.LayoutTransform	레이아웃 변환	Layout transform
 Inspector.VerticalEnvelope	사선 보기 형상	Oblique view envelope
-Inspector.VerticalEnvelopeHint	사선 장면의 개략 체적입니다. 기존 X/Y 바닥 크기는 X/Z에 대응하며 고도와 수직 크기는 LU입니다. 실측 mm 치수가 아닙니다.	Schematic volume for the oblique view. Existing X/Y footprint maps to X/Z; elevation and vertical size use LU. These are not measured millimetres.
+Inspector.VerticalEnvelopeHint	가상 형상의 길이(X)·폭(Y)·높이(Z)는 LU 단위입니다. 실측 mm 치수가 아닙니다.	Schematic volume for the oblique view. Existing X/Y footprint maps to X/Z; elevation and vertical size use LU. These are not measured millimetres.
 Inspector.VerticalEnvelopeEstimated	높이 미설정: 바닥 크기에서 계산한 시각용 추정값입니다. 편집하면 레시피에 저장됩니다.	Height is unset. The displayed value is estimated from the footprint for visualization; editing it saves an envelope to the recipe.
 Inspector.AspectRatioHint	모서리 크기 조절 중 Shift를 누르면 종횡비를 유지합니다.	Hold Shift while resizing a corner to preserve the aspect ratio.
 Inspector.AuthoredProperties	작성 속성	Authored properties
@@ -895,12 +919,12 @@ Camera.SourceModeUnavailable	카메라 실행 경로 없음	No camera execution 
 Camera.SourceRelativePath	프로젝트 상대 경로	Project-relative path
 Camera.Browse	찾아보기	Browse
 Camera.BrowseTooltip	프로젝트 폴더 안의 단일 이미지 파일을 선택합니다.	Select a single-image file inside the project folder.
-Camera.SourceWidth	폭 (px)	Width (px)
-Camera.SourceHeight	높이 (px)	Height (px)
+Camera.SourceWidth	해상도 가로 (px)	Width (px)
+Camera.SourceHeight	해상도 세로 (px)	Height (px)
 Camera.SourcePixelFormat	픽셀 형식	Pixel format
 Camera.PixelFormatTooltip	획득 증거에 기록할 픽셀 형식을 입력합니다. 예: Mono8	Enter the pixel format recorded in acquisition evidence, for example Mono8.
-Camera.ApplySource	설정 적용	Apply settings
-Camera.ApplySourceTooltip	검증된 설정을 프로젝트에 적용합니다. 획득은 자동으로 시작하지 않습니다.	Apply validated settings to the project without starting acquisition.
+Camera.ApplySource	이미지 소스 적용	Apply settings
+Camera.ApplySourceTooltip	검증된 이미지 소스 설정을 프로젝트에 적용합니다. 촬영은 별도로 시작합니다.	Apply validated settings to the project without starting acquisition.
 Camera.RevertSource	편집 취소	Revert edits
 Camera.RevertSourceTooltip	아직 적용하지 않은 편집을 현재 프로젝트 설정으로 되돌립니다.	Restore fields from the current project settings without acquisition.
 Camera.SelectSourceFile	카메라 이미지 소스 선택	Select camera image source
@@ -911,7 +935,7 @@ Camera.SourceDimensionsInvalid	폭과 높이는 1 이상이어야 합니다.	Wid
 Camera.SourcePixelFormatInvalid	픽셀 형식을 앞뒤 공백 없이 입력하세요.	Enter a pixel format without leading or trailing spaces.
 Camera.SourceFileEmpty	이미지 소스 파일이 비어 있습니다.	The image-source file is empty.
 Camera.SourceFileInvalid	이미지 소스 파일이 없거나 프로젝트 밖을 가리킵니다.	The image-source file is missing or resolves outside the project.
-Camera.SourceDraftReady	유효한 변경입니다. 설정 적용을 선택하세요.	Valid changes. Select Apply settings.
+Camera.SourceDraftReady	유효한 변경입니다. 이미지 소스 적용을 선택하세요.	Valid changes. Select Apply settings.
 Camera.SourceAppliedSave	설정이 적용되었습니다. 프로젝트를 저장해야 유지됩니다.	Settings applied. Save the project to keep them.
 Camera.SourceConfigured	프로젝트에 저장된 이미지 소스 설정입니다.	Image-source settings restored from the project.
 Camera.StartManualControl	수동 운전 시작	Start manual
@@ -941,8 +965,8 @@ Camera.InspectionMessage	검사 메시지	Inspection message
 Camera.InspectionMetrics	검사 메트릭	Inspection metrics
 Camera.ExecutionEvidence	실행 증거	Execution evidence
 Camera.ResultSource	결과 출처	Result source
-Camera.WorkpieceAssociation	연결 작업물 ID	Associated workpiece ID
-Camera.WorkpieceInstanceId	실행 작업물 ID	Workpiece instance ID
+Camera.WorkpieceAssociation	연결 제품 ID	Associated workpiece ID
+Camera.WorkpieceInstanceId	실행 제품 ID	Workpiece instance ID
 Camera.ResultSourceMock	모의 · 결정적 모델 (실제 검사 아님)	Mock · deterministic model (not a real inspection)
 Camera.ResultSourceExternalVerified	외부 결과 · 상관관계 확인됨 (외부 실행)	External result · correlation verified (external execution)
 Camera.ResultSourceExternalUnverified	외부 결과 · 미검증	External result · not verified
@@ -971,15 +995,15 @@ Camera.EvidenceNoComparison	비교할 이전 실행 증거 없음	No prior execu
 Camera.EvidenceMatch	이전 실행 증거와 일치	Matches prior execution evidence
 Camera.EvidenceMismatch	이전 실행 증거와 불일치 · {0}	Differs from prior execution evidence · {0}
 Integration.Workspace	통합 워크스페이스	Integration workspace
-Integration.Hint	교환 설정을 저장한 뒤 Handoff 게시, Result 새로고침, 시뮬레이션 적용을 각각 명시적으로 실행합니다.	Save the exchange setup, then explicitly publish the Handoff, refresh Result, and apply it to Simulation.
+Integration.Hint	연동 설정을 저장한 뒤 검사 요청 전송, 검사 결과 확인, 결과 반영을 각각 수행합니다.	Save the exchange setup, then explicitly publish the Handoff, refresh Result, and apply it to Simulation.
 Integration.CentralWorkspaceHint	2D·3D 외부 검사 거래의 현재 상태와 복구 가능한 결과를 확인합니다. 설정 변경은 기존 연동 설정에서 명시적으로 저장합니다.	Review the current 2D/3D external-inspection transaction and recoverable result state. Change and save setup in the existing integration settings.
 Integration.SetupStepExchange	1/6 교환 폴더를 선택하고 설정을 저장하세요.	1/6 Choose the exchange folder and save setup.
 Integration.SetupStepRecipe	2/6 사용할 2D 검사 레시피를 선택하세요.	2/6 Choose the 2D inspection recipe to use.
-Integration.SetupStepConsumer	3/6 2D 소비자 버전과 40자리 source commit을 입력하세요.	3/6 Enter the 2D consumer version and 40-character source commit.
+Integration.SetupStepConsumer	3/6 2D 검사 프로그램 버전과 40자리 source commit을 입력하세요.	3/6 Enter the 2D consumer version and 40-character source commit.
 Integration.SetupStepTcp	4/6 TCP 수신·상대 주소와 포트를 확인하세요.	4/6 Check the TCP listen/peer addresses and ports.
 Integration.SetupStepKey	5/6 세션 공유 키를 입력하거나 허용된 환경 변수를 준비하세요.	5/6 Enter a session shared key or prepare the approved environment variable.
-Integration.SetupStepSave	6/6 변경 사항을 저장한 뒤 명시적 연결 또는 Handoff를 실행하세요.	6/6 Save the changes before an explicit connection or Handoff.
-Integration.SetupReady	설정 준비 완료. 수신 시작, 상대 Ping 또는 명시적 Handoff 중 하나를 선택하세요.	Setup ready. Choose Start listening, Ping peer, or an explicit Handoff.
+Integration.SetupStepSave	6/6 변경 사항을 저장한 뒤 명시적 연결 또는 검사 요청을 실행하세요.	6/6 Save the changes before an explicit connection or Handoff.
+Integration.SetupReady	설정 준비 완료. 수신 시작, 상대 Ping 또는 명시적 검사 요청 중 하나를 선택하세요.	Setup ready. Choose Start listening, Ping peer, or an explicit Handoff.
 Integration.ExchangeRoot	교환 폴더	Exchange folder
 Integration.Browse	찾아보기	Browse
 Integration.BrowseExchangeRootTooltip	Machine Studio와 소비자가 공유할 로컬 교환 폴더를 선택합니다.	Choose the local exchange folder shared by Machine Studio and the consumer.
@@ -989,11 +1013,11 @@ Integration.ResetSetup	초기화	Reset
 Integration.ResetSetupTooltip	저장된 통합 설정을 지우고 Handoff/Result 화면을 초기화합니다.	Clear the saved integration setup and reset the Handoff/Result projection.
 Integration.Recipe	2D 검사 레시피	2D inspection recipe
 Integration.BrowseRecipeTooltip	2D 소비자가 읽을 로컬 검사 레시피 파일을 선택합니다.	Choose the local inspection recipe file that the 2D consumer will read.
-Integration.ConsumerVersion	2D 소비자 버전	2D consumer version
-Integration.ConsumerCommit	2D 소비자 source commit	2D consumer source commit
-Integration.ConsumerCommitTooltip	2D 소비자 clean build의 40자리 source commit을 입력합니다.	Enter the 40-character source commit from the 2D consumer clean build.
-Integration.WaitForExternalResult	카메라 전송 후 외부 Result 대기	Wait for external Result after camera transfer
-Integration.WaitForExternalResultCompactLabel	Result 대기	Wait for Result
+Integration.ConsumerVersion	2D 검사 프로그램 버전	2D consumer version
+Integration.ConsumerCommit	2D 검사 프로그램 source commit	2D consumer source commit
+Integration.ConsumerCommitTooltip	2D 검사 프로그램의 clean build에 해당하는 40자리 source commit을 입력합니다.	Enter the 40-character source commit from the 2D consumer clean build.
+Integration.WaitForExternalResult	결과 대기 후 분기	Wait for external Result after camera transfer
+Integration.WaitForExternalResultCompactLabel	결과 대기 후 분기	Wait for Result
 Integration.WaitForExternalResultTooltip	다음 수동 카메라 트리거 또는 외부 자동 Sequence에서 로컬 판정을 만들지 않고 전송 완료 상태를 유지합니다. 자동 Sequence는 Result를 확인하면 적용하고, 수동 경로의 새로고침·적용은 자동 실행하지 않습니다.	For the next manual camera trigger or external automatic Sequence, keep the transferred frame pending without a local decision. Automatic Sequence applies a validated Result; manual refresh and apply remain explicit.
 Integration.UseThreeDHeightMap	3D HeightMap 자동 입력 사용	Use automatic 3D HeightMap input
 Integration.UseThreeDHeightMapTooltip	저장된 C3D HeightMap과 3D consumer identity를 자동 Sequence의 외부 검사 입력으로 사용합니다. 설정 저장 전에는 실행하지 않습니다.	Use the saved C3D HeightMap and 3D consumer identity as the automatic Sequence external-inspection input. Nothing runs before setup is saved.
@@ -1005,15 +1029,15 @@ Integration.ThreeDHeightMapHeight	HeightMap height	HeightMap height
 Integration.ThreeDHeightMapPixelFormat	HeightMap pixel format	HeightMap pixel format
 Integration.ThreeDHeightMapUnit	HeightMap unit	HeightMap unit
 Integration.ThreeDInspectionRecipe	3D c3d 검사 레시피	3D c3d inspection recipe
-Integration.ThreeDConsumerVersion	3D consumer 버전	3D consumer version
-Integration.ThreeDConsumerCommit	3D consumer source commit	3D consumer source commit
+Integration.ThreeDConsumerVersion	3D 검사 프로그램 버전	3D consumer version
+Integration.ThreeDConsumerCommit	3D 검사 프로그램 source commit	3D consumer source commit
 Integration.ThreeDSequenceId	자동 Sequence ID	Automatic Sequence ID
 Integration.ThreeDStepId	3D Trigger step ID	3D Trigger step ID
 Integration.ThreeDDeviceId	3D 입력 device ID	3D input device ID
-Integration.PublishTwoD	2D/Image 게시	Publish 2D/Image
-Integration.PublishTwoDShort	2D/Image 게시	Publish 2D/Image
+Integration.PublishTwoD	2D 검사 요청 전송	Publish 2D/Image
+Integration.PublishTwoDShort	2D 검사 요청 전송	Publish 2D/Image
 Integration.PublishTwoDTooltip	완료된 가상 카메라 프레임과 명시적 소비자 identity로 Handoff만 게시합니다. 소비자 검사는 실행하지 않습니다.	Publish only a Handoff using a completed virtual-camera frame and explicit consumer identity. The consumer inspection is not run.
-Integration.RefreshResults	Result 새로고침	Refresh Result
+Integration.RefreshResults	검사 결과 확인	Refresh Result
 Integration.RefreshResultsTooltip	현재 프로젝트의 Handoff, acknowledgement, Result를 교환 폴더에서 읽습니다. 검사를 실행하지 않습니다.	Read the current project's Handoff, acknowledgement, and Result from the exchange folder. No inspection is run.
 Integration.ApplyResultToSimulation	Result를 시뮬레이션에 적용	Apply Result to Simulation
 Integration.ApplyResultToSimulationTooltip	현재 프로세스에서 게시한 Handoff와 정확히 일치하는 검증된 Result만 일시정지된 시뮬레이션에 적용합니다.	Apply only a validated Result that exactly matches a Handoff published by this process to the paused Simulation.
@@ -1027,10 +1051,10 @@ Integration.TransactionHistoryHint	현재 프로젝트에서 발견한 Handoff�
 Integration.TransactionHistoryFilter	이력 상태	History state
 Integration.TransactionHistoryFilterHint	상태를 선택해 거래 이력을 좁혀 봅니다.	Select a state to narrow transaction history.
 Integration.TransactionHistoryFilterAll	전체 상태	All states
-Integration.TransactionHistoryFilterPendingReview	검토 대기	Pending review
-Integration.TransactionHistoryFilterReviewed	검토됨	Reviewed
-Integration.TransactionHistoryFilterRejected	거절됨	Rejected
-Integration.TransactionHistoryFilterPublished	결과 게시됨	Result published
+Integration.TransactionHistoryFilterPendingReview	수신 확인 대기	Pending review
+Integration.TransactionHistoryFilterReviewed	수신 확인됨	Reviewed
+Integration.TransactionHistoryFilterRejected	거부됨	Rejected
+Integration.TransactionHistoryFilterPublished	결과 수신	Result published
 Integration.TransactionHistoryFilterResultReadFailed	결과 읽기 실패	Result read failed
 Integration.NoTransactionHistory	현재 프로젝트에 거래 이력이 없습니다.	No transaction history is available for the current project.
 Integration.NoMatchingTransactionHistory	선택한 상태의 거래 이력이 없습니다.	No transaction history matches the selected state.
@@ -1065,7 +1089,7 @@ Integration.MmiRecipeActive	활성	Active
 Integration.InspectionWorkspaceTitle	촬영·검사	Capture and inspection
 Integration.InspectionWorkspaceHint	검사 레시피를 선택하고 촬영 이미지와 외부 검사 결과를 확인합니다.	Select an inspection recipe and review captured images and external inspection results.
 Integration.MmiSettingsWide	설정 넓게	Settings wide
-Integration.MmiShowInputWithSettings	입력과 함께 보기	Show input with settings
+Integration.MmiShowInputWithSettings	이미지 넓게	Widen input
 Integration.MmiActiveRecipe	활성 2D 레시피	Active 2D recipe
 Integration.InspectionActiveRecipeTooltip	다음 2D 검사 요청에 사용할 레시피입니다. 변경 후 설정을 저장하세요.	Recipe for the next 2D inspection request. Save setup after changing it.
 Integration.MmiSetupUnsaved	변경 사항이 저장되지 않았습니다. 다음 요청 전에 설정 저장을 누르세요.	Unsaved changes. Save setup before creating the next request.
@@ -1081,8 +1105,8 @@ Integration.MmiCreateTwoDRequest	2D 검사 요청 만들기	Create 2D inspection
 Integration.MmiCreateTwoDRequestTooltip	완료된 가상 카메라 프레임으로 2D Handoff 요청만 만듭니다. 하위 검사 프로그램의 검사는 여기서 실행하지 않습니다.	Create only a 2D Handoff request from the completed virtual-camera frame. The subordinate inspection is not run here.
 Integration.MmiCheckInspectionResult	검사 결과 확인	Check inspection result
 Integration.MmiCheckInspectionResultTooltip	현재 프로젝트의 Handoff, acknowledgement, Result를 교환 폴더에서 읽습니다. 검사를 실행하지 않습니다.	Read the current project's Handoff, acknowledgement, and Result from the exchange folder. No inspection is run.
-Integration.MmiApplyInspectionResult	검사 결과 적용	Apply inspection result
-Integration.MmiApplyInspectionResultTooltip	현재 프로세스가 만든 Handoff와 일치하는 검증된 Result만 일시정지된 시뮬레이션에 적용합니다.	Apply only a validated Result matching a Handoff created by this process to the paused Simulation.
+Integration.MmiApplyInspectionResult	검사 결과 반영	Apply inspection result
+Integration.MmiApplyInspectionResultTooltip	현재 프로세스의 검사 요청과 일치하는 검증된 결과만 일시정지된 시뮬레이션에 반영합니다.	Apply only a validated Result matching a Handoff created by this process to the paused Simulation.
 Integration.MmiVirtualCameraImage	가상 카메라 입력 이미지	Virtual camera input image
 Integration.MmiVirtualCameraImageEmpty	가상 촬영 후 프로젝트 이미지가 여기에 표시됩니다.	Acquire a virtual frame to show the project image here.
 Integration.MmiVirtualCameraImageError	이미지를 표시할 수 없습니다. 파일이 손상되었거나 지원하지 않는 형식입니다.	The image cannot be displayed. The file is damaged or uses an unsupported format.
@@ -1157,70 +1181,82 @@ Io.CommandRejected	{0} 명령 거부 · {1}: {2}	{0} rejected · {1}: {2}
 Io.StatusAccepted	{0} 명령을 승인했습니다.	{0} was accepted.
 Io.StatusRejected	{0} 명령이 거부되었습니다.	{0} was rejected.
 Sequence.Editor	시퀀스 편집기	Sequence Editor
-Sequence.GraphView	동작 흐름	Action flow
-Sequence.TableView	단계 표	Step table
+Sequence.GraphView	스텝 흐름	Action flow
+Sequence.TableView	스텝 표	Step table
 Sequence.Tagline	결정적 자동 사이클을 작성합니다.	Author the deterministic automatic cycle
-Sequence.NewStep	새 단계	New step
+Sequence.NewStep	새 스텝	New step
 Sequence.Add	추가	Add
 Sequence.Delete	삭제	Delete
-Sequence.AddTooltip	완료 단계 앞에 새 단계를 추가합니다.	Insert a new step before the final Complete step.
-Sequence.DeleteTooltip	선택한 종료 단계가 아닌 단계를 삭제합니다.	Delete the selected non-terminal step.
-Sequence.MoveUp	위로 이동	Move up
-Sequence.MoveDown	아래로 이동	Move down
+Sequence.AddTooltip	완료 스텝 앞에 새 스텝을 추가합니다.	Insert a new step before the final Complete step.
+Sequence.DeleteTooltip	종료 스텝을 제외한 선택 스텝을 삭제합니다.	Delete the selected non-terminal step.
+Sequence.MoveUp	위로	Move up
+Sequence.MoveDown	아래로	Move down
 Sequence.Name	이름	Name
-Sequence.Step	단계	Step
-Sequence.Action	동작	Action
+Sequence.Step	스텝	Step
+Sequence.Action	종류	Action
 Sequence.Target	대상	Target
-Sequence.WorkpieceTarget	촬영 대상 작업물	Target workpiece
-Sequence.NoWorkpieceAssociation	작업물 연결 안 함	No workpiece association
+Sequence.WorkpieceTarget	촬영 대상 제품	Target workpiece
+Sequence.NoWorkpieceAssociation	제품 연결 안 함	No workpiece association
 Sequence.Value	값	Value
-Sequence.Timeout	시간 제한	Timeout
+Sequence.Timeout	타임아웃 (ms)	Timeout
 Sequence.Next	다음	Next
 Sequence.Error	오류	Error
 Sequence.Failure	실패	Failure
-Sequence.StepId	단계 ID	Step ID
+Sequence.StepId	스텝 ID	Step ID
 Sequence.Validation	검증	Validation
 Sequence.ValidationInitial	검증 결과 {0}건을 기준으로 삼았습니다.	Validation baseline: {0} issue(s).
 Sequence.ValidationUnchanged	검증 결과가 동일합니다: {0}건	Validation unchanged: {0} issue(s).
 Sequence.ValidationImproved	검증 결과가 개선되었습니다: {0}건 → {1}건	Validation improved: {0} → {1} issue(s).
 Sequence.ValidationRegressed	검증 결과가 악화되었습니다: {0}건 → {1}건	Validation regressed: {0} → {1} issue(s).
 Sequence.ValidationChanged	검증 항목이 변경되었습니다: {0}건 → {1}건	Validation changed: {0} → {1} issue(s).
-Sequence.ValidationIssueLocationFormat	시퀀스 {0} · 단계 {1} · 대상 {2} · 속성 {3}	Sequence {0} · step {1} · target {2} · property {3}
+Sequence.ValidationIssueLocationFormat	시퀀스 {0} · 스텝 {1} · 대상 {2} · 속성 {3}	Sequence {0} · step {1} · target {2} · property {3}
 Sequence.ExpectedCheckpoint	종료 상태 검증	End-state check
-Sequence.ExpectedCheckpointTooltip	이 단계가 끝날 때 선택한 장비 상태를 검증합니다.	Validate the selected equipment state when this step ends.
+Sequence.ExpectedCheckpointTooltip	이 스텝이 끝날 때 선택한 장비 상태를 검증합니다.	Validate the selected equipment state when this step ends.
 Sequence.ExpectedState	기대 상태	Expected
 Sequence.NoSequenceSelected	선택한 시퀀스 없음	No sequence selected
-Sequence.SelectSequenceHint	시퀀스를 선택해 단계를 편집하세요.	Select a sequence to edit steps.
+Sequence.SelectSequenceHint	시퀀스를 선택해 스텝을 편집하세요.	Select a sequence to edit steps.
 Sequence.SelectEditableHint	편집 가능한 시퀀스와 호환되는 대상을 선택하세요.	Select an editable sequence and a compatible target.
-Sequence.ValidSummary	유효 · {0}개 단계	VALID · {0} steps
+Sequence.ValidSummary	유효 · 스텝 {0}개	VALID · {0} steps
 Sequence.InvalidSummary	유효하지 않음 · {0}건	INVALID · {0} issue(s)
 Sequence.StructuralLinear	선형 경로: 설계 모드에서 추가·삭제·순서 변경을 사용할 수 있습니다.	Linear path: add, remove, and reorder are available in Design mode.
 Sequence.StructuralBranched	분기 경로: 필드만 편집할 수 있으며 구조 명령은 잠겨 있습니다.	Branched path: edit fields only; structural commands are locked.
 Sequence.StepValid	유효	Valid
 Sequence.ExpectedStateFormat	기대 상태: {0} = {1}	Expected: {0} = {1}
 Sequence.Action.None	없음	None
-Sequence.Action.MoveAxis	축 이동	Move axis
+Sequence.Action.MoveAxis	축 이동 명령	Move axis
 Sequence.Action.SetChannel	채널 설정	Set channel
 Sequence.Action.Wait	대기	Wait
-Sequence.Action.TriggerCamera	카메라 트리거	Trigger camera
+Sequence.Action.TriggerCamera	촬영(트리거)	Trigger camera
 Sequence.Action.CallSubsequence	하위 시퀀스 호출	Call subsequence
 Sequence.Action.WaitSignal	신호 대기	Wait for signal
 Sequence.Action.SetSignal	신호 설정	Set signal
-Sequence.Action.WaitAxisDone	축 완료 대기	Wait for axis
+Sequence.Action.WaitAxisDone	축 이동 완료 대기	Wait for axis
 Sequence.Action.Complete	완료	Complete
 Sequence.Action.WaitVisionResult	검사 결과 대기	Wait for vision result
-Sequence.Action.FeedWorkpiece	작업물 투입	Feed workpiece
-Sequence.Action.EjectWorkpiece	작업물 배출	Eject workpiece
-Sequence.Template.set-output-on	출력 ON 설정	Set output ON
-Sequence.Template.set-output-off	출력 OFF 설정	Set output OFF
+Sequence.Action.FeedWorkpiece	제품 투입	Feed workpiece
+Sequence.Action.EjectWorkpiece	제품 배출	Eject workpiece
+Sequence.Action.Delay	딜레이	Delay
+Sequence.Action.FeedUnitWorkpiece	유닛 제품 투입	Feed unit workpiece
+Sequence.Action.ReceiveUnitWorkpiece	유닛 제품 수신	Receive unit workpiece
+Sequence.Action.TransferUnitWorkpiece	다음 유닛으로 이송	Transfer to next unit
+Sequence.Action.EjectUnitWorkpiece	검사 결과에 따라 배출	Eject by inspection result
+Sequence.Action.BranchInspection	유닛 검사 OK/NG 분기	Branch on unit inspection
+Sequence.Template.set-output-on	출력 ON	Set output ON
+Sequence.Template.set-output-off	출력 OFF	Set output OFF
 Sequence.Template.wait-input-on	입력 ON 대기	Wait for input ON
 Sequence.Template.wait-input-off	입력 OFF 대기	Wait for input OFF
-Sequence.Template.move-axis-home	축 원점 이동	Move axis to home
-Sequence.Template.wait-axis-done	축 완료 대기	Wait for axis done
-Sequence.Template.trigger-camera	가상 카메라 트리거	Trigger virtual camera
-Sequence.Template.feed-workpiece	작업물 투입	Feed workpiece
-Sequence.Template.eject-workpiece	작업물 배출	Eject workpiece
+Sequence.Template.move-axis-home	축 이동 명령	Move axis to home
+Sequence.Template.wait-axis-done	축 이동 완료 대기	Wait for axis done
+Sequence.Template.trigger-camera	촬영(트리거)	Trigger virtual camera
+Sequence.Template.feed-workpiece	제품 투입	Feed workpiece
+Sequence.Template.eject-workpiece	제품 배출	Eject workpiece
 Sequence.Template.call-subsequence	하위 시퀀스 호출	Call subsequence
+Sequence.Template.delay	딜레이	Delay (seconds)
+Sequence.Template.feed-unit	유닛 제품 투입	Feed unit workpiece
+Sequence.Template.receive-unit	유닛 제품 수신	Receive unit workpiece
+Sequence.Template.transfer-unit	다음 유닛으로 이송 (초)	Transfer to next unit (seconds)
+Sequence.Template.eject-unit	검사 결과에 따라 배출	Eject by inspection result
+Sequence.Template.branch-inspection	유닛 검사 OK/NG 분기	Branch on unit inspection
 Simulation.ScenarioSummary	시나리오: {0} | 모드: {1} | 시드: {2} | 기간: {3}사이클	Scenario: {0} | Mode: {1} | Seed: {2} | Duration: {3} cycles
 Simulation.WorkspaceRunning	시뮬레이션 실행 중 | 사이클 {0} | 활성 {1} | 알람 {2} | {3}	Simulation running | cycle {0} | {1} active | {2} alarm | {3}
 Simulation.WorkspacePaused	시뮬레이션 일시정지 | 사이클 {0} | 활성 {1} | 알람 {2} | {3}	Simulation paused | cycle {0} | {1} active | {2} alarm | {3}
@@ -1240,8 +1276,10 @@ Simulation.ScenarioDescription.fault-injection	운영자 대응 훈련을 위해
 Simulation.ScenarioDescription.recovery	초기 불안정 후 높은 복구 확률로 안정 상태로 돌아가는 복구 경로입니다.	Tough recovery path: initial instability then stable return with high recovery chance.
 Simulation.ScenarioDescription.congested	장비 전체의 처리량 병목과 혼잡 압력을 재현합니다.	Throughput bottleneck and congestion pressure across equipment.
 Simulation.TestScenario	테스트 시나리오	Test scenario
+Shell.TestScenarioMenu	테스트 시나리오…	Test scenario…
+Simulation.ScenarioConditions	조건 설정	Scenario conditions
 Simulation.TestScenarioHint	엔진 스냅샷 기반의 결정적 조건 변화를 실행합니다.	Run deterministic condition changes from the engine snapshot.
-Simulation.TestWorkspaceRunHint	조건을 설정한 뒤 상단에서 운전 모드로 전환하여 시험을 실행하세요.	Configure the conditions, then switch to Run mode above to execute the test.
+Simulation.TestWorkspaceRunHint	조건 설정 후 이 창을 닫고 운전 모드로 전환하세요. 보기 메뉴에서 다시 열어 시나리오를 시작할 수 있습니다.	After configuring conditions, close this dialog and switch to Run mode. Reopen it from View to start the scenario.
 Simulation.ScenarioProfile	시나리오 프로필	Scenario profile
 Simulation.RuntimeTarget	런타임 대상	Runtime target
 Simulation.DurationTicks	기간 (Tick)	Duration (ticks)
@@ -1272,7 +1310,7 @@ Simulation.AcceptanceCriteria	통과 조건	Acceptance criteria
 Simulation.AcceptanceCriteriaHint	반복 실행이 성공하려면 만족해야 하는 결과를 선택합니다.	Choose the outcomes required for a successful repeat run.
 Simulation.RequireAutomaticCycleCompleted	자동 사이클 완료	Automatic cycle completed
 Simulation.MinimumCompletedCycles	최소 완료 횟수	Minimum completions
-Simulation.RequireNoActiveFaults	마지막에 활성 장애 없음	No active faults at finish
+Simulation.RequireNoActiveFaults	마지막에 활성 고장 없음	No active faults at finish
 Simulation.RequireFinalEquipmentState	마지막 장비 상태 확인	Check final equipment state
 Simulation.AssertionTarget	대상 장비	Equipment
 Simulation.ExpectedFinalState	예상 상태	Expected state
@@ -1288,7 +1326,7 @@ Simulation.AssertionOutcomeEquipment	{0}: {1} / 예상 {2} · Tick {3}	{0}: {1} 
 Simulation.RepeatValidation	반복 검증	Repeat validation
 Simulation.RepeatValidationHint	같은 조건을 순차 실행하고 각 결과를 첫 실행 또는 승인 기준선과 비교합니다.	Run the same conditions sequentially and compare each result with the first run or accepted baseline.
 Simulation.RepetitionCount	반복 횟수	Repetitions
-Simulation.RunBatch	반복 실행	Run batch
+Simulation.RunBatch	반복 운전	Run batch
 Simulation.CancelBatch	취소	Cancel
 Simulation.AcceptBaseline	기준선 승인	Accept baseline
 Simulation.ClearBaseline	기준선 해제	Clear baseline
@@ -1361,7 +1399,7 @@ Simulation.CommandTraceReplayed	{0}개 명령 추적을 재생했습니다. 해�
 Simulation.CommandTraceReplayStatus	최근 재생: {0}개 명령 경계 · 해시 {1}	Last replay: {0} command boundaries · hash {1}
 Simulation.CommandTraceReplayFailed	명령 추적을 재생하지 않았습니다: {0}	Command trace was not replayed: {0}
 Equipment.MachineFrame	머신 프레임	Machine frame
-Equipment.LinearStageMotor	리니어 스테이지 / 모터	Linear stage / motor
+Equipment.LinearStageMotor	리니어 축 / 모터	Linear stage / motor
 Equipment.RotaryStageMotor	회전 스테이지 / 모터	Rotary stage / motor
 Equipment.DigitalSensor	디지털 센서	Digital sensor
 Equipment.PneumaticCylinder	공압 실린더	Pneumatic cylinder
@@ -1387,16 +1425,26 @@ Equipment.Binding	바인딩	Binding
 Equipment.Speed	속도	Speed
 Equipment.Direction	방향	Direction
 Equipment.Type	유형	Type
-Equipment.AddComponentButton	+ 부품	+ Components
-Equipment.AddPartButton	+ 부품	+ Part
-Equipment.CoordinateX	X (LU)	X (LU)
-Equipment.CoordinateHeightY	높이 Y (LU)	Height Y (LU)
-Equipment.CoordinateDepthZ	깊이 Z (LU)	Depth Z (LU)
+Equipment.AddComponentButton	+ 장치	+ Components
+Equipment.AddPartButton	+ 장치	+ Part
+Equipment.CoordinateX	X (이송, LU)	X (LU)
+Equipment.CoordinateHeightY	Z (높이, LU)	Height Y (LU)
+Equipment.CoordinateDepthZ	Y (폭, LU)	Depth Z (LU)
+Equipment.OutlineTitle	장비	Equipment
+Equipment.OutlineProductModelName	제품 모델: {0}	Product model: {0}
+Equipment.OutlineEquipmentDetail	{0}개 유닛 · {1}개 장치	{0} units · {1} devices
+Equipment.OutlineOverviewDetail	{0}개 유닛 · {1}개 장치 · {2}개 제품	{0} units · {1} devices · {2} products
+Equipment.OutlineUnitDetail	{0} · 장치 {1} · 스텝 {2}	{0} · devices {1} · steps {2}
+Equipment.OutlineEmpty	장치가 없습니다. 유닛과 장치를 추가하세요.	No devices. Add a unit and devices.
+Equipment.OutlineCamera2D	2D 카메라	2D camera
+Equipment.OutlineCamera3D	3D 센서(높이 측정)	3D sensor (height measurement)
 Equipment.OutlineCount	{0}개	{0} parts
-Equipment.OutlineUnitAutomationName	{0} / 부품 수: {1}	{0} / component count: {1}
+Equipment.OutlineUnitAutomationName	{0} / 장치 수: {1}	{0} / component count: {1}
 Equipment.OutlineSelection	{0}개 선택	{0} selected
 Equipment.OutlineSelectPart	{0} 선택	Select {0}
-Equipment.OutlineSearch	이름·ID·종류·유닛 검색	Search name · ID · kind · unit
+Equipment.OutlineSearch	이름·ID·종류 검색	Search name · ID · kind
+Equipment.OutlineSearchName	장치 검색	Device search
+Equipment.OutlineUnassignedDevices	미배정 장치	Unassigned devices
 Equipment.OutlineSearchClear	검색 지우기	Clear search
 Equipment.OutlineAddUnit	+ 유닛	+ Unit
 Equipment.OutlineRemoveUnit	유닛 삭제	Delete unit
@@ -1406,15 +1454,23 @@ Equipment.OutlinePrevious	이전	Previous
 Equipment.OutlineNext	다음	Next
 Equipment.OutlineUnassigned	미배정	Unassigned
 Equipment.OutlineUnitActiveStatus	현재 유닛	Current unit
-Equipment.ComponentCountLabel	부품	components
-Equipment.LibrarySearchLabel	부품 종류 검색	Search component types
+Equipment.ComponentCountLabel	장치	components
+Equipment.LibrarySearchLabel	장치 종류 검색	Search component types
 Equipment.LibrarySearchClear	검색 지우기	Clear search
-Equipment.LibraryNoMatches	일치하는 부품이 없습니다.	No matching components
-Equipment.LibraryUnitRequired	부품을 추가할 스테이션·유닛을 먼저 선택하거나 만드세요.	Select or create the station and unit that will receive the component.
-Equipment.LibraryDialogTitle	부품 추가	Add component
+Equipment.LibraryNoMatches	일치하는 장치가 없습니다.	No matching components
+Equipment.LibraryUnitRequired	장치를 추가할 스테이션·유닛을 먼저 선택하거나 만드세요.	Select or create the station and unit that will receive the component.
+Equipment.LibraryDialogTitle	장치 추가	Add component
+Equipment.RemovalWorkpiece	제품	Workpiece
+Equipment.RemovalExpectedTarget	기대 대상	Expected target
+Equipment.RemovalTarget	대상	Target
+Equipment.RemovalNoImpacts	참조하는 시퀀스 연결이 없습니다.	No sequence connections reference these components.
+Equipment.RemovalImpacts	영향받는 시퀀스 연결	Affected sequence connections
+Equipment.RemovalTitleSingle	선택 장치 {0}개를 삭제할까요?	Delete {0} selected component?
+Equipment.RemovalTitle	선택 장치 {0}개를 삭제할까요?	Delete {0} selected components?
+Equipment.RemovalWarning	장치를 삭제해도 시퀀스와 장비 정의의 연결은 자동으로 지워지지 않습니다. 영향을 확인하고 필요한 연결을 수정하세요.	Deleting components does not silently remove sequence or device definitions. Review and repair affected connections.
 Equipment.OverviewButton	전체 장비	Whole machine
-Equipment.StationUnitAddButton	스테이션·유닛 추가	Add station / unit
-Equipment.StationUnitDialogTitle	스테이션·유닛 설정	Station and unit setup
+Equipment.StationUnitAddButton	유닛 추가	Add unit
+Equipment.StationUnitDialogTitle	유닛 추가	Add unit
 Equipment.StationUnitDialogHint	기존 스테이션에 유닛을 추가하거나 새 스테이션과 유닛을 만듭니다. 파일 저장은 별도로 해야 합니다.	Add a unit to an existing station or create a station and unit. Save the project separately to retain the change.
 Equipment.StationUnitUnitName	유닛 이름	Unit name
 Equipment.StationUnitStation	스테이션	Station
@@ -1435,13 +1491,13 @@ Equipment.StationRemovalTitle	스테이션 '{0}'을(를) 삭제할까요?	Delete
 Equipment.StationRemovalMessage	빈 스테이션 '{0}'을(를) 현재 프로젝트에서 삭제합니다. 변경을 보존하려면 프로젝트를 저장하세요.	Remove empty station '{0}' from the current project. Save the project separately to keep this change.
 Equipment.StationRemovedStatus	스테이션 '{0}'을(를) 프로젝트에서 삭제했습니다. 변경을 보존하려면 저장하세요.	Removed station '{0}' from the project. Save to retain the change.
 Equipment.UnitRemovalTitle	유닛 '{0}'을(를) 삭제할까요?	Delete unit '{0}'?
-Equipment.UnitRemovalMessage	'{0}' 스테이션의 '{1}' 유닛을 프로젝트에서 삭제합니다. 연결된 부품은 삭제하지 않습니다. 변경을 보존하려면 프로젝트를 저장하세요.	Remove unit '{1}' from station '{0}'. Assigned components are never deleted. Save the project separately to keep this change.
-Equipment.UnitRemovalBlocked	'{0}' 유닛에 연결된 부품 {1}개가 있어 삭제할 수 없습니다. 다른 유닛으로 재배정하거나 미배정으로 바꾸세요.	Cannot delete unit '{0}' while {1} assigned components remain. Reassign them or set them to Unassigned first.
+Equipment.UnitRemovalMessage	'{0}' 스테이션의 '{1}' 유닛을 프로젝트에서 삭제합니다. 연결된 장치는 삭제하지 않습니다. 변경을 보존하려면 프로젝트를 저장하세요.	Remove unit '{1}' from station '{0}'. Assigned components are never deleted. Save the project separately to keep this change.
+Equipment.UnitRemovalBlocked	'{0}' 유닛에 연결된 장치 {1}개가 있어 삭제할 수 없습니다. 다른 유닛으로 재배정하거나 미배정으로 바꾸세요.	Cannot delete unit '{0}' while {1} assigned components remain. Reassign them or set them to Unassigned first.
 Equipment.UnitRemovalBlockedTitle	유닛을 삭제할 수 없습니다	Cannot delete unit
 Equipment.UnitRemovedStatus	유닛 '{0}'을(를) 프로젝트에서 삭제했습니다. 변경을 보존하려면 저장하세요.	Removed unit '{0}' from the project. Save to retain the change.
 Equipment.LargeOverviewTitle	전체 장비 / {0}개 유닛	Whole machine / {0} units
 Equipment.LargeOverviewHint	구성요소가 많은 장비입니다. 작업할 유닛을 선택하세요.	This machine has many components. Select a unit to work on.
-Equipment.LargeOverviewCount	{0}개 부품 / {1}개 동작	{0} components / {1} actions
+Equipment.LargeOverviewCount	{0}개 장치 / {1}개 스텝	{0} components / {1} actions
 Equipment.LargeOverviewOpen	유닛 열기 →	Open unit →
 Equipment.SimulationUnitsTitle	유닛 구성	Units
 Equipment.SimulationUnitSelectPlaceholder	유닛 선택	Select a unit
@@ -1454,18 +1510,26 @@ Equipment.BulkMoveZ	Z 이동 (mm)	Z offset (mm)
 Equipment.BulkMoveCancel	취소	Cancel
 Equipment.BulkMoveApply	이동 적용	Apply move
 Equipment.BulkMoveInvalid	X와 Z 이동 거리를 숫자로 입력하세요.	Enter numeric X and Z offsets.
-Equipment.SinglePartCheck	단품 확인	Single-part check
+Equipment.SinglePartCheck	수동 조작	Single-part check
 Equipment.PlacementTab	배치	Placement
 Equipment.DriveTab	구동	Drive
-Equipment.DriveTabHint	구동·입출력 값은 변경 즉시 반영됩니다. 표시할 항목이 없으면 별도 구동 설정이 없는 부품입니다.	Drive and I/O changes take effect immediately. If no fields appear, this component has no separate drive settings.
+Equipment.DriveTabHint	구동·입출력 값은 변경 즉시 반영됩니다. 표시할 항목이 없으면 별도 구동 설정이 없는 장치입니다.	Drive and I/O changes take effect immediately. If no fields appear, this component has no separate drive settings.
 Equipment.AxisDriveDraftHint	축 이동 범위·원점·속도는 변경 적용 후 저장됩니다. 축 단위는 아래에 표시됩니다.	Axis travel, home, and speed are saved after Apply changes. The axis unit appears below.
-Equipment.AxisDriveDraftInvalid	최소·최대 범위, 원점과 양수 속도를 확인하세요.	Check the travel range, home position, and positive speed.
+Equipment.AxisDriveDraftInvalid	소프트 리밋, 원점 위치와 양수 속도를 확인하세요.	Check the travel range, home position, and positive speed.
 Equipment.AxisDriveDraftStale	축이 다른 작업에서 변경되었습니다. 초안을 버리고 현재 값을 다시 확인하세요.	The axis changed elsewhere. Discard the draft and review the current values.
 Equipment.AxisDriveDraftResolveFirst	구동 변경을 적용하거나 버린 뒤 축 연결을 바꾸세요.	Apply or discard drive changes before changing the axis binding.
 Equipment.InspectorDraftTitle	적용하지 않은 설정 변경	Unapplied settings changes
-Equipment.InspectorDraftLeaveMessage	설정 변경을 적용하거나 버린 뒤 계속하세요. 취소하면 현재 화면에서 편집을 계속합니다.	Apply or discard settings changes before continuing. Cancel keeps this editor open.
+Equipment.InspectorDraftLeaveMessage	적용 후 계속하면 변경 내용을 반영합니다. 적용 안 함을 선택하면 변경 내용을 버리고 계속합니다. 취소하면 현재 화면에서 편집을 계속합니다.	Apply or discard settings changes before continuing. Cancel keeps this editor open.
+Equipment.InspectorPending	미적용 변경 있음	Unapplied changes
+Equipment.InspectorRevert	되돌리기	Revert
+Equipment.InspectorLocked	배치·설정은 잠겨 있습니다. 정지 후 편집에서 변경하세요.	Placement and settings are locked. Stop and edit to change them.
+Equipment.InspectorCoordinateY	Y (폭, LU)	Y (depth, LU)
+Equipment.InspectorCoordinateZ	Z (높이, LU)	Z (elevation, LU)
+Equipment.InspectorEnvelopeHint	형상 크기는 LU입니다. 실측 mm 치수가 아닙니다.	Envelope sizes use LU, not measured millimetres.
+Equipment.InspectorEnvelopeEstimated	높이 미설정 · 시각용 추정값. 편집 후 적용하면 레시피에 반영됩니다.	Height unset · visual estimate. Edit and apply to update the recipe.
+Equipment.InspectorAxisDraftHint	축 이동 범위·원점·속도는 변경 적용 후 반영됩니다. 파일 저장은 별도입니다.	Apply changes to update axis travel, home and speed. Save the file separately.
 Equipment.PlacementDraftApply	변경 적용	Apply changes
-Equipment.PlacementDraftDiscard	변경 버리기	Discard changes
+Equipment.PlacementDraftDiscard	적용 안 함	Discard changes
 Equipment.PlacementDraftHint	좌표와 높이는 LU입니다. 변경 적용 후 파일을 저장하세요.	Coordinates and height use LU. Save the file after applying changes.
 Equipment.PlacementDraftTitle	적용하지 않은 배치 변경	Unapplied placement changes
 Equipment.PlacementDraftLeaveMessage	이름·좌표·높이 변경을 적용하거나 버린 뒤 계속하세요. 취소하면 현재 화면에서 편집을 계속합니다.	Apply or discard the name, coordinate, and height changes before continuing. Cancel keeps this editor open.
@@ -1481,7 +1545,7 @@ Equipment.Skipped	건너뜀	SKIP
 Equipment.State.Idle	대기	IDLE
 Equipment.State.Moving	이동 중	MOVING
 Equipment.State.Stopped	정지	STOPPED
-Equipment.State.Error	오류	ERROR
+Equipment.State.Error	알람	ERROR
 Equipment.State.Limited	제한	LIMITED
 Equipment.State.Ready	준비	READY
 Equipment.State.Completed	완료	COMPLETED
@@ -1491,10 +1555,10 @@ Equipment.State.Exposing	노출 중	EXPOSING
 Equipment.State.Transferring	전송 중	TRANSFERRING
 Equipment.State.AwaitingExternalResult	외부 결과 대기	AWAITING EXTERNAL RESULT
 Equipment.State.FrameReady	프레임 준비	FRAME READY
-Equipment.State.Retracted	후퇴	RETRACTED
+Equipment.State.Retracted	후진 완료	RETRACTED
 Equipment.State.Extending	전진 중	EXTENDING
 Equipment.State.Extended	전진 완료	EXTENDED
-Equipment.State.Retracting	후퇴 중	RETRACTING
+Equipment.State.Retracting	후진 중	RETRACTING
 Equipment.State.Running	운전 중	RUNNING
 Equipment.State.Warning	경고	WARNING
 Equipment.State.Alarm	알람	ALARM
@@ -1521,7 +1585,7 @@ Properties.Camera	카메라	Camera
 Properties.Sensor	센서	Sensor
 Properties.Cylinder	실린더	Cylinder
 Properties.Conveyor	컨베이어	Conveyor
-Properties.Workpiece	워크피스	Workpiece
+Properties.Workpiece	제품	Workpiece
 Properties.Id	ID	Id
 Properties.Name	이름	Name
 Properties.Value	값	Value
@@ -1530,13 +1594,13 @@ LayoutValidation.ComponentNameRequired	모든 레이아웃 구성요소에 이�
 Properties.X	X	X
 Properties.Y	Y	Y
 Properties.Rotation	회전	Rotation
-Properties.Width	너비	Width
+Properties.Width	길이 (X)	Width
 Properties.Height	높이	Height
-Properties.Depth	깊이 (Z)	Depth (Z)
+Properties.Depth	폭 (Y)	Depth (Z)
 Properties.Unit	유닛	Unit
 Properties.UnitUnassigned	미배정	Unassigned
 Properties.BaseElevation	기준 고도 (LU)	Base elevation (LU)
-Properties.VerticalHeight	수직 크기 (LU)	Vertical size (LU)
+Properties.VerticalHeight	높이 (Z, LU)	Vertical size (LU)
 Properties.Behavior	동작 바인딩	Behavior
 Properties.ExposureDelay	노출 지연	Exposure delay
 Properties.TransferDelay	전송 지연	Transfer delay
@@ -1546,13 +1610,13 @@ Properties.TargetComponent	대상 컴포넌트	Target component
 Properties.OnDelay	ON 지연	On delay
 Properties.OffDelay	OFF 지연	Off delay
 Properties.ExtendCommand	전진 명령	Extend command
-Properties.ExtendedSensor	전진 센서	Extended sensor
-Properties.RetractedSensor	후퇴 센서	Retracted sensor
+Properties.ExtendedSensor	전진 완료 센서	Extended sensor
+Properties.RetractedSensor	후진 완료 센서	Retracted sensor
 Properties.ExtendDuration	전진 시간	Extend duration
-Properties.RetractDuration	후퇴 시간	Retract duration
+Properties.RetractDuration	후진 시간	Retract duration
 Properties.Stroke	스트로크	Stroke
-Properties.ExtendedSensorDelay	전진 센서 지연	Extended sensor delay
-Properties.RetractedSensorDelay	후퇴 센서 지연	Retracted sensor delay
+Properties.ExtendedSensorDelay	전진 완료 센서 지연	Extended sensor delay
+Properties.RetractedSensorDelay	후진 완료 센서 지연	Retracted sensor delay
 Properties.RunCommand	운전 명령	Run command
 Properties.ReverseCommand	역방향 명령	Reverse command
 Properties.Speed	속도	Speed
@@ -1577,15 +1641,16 @@ Properties.ValueFail	실패	Fail
 Properties.ValuePending	대기	Pending
 Properties.Value.Static	정적	Static
 Properties.Value.MachineFrame	머신 프레임	Machine frame
-Properties.Value.LinearStage	리니어 스테이지	Linear stage
+Properties.Value.LinearStage	리니어 축	Linear stage
 Properties.Value.RotaryStage	회전 스테이지	Rotary stage
 Properties.Value.DigitalSensor	디지털 센서	Digital sensor
 Properties.Value.PneumaticCylinder	공압 실린더	Pneumatic cylinder
 Properties.Value.Conveyor	컨베이어	Conveyor
-Properties.Value.Workpiece	워크피스	Workpiece
+Properties.Value.Workpiece	제품	Workpiece
 Properties.Value.Camera	카메라	Camera
-Properties.Value.Passed	통과	Passed
-Properties.Value.Failed	실패	Failed
+Properties.Value.DigitalIo	디지털 I/O	Digital I/O
+Properties.Value.Passed	OK	Passed
+Properties.Value.Failed	NG	Failed
 Properties.Value.Skipped	건너뜀	Skipped
 Properties.Model.Project	머신 프로젝트	Machine project
 Properties.Model.Layout	머신 레이아웃	Machine layout
@@ -1663,8 +1728,8 @@ Fault.SelectTargetHint	런타임 대상을 선택해 고장을 주입하세요.	
 Fault.NoMatchingTarget	현재 스냅샷에 이 고장 유형과 일치하는 런타임 대상이 없습니다.	No matching runtime target for this fault type in the current snapshot.
 Fault.NoActiveFaults	활성 고장 없음	No active faults
 Debugger.Hint	엔진 소유 실행 경계, 세션 중단점, 상태 Watch, 이벤트 및 복구 상태를 한곳에서 확인합니다.	Inspect engine-owned execution boundaries, session breakpoints, state watches, events, and recovery status in one place.
-Debugger.NextSequenceStep	다음 시퀀스 단계	Next sequence step
-Debugger.NextSequenceStepTooltip	일시정지된 실행을 정확히 다음 시퀀스 전이 경계까지 진행합니다.	Advance a paused run to exactly the next sequence transition boundary.
+Debugger.NextSequenceStep	1스텝 진행	Next sequence step
+Debugger.NextSequenceStepTooltip	일시정지된 운전을 다음 스텝 경계까지 진행합니다.	Advance a paused run to exactly the next sequence transition boundary.
 Debugger.Breakpoints	중단점	Breakpoints
 Debugger.BreakpointSelectionTooltip	실행 전에 일시정지할 시퀀스 단계를 선택합니다.	Select the sequence step where execution pauses before the step runs.
 Debugger.StateWatches	상태 Watch	State watches
@@ -1825,9 +1890,9 @@ Axis.RecipeBaselineAcceptedStatus	선택한 검증 결과를 커미셔닝 기준
 Axis.RecipeBaselineClearedStatus	커미셔닝 기준선을 해제했습니다.	Commissioning baseline cleared.
 Axis.RecipeMismatchNavigationStatus	{0} 축의 첫 불일치 Tick {1}을 선택했습니다.	Selected axis {0} at first mismatch Tick {1}.
 Axis.HomePosition	원점 위치	Home position
-Axis.SoftLimits	소프트 한계	Soft limits
-Axis.SoftLimitMin	최소 소프트 한계	Minimum soft limit
-Axis.SoftLimitMax	최대 소프트 한계	Maximum soft limit
+Axis.SoftLimits	소프트 리밋	Soft limits
+Axis.SoftLimitMin	소프트 리밋 (−)	Minimum soft limit
+Axis.SoftLimitMax	소프트 리밋 (+)	Maximum soft limit
 Axis.MaxVelocity	최대 속도	Maximum velocity
 Axis.MaxAcceleration	최대 가속도	Maximum acceleration
 Axis.MaxDeceleration	최대 감속도	Maximum deceleration
@@ -1835,11 +1900,11 @@ Axis.FollowingErrorLimit	추종 오차 한계	Following error limit
 Axis.ResetDriveDefaults	드라이브 기본값 복원	Restore drive defaults
 Axis.ResetDriveDefaultsTooltip	속도, 가속도, 감속도와 추종 오차 한계를 기본값으로 복원합니다.	Restore velocity, acceleration, deceleration, and following-error limit defaults.
 Axis.TuningValid	작성된 축 설정이 유효합니다.	Authored axis setup is valid.
-Axis.TuningTravelInvalid	소프트 한계와 원점 위치의 범위를 확인하세요.	Check the soft-limit and home-position range.
+Axis.TuningTravelInvalid	소프트 리밋과 원점 위치의 범위를 확인하세요.	Check the soft-limit and home-position range.
 Axis.TuningDriveInvalid	속도, 가속도, 감속도와 추종 오차 한계는 0보다 큰 유한값이어야 합니다.	Velocity, acceleration, deceleration, and following-error limit must be finite and greater than zero.
 Axis.DriveTuningFormat	V {0:F3} {3}/s · A/D {1:F3}/{2:F3} {3}/s²	V {0:F3} {3}/s · A/D {1:F3}/{2:F3} {3}/s²
 Axis.TargetPosition	목표 위치	Target position
-Axis.Move	이동	Move
+Axis.Move	목표 위치로 이동	Move
 Axis.MoveTooltip	입력한 절대 위치로 선택 축을 이동합니다.	Move the selected axis to the entered absolute position.
 Axis.TargetInvalid	숫자로 목표 위치를 입력하세요.	Enter a numeric target position.
 Axis.TargetOutOfRange	목표 위치는 {0:F3} … {1:F3} {2} 범위여야 합니다.	Target position must be within {0:F3} … {1:F3} {2}.
@@ -1854,30 +1919,30 @@ Axis.VelocityInvalid	0이 아닌 숫자로 명령 속도를 입력하세요.	Ent
 Axis.VelocityOutOfRange	명령 속도 크기는 {0:F3} {1} 이하여야 합니다.	Command velocity magnitude must be no greater than {0:F3} {1}.
 Axis.StartManualControl	수동 운전 시작	Start manual control
 Axis.StartManualControlTooltip	자동 또는 시퀀스 운전과 분리된 수동 축 제어를 시작합니다.	Start manual axis control separately from automatic or sequence operation.
-Axis.JogNegative	조그 −	Jog −
-Axis.JogPositive	조그 +	Jog +
-Axis.Home	원점	Home
+Axis.JogNegative	JOG −	Jog −
+Axis.JogPositive	JOG +	Jog +
+Axis.Home	원점 위치 이동	Home
 Axis.Stop	정지	Stop
-Axis.HoldJogNegativeTooltip	누르고 있는 동안 음의 소프트 한계 방향으로 이동합니다.	Move toward the negative soft limit while held.
-Axis.HoldJogPositiveTooltip	누르고 있는 동안 양의 소프트 한계 방향으로 이동합니다.	Move toward the positive soft limit while held.
+Axis.HoldJogNegativeTooltip	누르고 있는 동안 소프트 리밋 (−) 방향으로 이동합니다.	Move toward the negative soft limit while held.
+Axis.HoldJogPositiveTooltip	누르고 있는 동안 소프트 리밋 (+) 방향으로 이동합니다.	Move toward the positive soft limit while held.
 Axis.HomeTooltip	작성된 원점 위치로 이동합니다.	Move to the authored home position.
 Axis.StopTooltip	현재 축 이동을 정지합니다.	Stop the current axis motion.
-Axis.NoAxisHint	커미셔닝할 축이 없습니다.	No axis is available for commissioning.
-Axis.StartManualHint	수동 운전을 시작한 뒤 원점 또는 조그 명령을 사용하세요.	Start manual control, then use Home or Jog.
-Axis.MoveStartManualHint	수동 운전을 시작한 뒤 목표 위치 이동, 원점 또는 조그 명령을 사용하세요.	Start manual control, then use Move, Home, or Jog.
-Axis.RelativeMoveStartManualHint	수동 운전을 시작한 뒤 절대·상대 이동, 원점 또는 조그 명령을 사용하세요.	Start manual control, then use absolute or relative Move, Home, or Jog.
-Axis.ManualMoveHint	절대·상대 이동을 실행하거나 조그 버튼을 누르는 동안 이동하세요.	Use absolute or relative Move, or hold a Jog button to move.
-Axis.VelocityMoveStartManualHint	수동 운전을 시작한 뒤 절대·상대·속도 운전, 원점 또는 조그 명령을 사용하세요.	Start manual control, then use absolute, relative, or velocity motion, Home, or Jog.
-Axis.ManualVelocityMoveHint	절대·상대·속도 운전을 실행하거나 조그 버튼을 누르는 동안 이동하세요.	Use absolute, relative, or velocity motion, or hold a Jog button to move.
-Axis.HoldJogHint	조그 버튼은 누르는 동안만 이동하며 놓으면 정지합니다.	A Jog button moves only while held and stops when released.
+Axis.NoAxisHint	수동 조작할 축이 없습니다.	No axis is available for commissioning.
+Axis.StartManualHint	수동 시운전을 시작한 뒤 원점 위치 이동 또는 JOG 명령을 사용하세요.	Start manual control, then use Home or Jog.
+Axis.MoveStartManualHint	수동 시운전을 시작한 뒤 목표 위치로 이동, 원점 위치 이동 또는 JOG 명령을 사용하세요.	Start manual control, then use Move, Home, or Jog.
+Axis.RelativeMoveStartManualHint	수동 시운전을 시작한 뒤 절대·상대 이동, 원점 위치 이동 또는 JOG 명령을 사용하세요.	Start manual control, then use absolute or relative Move, Home, or Jog.
+Axis.ManualMoveHint	절대·상대 이동을 명령하거나 JOG 버튼을 누르는 동안 이동하세요.	Use absolute or relative Move, or hold a Jog button to move.
+Axis.VelocityMoveStartManualHint	수동 시운전을 시작한 뒤 절대·상대·속도 운전, 원점 위치 이동 또는 JOG 명령을 사용하세요.	Start manual control, then use absolute, relative, or velocity motion, Home, or Jog.
+Axis.ManualVelocityMoveHint	절대·상대·속도 운전을 명령하거나 JOG 버튼을 누르는 동안 이동하세요.	Use absolute, relative, or velocity motion, or hold a Jog button to move.
+Axis.HoldJogHint	JOG 버튼은 누르는 동안만 이동하며 놓으면 정지합니다.	A Jog button moves only while held and stops when released.
 Axis.ResetForManualHint	자동 또는 시퀀스 운전 중입니다. 초기화 후 수동 운전을 시작하세요.	Automatic or sequence operation is active. Reset before starting manual control.
 Axis.ActionStartManual	수동 운전 시작	Start manual control
-Axis.ActionMove	목표 위치 이동	Move to target
+Axis.ActionMove	목표 위치로 이동	Move to target
 Axis.ActionMoveRelative	상대 거리 이동	Move by distance
 Axis.ActionMoveVelocity	속도 운전	Run by velocity
-Axis.ActionHome	원점 이동	Home
-Axis.ActionJogNegative	음의 방향 조그	Jog negative
-Axis.ActionJogPositive	양의 방향 조그	Jog positive
+Axis.ActionHome	원점 위치 이동	Home
+Axis.ActionJogNegative	JOG −	Jog negative
+Axis.ActionJogPositive	JOG +	Jog positive
 Axis.ActionStop	축 정지	Stop axis
 Axis.CommandAccepted	{0} 명령 승인 · {1}	{0} accepted · {1}
 Axis.CommandRejected	{0} 명령 거부 · {1}: {2}	{0} rejected · {1}: {2}
@@ -1892,30 +1957,30 @@ Axis.InterlockReady	정상	Ready
 Axis.InterlockBlocked	이동 차단	Motion blocked
 Axis.ClearInterlockHint	축 이동 차단 고장을 해제하거나 초기화한 뒤 수동 운전을 시작하세요.	Clear the blocked-axis fault or Reset before starting manual control.
 Axis.ClearDriveAlarmHint	Fault Manager에서 축 추종 오차를 해제하거나 초기화한 뒤 수동 운전을 시작하세요.	Clear the axis following-error fault in Fault Manager or Reset before starting manual control.
-Cylinder.Commissioning	실린더 커미셔닝	Cylinder commissioning
+Cylinder.Commissioning	실린더 수동 조작	Cylinder commissioning
 Cylinder.TravelInterlock	이동 인터록	Travel interlock
 Cylinder.InterlockReady	정상	Ready
 Cylinder.InterlockBlocked	이동 차단	Travel blocked
 Cylinder.StartManualControl	수동 운전 시작	Start manual control
 Cylinder.StartManualControlTooltip	자동 또는 시퀀스 운전과 분리된 수동 실린더 제어를 시작합니다.	Start manual cylinder control separately from automatic or sequence operation.
-Cylinder.Retract	후퇴	Retract
+Cylinder.Retract	후진	Retract
 Cylinder.Extend	전진	Extend
-Cylinder.RetractTooltip	선택한 실린더의 작성된 출력으로 후퇴를 명령합니다.	Command the selected cylinder to retract through its authored output.
+Cylinder.RetractTooltip	선택한 실린더의 작성된 출력으로 후진을 명령합니다.	Command the selected cylinder to retract through its authored output.
 Cylinder.ExtendTooltip	선택한 실린더의 작성된 출력으로 전진을 명령합니다.	Command the selected cylinder to extend through its authored output.
-Cylinder.NoCylinderHint	커미셔닝할 실린더를 선택하세요.	Select a cylinder to commission.
-Cylinder.StartManualHint	수동 운전을 시작한 뒤 전진 또는 후퇴 명령을 사용하세요.	Start manual control, then use Extend or Retract.
-Cylinder.ManualRunningHint	전진·후퇴 동작은 엔진의 고정 Tick과 피드백으로 진행됩니다.	Extend and Retract advance through fixed engine ticks and feedback.
-Cylinder.ManualPausedHint	전진 또는 후퇴를 선택한 뒤 단계 실행으로 정확히 한 Tick씩 진행하세요.	Choose Extend or Retract, then use Step to advance exactly one tick.
+Cylinder.NoCylinderHint	수동 조작할 실린더를 선택하세요.	Select a cylinder to commission.
+Cylinder.StartManualHint	수동 시운전을 시작한 뒤 전진 또는 후진 명령을 사용하세요.	Start manual control, then use Extend or Retract.
+Cylinder.ManualRunningHint	전진·후진 동작은 엔진의 고정 Tick과 피드백으로 진행됩니다.	Extend and Retract advance through fixed engine ticks and feedback.
+Cylinder.ManualPausedHint	전진 또는 후진을 선택한 뒤 단계 실행으로 정확히 한 Tick씩 진행하세요.	Choose Extend or Retract, then use Step to advance exactly one tick.
 Cylinder.ResetForManualHint	자동 또는 시퀀스 운전 중입니다. 초기화 후 수동 운전을 시작하세요.	Automatic or sequence operation is active. Reset before starting manual control.
-Cylinder.ClearInterlockHint	이동 차단 고장을 해제한 뒤 전진 또는 후퇴를 다시 명령하세요.	Clear the travel fault, then explicitly command Extend or Retract again.
+Cylinder.ClearInterlockHint	이동 차단 고장을 해제한 뒤 전진 또는 후진을 다시 명령하세요.	Clear the travel fault, then explicitly command Extend or Retract again.
 Cylinder.ActionStartManual	수동 운전 시작	Start manual control
-Cylinder.ActionRetract	실린더 후퇴	Retract cylinder
+Cylinder.ActionRetract	실린더 후진	Retract cylinder
 Cylinder.ActionExtend	실린더 전진	Extend cylinder
 Cylinder.CommandAccepted	{0} 명령 승인 · {1}	{0} accepted · {1}
 Cylinder.CommandRejected	{0} 명령 거부 · {1}: {2}	{0} rejected · {1}: {2}
 Cylinder.StatusAccepted	{0} 명령이 승인되었습니다.	{0} was accepted.
 Cylinder.StatusRejected	{0} 명령이 거부되었습니다.	{0} was rejected.
-Conveyor.Commissioning	컨베이어 커미셔닝	Conveyor commissioning
+Conveyor.Commissioning	컨베이어 수동 조작	Conveyor commissioning
 Conveyor.StartManualControl	수동 운전 시작	Start manual control
 Conveyor.StartManualControlTooltip	자동 또는 시퀀스 운전과 분리된 수동 컨베이어 제어를 시작합니다.	Start manual conveyor control separately from automatic or sequence operation.
 Conveyor.Forward	정방향	Forward
@@ -1924,7 +1989,7 @@ Conveyor.Reverse	역방향	Reverse
 Conveyor.ForwardTooltip	선택한 컨베이어를 작성된 속도로 정방향 운전합니다.	Run the selected conveyor forward at its authored speed.
 Conveyor.StopTooltip	선택한 컨베이어를 정지합니다.	Stop the selected conveyor.
 Conveyor.ReverseTooltip	선택한 컨베이어를 작성된 속도로 역방향 운전합니다.	Run the selected conveyor in reverse at its authored speed.
-Conveyor.NoConveyorHint	커미셔닝할 컨베이어를 선택하세요.	Select a conveyor to commission.
+Conveyor.NoConveyorHint	수동 조작할 컨베이어를 선택하세요.	Select a conveyor to commission.
 Conveyor.StartManualHint	수동 운전을 시작한 뒤 정방향 또는 역방향을 선택하세요.	Start manual control, then choose Forward or Reverse.
 Conveyor.ManualRunningHint	정방향·정지·역방향 명령은 엔진의 고정 Tick에서 반영됩니다.	Forward, Stop, and Reverse are applied on fixed engine ticks.
 Conveyor.ManualPausedHint	방향 또는 정지를 선택한 뒤 단계 실행으로 정확히 한 Tick씩 확인하세요.	Choose a direction or Stop, then use Step to verify exactly one tick.
@@ -1937,12 +2002,12 @@ Conveyor.CommandAccepted	{0} 명령 승인 · {1}	{0} accepted · {1}
 Conveyor.CommandRejected	{0} 명령 거부 · {1}: {2}	{0} rejected · {1}: {2}
 Conveyor.StatusAccepted	{0} 명령이 승인되었습니다.	{0} was accepted.
 Conveyor.StatusRejected	{0} 명령이 거부되었습니다.	{0} was rejected.
-Sensor.Commissioning	센서 커미셔닝	Sensor commissioning
+Sensor.Commissioning	센서 수동 조작	Sensor commissioning
 Sensor.ForceState	입력 소유 상태	Input ownership
 Sensor.ForceReleased	자동 감지	Automatic detection
 Sensor.ForcedOn	수동 Force ON	Manual Force ON
 Sensor.ForcedOff	수동 Force OFF	Manual Force OFF
-Sensor.FaultOverride	고장 Override	Fault override
+Sensor.FaultOverride	센서 상시 ON/OFF	Fault override
 Sensor.StartManualControl	수동 운전 시작	Start manual control
 Sensor.StartManualControlTooltip	자동 또는 시퀀스 운전과 분리된 수동 센서 입력 제어를 시작합니다.	Start manual sensor input control separately from automatic or sequence operation.
 Sensor.ForceOn	Force ON	Force ON
@@ -1951,12 +2016,12 @@ Sensor.ClearForce	Force 해제	Clear force
 Sensor.ForceOnTooltip	선택 센서의 유효 입력을 ON으로 고정하고 실제 감지값은 계속 보존합니다.	Force the selected sensor input ON while retaining its current detected value.
 Sensor.ForceOffTooltip	선택 센서의 유효 입력을 OFF로 고정하고 실제 감지값은 계속 보존합니다.	Force the selected sensor input OFF while retaining its current detected value.
 Sensor.ClearForceTooltip	수동 Force를 해제하고 최신 실제 감지값으로 복귀합니다.	Clear the manual force and return to the latest detected value.
-Sensor.NoSensorHint	커미셔닝할 디지털 센서를 선택하세요.	Select a digital sensor to commission.
+Sensor.NoSensorHint	수동 조작할 디지털 센서를 선택하세요.	Select a digital sensor to commission.
 Sensor.StartManualHint	수동 운전을 시작한 뒤 Force ON 또는 Force OFF를 선택하세요.	Start manual control, then choose Force ON or Force OFF.
 Sensor.ManualRunningHint	Force 중에도 실제 감지값은 고정 Tick마다 갱신되며 해제 시 즉시 복귀합니다.	The detected value keeps updating on fixed ticks and is restored immediately when force is cleared.
 Sensor.ManualPausedHint	Force를 선택한 뒤 단계 실행으로 정확히 한 Tick 이후에도 유지되는지 확인하세요.	Choose a force, then use Step to verify that it remains active after exactly one tick.
 Sensor.ResetForManualHint	자동 또는 시퀀스 운전 중입니다. 초기화한 뒤 수동 운전을 시작하세요.	Automatic or sequence operation is active. Reset before starting manual control.
-Sensor.ClearFaultHint	Stuck-input 고장을 해제하거나 초기화한 뒤 수동 Force를 사용하세요.	Clear the stuck-input fault or Reset before using manual force.
+Sensor.ClearFaultHint	고장 시뮬레이션에서 센서 상시 ON/OFF를 해제하거나 초기화한 뒤 수동 조작하세요.	Clear the stuck-input fault or Reset before using manual force.
 Sensor.ActionStartManual	수동 운전 시작	Start manual control
 Sensor.ActionForceOn	센서 Force ON	Force sensor ON
 Sensor.ActionForceOff	센서 Force OFF	Force sensor OFF
@@ -1965,39 +2030,42 @@ Sensor.CommandAccepted	{0} 명령 승인 · {1}	{0} accepted · {1}
 Sensor.CommandRejected	{0} 명령 거부 · {1}: {2}	{0} rejected · {1}: {2}
 Sensor.StatusAccepted	{0} 명령을 승인했습니다.	{0} was accepted.
 Sensor.StatusRejected	{0} 명령이 거부되었습니다.	{0} was rejected.
-Equipment.ManualCommissioning	수동 커미셔닝	Manual commissioning
-Equipment.StartManualControl	수동 운전 시작	Start manual control
+Equipment.ManualCommissioning	수동 조작	Manual commissioning
+Equipment.StartManualControl	수동 시운전 시작	Start manual control
 Equipment.StartManualControlTooltip	선택 장비를 자동 또는 시퀀스 운전과 분리된 수동 제어로 전환합니다.	Switch the selected equipment to manual control separately from automatic or sequence operation.
 Workspace.Equipment	장비 구성	Equipment setup
-Workspace.Teaching	시뮬레이션	Simulation
-Workspace.Execution	검사 연결	Inspection connection
-Workspace.Results	실행 기록	Run records
+Workspace.Teaching	시퀀스·시운전	Simulation
+Workspace.Execution	비전 검사	Inspection connection
+Workspace.Results	운전 이력	Run records
 Workspace.ResultsHint	다축 반복 검증 이력을 선택하고 기준 결과와 비교하세요. 시험 결과는 제품 검사 판정과 별도로 관리합니다.	Select a multi-axis validation run and compare it with the baseline. Test results are separate from product inspection judgments.
 Scene.EquipmentView	장비 보기	Machine
-Scene.ViewPlan	평면 보기	Top view
-Scene.ViewOblique	사선 3D 보기	Oblique 3D view
+Scene.ViewPlan	평면도	Top view
+Scene.ViewOblique	3D 뷰	3D view
 Scene.ToggleViewTooltip	같은 장비 장면을 사선 3D와 평면 보기로 전환합니다.	Switch the same equipment scene between oblique and top views.
+Scene.OrbitHelp	회전: 우클릭 끌기 · 이동: 가운데 버튼 · 확대: 휠 · 복원: Home	Orbit: right drag · Pan: middle drag · Zoom: wheel · Reset: Home
 Scene.SchematicEstimateShort	추정	EST
 Scene.SimulationState	시뮬레이션	Simulation
 Scene.SequenceState	시퀀스	Sequence
 Integration.InspectionWorkspace	검사 연동	Inspection
 Integration.ExchangeStatusCaption	거래 상태	Transaction status
-RecipeEntry.New	새 레시피 만들기	Create a new recipe
-RecipeEntry.NewDescription	빈 레시피에서 가상 장비 구성을 시작합니다.	Start a virtual machine layout from a blank recipe.
-RecipeEntry.InspectionTitle	같은 작업물 2D·높이 판정 흐름 (모의)	Same-workpiece 2D and height-verdict flow (mock)
-RecipeEntry.InspectionDescription	상면 검사 뒤 고정 모의 높이 판정을 진행합니다. 입력 이미지와 수치 HeightMap은 생성하지 않습니다.	Runs a fixed mock height verdict after top inspection. No input image or numeric HeightMap is generated.
+RecipeEntry.New	새 레시피	New recipe
+RecipeEntry.NewTitle	새 장비	New machine
+RecipeEntry.NewDescription	빈 레시피에서 유닛과 장치를 추가합니다.	Add units and devices to a blank recipe.
+RecipeEntry.InspectionTitle	같은 제품의 2D·높이 판정 예제	Same-workpiece 2D and height-verdict flow (mock)
+RecipeEntry.InspectionDescription	상면 검사 뒤 고정 높이 판정을 시뮬레이션합니다. 촬영 이미지와 수치 높이맵은 생성하지 않는 예제입니다.	Runs a fixed mock height verdict after top inspection. No input image or numeric HeightMap is generated.
 RecipeEntry.InspectionOpen	검사 예제 열기	Open inspection example
-RecipeEntry.LargeTitle	500개 부품 탐색	Explore 500 components
+RecipeEntry.LargeTitle	500개 장치 탐색	Explore 500 components
 RecipeEntry.LargeDescription	스테이션 2개와 유닛 20개에 구성요소 500개가 담긴 레시피를 엽니다.	Open a recipe with 500 components across 2 stations and 20 units.
-RecipeEntry.LargeHint	탐색용 예제입니다. 이 규모의 실행 성능은 검증되지 않았습니다.	Exploration only. Runtime performance at this scale has not been verified.
+RecipeEntry.LargeHint	탐색용 예제입니다. 이 규모의 운전 성능은 검증되지 않았습니다.	Exploration only. Runtime performance at this scale has not been verified.
 RecipeEntry.LargeOpen	대규모 예제 열기	Open large-layout example
-RecipeEntry.Open	레시피 열기	Open a recipe
+RecipeEntry.Open	레시피 열기…	Open recipe…
+RecipeEntry.SavedTitle	저장한 레시피	Saved recipes
 RecipeEntry.OpenDescription	저장한 레시피를 열어 편집을 이어갑니다.	Open a saved recipe and continue editing.
-RecipeEntry.Title	레시피로 시작하기	Start with a recipe
+RecipeEntry.Title	레시피를 열어 시작하세요	Open a recipe to start
 RecipeEntry.Hint	내 가상 장비를 만들고 동작·검사를 연결해 시운전하세요.	Build your virtual machine, connect its behavior and inspection, and commission it.
-Workspace.EndAndEdit	종료 후 편집	End run and edit
-Workspace.EndAndEditHint	실행을 끝내고 초기 상태로 되돌린 뒤 편집합니다. 일시정지 후 계속하기와 다릅니다.	End and reset the run before editing. This is different from pause and resume.
-Workspace.SaveSettings	설정 저장	Save settings
+Workspace.EndAndEdit	정지 후 편집	End run and edit
+Workspace.EndAndEditHint	운전을 정지하고 초기 상태로 되돌린 뒤 편집합니다. 일시정지 후 운전 재개와 구분합니다.	End and reset the run before editing. This is different from pause and resume.
+Workspace.SaveSettings	저장	Save settings
 
 Equipment.MaterialSlot	{0} 자리	{0} slot
 Equipment.SlotEmpty	비어 있음	Empty
@@ -2018,14 +2086,807 @@ Equipment.SlotInspectionError	검사 오류	Inspection error
 Equipment.SlotMoving	이송 중	Moving
 Equipment.SettingsAction	설정	Settings
 Equipment.SequenceAction	동작 순서	Action sequence
-Equipment.FooterStatus	설정 r{0} / {1}개 선택	Settings r{0} / {1} selected
-Equipment.SimulationOnly	모의 동작 / 실제 장비 제어 없음	Simulation only / no physical device control
+Equipment.FooterStatus	Rev.{0} / {1}개 선택	Settings r{0} / {1} selected
+Equipment.SimulationOnly	가상 장비 · 시뮬레이션	Simulation only / no physical device control
 Connections.RecipeConnectionsTab	레시피 연결	Recipe connections
 Integration.InputResultsTab	입력·검사 결과	Input and results
 Integration.ExternalSetup	외부 검사 설정	External inspection setup
 Camera.InputSingleImage	단일 이미지: {0} / {1}×{2} px / {3}	Single image: {0} / {1}×{2} px / {3}
 Camera.InputNotConfigured	이미지 입력 미설정 / 모의 판정 설정 사용	Image input not configured / uses placeholder decision settings
 Workspace.SessionRecords	현재 세션 기록	Current session records
-Workspace.SessionRecordsHint	최근 실행 이벤트를 확인하고 오류 위치로 이동하세요. 현재 세션의 최대 200개 이벤트를 표시하며 재시작 후 복원하지 않습니다.	Review recent runtime events and navigate to their error location. Shows up to 200 events from the current session; they are not restored after restart.
+Workspace.SessionRecordsHint	최근 운전 이벤트를 확인하고 알람 위치로 이동하세요. 현재 세션의 최대 200개 이벤트를 표시하며 재시작 후 복원하지 않습니다.	Review recent runtime events and navigate to their error location. Shows up to 200 events from the current session; they are not restored after restart.
 Workspace.AxisValidationRecords	다축 검증 기록	Multi-axis validation records
-Workspace.NavigateRuntimeError	오류 위치로 이동	Go to error location
+Workspace.NavigateRuntimeError	알람 위치로 이동	Go to error location
+Equipment.EnterManualCommissioning	수동 시운전 시작	Start manual commissioning
+Equipment.ManualControlScopeHint	선택한 장치의 수동 명령을 사용합니다. 자동 운전·시퀀스·파일 저장은 시작하지 않습니다.	Use the selected device’s manual commands. This does not start an automatic run or sequence, or save the file.
+Equipment.ManualControlOwner	현재 제어권: {0}	Current control: {0}
+Equipment.ManualHint.Applying	장비 구성을 준비하고 있습니다. 완료 후 다시 시도하세요.	The equipment definition is being prepared. Try again when it finishes.
+Equipment.ManualHint.Automatic	자동 운전 또는 시퀀스를 종료·초기화한 뒤 수동 시운전을 시작하세요.	End and reset the automatic run or sequence before starting manual commissioning.
+Equipment.ManualHint.Busy	수동 제어를 준비하고 있습니다. 완료까지 기다려 주세요.	Manual control is being prepared. Wait for it to finish.
+Equipment.ManualHint.CameraReady	수동 제어가 준비됐습니다. 선택 카메라의 촬영 명령을 실행하세요. 편집 복귀 시 운전을 종료·초기화합니다.	Manual control is ready. Trigger the selected camera. Returning to editing ends and resets the run.
+Equipment.ManualHint.Closing	종료 중에는 수동 시운전을 시작할 수 없습니다.	Manual commissioning cannot start while closing.
+Equipment.ManualHint.DirtyRun	편집으로 돌아가 장비 설정을 적용한 뒤 다시 시도하세요.	Return to editing and apply the equipment settings before trying again.
+Equipment.ManualHint.Interlock	선택 장치의 오류 또는 인터록을 해제한 뒤 다시 시도하세요.	Clear the selected component fault or interlock before trying again.
+Equipment.ManualHint.ManualPauseRejected	수동 제어는 시작됐지만 일시정지가 거부됐습니다. 운전을 일시정지한 뒤 현재 장치을 확인하세요.	Manual control started, but pause was rejected. Pause the run and check the current component.
+Equipment.ManualHint.MissingTarget	장치의 구동 연결과 장비 설정을 확인하고 적용한 뒤 다시 시도하세요.	Check and apply the component drive connection and equipment settings before trying again.
+Equipment.ManualHint.NotPrepared	수동 시운전을 시작하지 않았습니다. 초안·장비 설정과 상태 안내를 확인한 뒤 다시 시도하세요.	Manual commissioning was not started. Check the draft, equipment settings and status before trying again.
+Equipment.ManualHint.Pause	진행 중인 운전을 일시정지한 뒤 수동 시운전을 시작하세요.	Pause the current run before starting manual commissioning.
+Equipment.ManualHint.Paused	수동 운전이 일시정지됐습니다. 수동 시운전 시작으로 재개하세요. 편집 복귀 시 운전을 종료·초기화합니다.	Manual control is paused. Start manual commissioning to resume. Returning to editing ends and resets the run.
+Equipment.ManualHint.Prepare	수동 시운전 시작 시 적용된 장비 구성을 준비합니다. 자동 운전·시퀀스는 시작하지 않습니다.	Starting manual commissioning prepares the applied equipment definition. It does not start an automatic run or sequence.
+Equipment.ManualHint.Ready	수동 시운전을 시작한 뒤 선택 장치의 명령을 실행하세요. 자동 운전·시퀀스는 시작하지 않습니다.	Start manual commissioning, then use the selected component commands. No automatic run or sequence will start.
+Equipment.ManualHint.Rejected	수동 제어 요청이 거부됐습니다. 현재 운전 상태와 장치 연결을 확인한 뒤 다시 시도하세요.	Manual control was rejected. Check the run state and component connection before trying again.
+Equipment.ManualHint.RunMode	운전 모드로 전환한 뒤 수동 시운전을 시작하세요.	Switch to Run mode before starting manual commissioning.
+Equipment.ManualHint.Running	수동 운전 중입니다. 선택 장치의 명령을 실행할 수 있습니다. 편집 복귀 시 운전을 종료·초기화합니다.	Manual control is running. Use the selected component commands. Returning to editing ends and resets the run.
+Equipment.ManualHint.Selection	장비 구성에서 장치 하나를 선택하고 현재 편집을 마친 뒤 수동 시운전을 시작하세요.	Select one component in Equipment and finish the current edit before starting manual commissioning.
+Equipment.ManualHint.SelectionChanged	선택이 바뀌어 수동 운전을 일시정지했습니다. 현재 장치을 확인한 뒤 다시 시작하거나 편집으로 돌아가세요.	Manual control was paused because selection changed. Check the current component, then restart or return to editing.
+Equipment.ManualHint.Transition	현재 운전 명령과 모드 전환이 끝난 뒤 다시 시도하세요.	Try again after the current run command and mode transition finish.
+Equipment.ManualHint.Validation	검증이 끝난 뒤 수동 시운전을 시작하세요.	Start manual commissioning after validation finishes.
+Axis.AdvancedMotion	간격·속도 이동	Relative and velocity moves
+Axis.DriveDiagnostics	드라이브 상세 진단	Drive diagnostics
+Sequence.TargetUnassigned	대상 미설정	No target selected
+Sequence.TargetMissing	미연결 대상	Missing target
+Scene.RecipeState	레시피	Recipe
+Shell.RecipeExecutionProgress	{0} · 완료 {1}/{2}	{0} · {1}/{2}
+Shell.RecipeRepeatWaitingProgress	반복 대기 · 완료 {0}/{1}	Repeat waiting · {0}/{1}
+Camera.CurrentInputs	운전 촬영 이미지	Current inputs
+Camera.CurrentInputsSummary	현재 실행 {0} · 최신 입력 {1}개 · 카메라 {2}대	Runtime {0} · {1} latest inputs · {2} cameras
+Camera.LatestInputsOnly	카메라별 최신 입력만 표시합니다.	Shows only the latest input from each camera.
+Camera.ChooseCapturedInput	촬영된 입력 선택	Choose a captured input
+Camera.InputNotAcquired	미촬영 · 현재 입력 없음	Not captured · no current input
+Camera.InputAcquiring	촬영 중 · 입력 준비 대기	Capturing · waiting for input
+Camera.InputFaulted	촬영 실패 · 현재 입력 없음	Capture failed · no current input
+Camera.InputReady	입력 1개 · {0}	1 input · {0}
+Camera.InputAwaitingResult	입력 1개 · 외부 판정 대기	1 input · awaiting external result
+Camera.InputOnlyMockResult	이미지 입력 없음 · 모의 판정 {0}	No image input · mock decision {0}
+Camera.InputRecordedStep	기록된 촬영 스텝: {0}	Recorded capture step: {0}
+Camera.InputLinkedSteps	연결된 등록 단계: {0}	Linked configured steps: {0}
+Camera.InputUnrecordedStep	촬영 스텝 미기록	Capture step not recorded
+Camera.InputContext	제품: {0} · 레시피: {1}	Workpiece: {0} · recipe: {1}
+Camera.InputAcquisition	촬영 ID: {0} · 촬영 번호 {1}	Acquisition: {0} · trigger ordinal {1}
+Camera.InputOriginUnavailable	현재 실행 정보 없음	Current runtime information unavailable
+Camera.InputForeignRuntime	다른 프로젝트의 실행 · 현재 입력 없음	Other project runtime · no current input
+Camera.ExternalHistoryHint	외부 거래의 최신 기록입니다. 현재 카메라·실행의 판정과 다를 수 있습니다.	Latest external transaction history. It can differ from the selected camera and current runtime.
+Camera.CaptureStation	카메라	Capture station
+Camera.RunInputs	운전 입력 보기	View run inputs
+Camera.EquipmentLocation	장비 위치	Equipment location
+Camera.Variation	편차	Variation
+Camera.Generation	생성	Generation
+Camera.InspectionConnection	검사 연동	Inspection connection
+Camera.ReferenceAxis	편차 기준 축	Reference axis
+Camera.CaptureWidth	FOV 가로 (LU)	Capture width (LU)
+Camera.CaptureSetupHint	지정 위치에서 촬영 / 위치·기울기·흔들림 편차 허용	Capture at the configured position with position, tilt and shake variation.
+Camera.CaptureScopeHint	선택한 카메라에 저장합니다. 촬영 이미지에 당시 제품과 촬영 스텝을 함께 남깁니다.	Saved per capture station. Run inputs retain their workpiece and capture step.
+Camera.AxisDeviationHint	X 편차 = 설정 X + 기준 축 위치. Y·회전·기울기는 검사판의 예제 편차입니다.	X deviation = configured X + reference axis position. Y, rotation and tilt are numerical example variations.
+Camera.VariationScopeHint	선택한 카메라의 촬영 편차입니다. 촬영 설정 적용 후 레시피를 저장하세요. 촬영과 운전은 별도로 시작합니다. 기본값은 전체 촬영 설정의 초안을 초기화합니다.	Edit capture deviations for the selected camera. Apply settings, then save the recipe. Start capture and operation separately. Defaults resets the entire capture draft.
+Camera.VariationSourceRequired	이미지 소스에서 수치 촬영을 설정하고 현재 레시피 버전을 확인한 뒤 편차를 적용하세요.	Configure numerical capture in Image source and confirm the current recipe version before applying deviations.
+Camera.VariationSelectionRequired	편차를 편집하려면 카메라를 선택하고 편집 가능한 상태인지 확인하세요.	Select a camera and ensure editing is available to change deviations.
+Camera.VariationHint	장비 장면의 확대·회전과 다른 촬영 조건입니다.	Capture conditions are separate from equipment scene zoom and rotation.
+Camera.UseNumericalInput	합성 이미지 사용	Use numerical mock input
+Camera.NumericalInputHint	수치 모의 입력입니다. 실제 AI 생성·물리 측정·외부 검사를 수행하지 않습니다.	Numerical mock input. Does not perform AI generation, physical measurement or external inspection.
+Camera.MockDefect	NG 이미지 생성	Mock defect input
+Camera.ApplySettings	촬영 설정 적용	Apply settings
+Camera.RecipeVersion	버전	Version
+Camera.ConfirmVersion	현재 버전 확인	Confirm current version
+Camera.GenerateInput	입력 생성	Generate input
+Camera.CaptureInput	촬영 이미지	Capture input
+Camera.HeightData	높이 데이터	Height data
+Camera.NumericalHeightLegend	높이 색상: 파랑(낮음) → 빨강(높음) · 수치 모의	Height colors: blue (low) → red (high) · numerical mock
+Shell.Defaults	기본값	Defaults
+Camera.InputKind	입력 종류	Input kind
+Camera.TwoDImage	2D 이미지	2D image
+Camera.EmptyInput	아직 이미지가 없습니다	No image yet
+Camera.GenerateRecipeInput	레시피로 입력 생성	Generate via recipe
+Camera.GenerationExecutionHint	설정 적용 후 선택한 실행 대상의 레시피를 시작해 촬영 이미지를 생성합니다.	Apply the settings, then start the selected run target’s recipe to generate camera inputs.
+MaterialFlow.SettingsTitle	제품·자리	Products and slots
+MaterialFlow.OpenSettings	제품·자리 설정	Product and slot settings
+MaterialFlow.Apply	적용	Apply
+MaterialFlow.ApplySettings	제품·자리 설정 적용	Apply product and slot settings
+MaterialFlow.SaveHint	자리당 제품 한 개를 받습니다. 설정을 적용한 뒤 저장해야 다음에 복구됩니다.	Each slot receives one product. Apply, then save the settings to restore them next time.
+MaterialFlow.ProductName	제품 이름	Product name
+MaterialFlow.EnableTransfer	제품 이송 사용	Enable product transfer
+MaterialFlow.CurrentUnit	현재 유닛	Current unit
+MaterialFlow.SlotUnit	자리 설정 유닛	Unit for slot settings
+MaterialFlow.SlotName	자리 이름	Slot name
+MaterialFlow.RepeatCountHint	제품 수 / 모든 유닛의 반복 횟수 (1–100개)	Product count / repeat count for all units (1–100)
+MaterialFlow.RepeatCount	유닛 반복 횟수	Unit repeat count
+MaterialFlow.FeedPosition	투입 위치	Feed position
+MaterialFlow.ExitPosition	배출 위치	Exit position
+MaterialFlow.FeedPositionHint	유닛 자리로 새 제품을 투입합니다. 추가 후 제품·자리에서 유닛과 컨베이어를 연결하세요.	Feed a new product into the unit slot. Connect the unit and conveyor in Product and slot settings after adding.
+MaterialFlow.ExitPositionHint	검사가 끝난 제품을 유닛 자리에서 배출합니다. 추가 후 제품·자리에서 배출 경로를 지정하세요.	Eject an inspected product from the unit slot. Set its exit route in Product and slot settings after adding.
+Properties.Value.FeedPosition	투입 위치	Feed position
+Properties.Value.ExitPosition	배출 위치	Exit position
+MaterialFlow.UseTotalSupply	운전 전체의 신규 투입 수량 지정	Set the total new supply for this run
+MaterialFlow.TotalSupply	총 신규 투입 수량 (1–100개)	Total new supply (1–100)
+MaterialFlow.SupplyCompletionHint	수량에 도달하면 새 투입을 멈추고 제품 배출과 관련 시퀀스 종료를 기다립니다. 일시정지·재개는 수량을 유지합니다. 지정하지 않으면 기존 반복 설정을 사용합니다.	Once the quantity is reached, stop new feeds and wait for products to exit and related sequences to finish. Pause and resume retain the count. Without a quantity, existing repeat settings apply.
+MaterialFlow.OkRoute	OK 배출 경로 이름	OK exit route name
+MaterialFlow.NgRoute	NG 배출 경로 이름	NG exit route name
+MaterialFlow.PositionUnit	위치 장치가 사용하는 유닛 자리	Unit slot used by this position
+MaterialFlow.PositionConveyor	같은 유닛의 연결 컨베이어	Connected conveyor in the same unit
+MaterialFlow.ExitRoute	배출 판정 경로	Exit decision route
+MaterialFlow.AutoRoute	판정에 따른 자동 배출	Automatic exit by decision
+MaterialFlow.InvalidPositions	각 위치의 유닛·컨베이어·배출 경로를 지정하세요. 같은 유닛의 투입 위치 또는 같은 배출 경로는 중복할 수 없습니다.	Select each position's unit, conveyor and exit route. Feed positions and identical exit routes cannot be duplicated within one unit.
+MaterialFlow.TotalSupplyRunTarget	신규 투입 총 {0}개 · 배출 후 완료	Total new supply {0} · complete after exit
+MaterialFlow.RemovalDependency	'{1}' 삭제 전에 위치 '{0}'의 컨베이어 연결을 바꾸거나 해당 위치를 삭제하세요.	Change position '{0}' conveyor or remove that position before removing '{1}'.
+MaterialFlow.SequenceHint	시퀀스에서 투입·받기·이송·배출 스텝을 연결하세요.	Connect Load, Receive, Transfer, and Unload steps in the sequence.
+MaterialFlow.SampleProduct	샘플제품	Sample product
+MaterialFlow.SlotDefaultFormat	{0} 자리	{0} slot
+MaterialFlow.RecipeChanged	레시피가 변경되었습니다. 설정을 닫고 다시 열어 주세요.	The recipe changed. Close and reopen the settings.
+MaterialFlow.InvalidSettings	제품·자리 이름과 반복 횟수 1–100개를 확인하세요.	Check the product and slot names and a repeat count of 1–100.
+MaterialFlow.InvalidTotalSettings	제품·자리·배출 경로 이름, 제품 이송 사용 여부와 총 신규 투입 수량 1–100개를 확인하세요.	Check the product, slot and exit route names, enable material flow and enter a total new feed count from 1 to 100.
+MaterialFlow.UnitRequired	제품 이송을 사용하려면 유닛을 먼저 추가하세요.	Add a unit before enabling product transfer.
+Properties.WorkpieceType	제품 모델	Type
+Properties.Value.Pending	검사 대기	Pending
+LayoutValidation.MissingBehaviorBinding	연결할 장치 또는 축을 선택하세요.	Select the linked device or axis.
+LayoutValidation.UnsupportedBehaviorBinding	이 장치 종류에 맞는 구동 연결을 선택하세요.	Select a behavior binding supported by this component kind.
+LayoutValidation.AmbiguousBehaviorBinding	중복된 연결 ID가 있습니다. 연결 대상의 ID를 확인하세요.	Check the duplicate binding IDs.
+LayoutValidation.SensorDeviceBindingInvalid	디지털 센서 장치를 선택하세요.	Select a digital sensor device.
+LayoutValidation.SensorOutputChannelRequired	센서 출력에는 디지털 입력 채널을 선택하세요.	Select a digital-input channel for the sensor output.
+LayoutValidation.SensorOutputChannelNotFound	센서 출력 채널을 찾을 수 없습니다. 디지털 입력 채널을 다시 선택하세요.	Reselect the missing sensor output channel.
+LayoutValidation.SensorOutputChannelMustBeDigitalInput	센서 출력에는 디지털 입력 채널을 선택하세요.	Select a digital-input channel for the sensor output.
+LayoutValidation.SensorTargetComponentRequired	센서가 감지할 장치를 선택하세요.	Select the sensor target component.
+LayoutValidation.SensorTargetComponentNotFound	센서가 감지할 장치를 찾을 수 없습니다. 대상을 다시 선택하세요.	Reselect the missing sensor target component.
+LayoutValidation.SensorTargetComponentMustBeInSameLayout	같은 레이아웃에서 센서가 감지할 장치를 선택하세요.	Select a sensor target in the same layout.
+LayoutValidation.CylinderDeviceBindingInvalid	공압 실린더 장치를 선택하세요.	Select a pneumatic cylinder device.
+LayoutValidation.CylinderChannelIdRequired	실린더 명령에는 디지털 출력, 완료 센서에는 디지털 입력 채널을 선택하세요.	Select digital-output command and digital-input feedback channels.
+LayoutValidation.CylinderChannelNotFound	실린더 연결 채널을 찾을 수 없습니다. 해당 채널을 다시 선택하세요.	Reselect the missing cylinder channel.
+LayoutValidation.CylinderCommandMustBeDigitalOutput	실린더 전진 명령에는 디지털 출력 채널을 선택하세요.	Select a digital-output channel for the cylinder extend command.
+LayoutValidation.CylinderFeedbackMustBeDigitalInput	실린더 완료 센서에는 디지털 입력 채널을 선택하세요.	Select a digital-input channel for the cylinder feedback.
+LayoutValidation.CylinderChannelIdsMustBeDistinct	실린더 명령과 각 완료 센서에는 서로 다른 채널을 선택하세요.	Use distinct cylinder command and feedback channels.
+LayoutValidation.ConveyorDeviceBindingInvalid	컨베이어 장치를 선택하세요.	Select a conveyor device.
+LayoutValidation.ConveyorChannelIdRequired	컨베이어 운전·역방향 명령에는 디지털 출력 채널을 선택하세요.	Select digital-output channels for conveyor run and reverse commands.
+LayoutValidation.ConveyorChannelNotFound	컨베이어 명령 채널을 찾을 수 없습니다. 해당 채널을 다시 선택하세요.	Reselect the missing conveyor command channel.
+LayoutValidation.ConveyorCommandMustBeDigitalOutput	컨베이어 명령에는 디지털 출력 채널을 선택하세요.	Select a digital-output channel for the conveyor command.
+LayoutValidation.ConveyorChannelIdsMustBeDistinct	컨베이어 운전과 역방향 명령에는 서로 다른 채널을 선택하세요.	Use distinct conveyor run and reverse command channels.
+LayoutValidation.WorkpieceDeviceBindingInvalid	제품 장치를 선택하세요.	Select a workpiece device.
+LayoutValidation.WorkpieceTypeRequired	제품 모델을 입력하세요.	Enter the workpiece type.
+LayoutValidation.WorkpieceConveyorComponentRequired	제품의 이송 컨베이어를 선택하세요.	Select the workpiece carrier conveyor.
+LayoutValidation.WorkpieceConveyorComponentNotFound	제품의 이송 컨베이어를 찾을 수 없습니다. 컨베이어를 다시 선택하세요.	Reselect the missing workpiece carrier conveyor.
+LayoutValidation.WorkpieceCarrierMustBeConveyor	같은 레이아웃의 이송 컨베이어를 선택하세요.	Select a carrier conveyor in the same layout.
+LayoutValidation.WorkpieceInspectionStateInvalid	목록에서 제품의 초기 검사 상태를 선택하세요.	Select a supported initial workpiece inspection state.
+Sequence.SceneStepsResize	장면과 스텝 목록 높이 조절	Resize scene and step list
+Sequence.StepSettings	스텝 설정	Step settings
+Sequence.ApplyStep	스텝 적용	Apply step
+Sequence.DiscardStep	변경 취소	Discard changes
+Sequence.StepDraftPending	미적용 변경 있음	Unapplied changes
+Sequence.StepDraftApplied	적용된 설정	Applied settings
+Sequence.StepDraftStale	적용된 스텝이 변경됐습니다. 변경을 취소한 뒤 다시 편집하세요.	The applied step changed. Discard changes and edit again.
+Sequence.StepDraftIntegerError	타임아웃은 0.001 s 단위의 0 이상 초 값, 배출 딜레이는 0 이상의 정수(ms)여야 합니다.	Timeout must be non-negative seconds in 0.001 s increments; ejection delay must be non-negative integer milliseconds.
+Sequence.StepDraftInvalid	입력값을 확인하세요.	Check the input values.
+Sequence.TestSelectedStep	이 스텝만 테스트	Test this step
+Sequence.StepTestBusy	스텝 테스트 중	Testing step
+Sequence.StepTestComplete	스텝 테스트 완료	Step test completed
+Sequence.StepTestIncomplete	스텝 테스트 미완료	Step test incomplete
+Sequence.StepTestScope	적용된 스텝만 격리해 테스트합니다. 현재 운전·장면·운전 이력은 바꾸지 않습니다.	Tests only the applied step in isolation. The current run, scene and run history stay unchanged.
+Sequence.StepTestUnsupported	이 종류의 스텝 테스트는 아직 지원하지 않습니다. 축 이동·축 완료 대기·출력·신호 대기 스텝을 지원합니다.	Step testing is unavailable for this action. Axis motion, axis completion, output and signal wait are supported.
+Sequence.WaitForAxisCompletion	축 이동 완료 후 다음 스텝	Continue after axis motion completes
+Sequence.EjectionDelay	배출 딜레이 (ms)	Ejection delay (ms)
+Sequence.DestinationUnit	이송 목적지 유닛	Destination unit
+Sequence.SelectStepSettingsHint	목록에서 스텝을 선택해 설정하세요.	Select a step in the list to edit its settings.
+Sequence.StepTimeout	타임아웃	Timeout
+Sequence.UnitSettings	유닛 시퀀스 설정	Unit sequence settings
+Sequence.OwnerUnit	시퀀스 소유 유닛	Sequence owner unit
+Sequence.CommonSequence	공용 시퀀스	Common sequence
+Sequence.AddUnitSequence	유닛 시퀀스 추가	Add unit sequence
+Sequence.AddUnitSequenceHint	시퀀스가 없는 첫 유닛에 새 시퀀스를 만듭니다.	Creates a sequence for the first unit without one.
+Sequence.UnitRepeat	유닛 반복	Unit repeat
+Sequence.UnitRepeatRange	유닛 반복 횟수 (1–100회)	Unit repeat count (1–100)
+Sequence.ApplyUnitRepeat	반복 적용	Apply repeat
+Sequence.UnitSettingsScope	유닛 배정은 즉시 반영됩니다. 반복 횟수는 적용 후 프로젝트에 저장하세요.	Unit assignment takes effect immediately. Apply the repeat count, then save the project.
+Sequence.UnitAlreadyHasSequence	이 유닛에는 이미 시퀀스가 있습니다.	This unit already has a sequence.
+Sequence.UnitRepeatError	유닛 반복 횟수는 1–100 범위의 정수여야 합니다.	Unit repeat count must be an integer from 1–100.
+Sequence.UnitRepeatApplied	{0} · {1}회 반복 적용 · 프로젝트 저장 필요	{0} · {1} repeats applied · Save the project
+Sequence.UnitSequenceName	{0} 시퀀스	{0} sequence
+Camera.Capture.Parameter.FieldOfView	FOV 가로	FOV width
+Camera.Capture.Parameter.OffsetX	X 편차	X deviation
+Camera.Capture.Parameter.OffsetY	Y 편차	Y deviation
+Camera.Capture.Parameter.Yaw	회전	Rotation
+Camera.Capture.Parameter.Tilt	기울어짐	Tilt
+Camera.Capture.Parameter.Shake	축 진동 진폭	Shake
+Camera.Capture.Parameter.Light	조명 밝기 배율	Light
+Camera.Capture.Parameter.Seed	시드	Seed
+Camera.Capture.Parameter.GenerationDelay	생성 지연	Generation delay
+Camera.Capture.Parameter.ResponseDelay	검사 응답	Inspection response
+Camera.Capture.NoReferenceAxis	축 연결 안 함	No reference axis
+Camera.Capture.VersionConfirmed	확인된 버전: {0}	Confirmed version: {0}
+Camera.Capture.VersionRequired	레시피 버전 확인 필요	Confirm the recipe version
+Camera.Capture.IndependentHint	수치 모의 촬영 이미지는 외부 AI 검사와 분리됩니다.	Numerical mock capture images are separate from external AI inspection.
+Camera.Capture.DefaultsLoaded	기본값을 불러왔습니다. 적용 후 저장하세요.	Defaults loaded. Apply, then save the project.
+Camera.Capture.Loaded	촬영 설정을 불러왔습니다. 촬영은 별도로 시작합니다.	Capture settings loaded. Start acquisition separately.
+Camera.Capture.AppliedNeedsSave	촬영 설정 적용 완료 · 프로젝트 저장 필요 · 촬영은 별도로 시작합니다.	Capture settings applied · save the project · start acquisition separately.
+Camera.Capture.AppliedSaved	적용한 촬영 설정을 프로젝트에 저장했습니다. 촬영은 별도로 시작합니다.	Capture settings saved to the project. Start acquisition separately.
+Camera.Capture.Confirmed	{0} · 버전 {1} 확인. 적용 후 프로젝트를 저장하세요.	{0} · version {1} confirmed. Apply, then save the project.
+Camera.Capture.Error.Version	버전은 1–100000 범위의 정수여야 합니다.	Version must be an integer from 1 to 100000.
+Camera.Capture.Error.Finite	{0}: 유한한 숫자를 입력하세요.	{0}: enter a finite number.
+Camera.Capture.Error.Timing	버전·시드는 정수, 지연 시간은 0–60초 범위여야 합니다.	Version and seed must be integers; delays must be between 0 and 60 seconds.
+Camera.Capture.Error.ConfirmVersion	현재 레시피 버전을 확인한 뒤 적용하세요.	Confirm the current recipe version before applying.
+Camera.Capture.Error.MissingAxis	연결 축이 삭제되었습니다. 다시 선택하세요.	The reference axis was removed. Select another axis.
+Camera.Capture.Error.FixedStep	생성·응답 지연은 고정 시간 간격({0} ms)의 배수여야 합니다.	Generation and response delays must be multiples of the fixed step ({0} ms).
+Camera.Capture.Error.SequenceTimeout	촬영 지연 {0} ms가 '{1} / {2}' 결과 대기 제한 {3} ms를 넘습니다. 생성·응답 지연을 줄이거나 시퀀스 대기 제한을 수정한 뒤 적용하세요.	Capture delay {0} ms exceeds the {3} ms result timeout for '{1} / {2}'. Reduce the generation or response delay, or change the sequence timeout, then apply.
+Camera.Capture.Error.InputKind	2D 또는 3D 입력 종류를 선택하세요.	Select a 2D image or 3D heightmap.
+Camera.Capture.Error.Recipe	레시피 이름과 버전을 확인하세요.	Check the recipe name and version.
+Camera.Capture.Error.FieldOfView	시야는 10–10000 범위의 유한한 값이어야 합니다.	FOV width must be a finite value from 10 to 10000.
+Camera.Capture.Error.Position	위치와 회전 편차를 확인하세요.	Check the position and rotation variation.
+Camera.Capture.Error.Variation	기울기와 흔들림 범위를 확인하세요.	Check the tilt and shake ranges.
+Camera.Capture.Error.LightSeed	조명은 0–4, 시드는 0 이상의 정수여야 합니다.	Light must be from 0 to 4; seed must be a non-negative integer.
+Camera.Capture.Error.Delay	생성·응답 지연은 0–60000ms 범위여야 합니다.	Generation and response delays must be from 0 to 60000 ms.
+Camera.HeightMap3D	3D 높이맵	3D height map
+Camera.AppliedNumericalInput	수치 모의 입력 · {0} · {1} v{2} / 확인 v{3}	Numerical mock input · {0} · {1} v{2} / confirmed v{3}
+Camera.ConfigureNumericalSourceHint	프로젝트를 저장하고 수치 촬영 설정의 레시피·버전을 확인하세요.	Save the project and confirm the recipe and version of the numerical capture settings.
+Camera.ListTitle	카메라	Cameras
+Camera.EmptyListHint	카메라가 없습니다. 장비 구성에서 추가하세요.	No cameras. Add a camera in Equipment.
+Integration.RequestCaption	검사 요청	Request
+Integration.ReceiptCaption	수신 확인	Acknowledgement
+Integration.ResultCaption	검사 결과	Result
+Integration.ExchangeDetails	연동 상세	Integration details
+Integration.RequestNone	현재 프로젝트의 검사 요청이 없습니다.	No Handoff exists for the current project.
+Integration.ReceiptNone	현재 프로젝트의 수신 확인이 없습니다.	No Acknowledgement exists for the current project.
+Integration.ResultNone	아직 검증된 검사 결과가 없습니다.	No validated Result is available yet.
+Integration.OpenSetup	연동 설정	Integration setup
+Integration.SetupStepThreeD	2/6 3D 높이 원본, c3d 레시피, 검사 프로그램 버전·source commit과 시퀀스·장치 연결을 저장하세요.	2/6 Save the 3D HeightMap source, c3d recipe, consumer identity, and Sequence/device binding.
+Integration.RequestStatusFormat	최근 검사 요청: {0}/{1} · {2}	Latest Handoff: {0}/{1} · {2}
+Integration.ReceiptStatusFormat	최근 수신 확인: {0}	Latest Acknowledgement: {0}
+Integration.ReceiptReadFailed	수신 확인 읽기 실패: {0}	Acknowledgement read failed: {0}
+Integration.ReceiptPendingValidation	수신 확인을 아직 검증하지 못했습니다.	Acknowledgement has not been validated yet.
+Integration.ResultStatusFormat	최근 검사 결과: {0} · {1} · 운전 {2}	Latest Result: {0} · {1} · Run {2}
+Integration.ResultReadFailed	검사 결과 읽기 실패: {0}	Result read failed: {0}
+Integration.ResultPendingValidation	결과 파일이 있지만 요청·수신 확인·결과의 순서를 아직 검증하지 못했습니다.	A Result file exists, but the complete sequence is not validated yet.
+Integration.ReceiptAccepted	수신 확인됨	Accepted
+Integration.ReceiptRejected	거부됨	Rejected
+Integration.OutcomePass	OK	Pass
+Integration.OutcomeNg	NG	Ng
+Integration.OutcomeNotMeasured	측정 안 됨	NotMeasured
+Integration.OutcomeIndeterminate	판정불가	Indeterminate
+Integration.OutcomeCorrelationMismatch	요청-응답 불일치	CorrelationMismatch
+Integration.OutcomeTampered	데이터 무결성 오류	Tampered
+Integration.OutcomeExecutionError	처리 오류	ExecutionError
+Integration.ResultCompleted	완료	Completed
+Integration.ResultFailed	처리 오류	Failed
+Integration.ResultCancelled	취소됨	Cancelled
+History.LatestValidation	마지막 검증 결과	Latest validation result
+History.ValidationPassed	검증 통과	Validation passed
+History.ValidationFailed	검증 실패	Validation failed
+History.SelectRecord	왼쪽에서 시운전 검증 기록을 선택하세요.	Select a commissioning validation record on the left.
+History.SelectedRecord	선택한 시운전 기록	Selected commissioning record
+History.CapturedAtUtc	기록 시각(UTC)	Recorded at (UTC)
+History.CompletedRuns	완료 반복 횟수	Completed repetitions
+History.EvidenceHash	결과 해시	Result hash
+History.ReferenceUnavailable	이 기록에는 당시 장비·시운전 레시피의 참조가 없습니다.	This record has no captured machine or commissioning recipe reference.
+History.ProjectId	장비 레시피 ID	Machine recipe ID
+History.ProjectHash	장비 설정 해시	Machine settings hash
+History.RecipeId	시운전 레시피 ID	Commissioning recipe ID
+History.RecipeHash	시운전 설정 해시	Commissioning settings hash
+History.Mismatch	불일치 항목	Mismatch
+History.Expected	기준 해시	Expected hash
+History.Actual	관측 해시	Observed hash
+History.LastSequenceError	마지막 시퀀스 오류	Last sequence error
+Shell.SaveStateNotSaved	저장 안 됨	Not saved
+Shell.SaveStateAppliedUnsaved	적용됨 · 미저장	Applied · Unsaved
+Shell.SaveStateSaved	저장됨	Saved
+Shell.View	보기	View
+Shell.Help	도움말	Help
+Shell.Inspector	설정 패널	Inspector
+Shell.ProjectRevision	Rev.{0}	Settings r{0}
+Shell.FaultSimulation	고장 시뮬레이션	Fault simulation
+Shell.FaultSimulationOff	고장 시뮬레이션 꺼짐	Fault simulation off
+Shell.FaultSessionHint	레시피에 저장되지 않습니다. 초기화하거나 앱을 닫으면 해제됩니다.	Not saved in the recipe. Reset or close the app to clear faults.
+Shell.FaultRunModeHint	운전 모드에서 고장을 적용할 수 있습니다. 운전 시작 또는 수동 조작으로 장비를 준비하세요.	Apply faults in Run mode. Prepare the equipment by starting a run or entering manual control.
+Shell.Speed	배속	Simulation speed
+Shell.RunOptions	운전 방식 선택	Run options
+Shell.RunTargetDetails	운전 대상 자세히 보기	Run target details
+Shell.CloseFaultSimulation	고장 시뮬레이션 닫기	Close fault simulation
+Scene.LegendConveyor	컨베이어	Conveyor
+Scene.LegendDigitalIo	디지털 I/O	Digital I/O
+Scene.LegendWorkpiece	제품	Product
+Scene.EquipmentLegendAxis	축	Axis
+Scene.EquipmentLegendCylinder	실린더	Cylinder
+Scene.EquipmentLegendSensor	센서	Sensor
+Scene.EquipmentLegendCamera	카메라	Camera
+Scene.EquipmentPlanHint	장치 선택·끌어서 이동 / 방향키로 이동 · Shift: 10배 · 확대: 휠 · 화면 맞춤: Home	Select or drag a device / arrows: move · Shift: ×10 · zoom: wheel · fit: Home
+Scene.FitShort	맞춤	Fit
+Scene.UnitSlots	유닛·자리	Units / slots
+Scene.UnitSlotsHint	유닛 요약과 제품 자리를 펼치거나 접습니다.	Expand or collapse unit summaries and product slots.
+Scene.MoreActions	장면 메뉴	Scene menu
+Scene.EquipmentSteps	사용하는 스텝 {0}개 →	Used by {0} steps →
+Equipment.InspectorDraftApplyAndContinue	적용 후 계속	Apply changes
+RunHistory.Title	저장된 운전	Saved runs
+RunHistory.Retention	보관된 기록을 확인하고 당시 설정을 초안으로 열 수 있습니다.	Review stored records and open a draft of their applied settings.
+RunHistory.Refresh	새로 고침	Refresh
+RunHistory.RetrySave	보관 재시도	Retry archive
+RunHistory.Empty	저장된 운전이 없습니다. 운전이 종료되면 당시 설정과 실제 제품·촬영·검사 정보를 기록합니다.	No saved runs. When a run ends, its applied settings and observed products, captures and inspections are recorded.
+RunHistory.SelectRun	조회할 운전을 선택하세요.	Select a run to inspect.
+RunHistory.Missing	미기록	Not recorded
+RunHistory.Saved	운전 기록을 저장했습니다.	Run record saved.
+RunHistory.SaveFailed	운전 기록 저장 실패. 기존 파일은 보존됩니다. 이 창에서 저장을 재시도하세요.	Run record could not be saved. Existing files are preserved. Retry saving in this window.
+RunHistory.ReadFailed	일부 운전 기록을 읽지 못했습니다. 정상 기록은 유지됩니다.	Some run records could not be read. Valid records are retained.
+RunHistory.OperationFailed	운전 이력 작업 실패:	Run history operation failed:
+RunHistory.Deleted	선택한 운전 기록을 삭제했습니다.	Selected run record deleted.
+RunHistory.Completed	정상 완료	Completed normally
+RunHistory.Stopped	사용자 정지	Stopped by user
+RunHistory.Faulted	알람 정지	Stopped by alarm
+RunHistory.PrepareDraft	당시 설정 초안 열기	Open settings draft
+RunHistory.ApplyDraft	초안 적용	Apply draft
+RunHistory.DraftHint	당시 설정의 초안을 현재 레시피에 적용할까요? 적용 후 설정을 확인하고 운전 시작을 누르세요. 원 기록은 유지됩니다.	Apply the historical settings draft to this recipe? Review the settings after applying, then select Start run. The original record is retained.
+RunHistory.DraftApplied	당시 설정을 적용했습니다. 설정을 확인하고 운전 시작을 누르세요. 원 기록은 유지됩니다.	Historical settings applied. Review the settings, then select Start run. The original record is retained.
+RunHistory.Delete	기록 삭제	Delete record
+RunHistory.DeleteHint	선택한 운전과 보관된 촬영·검사 기록을 삭제할까요? 삭제 후 이 기록은 복구할 수 없습니다. 레시피와 다른 기록은 유지됩니다.	Delete this run and its stored captures and inspections? This record cannot be recovered after deletion. The recipe and other records are retained.
+RunHistory.Product	제품	Products
+RunHistory.Images	촬영 이미지	Captured images
+RunHistory.Settings	당시 설정	Applied settings
+RunHistory.Inspection	검사 요청·결과	Inspection requests / results
+RunHistory.MissingHint	기록되지 않은 요청·결과는 ‘미기록’으로 표시합니다.	Missing requests and results are shown as Not recorded.
+RunHistory.ImageMissing	이미지 원본 미기록	Original image not recorded
+RunHistory.Camera	카메라	Camera
+RunHistory.Acquisition	촬영 ID	Acquisition ID
+RunHistory.Request	검사 요청	Inspection request
+RunHistory.Result	검사 결과	Inspection result
+RunHistory.State	상태	State
+RunHistory.Target	총 신규 투입 수량	Total new feed count
+RunHistory.ActualFeed	실제 신규 투입	Actual new feeds
+RunHistory.LegacySupply	기존 반복 설정 사용	Uses legacy repeat settings
+RunHistory.LegacyRepeats	기존 반복 횟수	Legacy repeats
+RunHistory.RuntimeSettings	운전 시작 시 적용 상태	Applied runtime state at start
+RunHistory.AppliedRecipe	당시 적용 레시피	Recipe applied to this run
+RunHistory.State.Exited	배출됨	Exited
+RunHistory.State.Occupied	제품 있음	Occupied
+RunHistory.State.Moving	이송 중	Transferring
+RunHistory.State.Reserved	이송 예약	Reserved
+RunHistory.State.Available	투입 대기	Available
+RunHistory.State.Attached	이송 중	Attached
+RunHistory.State.Placed	이송 완료	Placed
+Inspector.EquipmentOverview	전체 장비	All equipment
+Inspector.EquipmentOverviewHint	장치나 유닛을 선택하면 여기서 설정합니다.	Select a device or unit to configure it here.
+Inspector.EquipmentDevices	장치	Devices
+Inspector.EquipmentRunConditions	운전 조건	Run conditions
+Inspector.EquipmentCheckConditions	운전 조건 점검	Check run conditions
+Inspector.EquipmentWorkflowTitle	대표 흐름	Workflow
+Inspector.EquipmentWorkflow	장비 구성 → 시퀀스·시운전 → 비전 검사 → 운전 → 운전 이력·비교	Equipment → Sequence and commissioning → Vision → Run → Run history and comparison
+Inspector.EquipmentApplySaveHint	각 화면의 설정은 "적용"으로 레시피에 반영하고, "저장"으로 저장소에 남깁니다. 운전은 적용된 설정의 사본으로 초기 상태에서 시작합니다.	Apply each screen’s settings to the recipe, then Save them to storage. A run starts from the initial state using a copy of the applied settings.
+Equipment.InspectorUnchanged	변경 없음	No changes
+Inspector.EquipmentAssignedUnit	소속 유닛	Assigned unit
+R24.Field.x	X (mm)	X (mm)
+R24.Field.y	Y (mm)	Y (mm)
+R24.Field.z	설치 높이 Z (mm)	Installation height Z (mm)
+R24.Field.min	소프트 리밋 (−) (mm)	Soft limit (−) (mm)
+R24.Field.max	소프트 리밋 (+) (mm)	Soft limit (+) (mm)
+R24.Field.home	원점 (mm)	Home (mm)
+R24.Field.speed	속도 (mm/s)	Speed (mm/s)
+R24.Field.teach	티칭 위치 (이름=값; …)	Teaching positions (name=value; …)
+R24.Field.length	길이 (mm)	Length (mm)
+R24.Field.width	폭 (mm)	Width (mm)
+R24.Field.target	감지 대상	Detection target
+R24.Field.zoneW	감지 길이 (X) (mm)	Detection length (X) (mm)
+R24.Field.zoneD	감지 폭 (Y) (mm)	Detection width (Y) (mm)
+R24.Field.zoneZ	감지 중심 Y (mm)	Detection center Y (mm)
+R24.Field.onDelay	ON 지연 (ms)	ON delay (ms)
+R24.Field.offDelay	OFF 지연 (ms)	OFF delay (ms)
+R24.Field.stroke	스트로크 (mm)	Stroke (mm)
+R24.Field.mount	장착	Mount
+R24.Field.offX	축 기준 오프셋 X (mm)	Axis offset X (mm)
+R24.Field.fovW	FOV 가로 (mm)	FOV width (mm)
+R24.Field.fovH	FOV 세로 (mm)	FOV height (mm)
+R24.Field.resW	해상도 가로 (px)	Resolution width (px)
+R24.Field.resH	해상도 세로 (px)	Resolution height (px)
+R24.Field.lookZ	FOV 중심 Y (mm)	FOV center Y (mm)
+R24.Field.conveyor	투입 컨베이어	Feed conveyor
+R24.Field.route	경로	Route
+R24.Field.zone	영역 폭 (mm)	Zone width (mm)
+R24.FixedMount	고정 (장비 프레임)	Fixed (equipment frame)
+R24.AxisMountSuffix	에 장착	 mount
+R24.AllProducts	제품 (전체)	Products (all)
+R24.InvalidValue	값과 허용 범위를 확인하세요.	Check the value and allowed range.
+R24.InvalidSettings	설정값과 연결 대상을 확인하세요.	Check settings and bindings.
+R24.UnappliedDraft	미적용 변경	Unapplied changes
+R24.PlacementHint	평면도에서 끌거나 방향키(1 mm, Shift 10 mm)로도 옮길 수 있습니다. 끌기·방향키는 바로 적용되고 실행 취소로 되돌립니다.	Drag in plan view or use arrow keys (1 mm, Shift 10 mm). These actions apply immediately and can be undone.
+R24.SettingsHint.LinearStage	축 이동 완료 대기는 이번 사이클에서 명령한 목표로만 판단합니다. 티칭 위치는 목표 값을 채우는 데만 씁니다.	Axis completion waits use the current commanded target. Teaching positions only fill targets.
+R24.SettingsHint.RotaryStage	축 이동 완료 대기는 이번 사이클에서 명령한 목표로만 판단합니다. 티칭 위치는 목표 값을 채우는 데만 씁니다.	Axis completion waits use the current commanded target. Teaching positions only fill targets.
+R24.SettingsHint.Conveyor	운전 출력이 ON이면 컨베이어 위 제품이 +X 방향으로 이송됩니다.	When the run output is ON, products move in the +X direction.
+R24.SettingsHint.PneumaticCylinder	출력 ON만으로 완료로 보지 않습니다. 전진·후진 완료 센서를 신호 대기 스텝으로 확인하세요.	ON does not mean completed. Check extended/retracted sensors in signal wait steps.
+R24.SettingsHint.DigitalIo	출력 ON/OFF 스텝이나 수동 조작으로 조작합니다.	Use output ON/OFF steps or manual control.
+R24.SettingsHint.ExitPosition	배출 스텝은 이번 제품이 이 영역(X ± 폭/2) 안에 있을 때만 성공합니다.	The eject step succeeds only when the current product is in this zone (X ± width/2).
+R24.RunOutput	운전 출력	Run output
+R24.SensorOutput	출력 신호	Output signal
+R24.ExtendCommand	전진 명령	Extend command
+R24.EndSensors	완료 센서	End sensors
+R24.Output	출력	Output
+R24.Input	입력	Input
+R24.Resolution	분해능	Resolution
+R24.ImageFormat	이미지 형식	Image format
+R24.CameraDirection	수직 하향 고정 (이 시안). 경사 촬영·렌즈 왜곡은 카메라 모델 결정 후 추가	Fixed vertically downward (this proposal). Oblique capture and lens distortion will be added after selecting a camera model.
+R24.CameraSettingsLink	이미지 소스·편차 조건·검사 연동 설정 →	Image source, variation and inspection settings →
+R24.LegendPending	제품(판정 전)	Product (pending)
+R24.LegendUnit	단위 mm	Units mm
+R24.MonoFormat	Mono8 (8비트 흑백)	Mono8 (8-bit grayscale)
+R24.HeightFormat	Float32(32비트 실수) 높이맵 · mm · 무효 픽셀=NaN	Float32 (32-bit float) height map · mm · invalid pixel=NaN
+R24.ManualNote	초기 상태에서 이 장치만 조작합니다. 운전을 시작하면 초기화 후 시작합니다.	Operate only this device in its initial state. A run resets the equipment before starting.
+R24.ManualScope	수동 조작은 이 장치만 움직입니다. 운전·저장을 시작하지 않습니다.	Manual operation moves only this device. It does not start a run or save.
+R24.CurrentPosition	현재 위치	Current position
+R24.TargetPosition	목표 위치 (mm)	Target position (mm)
+R24.JogDistance	조그 이동량 (mm)	Jog distance (mm)
+R24.MoveHome	원점 위치 이동	Move to home position
+R24.MoveTarget	목표 위치로 이동	Move to target position
+R24.TeachCurrent	현재 위치를 티칭	Teach current position
+R24.HomeHint	"원점 위치 이동"은 저장된 원점 위치로 이동합니다. 원점 복귀(원점 검색)는 하지 않습니다.	"Move to home position" moves to the saved home position. It does not perform a homing search.
+R24.State	상태	State
+R24.Extended	전진완료	Extended
+R24.Retracted	후진완료	Retracted
+R24.Extend	전진 명령	Extend command
+R24.Retract	후진 명령	Retract command
+R24.Products	제품	Products
+R24.DetectionSignal	감지 신호	Detection signal
+R24.RunOn	운전 ON	Run ON
+R24.RunOff	운전 OFF	Run OFF
+R24.PlaceFeedSample	투입 위치에 샘플 제품 놓기	Place a sample product at the feed position
+R24.ClearSamples	샘플 제품 치우기	Clear sample products
+R24.PlaceSample	샘플 제품 놓기	Place a sample product
+R24.Clear	치우기	Clear
+R24.PlaceSensorSample	감지 영역에 샘플 제품 놓기	Place a sample product in the detection area
+R24.ConveyorManualHint	샘플 제품을 놓고 운전하면 센서가 실제로 감지하는지 확인할 수 있습니다.	Place a sample product and run the conveyor to check sensor detection.
+R24.SensorManualHint	강제 ON/OFF·상시 ON/OFF는 "고장 시뮬레이션"에서 켭니다. 켜진 동안 상단에 항상 표시됩니다.	Enable forced or stuck ON/OFF in "Fault simulation". Active faults stay visible at the top.
+R24.OutputOn	출력 ON	Output ON
+R24.OutputOff	출력 OFF	Output OFF
+R24.TestCapture	테스트 촬영	Test capture
+R24.GoVision	비전 검사에서 보기 →	View in Vision →
+R24.CameraManualHint	FOV에 제품이 없으면 현재 편차 조건을 적용한 샘플 제품을 FOV 중앙에 놓고 촬영합니다.	If the FOV contains no product, capture a sample product at its center using the current deviation conditions.
+R24.NoManualCommand	이 장치는 수동 조작 명령이 없습니다.	This device has no manual command.
+R24.SampleProduct	샘플 제품	Sample product
+R24.None	없음	None
+R24.Box	박스	box
+R24.ExitArrow	배출 →	exit →
+R24.Feed	투입	Feed
+R24.ProductModel	제품 모델	Product model
+R24.ProductDescription	장비 장치와 검사 대상(제품)을 구분합니다. 운전 중 투입된 제품마다 새 ID가 붙습니다.	Equipment devices and inspected products are distinct. Each product introduced during a run receives a new ID.
+R24.ProductLength	길이 (X) (mm)	Length (X) (mm)
+R24.ProductWidth	폭 (Y) (mm)	Width (Y) (mm)
+R24.ProductHeight	높이 (Z) (mm)	Height (Z) (mm)
+R24.ReferenceData	기준 데이터	Reference data
+R24.Reference2D	2D 마스터 이미지	2D master image
+R24.Reference3D	3D 기준 형상	3D reference shape
+R24.ReferenceUnspecified	미지정	Not specified
+R24.ReferenceHint	합성 이미지와 AI 생성 이미지의 기준입니다. Machine Studio 실제 버전에서는 소스·버전·단위를 확인할 수 있는 마스터 이미지와 높이 기준 데이터를 지정합니다. 둘 중 하나만 있으면 다른 하나가 있다고 간주하지 않습니다.	Reference for synthetic and AI-generated images. The implemented version requires master image and height reference data with identifiable sources, versions and units. One reference does not imply that the other exists.
+R24.CameraDirectionCaption	촬영 방향	Capture direction
+R24.Count	{0}개	{0}
+R24.Description.LinearStage	명령한 목표 위치로 이동합니다. 카메라를 장착할 수 있습니다.	Moves to the commanded target position. A camera can be mounted.
+R24.Description.Conveyor	운전 출력이 ON이면 위에 놓인 제품을 이송합니다.	Transports products on the conveyor while the run output is ON.
+R24.Description.DigitalSensor	감지 영역에 제품이 들어오면 ON 지연 시간 뒤 감지 신호가 ON 됩니다.	The detection signal turns ON after the ON delay when a product enters the detection area.
+R24.Description.PneumaticCylinder	전진 명령 출력으로 움직이고 전진·후진 완료 신호를 냅니다.	Moves on the extend command output and provides extended and retracted completion signals.
+R24.Description.Camera2D	촬영 스텝에서 2D 이미지(Mono8)를 만듭니다.	Produces a 2D image (Mono8) in the capture step.
+R24.Description.Camera3D	촬영 스텝에서 높이맵(Float32, mm)을 만듭니다.	Produces a height map (Float32, mm) in the capture step.
+R24.Description.DigitalIo	출력 ON/OFF와 입력 신호를 제공합니다(예: 경광등, 버튼).	Provides output ON/OFF and input signals (such as a beacon or button).
+R24.Description.FeedPosition	제품 투입 스텝이 새 제품을 놓는 위치입니다. 컨베이어에 연결합니다.	The feed step places new products here. Connect it to a conveyor.
+R24.Description.ExitPosition	제품 배출 스텝이 제품을 내보내는 위치입니다. OK/NG 경로를 지정합니다.	The eject step removes a product here. Select the OK or NG route.
+R40.DeviceNavigation	장치 탐색	Device navigation
+R40.Configuration	구성	Configuration
+R40.AddDevice	장치 추가	Add device
+R40.RecipeExamples	예제	Examples
+R40.EditProcess	공정·동작 편집 →	Edit process →
+R40.SelectTool	선택	Select
+R40.MoveTool	이동	Move
+R40.SelectionToolHint	장치를 선택해 설정을 확인하세요. 배치를 옮기려면 이동 도구를 선택하세요.	Select a device to inspect its settings. Choose Move to change its placement.
+R40.MoveToolHint	끌기 또는 방향키 1 mm, Shift+방향키 10 mm로 이동합니다. Esc로 끌기를 취소합니다.	Drag or use arrows for 1 mm and Shift+arrows for 10 mm. Esc cancels a drag.
+R40.EquipmentOverviewHint	장치의 배치·장착·연결을 설정합니다.	Configure device placement, mounts and connections.
+R40.ProductSetup	제품·투입·배출 설정	Product, feed and exit settings
+R40.EquipmentSaveHint	변경 적용 후 저장하면 파일에 보관됩니다.	Apply changes updates this recipe. Save writes it to a file.
+R24.Flow.Equipment	장비 구성	Equipment
+R24.Flow.Sequence	시퀀스·시운전	Sequence and commissioning
+R24.Flow.Vision	비전 검사	Vision
+R24.Flow.Run	운전	Run
+R24.Flow.History	운전 이력·비교	Run history and comparison
+R24.SceneEditHint	장치를 끌어 배치 · 방향키 1 mm, Shift 10 mm · 평면도에서는 5 mm 단위로 정렬	Drag devices to place them · arrow keys 1 mm, Shift 10 mm · plan view snaps to 5 mm
+R24.CameraMountedHint	축에 장착된 카메라입니다. X 위치는 축 기준 + 오프셋 + 축 현재 위치로 정해집니다. 장착은 "설정" 탭에서 바꿉니다.	Axis-mounted camera. X is the axis origin plus offset and current axis position. Change the mount in Settings.
+R24.ErrorCountFormat	오류 {0}개 — 첫 오류로	{0} errors — first error
+R24.NumberRequired	숫자를 입력하세요.	Enter a number.
+R24.IntegerRequired	정수를 입력하세요.	Enter an integer.
+R24.RangeRequired	{0}~{1}{2} 범위로 입력하세요.	Enter a value in {0}~{1}{2}.
+R24.NameRequired	1~60자로 입력하세요.	Enter 1~60 characters.
+R24.NameTooLong	60자 이하로 입력하세요.	Enter no more than 60 characters.
+R24.UnitRequired	소속 유닛을 선택하세요.	Select the owning unit.
+R24.TeachingFormatError	"이름=값; 이름=값" 형식으로 입력하세요.	Use "name=value; name=value".
+R24.TeachingRangeError	티칭 위치가 소프트 리밋을 벗어납니다.	Teaching position exceeds the soft limits.
+R24.LimitOrderError	소프트 리밋 (+)는 (−)보다 커야 합니다.	The (+) soft limit must exceed the (−) limit.
+R24.HomeRangeError	원점은 소프트 리밋 안에 있어야 합니다.	Home must be within the soft limits.
+R24.ConveyorRequired	컨베이어를 선택하세요.	Select a conveyor.
+R24.RunningLockNote	운전 중에는 설정을 변경할 수 없습니다(조회·선택 가능). 변경하려면 ■ 정지하세요.	Settings are read-only during a run. Stop to edit.
+R24.Select	선택	Select
+R24.FeedZone	투입 영역 폭 (mm)	Feed zone width (mm)
+R24.ExitZone	배출 영역 폭 (mm)	Exit zone width (mm)
+R24.SensorTargetHelp	Machine Studio 엔진의 DigitalSensorDefinition.TargetComponentId와 같은 의미입니다.	Same meaning as DigitalSensorDefinition.TargetComponentId in the Machine Studio engine.
+R24.FutureSensorTarget	특정 장치 — 이후 제공	Specific device — coming later
+R24.NonSquareResolution	(가로·세로 분해능 다름)	(Horizontal and vertical resolution differ)
+R24.Caption.x	X	X
+R24.Caption.y	Y	Y
+R24.Caption.z	설치 높이 Z	Installation height Z
+R24.Caption.length	길이 (X)	Length (X)
+R24.Caption.width	폭 (Y)	Width (Y)
+R24.Caption.height	높이 (Z)	Height (Z)
+R24.Caption.target	목표 위치	Target position
+R24.Caption.jog	조그 이동량	Jog distance
+R24.UnitMm	 (mm)	 (mm)
+R24.ViewToggleInspector	오른쪽 패널 접기	Collapse right panel
+R24.Editing	편집	Editing
+R24.Stop	정지	Stop
+R24.Resume	재개	Resume
+R24.OneStep	1스텝 진행	1 step
+R24.WholeEquipment	전체 장비	Whole equipment
+R24.ManualRunScope	수동 운전	Manual operation
+R24.NoFeed	없음	None
+R24.FeedCount	{0}개	{0} items
+R24.UnlimitedFeed	제한 없음	Unlimited
+R24.ConditionNotSet	미지정	Not set
+R24.RunSummary	{0} · 투입 {1} · 편차 조건: {2}	{0} · Feed {1} · Variation condition: {2}
+R24.Bottom.Events	이벤트	Events
+R24.Bottom.Requests	검사 요청	Inspection requests
+R24.Bottom.RequestAcknowledgement	수신 확인	Acknowledged
+R24.Bottom.RequestExecutionStatusHint	검사 실행 상태는 외부 검사 프로그램에서 확인하세요.	Check inspection execution status in the external inspection program.
+R24.Bottom.Generation	AI 생성	AI generation
+R24.Bottom.Alarms	알람	Alarms
+R24.Bottom.Open	▴ 열기	▴ Open
+R24.Bottom.Close	▾ 접기	▾ Close
+R24.Bottom.NoRun	운전 없음	No run
+R24.Bottom.Run	운전 {0} · {1}	Run {0} · {1}
+R24.Bottom.EventsEmpty	이벤트가 없습니다.	No events.
+R24.Bottom.RequestsEmpty	외부 검사 요청이 없습니다. 내장 간이 판정 결과는 이벤트와 운전 이력에서 확인합니다.	No external inspection requests. Built-in inspection results appear in events and run history.
+R24.Bottom.GenerationEmpty	AI 생성 작업이 없습니다. AI 생성 이미지 세트나 "촬영 시마다 생성" 소스를 쓰면 여기에 표시됩니다.	No AI generation jobs. Jobs appear here when using an AI-generated image set or a "generate on every capture" source.
+R24.Bottom.AlarmsEmpty	알람이 없습니다.	No alarms.
+R24.NoChanges	변경 없음	No changes
+R24.Revert	되돌리기	Revert
+R24.StepUp	↑ 위로	↑ Move up
+R24.StepDown	↓ 아래로	↓ Move down
+R24.DeleteStep	스텝 삭제	Delete step
+R24.StepDescription.MoveAxis	축에 이번 목표 위치로 이동을 명령합니다. 이동 완료를 기다리지 않으므로 다른 스텝과 동시에 진행합니다.	Commands the axis to the current target. It does not wait for movement to complete, so other steps can proceed at the same time.
+R24.StepDescription.MoveAxisWait	축에 이번 목표 위치로 이동을 명령하고 이동 완료를 기다립니다.	Commands the axis to the current target and waits for movement to complete.
+R24.InvalidNumber	숫자를 입력하세요.	Enter a number.
+R24.AxisTargetPosition	목표 위치	Target position
+R24.AxisTargetPositionFormat	목표 위치 ({0})	Target position ({0})
+R24.SequenceSceneHint	장면을 보면서 아래 스텝 목록을 편집합니다. 선택한 스텝의 대상이 강조됩니다.	Edit the step list below while viewing the scene. The selected step's target is highlighted.
+R24.StepTeachingUse	티칭 위치 사용	Use teaching position
+R24.TeachingDirectInput	직접 입력	Direct input
+R24.NextStep	다음 스텝	Next step
+R24.DefaultNextStep	다음 스텝 (기본)	Next step (default)
+R24.StepCount	{0}개 스텝	{0} steps
+R24.StepListValue	설정값	Setting
+R24.StepListStatus	상태	Status
+R24.StepExecuting	실행 중	Executing
+R24.AddStep	+ 스텝	+ Step
+R24.Readiness	운전 조건 점검	Run readiness
+R24.TestSelectedStep	선택 스텝 테스트	Test selected step
+R24.EmptyUnitSteps	이 유닛에서 실행할 스텝을 추가하세요.	Add steps to run in this unit.
+R24.AddStepTitle	스텝 추가	Add step
+R24.Close	닫기	Close
+R24.CycleEnd	사이클 종료	Cycle end
+R24.StepTimeout	타임아웃 {0} s	Timeout {0} s
+R24.NoTimeout	타임아웃 없음	No timeout
+R24.StepSignal	신호	Signal
+R24.StepExpectedValue	확인 값	Expected value
+Shell.FaultSessionBadge	레시피에 저장 안 됨 · 앱을 닫으면 해제	Not saved in recipe · cleared when app closes
+Shell.EquipmentFaults	장비 고장	Equipment faults
+Shell.ClearAllFaultSimulation	고장 시뮬레이션 모두 해제	Clear all fault simulation
+R24.CameraEmptyTitle	카메라가 없습니다	No cameras
+R24.CameraEmptyHint	장비 구성에서 2D 카메라나 3D 센서를 추가하면 여기서 이미지와 검사 결과를 확인합니다.	Add a 2D camera or 3D sensor in Equipment to view images and inspection results here.
+R24.CameraEmptyInspector	카메라가 없습니다.	No cameras.
+R24.ProjectExchangeDetails	프로젝트 교환 이력·진단	Project exchange history and diagnostics
+R24.ProjectIntegrationSummary	프로젝트 공통 상태	Project integration status
+R24.ProjectIntegrationHint	현재 프로젝트의 연동 상태입니다.	Integration status for the current project.
+R24.IntegrationSetupStatus	설정 상태	Setup status
+R24.ProjectTransactionHistoryHint	현재 프로젝트의 거래를 최신순으로 표시합니다. 상태를 선택해 이력을 좁혀 봅니다.	Shows current-project transactions, newest first. Select a state to narrow the history.
+R24.ProjectExchangeStatus	교환 상태	Exchange status
+R24.ProjectExchangeHistory	교환 이력	Exchange history
+R24.ProjectExchangeDiagnostics	진단	Diagnostics
+
+Shell.RecipeConnectionsMenu	레시피 연결…	Recipe connections…
+Connections.CloseDialog	닫기	Close
+Connections.ConnectionListTitle	연결 현황	Connection status
+Connections.SetupPreviewTitle	설정 미리보기	Setup preview
+Connections.StationEntry	스테이션	Station
+Connections.ProcessEntry	공정 블록	Process block
+Connections.LoadLockEntry	로드락	Load lock
+Connections.HandlerEntry	핸들러	Handler
+Connections.PrealignerEntry	프리얼라이너	Pre-aligner
+Connections.InspectionHandoffEntry	검사 인계	Inspection handoff
+Connections.InspectionSortEntry	검사 분류	Inspection sorting
+Connections.OhtEntry	OHT 인계	OHT handoff
+Connections.CheckpointEntry	검증점	Checkpoints
+R24.AddStepHint	종료 스텝 앞에 추가합니다. 추가한 뒤 대상과 설정값을 확인하세요.	Add before the end step. Check the target and settings after adding.
+R24.StepTemplateDescription.set-output-on	출력 신호를 ON 합니다. 완료 여부는 별도 대기 스텝에서 확인하세요.	Set the output signal ON. Check completion in a separate wait step.
+R24.StepTemplateDescription.set-output-off	출력 신호를 OFF 합니다.	Set the output signal OFF.
+R24.StepTemplateDescription.wait-input-on	입력 신호가 ON이 될 때까지 타임아웃 내에서 기다립니다.	Wait for the input signal to turn ON within the timeout.
+R24.StepTemplateDescription.wait-input-off	입력 신호가 OFF가 될 때까지 타임아웃 내에서 기다립니다.	Wait for the input signal to turn OFF within the timeout.
+R24.StepTemplateDescription.move-axis-home	축의 원점 위치로 이동을 명령합니다. 완료는 별도 스텝에서 기다립니다.	Command the axis to its home position. Wait for completion in a separate step.
+R24.StepTemplateDescription.wait-axis-done	앞서 명령한 축 이동이 완료될 때까지 타임아웃 내에서 기다립니다.	Wait for the previously commanded axis movement to finish within the timeout.
+R24.StepTemplateDescription.trigger-camera	가상 카메라의 촬영을 요청합니다. 이미지 소스는 카메라 설정을 따릅니다.	Request a virtual camera capture using its configured image source.
+R24.StepTemplateDescription.feed-workpiece	선택한 제품 위치에 제품을 투입합니다. 추가 후 제품 위치를 직접 선택하세요.	Feed a product at the selected product position. Select the position after adding.
+R24.StepTemplateDescription.eject-workpiece	선택한 제품 위치의 제품을 배출합니다. 추가 후 제품 위치를 직접 선택하세요.	Eject the product at the selected product position. Select the position after adding.
+R24.StepTemplateDescription.delay	지정한 시뮬레이션 시간만큼 기다립니다.	Wait for the specified simulation time.
+R24.StepTemplateDescription.feed-unit	현재 유닛에 새 제품을 투입합니다. 제품 흐름 설정을 확인하세요.	Feed a new product into the current unit. Check the product flow settings.
+R24.StepTemplateDescription.receive-unit	현재 유닛에서 이전 유닛의 제품을 받을 때까지 기다립니다.	Wait for the current unit to receive a product from the previous unit.
+R24.StepTemplateDescription.transfer-unit	컨베이어를 통해 다음 유닛으로 제품을 이송합니다. 이송 시간을 확인하세요.	Transfer the product to the next unit by conveyor. Check the transfer time.
+R24.StepTemplateDescription.eject-unit	현재 유닛의 제품을 검사 결과에 맞는 배출 경로로 보냅니다.	Route the current unit product to an exit according to its inspection result.
+R24.StepTemplateDescription.branch-inspection	현재 유닛의 검사 결과에 따라 OK/NG 스텝으로 분기합니다.	Branch to the OK or NG step according to the current unit inspection result.
+R24.StepTemplateDescription.call-subsequence	다른 시퀀스를 호출합니다. 현재 시퀀스는 선택할 수 없습니다.	Call another sequence. The current sequence cannot be selected.
+R24.StepDescription.SetSignal	출력 신호를 설정한 값으로 바꿉니다.	Set the output signal to the configured value.
+R24.StepDescription.WaitSignal	지정한 신호가 확인 값이 될 때까지 기다립니다.	Wait until the selected signal reaches the expected value.
+R24.StepDescription.WaitAxisDone	앞서 명령한 축 이동이 완료될 때까지 기다립니다.	Wait for the previously commanded axis movement to finish.
+R24.StepDescription.TriggerCamera	촬영 레시피 ID로 가상 카메라의 촬영을 요청합니다.	Request a virtual camera capture with the capture recipe ID.
+R24.StepDescription.WaitVisionResult	카메라의 검사 결과를 기다리고 OK/NG 스텝으로 이동합니다.	Wait for the camera inspection result, then continue to the OK or NG step.
+R24.StepDescription.FeedWorkpiece	선택한 제품 위치에 제품을 투입합니다.	Feed a product at the selected product position.
+R24.StepDescription.EjectWorkpiece	선택한 제품 위치의 제품을 배출합니다.	Eject the product at the selected product position.
+R24.StepDescription.Delay	지정한 시뮬레이션 시간만큼 기다립니다.	Wait for the specified simulation time.
+R24.StepDescription.FeedUnitWorkpiece	현재 유닛에 새 제품을 투입합니다.	Feed a new product into the current unit.
+R24.StepDescription.ReceiveUnitWorkpiece	현재 유닛에서 이전 유닛의 제품을 받을 때까지 기다립니다.	Wait for the current unit to receive a product from the previous unit.
+R24.StepDescription.TransferUnitWorkpiece	설정한 이송 시간에 따라 컨베이어로 목적 유닛에 제품을 보냅니다.	Transfer the product by conveyor to the destination unit using the configured transfer time.
+R24.StepDescription.EjectUnitWorkpiece	배출 지연 후 현재 유닛의 제품을 선택한 배출 경로로 보냅니다.	After the ejection delay, send the current unit product to the selected exit route.
+R24.StepDescription.BranchInspection	현재 유닛의 검사 결과에 따라 OK/NG 스텝으로 이동합니다.	Continue to the OK or NG step according to the current unit inspection result.
+R24.StepDescription.CallSubsequence	다른 시퀀스를 호출하고 완료될 때까지 기다립니다.	Call another sequence and wait for it to finish.
+R24.StepDescription.Complete	현재 시퀀스를 마칩니다.	Finish the current sequence.
+R24.Inspector.Basic	기본 설정	Basic settings
+R24.Inspector.Additional	추가 설정	Additional settings
+R24.Inspector.Configured	지정됨	Configured
+R24.Inspector.Unconfigured	미지정	Not set
+R24.Inspector.AlarmRoute	알람 시 이동	On alarm, go to
+R24.Inspector.AlarmHint	오류가 발생하면 지정한 스텝으로 이동합니다. 미지정이면 현재 스텝을 오류로 처리합니다.	On error, go to the selected step. If unset, this step reports an error.
+R24.Inspector.OnOK	OK 시	On OK
+R24.Inspector.OnNG	NG 시	On NG
+R24.Inspector.EndStateCheck	종료 상태 검증	End-state check
+R24.Inspector.DryRunHint	DryRun에서 이 스텝이 끝난 시점의 대상 상태를 확인합니다.	Check the target state when this step finishes in DryRun.
+R24.Inspector.CheckTarget	확인 대상	Check target
+R24.Inspector.LegacyFailure	기존 NG 경로 확인	Check saved NG route
+R24.Inspector.LegacyFailureHint	이 종류에는 NG 경로를 사용할 수 없습니다. 값을 확인하고 지운 뒤 적용하세요.	This action does not support an NG route. Check and clear the saved value, then apply.
+R24.Inspector.InvalidTimeout	유효한 시간을 초 단위로 소수점 셋째 자리까지 입력하세요.	Enter a valid time in seconds with up to three decimal places.
+R24.Inspector.PositiveTimeout	검사 결과 대기는 0보다 큰 타임아웃이 필요합니다.	Waiting for vision results requires a positive timeout.
+R24.Inspector.NoTimeout	0이면 타임아웃을 사용하지 않습니다.	Zero disables the timeout.
+R24.Inspector.TimeoutError	타임아웃이 지나면 오류로 처리합니다.	When the timeout expires, this step reports an error.
+R24.Inspector.InvalidAlarmRoute	알람 이동 스텝이 없습니다. 추가 설정에서 경로를 확인하세요.	The alarm step does not exist. Check the route in Additional settings.
+R24.Inspector.TimeoutRoute	타임아웃이 지나면 {0} 스텝으로 이동합니다.	When the timeout expires, go to step {0}.
+R24.Inspector.OutputValue	출력 값	Output value
+R24.Inspector.CameraRecipeId	촬영 레시피 ID	Capture recipe ID
+R24.Inspector.TransferTime	이송 시간	Transfer time
+R24.Inspector.UnsupportedTimeout	이 종류는 타임아웃을 사용하지 않습니다. 값을 0으로 수정하세요.	This action does not use a timeout. Change the value to zero.
+R24.Inspector.EjectRoute	배출 경로	Ejection route
+RunHistory.SavedRuns	보관된 운전	Stored runs
+RunHistory.RetentionScope	현재 레시피의 기록입니다. 자동으로 삭제하지 않습니다.	Records for this recipe. There is no automatic deletion.
+RunHistory.DraftSteps	초안 열기 → 초안 적용 → 운전 화면에서 운전 시작	Open draft → Apply draft → Start run from the run view
+RunHistory.Cancel	취소	Cancel
+RunHistory.ConfirmDelete	삭제	Delete
+RunHistory.ProductId	제품 ID	Product ID
+RunHistory.ProductName	제품명	Product name
+RunHistory.Unit	유닛	Unit
+RunHistory.Verdict	판정	Verdict
+RunHistory.Exit	배출	Exit
+RunHistory.NoProducts	보관된 제품 기록 없음	No stored product records
+RunHistory.NoCaptures	보관된 촬영 이미지 없음	No stored captured images
+RunHistory.NoInspections	보관된 검사 요청·결과 없음	No stored inspection requests or results
+RunHistory.ImageUnreadable	보관된 이미지를 읽을 수 없습니다.	The stored image cannot be read.
+RunHistory.ViewTitle	운전 이력	Run history
+Sequence.Search	스텝·장치 찾기	Find step or device
+Sequence.FindNext	다음 찾기	Find next
+Sequence.SearchNoMatches	일치 없음	No matches
+Sequence.SearchMatchCount	{0}개	Matches: {0}
+Sequence.SearchHint	이름·ID·대상으로 찾습니다. Enter: 다음 항목, Esc: 검색 해제.	Find by name, ID or target. Enter: next match. Esc: clear search.
+Process.Workspace	공정·동작	Process and actions
+Process.SimulationWorkspace	시뮬레이션	Simulation
+Process.Overview	공정 개요	Process overview
+Process.ShowEquipment	장비 보기	Show equipment
+Process.TaskSteps	내부 스텝	Steps
+Process.Task.Position	축 위치 결정	Positioning
+Process.Task.PositionAndCapture	위치 결정·촬영	Position and capture
+Process.Task.Actuate	출력·완료 확인	Output and feedback
+Process.Task.Transport	이송·정지	Transfer and stop
+Camera.Workspace	촬영·검사	Capture and inspection
+Camera.CaptureStepList	촬영 스텝	Acquisition steps
+Camera.NoCaptureSteps	연결된 촬영 스텝이 없습니다.	No acquisition steps use this camera.
+Camera.OpenCaptureStep	공정에서 촬영 스텝 편집	Edit the acquisition step in Process and actions
+SimObservation.Diagnostics	공정별 진단	Process diagnostics
+SimObservation.History	운전 이력 보기	View run history
+SimObservation.OpenStep	스텝 보기	View step
+SimObservation.ObserveUnit	유닛 관찰	Observe unit
+SimObservation.NoStep	현재 스텝 없음	No current step
+SimObservation.NoValues	현재 스텝에 비교할 값 없음	No values to compare for this step
+SimObservation.NoLimit	없음	None
+SimObservation.Timing	스텝 {0} s · 제한 {1}	Step {0} s · limit {1}
+SimObservation.Watchdog	공정 {0}/{1} s	Process {0}/{1} s
+SimObservation.Values	{0} · 실제 {1} → 목표 {2}	{0} · actual {1} → target {2}
+SimObservation.Delay	경과 {0} s → 설정 {1} s	Elapsed {0} s → configured {1} s
+SimObservation.PendingDefinition	장비 설정을 변경했습니다. 운전을 시작하면 변경한 설정으로 진단을 갱신합니다.	Equipment settings changed. Start a run to refresh diagnostics with the new settings.
+SimObservation.NoProcesses	관찰할 공정 정보가 없습니다. 유닛을 선택해 장비 상태를 확인하세요.	No process information to observe. Select a unit to view its equipment state.
+SimObservation.Playback	저장한 재생 화면에서는 현재 운전의 공정별 진단을 표시하지 않습니다.	Current run diagnostics are hidden while viewing a saved playback.
+Experiment.Workspace	실험·데이터	Experiments and data
+Experiment.Conditions	편차 조건	Variation conditions
+Experiment.ScenarioSetup	시나리오·반복 검증	Scenarios and repeat validation
+Experiment.SetupHint	촬영 조건과 장비 고장을 설정하고 운전 데이터를 확인합니다.	Configure capture conditions and equipment faults, then review run data.
+Experiment.CaptureData	촬영 데이터	Capture data
+Experiment.CurrentDataHint	현재 운전의 최신 촬영 입력입니다. 이미지를 선택해 확인하고 촬영·검사에서 이어서 볼 수 있습니다.	Latest inputs from the current run. Select an input to preview it or continue in Capture and inspection.
+Experiment.OpenCapture	촬영·검사에서 보기	View in Capture and inspection
+Experiment.NoCamera	카메라를 추가한 뒤 촬영 조건을 설정하세요.	Add a camera before configuring capture conditions.
+Experiment.OpenEquipment	장비 구성으로	Go to Equipment setup
+RunHistory.AnalysisRun	분석할 운전	Run to analyze
+RunHistory.ReturnToWork	편집 위치로	Return to work
+RunHistory.Compare	운전 비교	Compare runs
+RunHistory.ComparisonRun	비교 운전	Comparison run
+RunHistory.SelectedRun	선택 운전	Selected run
+RunHistory.ComparisonMetric	항목	Metric
+RunHistory.Difference	차이 (비교 − 선택)	Difference (comparison − selected)
+RunHistory.ComparisonSettings	당시 설정 나란히 보기	View applied settings side by side
+RunHistory.ComparisonHint	보관된 값의 차이입니다. 수치 차이는 비교 운전 − 선택 운전이며, 검사 합격 여부를 뜻하지 않습니다.	These are stored-value differences. Numeric differences are comparison minus selected; they do not indicate inspection acceptance.
+RunHistory.ComparisonNeedsTwo	같은 레시피의 다른 운전 기록이 있어야 비교할 수 있습니다.	Another stored run of the same recipe is required for comparison.
+RunHistory.SelectComparison	비교할 운전을 선택하세요. 조회로 현재 설정이나 보관 기록은 바뀌지 않습니다.	Select a run to compare. Viewing does not change current settings or stored records.
+RunHistory.Scope	운전 범위	Run scope
+RunHistory.Duration	시뮬레이션 운전 시간 (s)	Simulation run duration (s)
+RunHistory.RecordedAlarms	보관된 알람 수	Recorded alarm count
+RunHistory.AlarmDetails	보관된 알람	Recorded alarms
+RunHistory.NoRecordedAlarms	보관된 알람 없음	No recorded alarms
+RunHistory.Same	같음	Same
+RunHistory.Different	다름	Different
+RunHistory.Recorded	기록 있음	Recorded
+RunHistory.AnalysisTitle	결과 분석	Result analysis
+RunHistory.RunOutcome	운전 결과	Run outcome
+RunHistory.ManualComparison	각 운전의 촬영 이미지를 선택하세요. 촬영 짝은 자동으로 맞추지 않습니다.	Select a captured image from each run. Captures are not paired automatically.
+RunHistory.ComparisonSummary	운전 요약 비교	Compare run summaries
+RunHistory.CurrentCameraSettings	현재 카메라 설정	Current camera settings
+RunHistory.ReturnToAnalysis	분석 기록으로	Return to analysis
+RunHistory.CameraSettingsHint	현재 설정을 엽니다. 촬영 스텝은 기록되지 않았습니다.	Opens current settings. The capture step was not recorded.
+RunHistory.SelectCaptureForSettings	현재 설정을 확인할 촬영 이미지를 선택하세요.	Select a capture to view its current camera settings.
+RunHistory.DifferentRecipe	다른 레시피의 기록입니다.	This record belongs to another recipe.
+RunHistory.CameraNotRecorded	카메라가 기록되지 않았습니다.	The camera was not recorded.
+RunHistory.CurrentCameraMissing	기록 카메라: {0} / 현재 카메라 없음	Recorded camera: {0} / no current camera
+RunHistory.CurrentCameraTarget	기록 카메라: {0} / 현재 카메라: {1} ({0})	Recorded camera: {0} / current camera: {1} ({0})
+Process.AllUnits	전체 흐름	All units
+Process.Summary	작업 구간 묶기	Group related steps
+Process.ZoomOut	흐름도 축소	Zoom out flow
+Process.ZoomIn	흐름도 확대	Zoom in flow
+Process.ZoomReset	흐름도 100%	Reset flow to 100%
+Process.InvalidRoute	미지정/잘못된 연결	Missing or invalid route
+Process.EditRoute	스텝 설정에서 연결 편집	Edit route in step settings
+Process.LaneHint	유닛별 병행 흐름입니다. 레인의 높이는 실행 시각이 아닙니다.	Parallel unit flows. Lane height does not represent execution time.
+Process.RouteDestinationHint	같은 시퀀스의 스텝을 선택하세요. 설정에서 적용해야 연결이 바뀝니다.	Select a step in this sequence, then apply in step settings to change the route.
+Process.CancelRouteDestination	연결 선택 취소	Cancel route selection
+R40.AxisStepTitle	축 스텝 작성	Create axis step
+R40.AxisStepTarget	대상 축	Target axis
+R40.AxisStepPreview	추가 미리보기	Add preview
+R40.AxisStepHint	축을 고르면 추가할 기본값을 미리 봅니다. 스텝 추가를 눌러 반영하세요. 추가해도 축은 움직이지 않습니다.	Choose an axis to preview the defaults. Select Add step to insert. Adding a step does not move the axis.
+R40.StepDirectAddHint	아래 종류를 누르면 기본 대상으로 바로 추가합니다.	Choose a kind below to add immediately with its default target.
+R40.AxisStepTimeoutLabel	타임아웃 (ms)	Timeout (ms)
+R40.UnitStepTitle	유닛 스텝 작성	Create unit step
+R40.UnitStepTarget	현재 시퀀스의 유닛	Current sequence unit
+R40.UnitStepNoTarget	현재 시퀀스에 사용할 유닛이 없습니다.	No unit is available for the current sequence.
+R40.UnitStepHint	종류를 고른 뒤 스텝 추가를 누르세요. 추가해도 운전은 시작하지 않습니다.	Choose an action, then select Add step. Adding a step does not start a run.
+R40.SubsequenceStepTarget	호출할 시퀀스	Sequence to call
+R40.SubsequenceStepNoTargets	호출할 다른 시퀀스가 없습니다.	No other sequences are available to call.
+R40.SubsequenceStepHint	시퀀스를 고른 뒤 스텝 추가를 누르세요. 추가해도 운전은 시작하지 않습니다.	Choose a sequence, then select Add step. Adding a step does not start a run.
+R40.SignalStepTitle	I/O 스텝 작성	Create I/O step
+R40.SignalStepTarget	대상 채널	Target channel
+R40.SignalStepNoTargets	사용할 디지털 I/O 채널이 없습니다.	No digital I/O channels are available.
+R40.SignalStepHint	채널과 종류를 고른 뒤 스텝 추가를 누르세요. 스텝을 추가해도 운전은 시작하지 않습니다.	Choose a channel and action, then select Add step. Adding a step does not start a run.
+R40.CameraStepTitle	카메라 스텝 작성	Create camera step
+R40.CameraStepNoTargets	사용할 카메라가 없습니다.	No cameras are available.
+R40.CameraStepTarget	대상 카메라	Target camera
+R40.CameraStepHint	카메라를 고르면 추가할 기본값을 미리 봅니다. 스텝 추가를 눌러 반영하세요. 추가해도 촬영하지 않습니다.	Choose a camera to preview the defaults. Select Add step to insert. Adding a step does not capture an image.
+R40.TeachingLookup	티칭 위치 찾기	Find teaching positions
+R40.TeachingSearch	이름·위치 찾기	Find by name or position
+R40.TeachingSelected	선택 위치	Selected position
+R40.TeachingMatchCount	일치하는 위치 {0}개	{0} matching positions
+R40.TeachingCopyDraft	스텝 초안에 넣기	Copy to step draft
+R40.TeachingLookupHint	선택은 미리보기입니다. 초안에 넣은 뒤 스텝 적용을 누르세요. 축은 이동하지 않습니다.	Selection previews the position. Copy to the draft, then apply the step. The axis does not move.
+R40.TransferStepTitle	제품 이송 스텝 작성	Create product transfer step
+R40.TransferStepTarget	컨베이어	Conveyor
+R40.TransferStepHint	컨베이어와 도착 유닛을 모두 고른 뒤 스텝 추가를 누르세요.	Choose both a conveyor and destination unit, then select Add step.
+R40.TransferStepUnavailable	현재 유닛과 다른 도착 유닛, 컨베이어가 필요합니다.	A conveyor and a destination unit different from the current unit are required.
+R40.WorkpieceStepTitle	제품 투입·배출 스텝 작성	Create product feed or eject step
+R40.WorkpieceStepTarget	대상 제품	Target product
+R40.WorkpieceStepNoTargets	현재 배치에 연결할 제품이 없습니다.	No product is available in the active layout.
+R40.WorkpieceStepHint	제품과 종류를 고른 뒤 스텝 추가를 누르세요. 추가해도 제품을 투입하거나 배출하지 않습니다.	Choose a product and action, then select Add step. Adding a step does not feed or eject a product.
+R40.TeachingOpenAxisSettings	축 위치 설정 열기	Open axis position settings
+R40.TeachingAxisSettingsHint	설정 적용과 스텝 적용은 별도입니다.	Settings and step targets are applied separately.
+R40.CapturePreparation	촬영 준비	Capture preparation
+R40.CurrentCapture	현재 촬영	Current capture
+R40.LinkedCaptureSteps	촬영 스텝	Capture steps
+R40.NoLinkedCaptureSteps	연결된 촬영 스텝이 없습니다.	No capture steps are linked.
+R40.CaptureStepOpenHint	설정만 엽니다. 촬영하지 않습니다.	Opens settings without capturing.
+R40.SelectedCaptureRecipe	선택한 촬영 레시피	Selected capture recipe
+R40.Experiment.AppliedSettings	적용된 카메라 설정	Applied camera settings
+R40.Experiment.CameraScope	카메라마다 따로 적용합니다.	Settings apply to each camera separately.
+R40.Experiment.AppliedSource	적용된 이미지 소스	Applied image source
+R40.Experiment.FullDraftApply	촬영 초안 전체를 적용합니다.	Apply updates the entire capture draft.
+R40.Experiment.ScenarioConfiguration	시나리오 설정	Scenario configuration
+R40.Experiment.ScenarioScope	카메라 편차 설정과 별개입니다.	Separate from camera deviation settings.
+R40.Experiment.CurrentValidation	현재 검증 상태	Current validation state
+R40.Experiment.Summary	설정 요약	Settings summary
+R40.Fault.CommandPending	명령 처리 중	Command in progress

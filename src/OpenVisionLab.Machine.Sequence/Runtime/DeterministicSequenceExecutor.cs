@@ -13,6 +13,7 @@ public sealed class DeterministicSequenceExecutor
     private TimeSpan _totalElapsed;
     private long _tickCount;
     private SequenceExecutionError? _lastError;
+    private int _completedCycles;
 
     public DeterministicSequenceExecutor(CompiledSequence sequence)
         : this(sequence, SingleSequenceCatalog(sequence))
@@ -131,6 +132,9 @@ public sealed class DeterministicSequenceExecutor
             EjectWorkpieceStep ejectWorkpiece => TickEjectWorkpiece(ejectWorkpiece, context),
             WaitVisionResultStep waitVision => TickWaitVisionResult(waitVision, context),
             CallSubsequenceStep callSubsequence => TickCallSubsequence(callSubsequence),
+            DelayStep delay => CurrentFrame!.ElapsedInStep >= delay.Duration ? Advance(delay) : CheckTimeout(delay),
+            UnitOperationStep operation => TickUnitOperation(operation, context),
+            BranchInspectionStep branch => TickInspectionBranch(branch, context),
             CompleteStep => Complete(),
             _ => Fault(Error(SequenceExecutionErrorCode.InvalidProgram, $"Step type '{step.GetType().Name}' is not supported."))
         };
@@ -166,6 +170,7 @@ public sealed class DeterministicSequenceExecutor
         _totalElapsed = TimeSpan.Zero;
         _tickCount = 0;
         _lastError = null;
+        _completedCycles = 0;
     }
 
     public SequenceExecutionSnapshot CaptureSnapshot()
@@ -186,7 +191,39 @@ public sealed class DeterministicSequenceExecutor
             _lastError,
             _rootSequence.WatchdogTimeout,
             nested ? frame!.Sequence.Id : null,
-            nested ? _frames.Select(item => item.Sequence.Id).ToArray() : null);
+            nested ? _frames.Select(item => item.Sequence.Id).ToArray() : null,
+            _rootSequence.UnitId, _completedCycles, _rootSequence.RepeatCount);
+    }
+
+    private SequenceExecutionResult TickUnitOperation(UnitOperationStep step, ISequenceRuntimeContext context)
+    {
+        var result = context.ExecuteUnitOperation(step, CurrentFrame!.ElapsedInStep);
+        if (result.IsSuccess && result.EndSequence)
+        {
+            var previous = CurrentFrame.CurrentStepId;
+            _frames.RemoveRange(1, _frames.Count - 1);
+            CurrentFrame.ElapsedInStep = TimeSpan.Zero;
+            CurrentFrame.CameraAcquisitionIds.Clear();
+            _status = SequenceExecutionStatus.Completed;
+            return Result(true, previous, _rootSequence.Id, CurrentFrame.CurrentStepId, null);
+        }
+        return !result.IsSuccess
+            ? RouteOrFault(step, Error(SequenceExecutionErrorCode.WorkpieceOperationFailed, "Unit material operation failed.", result.Error))
+            : result.IsComplete ? Advance(step) : CheckTimeout(step);
+    }
+
+    public SequenceExecutionResult RejectMaterialCompletion(string message)
+    {
+        if (_status != SequenceExecutionStatus.Completed) return InvalidState("Only a completed sequence can reject its material completion.");
+        return Fault(Error(SequenceExecutionErrorCode.WorkpieceOperationFailed, message));
+    }
+
+    private SequenceExecutionResult TickInspectionBranch(BranchInspectionStep step, ISequenceRuntimeContext context)
+    {
+        var result = context.ReadUnitInspection(step.UnitId);
+        if (!result.IsSuccess || result.State is not (SequenceVisionResultState.Passed or SequenceVisionResultState.Failed))
+            return RouteOrFault(step, Error(SequenceExecutionErrorCode.VisionResultNotTriggered, "Inspection must finish before branching.", result.Error));
+        return Advance(result.State == SequenceVisionResultState.Failed ? step with { NextStepId = step.FailureStepId } : step);
     }
 
     private SequenceExecutionResult TickWaitSignal(WaitSignalStep step, ISequenceRuntimeContext context)
@@ -215,10 +252,22 @@ public sealed class DeterministicSequenceExecutor
 
     private SequenceExecutionResult TickMoveAxis(MoveAxisStep step, ISequenceRuntimeContext context)
     {
-        var move = context.RequestAxisMove(step.AxisId, step.TargetPosition);
-        return move.IsSuccess
-            ? Advance(step)
-            : RouteOrFault(step, Error(SequenceExecutionErrorCode.AxisMoveFailed, "Axis move request failed.", move.Error));
+        var frame = CurrentFrame!;
+        if (!frame.AxisMoveRequested)
+        {
+            var move = context.RequestAxisMove(step.AxisId, step.TargetPosition);
+            if (!move.IsSuccess) return RouteOrFault(step, Error(SequenceExecutionErrorCode.AxisMoveFailed, "Axis move request failed.", move.Error));
+            frame.AxisMoveRequested = true;
+        }
+        if (!step.WaitForCompletion) return Advance(step);
+        var read = context.ReadAxisMotionState(step.AxisId);
+        if (!read.IsSuccess) return RouteOrFault(step, Error(SequenceExecutionErrorCode.AxisStateReadFailed, "Axis state read failed.", read.Error));
+        return read.State switch
+        {
+            SequenceAxisMotionState.Completed => Advance(step),
+            SequenceAxisMotionState.Faulted => RouteOrFault(step, Error(SequenceExecutionErrorCode.AxisFaulted, "Axis entered a faulted state.")),
+            _ => CheckTimeout(step)
+        };
     }
 
     private SequenceExecutionResult TickWaitAxisDone(WaitAxisDoneStep step, ISequenceRuntimeContext context)
@@ -393,6 +442,7 @@ public sealed class DeterministicSequenceExecutor
         var previous = step.Id;
         frame.CurrentStepId = step.NextStepId;
         frame.ElapsedInStep = TimeSpan.Zero;
+        frame.AxisMoveRequested = false;
         return Result(true, previous, frame.Sequence.Id, frame.CurrentStepId, null);
     }
 
@@ -408,6 +458,7 @@ public sealed class DeterministicSequenceExecutor
         var previous = step.Id;
         frame.CurrentStepId = step.FailureStepId;
         frame.ElapsedInStep = TimeSpan.Zero;
+        frame.AxisMoveRequested = false;
         return Result(true, previous, frame.Sequence.Id, frame.CurrentStepId, null);
     }
 
@@ -427,6 +478,12 @@ public sealed class DeterministicSequenceExecutor
         completedFrame.CameraAcquisitionIds.Clear();
         if (_frames.Count == 1)
         {
+            _completedCycles++;
+            if (_completedCycles < _rootSequence.RepeatCount)
+            {
+                completedFrame.CurrentStepId = completedFrame.Sequence.EntryStepId;
+                return Result(true, previous, completedFrame.Sequence.Id, completedFrame.CurrentStepId, null);
+            }
             _status = SequenceExecutionStatus.Completed;
             return Result(true, previous, completedFrame.Sequence.Id, completedFrame.CurrentStepId, null);
         }
@@ -468,6 +525,7 @@ public sealed class DeterministicSequenceExecutor
         var previous = step.Id;
         frame.CurrentStepId = step.ErrorStepId;
         frame.ElapsedInStep = TimeSpan.Zero;
+        frame.AxisMoveRequested = false;
         return Result(true, previous, frame.Sequence.Id, frame.CurrentStepId, error);
     }
 
@@ -606,6 +664,7 @@ public sealed class DeterministicSequenceExecutor
         public string? ReturnStepId { get; }
 
         public TimeSpan ElapsedInStep { get; set; }
+        public bool AxisMoveRequested { get; set; }
 
         public TimeSpan TotalElapsed { get; set; }
 

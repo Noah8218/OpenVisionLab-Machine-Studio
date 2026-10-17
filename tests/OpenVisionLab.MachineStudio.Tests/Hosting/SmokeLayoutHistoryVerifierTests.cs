@@ -186,8 +186,11 @@ public sealed class SmokeLayoutHistoryVerifierTests
                 var runButton = FindCommandButton(commandBar, viewModel.RunCommand);
                 var pauseButton = FindCommandButton(commandBar, viewModel.PauseCommand);
                 var resetButton = FindCommandButton(commandBar, viewModel.ResetCommand);
-                var designModeRadio = FindModeRadio(commandBar, nameof(MainViewModel.IsDesignMode));
-                var runModeRadio = FindModeRadio(commandBar, nameof(MainViewModel.IsRunMode));
+                var runOptionsPopup = (Popup)commandBar.FindName("RunOptionsPopup");
+                runOptionsPopup.SetCurrentValue(Popup.IsOpenProperty, true);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var designModeRadio = FindModeRadio(runOptionsPopup.Child, nameof(MainViewModel.IsDesignMode));
+                var runModeRadio = FindModeRadio(runOptionsPopup.Child, nameof(MainViewModel.IsRunMode));
 
                 Assert.True(
                     designModeRadio.IsChecked == true,
@@ -240,6 +243,7 @@ public sealed class SmokeLayoutHistoryVerifierTests
             }
             finally
             {
+                ((Popup)commandBar.FindName("RunOptionsPopup")).SetCurrentValue(Popup.IsOpenProperty, false);
                 window.Close();
             }
 

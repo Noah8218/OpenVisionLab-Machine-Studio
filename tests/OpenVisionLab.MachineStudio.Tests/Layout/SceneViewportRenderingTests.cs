@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -13,6 +14,7 @@ using OpenVisionLab.Machine.Simulation.Layout;
 using OpenVisionLab.Machine.Simulation.Snapshots;
 using OpenVisionLab.MachineStudio.Model;
 using OpenVisionLab.MachineStudio.View.Scene;
+using OpenVisionLab.MachineStudio.View.Shell;
 using OpenVisionLab.MachineStudio.ViewModel;
 using OpenVisionLab.TestSupport;
 using Xunit;
@@ -25,6 +27,80 @@ public sealed class SceneViewportRenderingTests
     private readonly StudioUiTestHost _ui;
 
     public SceneViewportRenderingTests(StudioUiTestHost ui) => _ui = ui;
+
+    [Theory]
+    [InlineData(45, 28.65222299882812)]
+    [InlineData(225, 28.65222299882812)]
+    [InlineData(45, -28.65222299882812)]
+    [InlineData(225, -28.65222299882812)]
+    public async Task ASeparateUnitTableStaysBehindPartsFromAboveAndOccludesThemFromBelow(double yaw, double pitch)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var frame = CreateItem("frame", LayoutComponentKind.MachineFrame, 10, 12.5, 340, 155);
+            frame.Component!.VerticalEnvelope = new() { BaseElevation = -105, Height = 92 };
+            var stage = CreateItem("stage", LayoutComponentKind.LinearStage, -50, 50, 90, 38);
+            stage.Component!.VerticalEnvelope = new() { BaseElevation = 0, Height = 33 };
+            var viewport = new MachineSceneViewport { IsObliqueView = true, ItemsSource = [frame, stage] };
+            var window = new Window { Content = viewport, Width = 800, Height = 560, ShowInTaskbar = false, ShowActivated = false, WindowStyle = WindowStyle.None };
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                viewport.OrbitBy(new Vector((yaw - SceneViewportProjection.DefaultYawDegrees) / .35, (SceneViewportProjection.DefaultPitchDegrees - pitch) / .35));
+                viewport.FitToLayout();
+                PumpRenderDispatcher();
+                var projection = SceneViewportProjection.Create([new(10, 12.5, 340, 155, 0, -105, 92), new(-50, 50, 90, 38, 0, 0, 33)], viewport.ActualWidth, viewport.ActualHeight, true, yaw, pitch);
+                var point = pitch > 0 ? projection.ToScreen(-80, 50, 33) : projection.ToScreen(-50, 50, 0);
+                var image = Capture(viewport);
+                if (pitch > 0)
+                {
+                    int index = ((int)Math.Round(point.Y) * image.Width + (int)Math.Round(point.X)) * 4;
+                    Assert.Equal(new byte[] { 0xD6, 0xC5, 0x6D }, image.Pixels.AsSpan(index, 3).ToArray());
+                }
+                Assert.True(viewport.SelectItemAt(point));
+                Assert.Same(pitch > 0 ? stage : frame, viewport.SelectedItem);
+                return true;
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task DigitalIoKeepsItsKindColorWhileTheRenderedOnOffStateChanges(bool oblique, bool designMode)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var item = CreateItem("io", LayoutComponentKind.DigitalIo, 40, 40, 25, 24);
+            item.Component!.BehaviorBindingId = "do.io";
+            var store = new SceneSnapshotStore();
+            var viewport = new MachineSceneViewport { Width = 300, Height = 220, IsDesignMode = designMode, IsObliqueView = oblique, ItemsSource = [item], SnapshotSource = store };
+            var window = new Window { Content = viewport, Width = 300, Height = 220, WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false };
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                byte[]? previous = null;
+                foreach (bool on in new[] { false, true })
+                {
+                    store.Publish(new SimulationSnapshot(TimeSpan.Zero, 0, SimulationRunMode.Paused, SimulationControlOwner.Manual, 1, [], 0,
+                        [new DigitalSignalSnapshot("do.io", "I/O", OpenVisionLab.Machine.Core.Channels.ChannelKind.DigitalOutput, on)], []));
+                    PumpRenderDispatcher();
+                    var frame = Capture(viewport);
+                    int pinkPixels = Enumerable.Range(0, frame.Pixels.Length / 4).Count(index => frame.Pixels[index * 4] == 0x9D && frame.Pixels[index * 4 + 1] == 0xAA && frame.Pixels[index * 4 + 2] == 0xE4);
+                    Assert.True(pinkPixels > 50, "The R19 I/O body must stay pink in both ON and OFF states.");
+                    if (previous is not null && !designMode) Assert.True(CountDifferentPixels(previous, frame.Pixels) > 10, "ON/OFF must also change the rendered state cue.");
+                    previous = frame.Pixels;
+                }
+                return true;
+            }
+            finally { window.Close(); }
+        });
+    }
 
     [Theory]
     [InlineData(false)]
@@ -199,18 +275,73 @@ public sealed class SceneViewportRenderingTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task SelectedComponentNameIsRenderedInBothProjections(bool oblique)
+    [InlineData(false, -530)]
+    [InlineData(false, 530)]
+    [InlineData(true, -530)]
+    [InlineData(true, 530)]
+    public async Task EquipmentSelectedLabelStaysInsideSceneForLongNamesAtViewportEdges(bool oblique, double cameraX)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var frame = CreateItem("frame", LayoutComponentKind.MachineFrame, 0, 0, 400, 250);
+            var camera = CreateItem("camera-top-2d", LayoutComponentKind.Camera, cameraX, 120, 24, 20);
+            camera.CurrentName = string.Concat(Enumerable.Repeat("상면 검사 카메라 ", 6));
+            camera.IsSelected = true;
+            var header = new Border { Height = 80, VerticalAlignment = VerticalAlignment.Top, Background = Brushes.White };
+            var footer = new Border { Height = 70, VerticalAlignment = VerticalAlignment.Bottom, Background = Brushes.White };
+            var viewport = new MachineSceneViewport
+            {
+                IsObliqueView = oblique, UseEquipmentPresentation = true,
+                ItemsSource = new[] { frame, camera }, SelectedItem = camera,
+                LabelHeaderElement = header, LabelFooterElement = footer
+            };
+            var root = new Grid { Children = { viewport, header, footer } };
+            var window = new Window { Width = 705, Height = 561, Content = root, WindowStyle = WindowStyle.None, ShowActivated = false, ShowInTaskbar = false };
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                viewport.FitToLayout();
+                PumpRenderDispatcher();
+                var longNameFrame = Capture(viewport);
+                var label = Assert.IsType<Rect>(viewport.LastRenderedSelectedLabelBounds);
+                Assert.True(new Rect(viewport.RenderSize).Contains(label), $"Label {label}; viewport {viewport.RenderSize}");
+                Assert.True(label.Top >= header.ActualHeight && label.Bottom <= viewport.ActualHeight - footer.ActualHeight);
+                window.Width = 420;
+                window.UpdateLayout();
+                PumpRenderDispatcher();
+                label = Assert.IsType<Rect>(viewport.LastRenderedSelectedLabelBounds);
+                Assert.True(new Rect(viewport.RenderSize).Contains(label));
+                Assert.True(label.Top >= header.ActualHeight && label.Bottom <= viewport.ActualHeight - footer.ActualHeight);
+                window.Width = 705;
+                camera.CurrentName = "카메라";
+                window.UpdateLayout();
+                PumpRenderDispatcher();
+                var shortNameFrame = Capture(viewport);
+                Assert.True(CountDifferentPixels(longNameFrame.Pixels, shortNameFrame.Pixels) > 10);
+                Assert.True(new Rect(viewport.RenderSize).Contains(Assert.IsType<Rect>(viewport.LastRenderedSelectedLabelBounds)));
+                return true;
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task SelectedComponentNameIsRenderedInBothProjections(bool oblique, bool equipmentPresentation)
     {
         await _ui.InvokeAsync(() =>
         {
             var item = CreateItem("AX-002", LayoutComponentKind.LinearStage, 180, 120, 100, 28);
             item.IsSelected = true;
-            var viewport = new MachineSceneViewport { Width = 640, Height = 420, IsObliqueView = oblique, ItemsSource = new[] { item } };
+            var viewport = new MachineSceneViewport { Width = 640, Height = 420, IsObliqueView = oblique, UseEquipmentPresentation = equipmentPresentation, ItemsSource = new[] { item } };
             var window = new Window { Content = viewport, Width = 640, Height = 420, ShowInTaskbar = false, ShowActivated = false, WindowStyle = WindowStyle.None };
             try
             {
+                SmokeDpiTestHook.PlaceOnTestMonitor(window, 640, 420);
                 window.Show();
                 window.UpdateLayout();
                 var before = Capture(viewport);
@@ -218,7 +349,7 @@ public sealed class SceneViewportRenderingTests
                 window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
                 var after = Capture(viewport);
                 Assert.True(CountDifferentPixels(before.Pixels, after.Pixels) > 10, "The selected name must be visible in the scene, not only the outline.");
-                Save(after.Bitmap, $"selected-label-{(oblique ? "oblique" : "plan")}.png", Path.Combine(TestStorage.RootPath, "r19-batch-1-4-20260930", "inprocess"));
+                Save(after.Bitmap, $"selected-label-{(equipmentPresentation ? "equipment-" : "")}{(oblique ? "oblique" : "plan")}.png", Path.Combine(TestStorage.RootPath, "r19-batch-1-4-20260930", "inprocess"));
                 return true;
             }
             finally
@@ -262,7 +393,8 @@ public sealed class SceneViewportRenderingTests
             CreateItem("cylinder-1", LayoutComponentKind.PneumaticCylinder, 115, 145, 74, 32),
             CreateItem("conveyor-1", LayoutComponentKind.Conveyor, 220, 145, 140, 36),
             CreateItem("workpiece-1", LayoutComponentKind.Workpiece, 410, 145, 40, 40),
-            CreateItem("camera-1", LayoutComponentKind.Camera, 500, 30, 44, 36)
+            CreateItem("camera-1", LayoutComponentKind.Camera, 500, 30, 44, 36),
+            CreateItem("digital-io-1", LayoutComponentKind.DigitalIo, 500, 145, 25, 24)
         };
         var viewport = new MachineSceneViewport
         {
@@ -459,6 +591,109 @@ public sealed class SceneViewportRenderingTests
         Assert.True(CountDifferentPixelsInRegion(leftStopped, rightStopped, 400, 800) > 10);
         Assert.True(CountDifferentPixelsInRegion(bothRunning, bothStopped, 0, 400) > 10);
         Assert.True(CountDifferentPixelsInRegion(bothRunning, bothStopped, 400, 800) > 10);
+    }
+
+    [Fact]
+    public async Task ReadOnlyOrbitPressPreservesSelectionUntilAConfirmedClick()
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var selected = CreateItem("selected", LayoutComponentKind.Workpiece, 40, 40, 40, 24);
+            var unitBase = CreateItem("unit-base", LayoutComponentKind.MachineFrame, 40, 40, 340, 155);
+            var viewport = new MachineSceneViewport
+            {
+                IsDesignMode = false, IsObliqueView = true, SelectedItem = selected,
+                ItemsSource = Array.Empty<LayoutItem>(), ReferenceUnitFrames = new[] { unitBase }
+            };
+            var window = new Window { Content = viewport, Width = 680, Height = 460, ShowInTaskbar = false, ShowActivated = false };
+            window.Show();
+            try
+            {
+                window.UpdateLayout();
+                viewport.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+                {
+                    RoutedEvent = Mouse.MouseDownEvent
+                });
+                Assert.Same(selected, viewport.SelectedItem);
+                viewport.ReleaseMouseCapture();
+                Assert.Same(selected, viewport.SelectedItem);
+                Assert.Equal(40, selected.Component!.Transform.X);
+                return true;
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Fact]
+    public async Task UnitBaseOnlySceneAllowsCameraNavigationAndParallelPlaneRejectsTransform()
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var unitBase = CreateItem("unit-base", LayoutComponentKind.MachineFrame, 40, 40, 340, 155);
+            var viewport = new MachineSceneViewport { IsObliqueView = true, ItemsSource = Array.Empty<LayoutItem>(), ReferenceUnitFrames = new[] { unitBase } };
+            var window = new Window { Content = viewport, Width = 680, Height = 460, ShowInTaskbar = false, ShowActivated = false };
+            window.Show();
+            try
+            {
+                window.UpdateLayout();
+                Assert.True(viewport.OrbitBy(new Vector(90 / .35, 0)));
+                Assert.True(viewport.PanBy(new Vector(20, -15)));
+                Assert.True(viewport.ZoomAtCenter(120));
+                Assert.Empty(viewport.ItemsSource!);
+                Assert.False(viewport.SelectItemAt(new Point(320, 220)));
+                var part = CreateItem("part", LayoutComponentKind.Workpiece, 40, 40, 40, 24);
+                part.IsSelected = true;
+                viewport.ItemsSource = new[] { part };
+                Assert.True(viewport.OrbitBy(new Vector(0, viewport.ViewPitchDegrees / .35)));
+                Assert.False(viewport.RequestSelectionTransform("part", LayoutTransformHandle.TopLeft, new Point(10, 20)));
+                Assert.Equal(40, part.Component!.Transform.X);
+                viewport.ResetCamera();
+                Assert.Equal(SceneViewportProjection.DefaultPitchDegrees, viewport.ViewPitchDegrees);
+                return true;
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Fact]
+    public async Task OrbitChangesVisibleDepthAndPickingWithoutMovingPartsAndFitRetainsOrientation()
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var lower = CreateItem("lower", LayoutComponentKind.Workpiece, 40, 40, 200, 200);
+            var upper = CreateItem("upper", LayoutComponentKind.Workpiece, 40, 40, 200, 200);
+            lower.Component!.VerticalEnvelope = new() { BaseElevation = 0, Height = 1 };
+            upper.Component!.VerticalEnvelope = new() { BaseElevation = 10, Height = 1 };
+            var viewport = new MachineSceneViewport { IsObliqueView = true, ItemsSource = new[] { lower, upper } };
+            var window = new Window { Content = viewport, Width = 680, Height = 460, ShowInTaskbar = false, ShowActivated = false };
+            window.Show();
+            try
+            {
+                window.UpdateLayout();
+                PumpRenderDispatcher();
+                Assert.True(viewport.SelectItemAt(viewport.GetItemCenter("upper")!.Value));
+                Assert.Same(upper, viewport.SelectedItem);
+                Assert.True(viewport.OrbitBy(new Vector(360 / .35, (SceneViewportProjection.DefaultPitchDegrees + 40) / .35)));
+                PumpRenderDispatcher();
+                Assert.InRange(viewport.ViewPitchDegrees, -40.000001, -39.999999);
+                Assert.True(viewport.SelectItemAt(viewport.GetItemCenter("upper")!.Value));
+                Assert.Same(lower, viewport.SelectedItem);
+                Assert.Equal(40, lower.Component.Transform.X);
+                Assert.Equal(40, upper.Component.Transform.X);
+                Assert.True(viewport.ZoomAtCenter(120));
+                Assert.True(viewport.PanBy(new Vector(17, 23)));
+                viewport.FitToLayout();
+                Assert.InRange(viewport.ViewPitchDegrees, -40.000001, -39.999999);
+                Assert.Equal(1, viewport.ZoomFactor);
+                viewport.ResetCamera();
+                Assert.Equal(SceneViewportProjection.DefaultPitchDegrees, viewport.ViewPitchDegrees);
+                Assert.Equal(SceneViewportProjection.DefaultYawDegrees, viewport.ViewYawDegrees);
+                Assert.True(viewport.SelectItemAt(viewport.GetItemCenter("upper")!.Value));
+                Assert.Same(upper, viewport.SelectedItem);
+                return true;
+            }
+            finally { window.Close(); }
+        });
     }
 
     private static LayoutItem CreateItem(

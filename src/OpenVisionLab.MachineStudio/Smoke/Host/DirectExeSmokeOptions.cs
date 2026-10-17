@@ -6,6 +6,8 @@ internal sealed class DirectExeSmokeOptions
     public int SmokePerfSampleCount { get; init; }
     public string? SmokePerfReportPath { get; init; }
     public string? ScreenshotPath { get; init; }
+    public string? FrameRecordingPath { get; init; }
+    public int FrameRecordingSeconds { get; init; } = 30;
     public string? LayoutReportPath { get; init; }
     public string SizeArgument { get; init; } = "1280x760";
     public (int Width, int Height) WindowSize { get; init; } = (1280, 760);

@@ -15,6 +15,10 @@ public sealed record RuntimeTimelineItem(
     string Message)
 {
     public string? CommandId { get; init; }
+    public double? TimeSeconds { get; init; }
+    public string SourceText { get; init; } = string.Empty;
+    public SimulationLogSeverity Severity { get; init; }
+    public string SecondsText => TimeSeconds is { } seconds ? seconds.ToString("F2", CultureInfo.InvariantCulture) + " s" : TimeText;
 
     public string CommandIdText => string.IsNullOrEmpty(CommandId)
         ? OpenVisionLanguageService.T(
@@ -37,7 +41,26 @@ public sealed record RuntimeTimelineItem(
     public string HeaderText => $"{TimeText} · tick {TickIndex}";
 }
 
-public sealed record RuntimeTimelineFilterItem(string Key, string DisplayText);
+public sealed class RuntimeTimelineFilterItem : ViewModelBase
+{
+    private string _displayText;
+
+    public RuntimeTimelineFilterItem(string key, string displayText)
+    {
+        Key = key;
+        _displayText = displayText;
+    }
+
+    public string Key { get; }
+
+    public string DisplayText
+    {
+        get => _displayText;
+        private set => SetProperty(ref _displayText, value);
+    }
+
+    internal void UpdateDisplayText(string displayText) => DisplayText = displayText;
+}
 
 /// <summary>
 /// Owns the bounded runtime-event history and its localized timeline rows.
@@ -46,13 +69,15 @@ internal sealed class RuntimeTimelineViewModel : ViewModelBase
 {
     private const int RetentionLimit = 200;
     private readonly List<SimulationEvent> _events = [];
+    private readonly Func<SimulationEvent, string> _sourceText;
     private string _selectedCategory = string.Empty;
     private SimulationLogSeverity? _selectedSeverity;
     private IReadOnlyList<RuntimeTimelineFilterItem> _filterOptions = [];
     private IReadOnlyList<RuntimeTimelineFilterItem> _severityFilterOptions = [];
 
-    internal RuntimeTimelineViewModel()
+    internal RuntimeTimelineViewModel(Func<SimulationEvent, string>? sourceText = null)
     {
+        _sourceText = sourceText ?? (_ => string.Empty);
         RebuildFilterOptions();
         RebuildSeverityFilterOptions();
     }
@@ -157,7 +182,7 @@ internal sealed class RuntimeTimelineViewModel : ViewModelBase
             string.IsNullOrEmpty(_selectedCategory)
             || string.Equals(item.Category, _selectedCategory, StringComparison.Ordinal))
             .Where(item => _selectedSeverity is null
-                || RuntimeObservabilityJournal.SeverityForCategory(item.Category) == _selectedSeverity))
+                || GetSeverity(item) == _selectedSeverity))
         {
             Items.Add(new RuntimeTimelineItem(
                 item.EventIndex,
@@ -167,11 +192,17 @@ internal sealed class RuntimeTimelineViewModel : ViewModelBase
                 item.Code,
                 SimulationLogEntry.LocalizeMessage(item.Message))
             {
-                CommandId = item.CommandId
+                CommandId = item.CommandId,
+                TimeSeconds = item.SimulationTime.TotalSeconds,
+                SourceText = _sourceText(item),
+                Severity = GetSeverity(item)
             });
         }
         NotifyPresentationChanged();
     }
+
+    private static SimulationLogSeverity GetSeverity(SimulationEvent item) => item.Code == "SequenceFaulted" || item.Category == "Alarm"
+        ? SimulationLogSeverity.Alarm : RuntimeObservabilityJournal.SeverityForCategory(item.Category);
 
     private void RebuildFilterOptions()
     {
@@ -191,8 +222,7 @@ internal sealed class RuntimeTimelineViewModel : ViewModelBase
         }
 
         _filterOptions = categoryKeys
-            .Select(key => new RuntimeTimelineFilterItem(
-                key,
+            .Select(key => GetFilterItem(_filterOptions, key,
                 string.IsNullOrEmpty(key)
                     ? OpenVisionLanguageService.T(
                         "Debugger.TimelineFilterAll",
@@ -206,7 +236,7 @@ internal sealed class RuntimeTimelineViewModel : ViewModelBase
     {
         _severityFilterOptions = new[]
             {
-                new RuntimeTimelineFilterItem(
+                GetFilterItem(_severityFilterOptions,
                     string.Empty,
                     OpenVisionLanguageService.T(
                         "Debugger.TimelineSeverityFilterAll",
@@ -214,7 +244,7 @@ internal sealed class RuntimeTimelineViewModel : ViewModelBase
                         "All severities"))
             }
             .Concat(Enum.GetValues<SimulationLogSeverity>().Select(severity =>
-                new RuntimeTimelineFilterItem(
+                GetFilterItem(_severityFilterOptions,
                     GetSeverityKey(severity),
                     OpenVisionLanguageService.T(
                         $"Runtime.{GetSeverityKey(severity)}",
@@ -224,6 +254,14 @@ internal sealed class RuntimeTimelineViewModel : ViewModelBase
     }
 
     private static string GetSeverityKey(SimulationLogSeverity? severity) => severity?.ToString() ?? string.Empty;
+
+    private static RuntimeTimelineFilterItem GetFilterItem(IReadOnlyList<RuntimeTimelineFilterItem> options, string key, string displayText)
+    {
+        var item = options.FirstOrDefault(option => string.Equals(option.Key, key, StringComparison.Ordinal));
+        if (item is null) return new RuntimeTimelineFilterItem(key, displayText);
+        item.UpdateDisplayText(displayText);
+        return item;
+    }
 
     private void NotifyPresentationChanged()
     {

@@ -8,6 +8,29 @@ namespace OpenVisionLab.MachineStudio.Tests;
 public sealed class SimulationRunControlAdmissionPolicyTests
 {
     [Fact]
+    public void PendingManualEntryBlocksEveryGlobalRunCommandAndReleasesItsAdmission()
+    {
+        var ready = CreateState();
+        var running = ready with { IsRunning = true, HasEmbeddedSequence = true, HasCycleStartInput = true, ActiveSequenceStatus = SequenceExecutionStatus.Running };
+        var faulted = ready with { ActiveSequenceStatus = SequenceExecutionStatus.Faulted, ActiveSequenceId = "sequence" };
+        var cases = new (Func<SimulationRunControlState, bool> CanExecute, SimulationRunControlState State)[]
+        {
+            (SimulationRunControlAdmissionPolicy.CanRun, ready),
+            (SimulationRunControlAdmissionPolicy.CanPause, running),
+            (SimulationRunControlAdmissionPolicy.CanAbortSequence, running),
+            (SimulationRunControlAdmissionPolicy.CanRetrySequence, faulted),
+            (SimulationRunControlAdmissionPolicy.CanStep, ready),
+            (SimulationRunControlAdmissionPolicy.CanCycleStart, running),
+            (SimulationRunControlAdmissionPolicy.CanReset, ready)
+        };
+        foreach (var item in cases)
+        {
+            Assert.True(item.CanExecute(item.State));
+            Assert.False(item.CanExecute(item.State with { IsManualControlEntryPending = true }));
+        }
+    }
+
+    [Fact]
     public void RunAdmissionUsesRuntimeReadiness()
     {
         var unavailable = CreateState() with

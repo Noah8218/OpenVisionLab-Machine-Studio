@@ -6,6 +6,49 @@ namespace OpenVisionLab.MachineStudio.Tests;
 public sealed class MachineIntegrationParticipantTests
 {
     [Fact]
+    public async Task InFlightObservationConsumesItsCompletionBeforeTheNextObservation()
+    {
+        using var participant = new MachineIntegrationParticipant();
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var operation = participant.TrackAsync(MachineIntegrationOperationKind.PublishHandoff, async () =>
+        {
+            await release.Task;
+            return new MachineIntegrationOperationObservation(MachineIntegrationOperationKind.PublishHandoff, MachineIntegrationParticipantOutcome.Completed);
+        });
+        var observation = participant.ObserveAsync(TimeSpan.FromSeconds(1));
+        Assert.False(observation.IsCompleted);
+        release.SetResult();
+        Assert.Equal(MachineIntegrationParticipantOutcome.Completed, (await observation).Outcome);
+        await operation;
+        Assert.Equal(MachineIntegrationParticipantOutcome.Idle, (await participant.ObserveAsync(TimeSpan.FromSeconds(1))).Outcome);
+    }
+
+    [Theory]
+    [InlineData("Completed")]
+    [InlineData("Failed")]
+    [InlineData("Cancelled")]
+    public async Task FinishedOperationIsObservedOnceBeforeReturningIdle(string outcome)
+    {
+        using var participant = new MachineIntegrationParticipant();
+        var expected = Enum.Parse<MachineIntegrationParticipantOutcome>(outcome);
+        var failure = expected == MachineIntegrationParticipantOutcome.Failed ? new InvalidOperationException("fast failure") : null;
+        var operation = participant.TrackAsync(MachineIntegrationOperationKind.PublishHandoff,
+            () => Task.FromResult(new MachineIntegrationOperationObservation(MachineIntegrationOperationKind.PublishHandoff, expected, failure)));
+        await operation;
+        Assert.False(participant.IsBusy);
+        Assert.True(participant.CanStart);
+
+        var observed = await participant.ObserveAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(expected, observed.Outcome);
+        Assert.Equal(MachineIntegrationOperationKind.PublishHandoff, observed.Kind);
+        Assert.Same(failure, observed.Exception);
+        Assert.Equal(MachineIntegrationParticipantOutcome.Idle, (await participant.ObserveAsync(TimeSpan.FromSeconds(1))).Outcome);
+        Assert.Equal(MachineIntegrationParticipantOutcome.Completed, (await participant.TrackAsync(MachineIntegrationOperationKind.RefreshResults,
+            () => Task.FromResult(new MachineIntegrationOperationObservation(MachineIntegrationOperationKind.RefreshResults, MachineIntegrationParticipantOutcome.Completed)))).Outcome);
+    }
+
+    [Fact]
     public async Task TrackAsyncSharesOneInFlightOperationAndReportsCompletion()
     {
         using var participant = new MachineIntegrationParticipant();

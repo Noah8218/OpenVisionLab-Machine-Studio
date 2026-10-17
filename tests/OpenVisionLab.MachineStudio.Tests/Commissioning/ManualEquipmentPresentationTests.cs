@@ -54,6 +54,67 @@ public sealed class ManualEquipmentPresentationTests
         Assert.Equal(ConveyorDirection.Forward, presentation.SelectedConveyorDirection);
     }
 
+    [Fact]
+    public void AppliedDirtyDefinitionCanBePreparedInEditButCannotBeHotPatchedInRun()
+    {
+        var projection = CreateProjection(LayoutComponentKind.LinearStage, "new-axis") with
+        {
+            IsRunMode = false, IsRuntimeDefinitionDirty = true, HasCurrentAxis = false
+        };
+        var presentation = new ManualEquipmentPresentation();
+        presentation.ApplyProjection(projection);
+        Assert.True(presentation.CanPrepareManualControl);
+        Assert.False(presentation.CanAcquireManualControl);
+        presentation.ApplyProjection(projection with { IsRunMode = true });
+        Assert.False(presentation.CanPrepareManualControl);
+        presentation.ApplyProjection(projection with { IsRuntimeDefinitionDirty = false, HasCurrentAxis = true });
+        Assert.True(presentation.CanPrepareManualControl);
+        Assert.True(presentation.CanAcquireManualControl);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    public void BusySelectionInterlockAndAutomaticStatesBlockPreparation(int boundary)
+    {
+        var projection = CreateProjection(LayoutComponentKind.Conveyor, "conveyor-1") with { IsRunMode = false };
+        projection = boundary switch
+        {
+            0 => projection with { IsApplyingProject = true },
+            1 => projection with { IsValidationBusy = true },
+            2 => projection with { IsRunControlBusy = true },
+            3 => projection with { IsModeTransitioning = true },
+            4 => projection with { IsSelectionEligible = false },
+            5 => projection with { IsAutomaticRunActive = true },
+            _ => projection with { SelectedComponentKind = LayoutComponentKind.LinearStage, HasCurrentAxis = true, IsCurrentAxisInterlocked = true }
+        };
+        var presentation = new ManualEquipmentPresentation();
+        presentation.ApplyProjection(projection);
+        Assert.False(presentation.CanPrepareManualControl);
+        Assert.False(presentation.CanAcquireManualControl);
+        Assert.NotEmpty(presentation.ManualControlHintText);
+        Assert.DoesNotContain("Equipment.ManualHint.", presentation.ManualControlHintText);
+    }
+
+    [Fact]
+    public void CameraEntryRequiresAnAvailableSelectedCamera()
+    {
+        var projection = CreateProjection(LayoutComponentKind.Camera, "camera-1") with { IsRunMode = false };
+        var presentation = new ManualEquipmentPresentation();
+        presentation.ApplyProjection(projection);
+        Assert.True(presentation.HasSelectedManualControlTarget);
+        Assert.False(presentation.CanPrepareManualControl);
+        presentation.ApplyProjection(projection with { HasCurrentCamera = true });
+        Assert.True(presentation.CanAcquireManualControl);
+        presentation.ApplyProjection(projection with { HasCurrentCamera = true, IsAutomaticRunActive = true });
+        Assert.False(presentation.CanPrepareManualControl);
+    }
+
     private static ManualEquipmentProjection CreateProjection(
         LayoutComponentKind selectedKind,
         string selectedId) => new(

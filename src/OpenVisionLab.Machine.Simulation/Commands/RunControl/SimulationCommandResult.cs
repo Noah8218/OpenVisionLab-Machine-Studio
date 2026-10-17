@@ -49,7 +49,8 @@ public enum SimulationCommandErrorCode
     ExternalInspectionCorrelationMismatch,
     ExternalInspectionNotPending,
     ExternalInspectionAcquisitionMismatch,
-    ExternalInspectionConflictingDuplicate
+    ExternalInspectionConflictingDuplicate,
+    TimeScaleInvalid
 }
 
 public sealed record SimulationCommandResult(

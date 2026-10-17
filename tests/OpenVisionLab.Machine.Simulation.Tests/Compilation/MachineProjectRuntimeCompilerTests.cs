@@ -15,6 +15,31 @@ namespace OpenVisionLab.Machine.Simulation.Tests;
 
 public sealed class MachineProjectRuntimeCompilerTests
 {
+    [Fact]
+    public void TotalSupplyCompilesAnEphemeralBudgetAndPreservesLegacyDefinition()
+    {
+        var project = new MachineProjectDocument { MaterialFlow = new() { Enabled = true, TotalFeedCount = 3 } };
+        project.Stations.Add(new() { Id = "s", Name = "Station", Units = [new() { Id = "u", Name = "Unit", RepeatCount = 7 }] });
+        project.Sequences.Add(new() { Id = "cycle", Name = "Cycle", UnitId = "u", Steps =
+        [
+            new() { Id = "feed", Name = "Feed", Action = SequenceStepAction.FeedUnitWorkpiece, TargetId = "u", NextStepId = "exit" },
+            new() { Id = "exit", Name = "Exit", Action = SequenceStepAction.EjectUnitWorkpiece, TargetId = "u", Parameter = "auto", NextStepId = "done" },
+            new() { Id = "done", Name = "Done", Action = SequenceStepAction.Complete }
+        ] });
+        var result = Compile(project);
+        Assert.True(result.IsSuccess, ErrorSummary(result));
+        Assert.Equal(3, Assert.Single(result.Configuration!.Sequences).RepeatCount);
+        Assert.Equal(7, project.Stations[0].Units[0].RepeatCount);
+        project.MaterialFlow.TotalFeedCount = null;
+        result = Compile(project);
+        Assert.True(result.IsSuccess, ErrorSummary(result));
+        Assert.Equal(7, Assert.Single(result.Configuration!.Sequences).RepeatCount);
+        project.MaterialFlow.TotalFeedCount = 101;
+        Assert.False(Compile(project).IsSuccess);
+        project.MaterialFlow.TotalFeedCount = 3;
+        Assert.True(Compile(project).IsSuccess);
+    }
+
     private static readonly TimeSpan FixedStep = TimeSpan.FromMilliseconds(5);
 
     public static TheoryData<string> BundledSamplePaths => new()
@@ -891,6 +916,24 @@ public sealed class MachineProjectRuntimeCompilerTests
     {
         string path = Path.Combine(AppContext.BaseDirectory, "SemiconductorRecipes", "01-FoupLoadPort.ovmachine");
         return new ProjectDocumentStore().Load(File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void UnitFlowUsesTheResolvedSingleLayoutWhenNoActiveLayoutIdWasSaved()
+    {
+        var project = new MachineProjectDocument { Name = "single layout", MaterialFlow = new() { Enabled = true } };
+        project.Stations.Add(new() { Id = "station", Name = "station", Units = [new() { Id = "a", Name = "a" }, new() { Id = "b", Name = "b" }] });
+        var layout = new MachineLayoutDefinition { Id = "layout", Name = "layout" };
+        project.Layouts.Add(layout);
+        var conveyor = new LayoutComponentAuthoringFactory().TryCreate(project, layout, LayoutComponentKind.Conveyor, null, out var failure);
+        Assert.Null(failure);
+        Assert.NotNull(conveyor);
+        conveyor.UnitId = "a";
+        layout.Components.Add(conveyor);
+        project.Sequences.Add(new() { Id = "sequence.a", Name = "a", UnitId = "a", Steps = [new() { Id = "done", Name = "done", Action = SequenceStepAction.Complete }] });
+        var result = Compile(project);
+        Assert.True(result.IsSuccess, ErrorSummary(result));
+        Assert.Equal("a", result.Configuration!.UnitMaterialFlow!.ConveyorUnitIds[conveyor.Id]);
     }
 
     private static string ErrorSummary(MachineProjectRuntimeCompilationResult result) =>

@@ -230,7 +230,7 @@ internal static class SmokeRuntimeDebuggerVerifier
             capture.Capture(window, Path.Combine(evidenceDirectory, "semantic-keyboard.png"));
 
             var simulationMenu = SmokeVisualTreeQuery.FindVisualDescendant<MenuItem>(window,
-                item => Equals(item.Header, OpenVisionLanguageService.T("Shell.Simulation")))!;
+                item => Equals(item.Header, OpenVisionLanguageService.T("Shell.Run")))!;
             var advancedMenu = SmokeVisualTreeQuery.FindVisualDescendant<MenuItem>(window,
                 item => Equals(item.Header, OpenVisionLanguageService.T("Shell.AdvancedDebugging")))!;
             Check("tick-only-in-advanced-menu", !simulationMenu.Items.OfType<MenuItem>().Any(item => ReferenceEquals(item.Command, viewModel.StepCommand))

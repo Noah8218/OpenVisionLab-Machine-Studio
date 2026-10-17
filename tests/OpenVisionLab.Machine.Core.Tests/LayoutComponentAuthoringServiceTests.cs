@@ -10,6 +10,100 @@ namespace OpenVisionLab.Machine.Core.Tests;
 public sealed class LayoutComponentAuthoringServiceTests
 {
     [Fact]
+    public void IndependentMaterialPositionsRoundTripAndProtectTheirConveyorDependency()
+    {
+        var project = new MachineProjectDocument
+        {
+            Stations = [new() { Id = "s", Name = "Station", Units = [new() { Id = "u", Name = "Unit", RepeatCount = 7 }] }]
+        };
+        var service = new LayoutComponentAuthoringService();
+        var conveyor = service.TryAdd(project, LayoutComponentKind.Conveyor, unitId: "u");
+        Assert.True(conveyor.IsSuccess);
+        var deviceCount = project.Devices.Count;
+        var feed = service.TryAdd(project, LayoutComponentKind.FeedPosition, unitId: "u");
+        var exit = service.TryAdd(project, LayoutComponentKind.ExitPosition, unitId: "u");
+        Assert.True(feed.IsSuccess);
+        Assert.True(exit.IsSuccess);
+        Assert.Equal(deviceCount, project.Devices.Count);
+        feed.Component!.MaterialConveyorId = conveyor.Component!.Id;
+        exit.Component!.MaterialConveyorId = conveyor.Component.Id;
+        exit.Component.MaterialRoute = "NG";
+        project.MaterialFlow.Enabled = true;
+        project.MaterialFlow.TotalFeedCount = 2;
+        Assert.True(new MachineProjectLayoutValidator().Validate(project).IsValid);
+        var store = new ProjectDocumentStore();
+        var reopened = store.Load(store.Save(project));
+        Assert.Equal(2, reopened.MaterialFlow.TotalFeedCount);
+        Assert.Equal(7, reopened.Stations[0].Units[0].RepeatCount);
+        Assert.Equal("NG", reopened.Layouts[0].Components.Single(component => component.Id == exit.Component.Id).MaterialRoute);
+        var removal = service.TryRemove(project, conveyor.Layout!, conveyor.Component.Id);
+        Assert.Equal(LayoutComponentRemovalFailureKind.MaterialPositionDependency, removal.Failure);
+        Assert.Contains(conveyor.Component, conveyor.Layout!.Components);
+        feed.Component.MaterialConveyorId = "missing";
+        Assert.Contains(new MachineProjectLayoutValidator().Validate(project).Errors, error => error.ComponentId == feed.Component.Id);
+        feed.Component.MaterialConveyorId = conveyor.Component.Id;
+        Assert.True(new MachineProjectLayoutValidator().Validate(project).IsValid);
+    }
+
+    [Theory]
+    [InlineData(NumericalCameraInputKind.Image2D)]
+    [InlineData(NumericalCameraInputKind.HeightMap3D)]
+    public void CameraVariantsPreserveExistingSourcesAndRollbackFailedAdmission(NumericalCameraInputKind inputKind)
+    {
+        var source = new VirtualSingleImageSourceDefinition { SourceRelativePath = "existing.png", Width = 12, Height = 9, PixelFormat = "Mono8" };
+        var existing = new DeviceDefinition { Id = "existing-camera", Name = "Existing", Kind = DeviceKind.Camera, Camera = new() { SingleImageSource = source } };
+        var project = new MachineProjectDocument { Devices = [existing], Stations = [new()
+        {
+            Id = "station", Name = "Station", Units = [new() { Id = "unit", Name = "Unit" }]
+        }] };
+        var service = new LayoutComponentAuthoringService();
+        var rejected = service.TryAdd(project, LayoutComponentKind.Camera, unitId: "missing", cameraInputKind: inputKind);
+        Assert.False(rejected.IsSuccess);
+        Assert.Single(project.Devices);
+        Assert.Empty(project.Layouts);
+        Assert.Same(source, existing.Camera!.SingleImageSource);
+        Assert.Null(existing.Camera.NumericalInput);
+        var added = service.TryAdd(project, LayoutComponentKind.Camera, unitId: "unit", cameraInputKind: inputKind);
+        Assert.True(added.IsSuccess);
+        Assert.Equal("unit", added.Component!.UnitId);
+        var camera = project.Devices.Single(device => device.Id == added.Component.BehaviorBindingId);
+        Assert.NotEqual(existing.Id, camera.Id);
+        Assert.Equal(inputKind, camera.Camera!.NumericalInput!.InputKind);
+        Assert.Null(camera.Camera.NumericalInput.Validate());
+        Assert.Same(source, existing.Camera.SingleImageSource);
+        Assert.Null(existing.Camera.NumericalInput);
+        Assert.True(new MachineProjectLayoutValidator().Validate(project).IsValid);
+    }
+
+    [Fact]
+    public void UnitDefaultsPlaceNewPartsAtTheirUnitAndExplicitDropPreservesTheRequestedWorldPoint()
+    {
+        var origin = LayoutComponentPlacementService.CreateUnitBaseOrigin(2);
+        var unit = new MachineUnitDefinition { Id = "unit-3", Name = "Third unit", BaseOrigin = origin };
+        var project = new MachineProjectDocument { Stations = [new() { Id = "station", Name = "Station", Units = [unit] }] };
+        var service = new LayoutComponentAuthoringService();
+        var stage = service.TryAdd(project, LayoutComponentKind.LinearStage, unitId: unit.Id);
+        Assert.True(stage.IsSuccess);
+        Assert.InRange(stage.Component!.Transform.X - origin.X, -55, -45);
+        Assert.InRange(stage.Component.Transform.Y - origin.Y, 45, 55);
+        Assert.Equal(stage.Component.Transform.X, Assert.Single(project.Axes).Position.X);
+        Assert.Equal(stage.Component.Transform.Y, Assert.Single(project.Axes).Position.Y);
+
+        var defaultConveyor = service.TryAdd(project, LayoutComponentKind.Conveyor, unitId: unit.Id);
+        Assert.True(defaultConveyor.IsSuccess);
+        Assert.Equal(452.5, defaultConveyor.Component!.Transform.X);
+        Assert.Equal(-447.5, defaultConveyor.Component.Transform.Y);
+        Assert.Equal(defaultConveyor.Component.Transform.X, Assert.Single(project.Devices).MountPosition.X);
+        Assert.Equal(defaultConveyor.Component.Transform.Y, Assert.Single(project.Devices).MountPosition.Y);
+
+        var conveyor = service.TryAdd(project, LayoutComponentKind.Conveyor, worldX: 105, worldY: 195, unitId: unit.Id);
+        Assert.True(conveyor.IsSuccess);
+        Assert.Equal(110, conveyor.Component!.Transform.X);
+        Assert.Equal(200, conveyor.Component.Transform.Y);
+        Assert.Equal(new Coordinate3D(450, -450, 0), unit.BaseOrigin);
+    }
+
+    [Fact]
     public void TryAddAssignsTheRequestedExistingUnit()
     {
         var unit = new MachineUnitDefinition { Id = "unit-camera", Name = "Camera" };
@@ -37,14 +131,16 @@ public sealed class LayoutComponentAuthoringServiceTests
         Assert.True(new MachineProjectLayoutValidator().Validate(project).IsValid);
     }
 
-    [Fact]
-    public void TryAddUnknownUnitRollsBackImplicitLayoutAndComponent()
+    [Theory]
+    [InlineData(LayoutComponentKind.MachineFrame)]
+    [InlineData(LayoutComponentKind.Camera)]
+    public void TryAddUnknownUnitRollsBackImplicitLayoutAndComponent(LayoutComponentKind kind)
     {
         var project = new MachineProjectDocument { Name = "Invalid unit" };
 
         var result = new LayoutComponentAuthoringService().TryAdd(
             project,
-            LayoutComponentKind.MachineFrame,
+            kind,
             unitId: "missing-unit");
 
         Assert.False(result.IsSuccess);
@@ -53,6 +149,7 @@ public sealed class LayoutComponentAuthoringServiceTests
             MachineProjectLayoutValidationErrorCode.ComponentUnitNotFound,
             result.Failure?.ValidationError?.Code);
         Assert.Empty(project.Layouts);
+        Assert.Empty(project.Devices);
         Assert.Null(project.Simulation.ActiveLayoutId);
     }
 
@@ -131,7 +228,7 @@ public sealed class LayoutComponentAuthoringServiceTests
     }
 
     [Fact]
-    public void TryAddCameraAgainDoesNotCreateDuplicatePlacementOrArtifacts()
+    public void TryAddCameraAgainCreatesIndependentPlacementAndDevice()
     {
         var layout = new MachineLayoutDefinition
         {
@@ -160,10 +257,12 @@ public sealed class LayoutComponentAuthoringServiceTests
 
         var result = new LayoutComponentAuthoringService().TryAdd(project, LayoutComponentKind.Camera);
 
-        Assert.False(result.IsSuccess);
-        Assert.Equal(LayoutComponentAuthoringFailureKind.CameraDeviceRequired, result.Failure?.Kind);
-        Assert.Single(layout.Components);
-        Assert.Single(project.Devices);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("camera-2", result.Component!.Id);
+        Assert.Equal("device.camera-2", result.Component.BehaviorBindingId);
+        Assert.Equal(2, layout.Components.Count);
+        Assert.Equal(2, project.Devices.Count);
+        Assert.Empty(project.Sequences);
     }
 
     [Fact]

@@ -12,6 +12,7 @@ public sealed class AxisDriveTuningEditorViewModel : ViewModelBase, IDisposable
 {
     private readonly VirtualAxisDefinition _axis;
     private readonly Action _definitionChanged;
+    private readonly Func<bool>? _canEditDefinition;
     private bool _hasValidationErrors;
     private string _validationMessage = string.Empty;
     private ICommand? _resetDriveDefaultsCommand;
@@ -19,10 +20,12 @@ public sealed class AxisDriveTuningEditorViewModel : ViewModelBase, IDisposable
 
     public AxisDriveTuningEditorViewModel(
         VirtualAxisDefinition axis,
-        Action definitionChanged)
+        Action definitionChanged,
+        Func<bool>? canEditDefinition = null)
     {
         _axis = axis ?? throw new ArgumentNullException(nameof(axis));
         _definitionChanged = definitionChanged ?? throw new ArgumentNullException(nameof(definitionChanged));
+        _canEditDefinition = canEditDefinition;
         Validate();
     }
 
@@ -141,7 +144,7 @@ public sealed class AxisDriveTuningEditorViewModel : ViewModelBase, IDisposable
 
     public ICommand ResetDriveDefaultsCommand => _resetDriveDefaultsCommand ??= new RelayCommand(_ =>
     {
-        if (IsDisposed)
+        if (!CanEdit)
         {
             return;
         }
@@ -156,7 +159,7 @@ public sealed class AxisDriveTuningEditorViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(FollowingErrorLimit));
         Validate();
         _definitionChanged();
-    }, _ => !IsDisposed);
+    }, _ => CanEdit);
 
     public void RefreshLocalization()
     {
@@ -187,6 +190,12 @@ public sealed class AxisDriveTuningEditorViewModel : ViewModelBase, IDisposable
     {
         if (IsDisposed)
         {
+            return;
+        }
+
+        if (!CanEdit)
+        {
+            OnPropertyChanged(propertyName);
             return;
         }
 
@@ -237,5 +246,6 @@ public sealed class AxisDriveTuningEditorViewModel : ViewModelBase, IDisposable
         return true;
     }
 
+    private bool CanEdit => !IsDisposed && (_canEditDefinition?.Invoke() ?? true);
     private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 }

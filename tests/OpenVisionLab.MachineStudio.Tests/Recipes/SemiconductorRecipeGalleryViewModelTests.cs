@@ -142,7 +142,7 @@ public sealed class SemiconductorRecipeGalleryViewModelTests
     public async Task CompatibilityCommandsUseInjectedSelectorsAndPreserveCancellation()
     {
         var root = Path.Combine(
-            "D:\\OpenVisionLab-TestData\\OpenVisionLab-Machine-Studio",
+            OpenVisionLab.TestSupport.TestStorage.RootPath,
             "semiconductor-recipe-gallery-viewmodel-tests",
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);

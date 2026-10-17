@@ -9,6 +9,19 @@ namespace OpenVisionLab.Machine.Core.Tests;
 public sealed class LayoutComponentPlacementServiceTests
 {
     [Fact]
+    public void UnitDefaultKeepsDependentWorkpieceAndAuthoredFramePlacement()
+    {
+        var service = new LayoutComponentPlacementService();
+        foreach (var kind in new[] { LayoutComponentKind.Workpiece, LayoutComponentKind.MachineFrame })
+        {
+            var component = new LayoutComponentDefinition { Kind = kind, Transform = new Transform2D { X = 490, Y = -430 } };
+            service.ApplyUnitDefault(component, new Coordinate3D(450, -450, 0));
+            Assert.Equal(490, component.Transform.X);
+            Assert.Equal(-430, component.Transform.Y);
+        }
+    }
+
+    [Fact]
     public void PlaceSnapsStageAndUpdatesBoundAxisPosition()
     {
         var project = new MachineProjectDocument { Name = "Authoring" };

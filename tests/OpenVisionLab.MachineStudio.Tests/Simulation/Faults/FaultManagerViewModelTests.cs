@@ -14,6 +14,21 @@ namespace OpenVisionLab.MachineStudio.Tests;
 public sealed class FaultManagerViewModelTests
 {
     [Fact]
+    public void RuntimeAdmissionChangePublishesTheBoundEnabledProperty()
+    {
+        using var viewModel = new FaultManagerViewModel(command => Task.FromResult(Accepted(command)));
+        var changes = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changes.Add(args.PropertyName);
+        viewModel.SetEnabled(true, invalidateCommands: false);
+        Assert.True(viewModel.IsEnabled);
+        Assert.Equal([nameof(FaultManagerViewModel.IsEnabled)], changes);
+        changes.Clear();
+        viewModel.SetEnabled(false, invalidateCommands: false);
+        Assert.False(viewModel.IsEnabled);
+        Assert.Equal([nameof(FaultManagerViewModel.IsEnabled)], changes);
+    }
+
+    [Fact]
     public async Task Dispose_SuppressesLateOperationPublication_AndDisablesCommands()
     {
         OpenVisionLanguageService.Load();

@@ -40,7 +40,9 @@ internal sealed class LayoutEditHistory
             Layouts = project.Layouts,
             Axes = project.Axes,
             Devices = project.Devices,
-            Channels = project.Channels
+            Channels = project.Channels,
+            MaterialFlow = project.MaterialFlow,
+            UnitSettings = project.Stations.SelectMany(station => station.Units).ToDictionary(unit => unit.Id, unit => new MaterialUnitSettings(unit.SlotName, unit.RepeatCount))
         };
         return new LayoutAuthoringState(
             JsonSerializer.Serialize(document, JsonOptions),
@@ -61,6 +63,13 @@ internal sealed class LayoutEditHistory
         project.Axes = document.Axes ?? new List<VirtualAxisDefinition>();
         project.Devices = document.Devices ?? new List<DeviceDefinition>();
         project.Channels = document.Channels ?? new List<ChannelDefinition>();
+        if (document.MaterialFlow is not null) project.MaterialFlow = document.MaterialFlow;
+        foreach (var unit in project.Stations.SelectMany(station => station.Units))
+        {
+            if (document.UnitSettings?.GetValueOrDefault(unit.Id) is not { } settings) continue;
+            unit.SlotName = settings.SlotName;
+            unit.RepeatCount = settings.RepeatCount;
+        }
     }
 
     public bool Record(LayoutAuthoringState before, LayoutAuthoringState after)
@@ -133,5 +142,9 @@ internal sealed class LayoutEditHistory
         public List<VirtualAxisDefinition>? Axes { get; init; }
         public List<DeviceDefinition>? Devices { get; init; }
         public List<ChannelDefinition>? Channels { get; init; }
+        public MaterialFlowDefinition? MaterialFlow { get; init; }
+        public Dictionary<string, MaterialUnitSettings>? UnitSettings { get; init; }
     }
+
+    private sealed record MaterialUnitSettings(string SlotName, int RepeatCount);
 }

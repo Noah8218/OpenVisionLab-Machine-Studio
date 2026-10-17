@@ -79,6 +79,13 @@ public sealed class ProjectAssetPathResolver
         return new ProjectAssetPath(fullPath, normalizedRelativePath);
     }
 
+    public ProjectAssetPath ResolveFileForWrite(string projectRelativePath)
+    {
+        var asset = ResolveFile(projectRelativePath);
+        EnsureLinkedTargetsStayWithinProject(asset);
+        return asset;
+    }
+
     public ProjectAssetPath ResolveExistingFile(string projectRelativePath)
     {
         var asset = ResolveFile(projectRelativePath);

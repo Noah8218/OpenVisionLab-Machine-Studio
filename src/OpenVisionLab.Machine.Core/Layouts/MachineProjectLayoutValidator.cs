@@ -61,7 +61,8 @@ public enum MachineProjectLayoutValidationErrorCode
     UnitNameRequired,
     DuplicateUnitId,
     InvalidComponentUnitId,
-    ComponentUnitNotFound
+    ComponentUnitNotFound,
+    SensorDetectionCenterInvalid
 }
 
 public sealed record MachineProjectLayoutValidationError(
@@ -94,6 +95,9 @@ public sealed class MachineProjectLayoutValidator
         ArgumentNullException.ThrowIfNull(project);
 
         var errors = new List<MachineProjectLayoutValidationError>();
+        if (project.MaterialFlow is null || string.IsNullOrWhiteSpace(project.MaterialFlow.WorkpieceName)
+            || string.IsNullOrWhiteSpace(project.MaterialFlow.OkRoute) || string.IsNullOrWhiteSpace(project.MaterialFlow.NgRoute))
+            errors.Add(Error(MachineProjectLayoutValidationErrorCode.ComponentNameRequired, null, null, "Material flow requires a workpiece name and OK/NG route names."));
         var layouts = project.Layouts ?? new List<MachineLayoutDefinition>();
         var unitIds = ValidateStations(project.Stations, errors);
         var layoutIds = new HashSet<string>(StringComparer.Ordinal);
@@ -368,6 +372,10 @@ public sealed class MachineProjectLayoutValidator
                         null,
                         $"Unit id '{unit.Id}' is duplicated."));
                 }
+
+                if (unit.RepeatCount is < 1 or > 100 || unit.SlotName is null || unit.SlotName.Length > 60
+                    || unit.BaseOrigin is { } origin && (!double.IsFinite(origin.X) || !double.IsFinite(origin.Y) || !double.IsFinite(origin.Z)))
+                    errors.Add(Error(MachineProjectLayoutValidationErrorCode.InvalidTransform, null, null, $"Unit '{unit.Id}' has invalid repeat, slot name or base origin."));
 
                 if (string.IsNullOrWhiteSpace(unit.Name))
                 {

@@ -60,7 +60,7 @@ internal static class DirectExeConnectionWorkbenchWorkflow
             await SmokeStationSkeletonVerifier.PrepareProjectAsync(window, vm, initialProject);
         }
 
-        vm.SelectedDocumentTabIndex = 1;
+        vm.Navigation.OpenRecipeConnectionsCommand.Execute(null);
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         var workbench = FindVisualDescendant<RecipeConnectionWorkbenchView>(window)
             ?? throw new InvalidOperationException("Connection workbench was not available.");

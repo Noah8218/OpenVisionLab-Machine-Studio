@@ -10,6 +10,10 @@ public sealed class SequenceDefinition
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 
+    [JsonPropertyName("unitId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? UnitId { get; set; }
+
     [JsonPropertyName("watchdogTimeoutMs")]
     public int WatchdogTimeoutMs { get; set; }
 

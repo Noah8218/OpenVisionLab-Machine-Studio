@@ -5,10 +5,12 @@ using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
 using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Layouts;
+using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.MachineStudio.View.Shell;
 using OpenVisionLab.MachineStudio.ViewModel;
 using static OpenVisionLab.MachineStudio.SmokeVisualTreeQuery;
@@ -103,13 +105,12 @@ internal static class SmokeGlobalCommandStateVerifier
 
         if (state.Equals("retry", StringComparison.OrdinalIgnoreCase))
         {
-            var retryName = OpenVisionLanguageService.T("Shell.RetrySequence");
-            var retryButton = FindVisualDescendant<Button>(
-                window,
-                candidate => string.Equals(
-                    System.Windows.Automation.AutomationProperties.GetName(candidate),
-                    retryName,
-                    StringComparison.Ordinal))
+            var commandBar = FindVisualDescendant<GlobalCommandBarView>(window, candidate => candidate.IsVisible)
+                ?? throw new InvalidOperationException("Global command bar was not available.");
+            var runOptionsPopup = (Popup)commandBar.FindName("RunOptionsPopup");
+            runOptionsPopup.SetCurrentValue(Popup.IsOpenProperty, true);
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            var retryButton = FindVisualDescendant<Button>(runOptionsPopup.Child, candidate => ReferenceEquals(candidate.Command, viewModel.RetrySequenceCommand))
                 ?? throw new InvalidOperationException("Sequence retry command was not available.");
 
             var faultedState = OpenVisionLanguageService.T("Equipment.State.Faulted");
@@ -192,7 +193,8 @@ internal static class SmokeGlobalCommandStateVerifier
                     "Sequence retry command did not recover after the pointer left the button.");
             }
 
-            var simulationMenuName = OpenVisionLanguageService.T("Shell.Simulation");
+            runOptionsPopup.SetCurrentValue(Popup.IsOpenProperty, false);
+            var simulationMenuName = OpenVisionLanguageService.T("Shell.Run");
             var simulationMenu = FindVisualDescendant<MenuItem>(
                 window,
                 candidate => string.Equals(
@@ -220,8 +222,15 @@ internal static class SmokeGlobalCommandStateVerifier
             return;
         }
 
+        if (state.StartsWith("outline-", StringComparison.OrdinalIgnoreCase) || state.StartsWith("scene-", StringComparison.OrdinalIgnoreCase))
+        {
+            await ApplyEquipmentPressedAsync(window, viewModel, state.ToLowerInvariant(), uiInteraction,
+                windowCapture ?? throw new InvalidOperationException("Outline state requires the window capture owner."), screenshotPath);
+            return;
+        }
+
         var topCommandState = state.ToLowerInvariant();
-        if (topCommandState is "undo-pressed" or "redo-pressed" or "save-pressed")
+        if (topCommandState is "undo-pressed" or "redo-pressed" or "save-pressed" or "fault-chip-pressed" or "target-chip-pressed" or "run-options-pressed" or "workspace-tab-pressed")
         {
             await ApplyTopCommandPressedAsync(
                 window,
@@ -263,6 +272,14 @@ internal static class SmokeGlobalCommandStateVerifier
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 uiInteraction.MovePointerToCenter(button);
                 await Task.Delay(100);
+                var pointerOwnership = uiInteraction.CheckPointerOwnership(window);
+                if (!pointerOwnership.IsOwned || !button.IsMouseOver)
+                {
+                    throw new InvalidOperationException(
+                        "Simulation ON pointer-down prerequisite failed. " + pointerOwnership.Diagnostic +
+                        $" Enabled={button.IsEnabled}, Visible={button.IsVisible}, MouseOver={button.IsMouseOver}, " +
+                        $"DirectOver={Mouse.DirectlyOver?.GetType().Name ?? "none"}.");
+                }
                 uiInteraction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
                 uiInteraction.MarkSmokePointerHeld();
                 break;
@@ -283,9 +300,138 @@ internal static class SmokeGlobalCommandStateVerifier
         await Task.Delay(150);
         if (state.Equals("pressed", StringComparison.OrdinalIgnoreCase) && !button.IsPressed)
         {
-            throw new InvalidOperationException("Simulation ON command did not enter the pointer-down state.");
+            var pointerOwnership = uiInteraction.CheckPointerOwnership(window);
+            var cursor = uiInteraction.GetCursorPosition();
+            var buttonPoint = button.PointFromScreen(new Point(cursor.X, cursor.Y));
+            throw new InvalidOperationException(
+                "Simulation ON command did not enter the pointer-down state. " + pointerOwnership.Diagnostic +
+                $" Enabled={button.IsEnabled}, Visible={button.IsVisible}, MouseOver={button.IsMouseOver}, " +
+                $"MouseCaptured={button.IsMouseCaptured}, LeftButton={Mouse.LeftButton}, " +
+                $"DirectOver={Mouse.DirectlyOver?.GetType().Name ?? "none"}, " +
+                $"ButtonPoint=({buttonPoint.X:F1},{buttonPoint.Y:F1}), Running={viewModel.IsRunning}.");
+        }
+        if (state.Equals("pressed", StringComparison.OrdinalIgnoreCase))
+        {
+            var ownership = uiInteraction.CheckPointerOwnership(window);
+            if (!ownership.IsOwned || viewModel.IsRunning || Mouse.LeftButton != MouseButtonState.Pressed)
+                throw new InvalidOperationException($"Run pointer-down lost ownership or executed prematurely. {ownership.Diagnostic}");
+            Console.WriteLine($"Run native pointer-down: {ownership.Diagnostic} Pressed={button.IsPressed}, LeftButton={Mouse.LeftButton}, Running={viewModel.IsRunning}.");
+            if (windowCapture is not null && !string.IsNullOrWhiteSpace(screenshotPath))
+            {
+                windowCapture.Capture(window, screenshotPath);
+                var outside = window.PointToScreen(new Point(8, 8));
+                uiInteraction.SetCursorPosition((int)Math.Round(outside.X), (int)Math.Round(outside.Y));
+                await window.Dispatcher.InvokeAsync(Mouse.Synchronize, DispatcherPriority.Input);
+                await Task.Delay(100);
+                uiInteraction.ReleaseSmokePointer();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                if (button.IsPressed || viewModel.IsRunning)
+                    throw new InvalidOperationException("Run executed or stayed pressed after release outside its button.");
+                Console.WriteLine("Run pointer-down released outside without activation.");
+            }
         }
         Console.WriteLine($"Global command visual state applied: {state}");
+    }
+
+    private static async Task ApplyEquipmentPressedAsync(
+        ShellWindow window, MainViewModel viewModel, string state, SmokeUiInteraction interaction,
+        SmokeWindowCapture capture, string? screenshotPath)
+    {
+        if (string.IsNullOrWhiteSpace(screenshotPath)) throw new ArgumentException("Outline pressed state requires a capture path.");
+        if (state == "outline-clear-pressed") viewModel.Layout.EquipmentOutlineSearchText = viewModel.Layout.SelectedItem?.Id ?? "camera";
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        var name = state switch
+        {
+            "outline-unit-pressed" => "OutlineAddUnitButton",
+            "outline-device-pressed" => "OutlineAddDeviceButton",
+            "outline-scope-pressed" => "OutlineOverviewButton",
+            "outline-clear-pressed" => "OutlineClearSearchButton",
+            "outline-part-pressed" => string.Empty,
+            "scene-fit-pressed" => "FitLayoutButton",
+            "scene-zoom-in-pressed" => "SceneZoomInButton",
+            "scene-zoom-out-pressed" => "SceneZoomOutButton",
+            "scene-inspector-pressed" => "EquipmentInspectorToggleButton",
+            "scene-plan-pressed" => "ScenePlanRadioButton",
+            "scene-oblique-pressed" => "SceneObliqueRadioButton",
+            "scene-slot-pressed" => "EquipmentSlotButton",
+            "scene-slot-toggle-pressed" => "EquipmentSlotsToggleButton",
+            "scene-manual-pressed" => "EquipmentSinglePartCheckButton",
+            "scene-references-pressed" => "EquipmentSequenceReferencesButton",
+            "scene-menu-pressed" => "EquipmentMoreActionsButton",
+            _ => throw new ArgumentException($"Unsupported outline state '{state}'.")
+        };
+        var button = FindVisualDescendant<FrameworkElement>(window, candidate => name.Length > 0
+            ? candidate.Name == name
+            : candidate is ICommandSource command && ReferenceEquals(command.Command, viewModel.Layout.SelectEquipmentOutlinePartCommand)
+                && ReferenceEquals(command.CommandParameter, viewModel.Layout.SelectedItem))
+            ?? throw new InvalidOperationException($"Outline button '{state}' was not available.");
+        if (!button.IsEnabled || !button.IsVisible) throw new InvalidOperationException("Outline button was not enabled and visible.");
+        var store = new ProjectDocumentStore();
+        var project = (MachineProjectDocument)viewModel.ProjectTree.Roots.Single().Model!;
+        var document = store.SerializeForEvidence(project);
+        var selected = viewModel.Layout.SelectedItems.Select(item => item.Id).ToArray();
+        var unit = viewModel.Layout.ActiveUnitId;
+        var station = viewModel.Layout.ActiveStationId;
+        var query = viewModel.Layout.EquipmentOutlineSearchText;
+        var dirty = viewModel.HasUnsavedChanges;
+        var oblique = viewModel.Layout.IsObliqueView;
+        var inspectorOpen = viewModel.Navigation.IsInspectorOpen;
+        try
+        {
+            if (button is Button commandButton)
+                await SmokeButtonPointerState.FocusAsync(window, commandButton, interaction, "Scene/outline button did not receive keyboard focus.");
+            else
+            {
+                interaction.ActivateWindow();
+                button.BringIntoView();
+                button.Focus();
+                Keyboard.Focus(button);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                if (!button.IsKeyboardFocused) throw new InvalidOperationException("Scene projection did not receive keyboard focus.");
+            }
+            if (state.StartsWith("scene-", StringComparison.Ordinal))
+            {
+                var neutral = window.PointToScreen(new Point(8, 8));
+                interaction.SetCursorPosition((int)Math.Round(neutral.X), (int)Math.Round(neutral.Y));
+                Mouse.Synchronize();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+                capture.Capture(window, Path.Combine(Path.GetDirectoryName(screenshotPath)!, "focused.png"));
+            }
+            interaction.MovePointerToCenter(button);
+            await Task.Delay(100);
+            var ownership = interaction.CheckPointerOwnership(window);
+            if (!ownership.IsOwned || !button.IsMouseOver) throw new InvalidOperationException("Outline native hover failed: " + ownership.Diagnostic);
+            if (state.StartsWith("scene-", StringComparison.Ordinal))
+                capture.Capture(window, Path.Combine(Path.GetDirectoryName(screenshotPath)!, "hover.png"));
+            interaction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
+            interaction.MarkSmokePointerHeld();
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            await Task.Delay(150);
+            var pressed = button is ButtonBase { IsPressed: true } || button is MenuItem { IsSubmenuOpen: true };
+            if (!pressed || Mouse.LeftButton != MouseButtonState.Pressed) throw new InvalidOperationException("Scene control did not enter actual pointer-down.");
+            capture.Capture(window, screenshotPath);
+            Console.WriteLine($"Scene/outline native focus/hover/pressed: {state}; {ownership.Diagnostic}; Pressed={pressed}, LeftButton={Mouse.LeftButton}.");
+        }
+        finally
+        {
+            var outside = window.PointToScreen(new Point(8, 8));
+            interaction.SetCursorPosition((int)Math.Round(outside.X), (int)Math.Round(outside.Y));
+            Mouse.Synchronize();
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Input);
+            await Task.Delay(100);
+            interaction.ReleaseSmokePointer();
+            if (button is MenuItem menu) menu.IsSubmenuOpen = false;
+        }
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        if (button is ButtonBase { IsPressed: true } || button is MenuItem { IsSubmenuOpen: true } || button.IsMouseOver || viewModel.IsRunning || viewModel.IsStationUnitEditorOpen
+            || viewModel.IsEquipmentComponentLibraryDialogOpen || viewModel.HasUnsavedChanges != dirty
+            || viewModel.Layout.ActiveUnitId != unit || viewModel.Layout.ActiveStationId != station
+            || viewModel.Layout.IsObliqueView != oblique || viewModel.Navigation.IsInspectorOpen != inspectorOpen
+            || viewModel.Layout.EquipmentOutlineSearchText != query
+            || !viewModel.Layout.SelectedItems.Select(item => item.Id).SequenceEqual(selected)
+            || store.SerializeForEvidence(project) != document)
+            throw new InvalidOperationException("Outline release outside did not recover without activating or changing project/selection/scope.");
+        Console.WriteLine("Scene/outline release outside: normal recovered; no dialog, project, selection, query, scope or run changes.");
     }
 
     private static async Task ApplyTopCommandPressedAsync(
@@ -305,6 +451,10 @@ internal static class SmokeGlobalCommandStateVerifier
         {
             "undo-pressed" => "TopUndoButton",
             "redo-pressed" => "TopRedoButton",
+            "fault-chip-pressed" => "FaultSimulationButton",
+            "target-chip-pressed" => "RunTargetDetailsButton",
+            "run-options-pressed" => "RunOptionsButton",
+            "workspace-tab-pressed" => "SimulationWorkspaceButton",
             _ => "TopSaveButton"
         };
         if (state == "undo-pressed" && !viewModel.UndoLayoutEditCommand.CanExecute(null))
@@ -322,35 +472,43 @@ internal static class SmokeGlobalCommandStateVerifier
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         }
 
-        var button = FindVisualDescendant<Button>(window, candidate => candidate.Name == buttonName)
+        var button = FindVisualDescendant<ButtonBase>(window, candidate => candidate.Name == buttonName)
             ?? throw new InvalidOperationException($"Top command '{buttonName}' was not available.");
-        if (!button.IsVisible || !button.IsEnabled || button.Command?.CanExecute(button.CommandParameter) != true)
+        if (!button.IsVisible || !button.IsEnabled || (button is Button && button.Command?.CanExecute(button.CommandParameter) != true))
             throw new InvalidOperationException($"Top command '{buttonName}' was not enabled for its pressed-state check.");
 
+        var initialChecked = (button as ToggleButton)?.IsChecked;
+        var initiallyRunning = viewModel.IsRunning;
         var saveHash = state == "save-pressed"
             ? SHA256.HashData(File.ReadAllBytes(viewModel.CurrentProjectPath
                 ?? throw new InvalidOperationException("Save pressed-state verification requires a saved smoke project.")))
             : null;
+        var saveWriteTime = state == "save-pressed" ? File.GetLastWriteTimeUtc(viewModel.CurrentProjectPath!) : (DateTime?)null;
         try
         {
-            await SmokeButtonPointerState.FocusAsync(
-                window,
-                button,
-                uiInteraction,
-                $"Top command '{buttonName}' did not receive keyboard focus.");
-            await SmokeButtonPointerState.HoverThenPressAsync(
-                window,
-                button,
-                uiInteraction,
-                () => $"Top command '{buttonName}' did not enter hover state.",
-                $"Top command '{buttonName}' did not enter the pointer-down state.");
+            uiInteraction.ActivateWindow();
+            button.Focus();
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            uiInteraction.MovePointerToCenter(button);
+            await Task.Delay(100);
+            var ownership = uiInteraction.CheckPointerOwnership(window);
+            if (!ownership.IsOwned || !button.IsMouseOver || !button.IsKeyboardFocused)
+                throw new InvalidOperationException($"Top command '{buttonName}' native input prerequisite failed. {ownership.Diagnostic}");
+            uiInteraction.MouseEvent(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
+            uiInteraction.MarkSmokePointerHeld();
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            await Task.Delay(150);
+            ownership = uiInteraction.CheckPointerOwnership(window);
+            if (!ownership.IsOwned || !button.IsPressed || Mouse.LeftButton != MouseButtonState.Pressed)
+                throw new InvalidOperationException($"Top command '{buttonName}' did not enter native pointer-down. {ownership.Diagnostic} Pressed={button.IsPressed}, LeftButton={Mouse.LeftButton}.");
+            Console.WriteLine($"Top command native pointer-down: {buttonName}; {ownership.Diagnostic} Pressed={button.IsPressed}, LeftButton={Mouse.LeftButton}.");
 
             windowCapture.Capture(window, screenshotPath);
             var outsidePoint = window.PointToScreen(new Point(8, 8));
             uiInteraction.SetCursorPosition((int)Math.Round(outsidePoint.X), (int)Math.Round(outsidePoint.Y));
-            Mouse.Capture(null);
             Mouse.Synchronize();
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Input);
+            await Task.Delay(100);
             if (button.IsPressed)
                 throw new InvalidOperationException($"Top command '{buttonName}' stayed pressed after the pointer left it.");
         }
@@ -363,13 +521,17 @@ internal static class SmokeGlobalCommandStateVerifier
         }
 
         await Task.Delay(250);
-        if (button.Command?.CanExecute(button.CommandParameter) != true)
+        if (button is Button && button.Command?.CanExecute(button.CommandParameter) != true)
             throw new InvalidOperationException($"Top command '{buttonName}' ran after its pressed-state capture.");
+        if ((button as ToggleButton)?.IsChecked != initialChecked || viewModel.IsRunning != initiallyRunning)
+            throw new InvalidOperationException($"Header control '{buttonName}' changed state after release outside.");
         if (saveHash is not null)
         {
             var currentPath = viewModel.CurrentProjectPath!;
             if (!SHA256.HashData(File.ReadAllBytes(currentPath)).SequenceEqual(saveHash))
                 throw new InvalidOperationException("Save executed when the smoke pointer was released outside its button.");
+            if (File.GetLastWriteTimeUtc(currentPath) != saveWriteTime)
+                throw new InvalidOperationException("Save rewrote the file when the smoke pointer was released outside its button.");
         }
 
         Console.WriteLine($"Top command pointer-down captured and released without activation: {buttonName}.");

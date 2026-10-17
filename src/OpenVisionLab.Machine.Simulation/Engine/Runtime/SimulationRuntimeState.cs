@@ -34,6 +34,8 @@ internal sealed class SimulationRuntimeState
     private DeterministicSignalHub _signalHub;
     private DeterministicMachineLayout? _machineLayout;
     private DeterministicPickPlaceWorkpiece? _pickPlaceWorkpiece;
+    private UnitMaterialFlowRuntime? _unitMaterialFlow;
+    private long _unitRunOrdinal;
     private SimulationRunMode _runMode = SimulationRunMode.Paused;
     private SimulationControlOwner _controlOwner = SimulationControlOwner.Definition;
     private string? _activeSequenceId;
@@ -48,6 +50,7 @@ internal sealed class SimulationRuntimeState
     private string? _activeWorkpieceRunId;
     private string? _resetRetrySequenceId;
     private bool _automaticExternalInspectionRearmRequired;
+    private readonly HashSet<string> _automaticNumericalCameraIds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, VirtualCameraExternalSource> _automaticExternalSources =
         new(StringComparer.Ordinal);
     private string? _automaticExternalSequenceId;
@@ -126,10 +129,20 @@ internal sealed class SimulationRuntimeState
     internal TimeSpan AutomaticExternalInspectionWaitElapsed => _automaticExternalInspectionWaitElapsed;
     internal TimeSpan? AutomaticExternalInspectionSimulationTimeout =>
         _automaticExternalInspectionSimulationTimeout;
+    internal IReadOnlyCollection<string> AutomaticNumericalCameraIds => _automaticNumericalCameraIds;
+
     internal IReadOnlyDictionary<string, VirtualCameraExternalSource> AutomaticExternalSources =>
         _automaticExternalSources;
 
     internal long NextTickIndex => _tickIndex + 1;
+    internal UnitMaterialFlowRuntime? UnitMaterialFlow => _unitMaterialFlow;
+
+    internal void BeginUnitRun()
+    {
+        if (_unitMaterialFlow is null) return;
+        _unitMaterialFlow.Reset($"{_projectId ?? "project"}/unit-run{++_unitRunOrdinal:0000}");
+        foreach (var camera in _cameras) camera.Reset();
+    }
     internal TimeSpan NextSimulationTime => _clock.Time + _clock.FixedStep;
 
     internal void AddAxis(ServoAxisComponent axis)
@@ -170,6 +183,7 @@ internal sealed class SimulationRuntimeState
         _cameras.AddRange(runtime.Cameras);
         _signalHub = runtime.SignalHub;
         _machineLayout = runtime.MachineLayout;
+        _unitMaterialFlow = configuration.UnitMaterialFlow is null ? null : new UnitMaterialFlowRuntime(configuration.UnitMaterialFlow);
         _activeWorkpieceRunId = null;
         _workpieceInstanceOrdinal = 0;
         _pickPlaceWorkpiece = runtime.PickPlaceWorkpiece;
@@ -262,6 +276,7 @@ internal sealed class SimulationRuntimeState
         _faultRuntime.Clear();
         _signalHub.Reset();
         _machineLayout?.Reset();
+        _unitMaterialFlow?.Reset($"{_projectId ?? "project"}/reset{_runtimeGeneration}");
         _activeWorkpieceRunId = null;
         _workpieceInstanceOrdinal = 0;
         _pickPlaceWorkpiece?.Reset();
@@ -355,6 +370,7 @@ internal sealed class SimulationRuntimeState
     internal bool TryArmAutomaticExternalInspection(
         string sequenceId,
         IReadOnlyDictionary<string, VirtualCameraExternalSource> sources,
+        IReadOnlyCollection<string> numericalCameraIds,
         out string error)
     {
         if (string.IsNullOrWhiteSpace(sequenceId))
@@ -363,7 +379,7 @@ internal sealed class SimulationRuntimeState
             return false;
         }
 
-        if (sources.Count == 0)
+        if (sources.Count == 0 && numericalCameraIds.Count == 0)
         {
             error = "Automatic external inspection requires at least one camera source.";
             return false;
@@ -378,6 +394,17 @@ internal sealed class SimulationRuntimeState
             }
         }
 
+        foreach (var cameraId in numericalCameraIds)
+        {
+            if (!_cameras.Any(camera => camera.Id == cameraId && camera.HasNumericalInput) || sources.ContainsKey(cameraId))
+            {
+                error = $"Numerical camera '{cameraId}' was not found or conflicts with a static source.";
+                return false;
+            }
+        }
+
+        _automaticNumericalCameraIds.Clear();
+        _automaticNumericalCameraIds.UnionWith(numericalCameraIds);
         _automaticExternalSources.Clear();
         foreach (var (cameraId, source) in sources)
         {
@@ -411,7 +438,7 @@ internal sealed class SimulationRuntimeState
 
     internal bool HasArmedAutomaticExternalInspection(string sequenceId) =>
         string.Equals(_automaticExternalSequenceId, sequenceId, StringComparison.Ordinal)
-        && _automaticExternalSources.Count > 0;
+        && (_automaticExternalSources.Count > 0 || _automaticNumericalCameraIds.Count > 0);
 
     internal void BeginAutomaticExternalInspection(string sequenceId, bool resumeRealTime)
     {
@@ -459,6 +486,7 @@ internal sealed class SimulationRuntimeState
         {
             _automaticExternalSequenceId = null;
             _automaticExternalSources.Clear();
+            _automaticNumericalCameraIds.Clear();
         }
     }
 
@@ -537,7 +565,8 @@ internal sealed class SimulationRuntimeState
                 _sequenceRuntime.DebugState.CreateSnapshot(),
                 _projectId,
                 _runtimeGeneration,
-                _resetRetrySequenceId));
+                _resetRetrySequenceId,
+                _unitMaterialFlow));
 
     internal (PickPlaceWorkpieceTransition Transition, string WorkpieceId)?
         AdvancePickPlaceWorkpiece()

@@ -21,13 +21,14 @@ public sealed class SequenceAuthoringTargetCatalogTests
         SequenceAuthoringTargetCatalogSnapshot result = catalog.Build(project);
 
         Assert.Equal(
-            new[] { "di.ready", "do.run", "axis-1", "camera-1", "workpiece-1", "parent", "child" },
+            new[] { "di.ready", "do.run", "axis-1", "camera-1", "conveyor-1", "workpiece-1", "parent", "child" },
             result.AuthoringTargets.Select(target => target.Id));
-        Assert.Equal("Ready · di.ready", result.AuthoringTargets[0].Name);
+        Assert.Equal("Ready (di.ready)", result.AuthoringTargets[0].Name);
         Assert.Equal("12.5", result.AuthoringTargets[2].DefaultParameter);
         Assert.Equal("camera-1", result.AuthoringTargets[3].Id);
-        Assert.Equal(SequenceAuthoringTargetKind.Workpiece, result.AuthoringTargets[4].Kind);
-        Assert.Equal(SequenceAuthoringTargetKind.Subsequence, result.AuthoringTargets[5].Kind);
+        Assert.Equal(SequenceAuthoringTargetKind.Conveyor, result.AuthoringTargets[4].Kind);
+        Assert.Equal(SequenceAuthoringTargetKind.Workpiece, result.AuthoringTargets[5].Kind);
+        Assert.Equal(SequenceAuthoringTargetKind.Subsequence, result.AuthoringTargets[6].Kind);
     }
 
     [Fact]

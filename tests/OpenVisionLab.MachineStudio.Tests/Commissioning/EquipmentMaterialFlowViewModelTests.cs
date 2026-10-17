@@ -18,6 +18,31 @@ namespace OpenVisionLab.MachineStudio.Tests;
 [Collection(StudioUiTestCollection.Name)]
 public sealed class EquipmentMaterialFlowViewModelTests
 {
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void SlotAndActivityCardsFollowUnitPositionsAcrossStationGroups(bool materialFlow, bool hasAuthoredWorkpieces)
+    {
+        var project = CreateProject();
+        var units = project.Stations[0].Units.ToArray();
+        for (int i = 0; i < units.Length; i++) units[i].BaseOrigin = new() { X = i * 480 };
+        project.Stations[0].Units = [units[0], units[2]];
+        project.Stations.Add(new() { Id = "inspection", Name = "Inspection", Units = [units[1]] });
+        project.MaterialFlow.Enabled = materialFlow;
+        if (!hasAuthoredWorkpieces) project.Layouts[0].Components.Clear();
+        var serialized = new ProjectDocumentStore().Serialize(project);
+        using var layout = new MachineLayoutViewModel();
+        layout.Load(project);
+        var flow = new EquipmentMaterialFlowViewModel();
+        flow.Update(project, layout.Items, Snapshot());
+        var expected = new[] { "unit-feed", "unit-inspection", "unit-eject" };
+        Assert.Equal(materialFlow || hasAuthoredWorkpieces ? expected : [], flow.Slots.Select(slot => slot.UnitId));
+        Assert.Equal(expected, flow.UnitActivities.Select(unit => unit.UnitId));
+        if (materialFlow) Assert.All(flow.Slots, slot => Assert.Equal(T("Equipment.SlotEmpty"), slot.StateText));
+        Assert.Equal(serialized, new ProjectDocumentStore().Serialize(project));
+    }
+
     [Fact]
     public void CardsFollowPresenceAndCurrentInstanceResultsThroughFailureAndRecovery()
     {
@@ -138,6 +163,18 @@ public sealed class EquipmentMaterialFlowViewModelTests
         flow.Update(project, layout.Items, Snapshot([Position("inspection", true, "new-run")]));
         Assert.Equal("new-run", flow.Slots[1].InstanceId);
         Assert.Equal(Progress(0), flow.Slots[1].StateText);
+    }
+
+    [Theory]
+    [InlineData("744143a892f4494485418b56f1ba1d2a/unit-run0003/WP003", "unit-run0003/WP003")]
+    [InlineData("744143a892f4494485418b56f1ba1d2a/unit-run0004/WP003", "unit-run0004/WP003")]
+    [InlineData("user/workpiece-3", "user/workpiece-3")]
+    [InlineData("—", "—")]
+    public void SlotLabelKeepsRunAndWorkpieceIdentityWithoutChangingTheFullIdentifier(string instance, string label)
+    {
+        var slot = new EquipmentUnitSlotItem("unit-inspection", "Inspection", "1", instance, "Occupied");
+        Assert.Equal(instance, slot.InstanceId);
+        Assert.Equal(label, slot.InstanceLabel);
     }
 
     [Fact]

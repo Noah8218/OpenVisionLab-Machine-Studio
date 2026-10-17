@@ -38,6 +38,7 @@ using OpenVisionLab.MachineStudio.View.Project;
 using OpenVisionLab.MachineStudio.View.Scene;
 using OpenVisionLab.MachineStudio.View.Shell;
 using OpenVisionLab.MachineStudio.View.Simulation;
+using OpenVisionLab.MachineStudio.View.Mmi;
 using OpenVisionLab.MachineStudio.ViewModel;
 using OpenVisionLab.Wpf.MessageDialogs;
 using static OpenVisionLab.MachineStudio.DirectExeSmokeArgumentParser;
@@ -123,6 +124,9 @@ internal static class DirectExeSmokeHost
 
         window.Show();
         SmokeDpiTestHook.Apply(window, smokeOptions.DpiScalePercent, width, height);
+        var monitorEvidence = SmokeDpiTestHook.CaptureMonitorEvidence(window);
+        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(monitorEvidence));
+        AssertSmoke(monitorEvidence.WindowIntersectsMonitor, "The smoke window does not intersect the selected test monitor.");
         if (smokeOptions.UseRunLayout)
         {
             vm.IsRunMode = true;
@@ -456,12 +460,12 @@ internal static class DirectExeSmokeHost
             }
             AssertSmoke(
                 searchBox is { IsVisible: true }
-                && string.Equals(searchBox.Text, smokeOptions.LibrarySearchText, StringComparison.Ordinal)
-                && vm.Layout.FilteredLibraryItems.Count == 1,
+                && string.Equals(searchBox.Text, smokeOptions.LibrarySearchText ?? string.Empty, StringComparison.Ordinal)
+                && (string.IsNullOrWhiteSpace(smokeOptions.LibrarySearchText) || vm.EquipmentComponentLibraryItems.Count == 1),
                 $"Equipment component dialog search did not render its filtered library result: " +
                 $"found={searchBox is not null}, visible={searchBox?.IsVisible}, " +
                 $"text={searchBox?.Text ?? "<missing>"}, " +
-                $"filteredCount={vm.Layout.FilteredLibraryItems.Count}, " +
+                $"filteredCount={vm.EquipmentComponentLibraryItems.Count}, " +
                 $"viewSize={dialogView.ActualWidth:F0}x{dialogView.ActualHeight:F0}.");
             var centerHit = window.InputHitTest(new Point(window.ActualWidth / 2, window.ActualHeight / 2))
                 as DependencyObject;
@@ -471,7 +475,39 @@ internal static class DirectExeSmokeHost
                 $"hit={centerHit?.GetType().Name ?? "<none>"}.");
         }
 
-        if (!string.IsNullOrWhiteSpace(smokeOptions.LibraryCardState))
+        if (!string.IsNullOrWhiteSpace(smokeOptions.LibraryCardState)
+            && smokeOptions.LibraryEntryState?.Equals("equipment-dialog", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            var dialog = FindVisualDescendant<EquipmentComponentLibraryDialogView>(window)!;
+            var card = FindVisualDescendant<Button>(dialog, button => button.CommandParameter is ComponentLibraryItem)
+                ?? throw new InvalidOperationException("Equipment library card was not available.");
+            if (smokeOptions.LibraryCardState.Equals("disabled", StringComparison.OrdinalIgnoreCase))
+            {
+                vm.IsRunMode = true;
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                AssertSmoke(!card.IsEnabled && !card.Command!.CanExecute(card.CommandParameter), "Equipment library was not locked in run mode.");
+            }
+            else if (smokeOptions.LibraryCardState.Equals("validation", StringComparison.OrdinalIgnoreCase))
+            {
+                vm.EquipmentComponentLibraryUnitId = "missing-unit";
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                AssertSmoke(!card.IsEnabled && !string.IsNullOrEmpty(vm.EquipmentComponentLibraryUnitValidationText), "Missing target unit had no admission guard or feedback.");
+            }
+            else if (smokeOptions.LibraryCardState.Equals("pressed", StringComparison.OrdinalIgnoreCase))
+            {
+                await nativeInput.WaitForForegroundAsync(window);
+                await SmokeButtonPointerState.HoverThenPressAsync(window, card, uiInteraction,
+                    () => "Equipment library did not enter hover state.", "Equipment library did not enter actual pointer-down state.", requirePointerOwnership: true);
+            }
+            else if (smokeOptions.LibraryCardState.Equals("hover", StringComparison.OrdinalIgnoreCase))
+            {
+                nativeInput.MovePointerToCenter(card);
+                await window.Dispatcher.InvokeAsync(Mouse.Synchronize, DispatcherPriority.Input);
+                AssertSmoke(card.IsMouseOver, "Equipment library did not enter hover state.");
+            }
+            else throw new ArgumentException($"Unsupported equipment library card state '{smokeOptions.LibraryCardState}'.");
+        }
+        else if (!string.IsNullOrWhiteSpace(smokeOptions.LibraryCardState))
         {
             var leftTools = FindVisualDescendant<LeftToolRegionView>(window)
                 ?? throw new InvalidOperationException("Left tool region was not available.");
@@ -751,6 +787,8 @@ internal static class DirectExeSmokeHost
             {
                 vm.OpenEquipmentPropertiesCommand.Execute(null);
             }
+            if (smokeOptions.LayoutPropertyState.ToLowerInvariant() is "inspector-apply-hover" or "inspector-apply-pressed" or "inspector-mouse-leave")
+                await nativeInput.WaitForForegroundAsync(window);
             await SmokeLayoutPropertyStateVerifier.ApplyAsync(window, vm, smokeOptions.LayoutPropertyState, uiInteraction);
         }
 
@@ -918,6 +956,17 @@ internal static class DirectExeSmokeHost
             }
             else
             {
+                if (smokeOptions.FrameRecordingPath is { } recordingPath)
+                {
+                    var recording = windowCapture.CaptureFramesAsync(window, recordingPath, smokeOptions.FrameRecordingSeconds, () => vm.SceneSnapshots.Latest);
+                    if (recording.IsFaulted) await recording;
+                    vm.RunCommand.Execute(null);
+                    await recording;
+                    Console.WriteLine($"Rendered simulation recording saved: {Path.GetFullPath(recordingPath)}");
+                    Application.Current.Shutdown(0);
+                    return;
+                }
+
                 vm.RunCommand.Execute(null);
                 await Task.Delay(900);
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
@@ -960,7 +1009,7 @@ internal static class DirectExeSmokeHost
             }
 
             vm.Navigation.IsSimulationWorkspace = true;
-            vm.Navigation.SelectedExecutionTabIndex = 2;
+            vm.Navigation.OpenTestScenarioCommand.Execute(null);
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             var testScenarioAnchor = FindVisualDescendant<TextBlock>(
                 window,
@@ -1122,7 +1171,7 @@ internal static class DirectExeSmokeHost
             }
 
             vm.Navigation.IsSimulationWorkspace = true;
-            vm.Navigation.SelectedExecutionTabIndex = 2;
+            vm.Navigation.OpenTestScenarioCommand.Execute(null);
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             await SmokeScenarioBatchVerifier.VerifyAsync(
                 window,
@@ -1182,7 +1231,7 @@ internal static class DirectExeSmokeHost
         {
             vm.IsRunMode = true;
             vm.Navigation.IsSimulationWorkspace = true;
-            vm.Navigation.SelectedExecutionTabIndex = 2;
+            vm.Navigation.OpenTestScenarioCommand.Execute(null);
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             var repeatValidationAnchor = FindVisualDescendant<TextBlock>(
                 window,
@@ -1321,8 +1370,7 @@ internal static class DirectExeSmokeHost
                 vm,
                 smokeOptions.IntegrationPanelState,
                 smokeOptions.IntegrationExchangeRoot,
-                root => FindVisualDescendant<RightToolRegionView>(root),
-                root => FindVisualDescendant<SimulationIntegrationWorkspaceView>(root));
+                root => FindVisualDescendant<MmiOperatorLayoutView>(root));
             if (!string.IsNullOrWhiteSpace(smokeOptions.IntegrationPanelReportPath))
             {
                 integrationPanelReport.Save(smokeOptions.IntegrationPanelReportPath);
@@ -1456,13 +1504,17 @@ internal static class DirectExeSmokeHost
 
         if (!string.IsNullOrWhiteSpace(smokeOptions.GlobalCommandState) && !globalCommandSmokeHandled)
         {
+            if (smokeOptions.GlobalCommandState is "pressed" or "undo-pressed" or "redo-pressed" or "save-pressed" or "fault-chip-pressed" or "target-chip-pressed" or "run-options-pressed" or "workspace-tab-pressed" or "outline-unit-pressed" or "outline-device-pressed" or "outline-scope-pressed" or "outline-part-pressed" or "outline-clear-pressed")
+                await nativeInput.WaitForForegroundAsync(window);
             await SmokeGlobalCommandStateVerifier.ApplyAsync(
                 window,
                 vm,
                 smokeOptions.GlobalCommandState,
                 uiInteraction,
                 windowCapture,
-                smokeOptions.GlobalCommandStateScreenshotPath);
+                smokeOptions.GlobalCommandState == "pressed" && smokeOptions.ScreenshotPath is { } pressedPath
+                    ? Path.ChangeExtension(pressedPath, ".held.png")
+                    : smokeOptions.GlobalCommandStateScreenshotPath);
         }
 
         if (vm.SelectedEquipmentStatus is { } selectedEquipmentStatus)

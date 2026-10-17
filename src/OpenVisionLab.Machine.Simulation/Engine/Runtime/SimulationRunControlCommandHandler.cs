@@ -28,7 +28,8 @@ internal sealed record SimulationRunControlOutcome(
     SimulationRunMode? RunMode = null,
     SimulationControlOwner? ControlOwner = null,
     int? PendingSteps = null,
-    IReadOnlyList<SimulationRunControlEvent>? Events = null);
+    IReadOnlyList<SimulationRunControlEvent>? Events = null,
+    double? TimeScale = null);
 
 internal sealed class SimulationRunControlCommandHandler
 {
@@ -41,6 +42,7 @@ internal sealed class SimulationRunControlCommandHandler
 
         return command switch
         {
+            SetSimulationTimeScaleCommand speed => ApplyTimeScale(speed, context),
             PlayCommand => ApplyPlay(command, context),
             FastForwardCommand fastForward => ApplyFastForward(command, fastForward, context),
             PauseCommand => ApplyPause(command, context),
@@ -53,6 +55,17 @@ internal sealed class SimulationRunControlCommandHandler
                 SimulationCommandErrorCode.UnsupportedCommand,
                 $"Command '{command.GetType().Name}' is not supported.")
         };
+    }
+
+    private static SimulationRunControlOutcome ApplyTimeScale(SetSimulationTimeScaleCommand command, SimulationRunControlContext context)
+    {
+        if (!double.IsFinite(command.TimeScale) || command.TimeScale <= 0)
+            return Reject(command, context, SimulationCommandErrorCode.TimeScaleInvalid, "Time scale must be finite and positive.");
+
+        return new SimulationRunControlOutcome(
+            SimulationCommandResult.Accepted(command, context.CommandBoundaryTick, context.CommandBoundaryTime, $"Simulation time scale changed to {command.TimeScale}."),
+            Events: [new("Runtime", "SimulationTimeScaleChanged", $"Simulation time scale changed to {command.TimeScale}.")],
+            TimeScale: command.TimeScale);
     }
 
     private static SimulationRunControlOutcome ApplyPlay(

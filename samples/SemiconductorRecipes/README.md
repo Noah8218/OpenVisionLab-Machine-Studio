@@ -1,9 +1,10 @@
 # Semiconductor Equipment Recipe Pack
 
 These ten projects are editable Machine Studio equipment programs. Open any
-`.ovmachine` file, add or reposition equipment on the Design canvas, change its
-explicit axis/device/channel/target connections in Properties, save a copy, and
-select **Simulation ON** when ready. Opening a project never starts simulation.
+`.ovmachine` file in **Equipment setup**, add or reposition devices, and edit
+their axis, signal and device connections in the settings panel. Review the
+sequence in **Process and actions**, save a copy, and select **Simulation ON**
+when ready. Opening a project never starts simulation.
 
 | File | Equipment case | Topology | Distinctive connected flow |
 | --- | --- | --- | --- |

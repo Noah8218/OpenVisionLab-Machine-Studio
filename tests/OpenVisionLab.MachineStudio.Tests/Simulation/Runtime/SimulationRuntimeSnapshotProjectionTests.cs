@@ -138,6 +138,48 @@ public sealed class SimulationRuntimeSnapshotProjectionTests
         Assert.Equal("axis-first", projection.CurrentAxis?.Id);
     }
 
+    [Theory]
+    [InlineData(SequenceExecutionStatus.Ready, SequenceExecutionStatus.Ready, SequenceExecutionStatus.Ready, 0)]
+    [InlineData(SequenceExecutionStatus.Completed, SequenceExecutionStatus.Ready, SequenceExecutionStatus.Ready, 1)]
+    [InlineData(SequenceExecutionStatus.Completed, SequenceExecutionStatus.Running, SequenceExecutionStatus.Running, 1)]
+    [InlineData(SequenceExecutionStatus.Completed, SequenceExecutionStatus.Completed, SequenceExecutionStatus.Completed, 2)]
+    [InlineData(SequenceExecutionStatus.Completed, SequenceExecutionStatus.Faulted, SequenceExecutionStatus.Faulted, 1)]
+    [InlineData(SequenceExecutionStatus.Running, SequenceExecutionStatus.Faulted, SequenceExecutionStatus.Faulted, 0)]
+    [InlineData(SequenceExecutionStatus.Running, SequenceExecutionStatus.Aborted, SequenceExecutionStatus.Aborted, 0)]
+    public void RecipeStatusIncludesEveryExecutingUnitAndExcludesRecoverySequences(
+        SequenceExecutionStatus first, SequenceExecutionStatus second, SequenceExecutionStatus expected, int completed)
+    {
+        var snapshot = CreateSnapshot(SimulationRunMode.RealTime, SimulationControlOwner.EmbeddedSequence, sequences:
+        [
+            CreateSequence("unit-a") with { UnitId = "a", Status = first, RepeatCount = 3, CompletedCycles = first == SequenceExecutionStatus.Completed ? 3 : 1 },
+            CreateSequence("unit-b") with { UnitId = "b", Status = second },
+            CreateSequence("recovery") with { Status = SequenceExecutionStatus.Faulted }
+        ]);
+        var projection = SimulationRuntimeSnapshotProjection.Create(snapshot, new(null, null, null, null, SimulationFaultKind.AxisMotionBlocked, "unit-a"));
+
+        Assert.True(projection.IsRunning);
+        Assert.Equal(expected, projection.RecipeStatus);
+        Assert.Equal(completed, projection.CompletedRecipeSequenceCount);
+        Assert.Equal(new[] { "unit-a", "unit-b" }, projection.RecipeSequences.Select(sequence => sequence.SequenceId));
+        Assert.Equal(first, projection.CurrentSequence!.Status);
+    }
+
+    [Fact]
+    public void SingleRecipeUsesItsRootOnlyAndMissingRootHasNoCompletion()
+    {
+        var snapshot = CreateSnapshot(SimulationRunMode.RealTime, SimulationControlOwner.EmbeddedSequence, sequences:
+        [CreateSequence("main") with { Status = SequenceExecutionStatus.Completed }, CreateSequence("unrelated") with { Status = SequenceExecutionStatus.Faulted, UnitId = "b" }]);
+        var selection = new SimulationRuntimeProjectionSelection(null, null, null, null, SimulationFaultKind.AxisMotionBlocked, "main");
+        var projection = SimulationRuntimeSnapshotProjection.Create(snapshot, selection);
+        Assert.Equal(SequenceExecutionStatus.Completed, projection.RecipeStatus);
+        Assert.Equal(1, projection.CompletedRecipeSequenceCount);
+        Assert.Single(projection.RecipeSequences);
+        var missing = SimulationRuntimeSnapshotProjection.Create(snapshot, selection with { ActiveSequenceId = "missing" });
+        Assert.Null(missing.RecipeStatus);
+        Assert.Empty(missing.RecipeSequences);
+        Assert.Null(SimulationRuntimeSnapshotProjection.Empty.RecipeStatus);
+    }
+
     private static SimulationSnapshot CreateSnapshot(
         SimulationRunMode runMode,
         SimulationControlOwner controlOwner,

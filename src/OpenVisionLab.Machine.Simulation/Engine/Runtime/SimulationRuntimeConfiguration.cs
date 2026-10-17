@@ -55,7 +55,8 @@ public sealed class SimulationRuntimeConfiguration
         AutomaticRunConfiguration? automaticRun,
         MachineLayoutRuntimeConfiguration? layout,
         PickPlaceWorkpieceRuntimeConfiguration? pickPlaceWorkpiece,
-        double? timeScale = null)
+        double? timeScale = null,
+        UnitMaterialFlowConfiguration? unitMaterialFlow = null)
     {
         ArgumentNullException.ThrowIfNull(axes);
         ArgumentNullException.ThrowIfNull(channels);
@@ -86,6 +87,13 @@ public sealed class SimulationRuntimeConfiguration
                 pickPlaceWorkpiece.PickX,
                 pickPlaceWorkpiece.PickY);
         TimeScale = timeScale;
+        UnitMaterialFlow = unitMaterialFlow is null ? null : unitMaterialFlow with
+        {
+            UnitIds = Array.AsReadOnly(unitMaterialFlow.UnitIds.ToArray()),
+            InspectionCameraIds = new System.Collections.ObjectModel.ReadOnlyDictionary<string, IReadOnlyList<string>>(
+                unitMaterialFlow.InspectionCameraIds.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<string>)Array.AsReadOnly(pair.Value.ToArray()), StringComparer.Ordinal)),
+            ConveyorUnitIds = new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(new Dictionary<string, string>(unitMaterialFlow.ConveyorUnitIds, StringComparer.Ordinal))
+        };
     }
 
     public IReadOnlyList<AxisConfiguration> Axes { get; }
@@ -96,6 +104,8 @@ public sealed class SimulationRuntimeConfiguration
     public MachineLayoutRuntimeConfiguration? Layout { get; }
     public PickPlaceWorkpieceRuntimeConfiguration? PickPlaceWorkpiece { get; }
     public double? TimeScale { get; }
+    public UnitMaterialFlowConfiguration? UnitMaterialFlow { get; }
+    public OpenVisionLab.Machine.Core.History.RunRecordingContext? RunRecording { get; init; }
 
     private static AxisConfiguration CloneAxis(AxisConfiguration source)
     {
@@ -135,7 +145,8 @@ public sealed class SimulationRuntimeConfiguration
             source.Name,
             source.ExposureTicks,
             source.TransferTicks,
-            source.PlaceholderDecision);
+            source.PlaceholderDecision,
+            source.NumericalInput);
     }
 
     private static AutomaticRunConfiguration CloneAutomaticRun(AutomaticRunConfiguration source) =>

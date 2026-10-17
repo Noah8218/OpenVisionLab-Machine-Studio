@@ -33,6 +33,10 @@ public sealed class VirtualAxisDefinition
     [JsonPropertyName("maxVelocity")]
     public double MaxVelocity { get; set; } = DefaultMaxVelocity;
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("teachingPositions")]
+    public Dictionary<string, double>? TeachingPositions { get; set; }
+
     [JsonPropertyName("position")]
     public Coordinate3D Position { get; set; }
 

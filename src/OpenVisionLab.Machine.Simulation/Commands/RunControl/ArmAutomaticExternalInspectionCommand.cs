@@ -13,7 +13,8 @@ public sealed class ArmAutomaticExternalInspectionCommand : SimulationCommand
     public ArmAutomaticExternalInspectionCommand(
         SimulationRuntimeIdentity expectedRuntime,
         string sequenceId,
-        IReadOnlyDictionary<string, VirtualCameraExternalSource> sources)
+        IReadOnlyDictionary<string, VirtualCameraExternalSource> sources,
+        IReadOnlyCollection<string>? numericalCameraIds = null)
     {
         if (string.IsNullOrWhiteSpace(expectedRuntime.ProjectId))
         {
@@ -23,7 +24,7 @@ public sealed class ArmAutomaticExternalInspectionCommand : SimulationCommand
         }
         ArgumentException.ThrowIfNullOrWhiteSpace(sequenceId);
         ArgumentNullException.ThrowIfNull(sources);
-        if (sources.Count == 0)
+        if (sources.Count == 0 && (numericalCameraIds is null || numericalCameraIds.Count == 0))
         {
             throw new ArgumentException(
                 "At least one automatic external camera source is required.",
@@ -38,10 +39,18 @@ public sealed class ArmAutomaticExternalInspectionCommand : SimulationCommand
             copied.Add(cameraId, source);
         }
 
+        var generatedIds = (numericalCameraIds ?? Array.Empty<string>()).ToArray();
+        if (generatedIds.Any(string.IsNullOrWhiteSpace) || generatedIds.Distinct(StringComparer.Ordinal).Count() != generatedIds.Length
+            || generatedIds.Any(copied.ContainsKey))
+            throw new ArgumentException("Numerical camera ids must be unique and separate from static sources.", nameof(numericalCameraIds));
+
+        NumericalCameraIds = Array.AsReadOnly(generatedIds);
         ExpectedRuntime = expectedRuntime;
         SequenceId = sequenceId;
         Sources = new ReadOnlyDictionary<string, VirtualCameraExternalSource>(copied);
     }
+
+    public IReadOnlyCollection<string> NumericalCameraIds { get; }
 
     public string SequenceId { get; }
 

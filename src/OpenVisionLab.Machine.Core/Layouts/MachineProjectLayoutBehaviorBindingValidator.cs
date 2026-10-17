@@ -109,8 +109,27 @@ public sealed class MachineProjectLayoutBehaviorBindingValidator
                         errors);
                     break;
 
+                case LayoutComponentKind.DigitalIo:
+                    var ioChannels = channelsById[component.BehaviorBindingId ?? string.Empty].ToArray();
+                    if (ioChannels.Length != 1 || ioChannels[0].Kind is not (ChannelKind.DigitalInput or ChannelKind.DigitalOutput))
+                    {
+                        errors.Add(Error(MachineProjectLayoutValidationErrorCode.UnsupportedBehaviorBinding, layout.Id, component.Id, "Digital I/O requires exactly one declared digital channel."));
+                    }
+                    break;
+
                 case LayoutComponentKind.Camera:
                     ValidateCameraBinding(layout, component, devicesById, errors);
+                    break;
+
+                case LayoutComponentKind.FeedPosition:
+                case LayoutComponentKind.ExitPosition:
+                    if (!string.IsNullOrWhiteSpace(component.BehaviorBindingId))
+                        errors.Add(Error(MachineProjectLayoutValidationErrorCode.UnsupportedBehaviorBinding, layout.Id, component.Id, "Material positions use the owning unit slot, not a device behavior binding."));
+                    if (component.MaterialConveyorId is { } conveyorId && !layout.Components.Any(candidate => candidate.Id == conveyorId
+                        && candidate.Kind == LayoutComponentKind.Conveyor && candidate.UnitId == component.UnitId))
+                        errors.Add(Error(MachineProjectLayoutValidationErrorCode.WorkpieceCarrierMustBeConveyor, layout.Id, component.Id, "Material position conveyor must belong to the same layout and unit."));
+                    if (component.MaterialRoute is { } route && (component.Kind != LayoutComponentKind.ExitPosition || route is not ("auto" or "OK" or "NG")))
+                        errors.Add(Error(MachineProjectLayoutValidationErrorCode.UnsupportedBehaviorBinding, layout.Id, component.Id, "Exit route must be auto, OK or NG."));
                     break;
             }
         }
@@ -258,7 +277,11 @@ public sealed class MachineProjectLayoutBehaviorBindingValidator
             }
         }
 
-        if (string.IsNullOrWhiteSpace(sensor.TargetComponentId))
+        if (sensor.DetectAllProducts == true)
+        {
+            // The explicit all-products mode has no single component reference.
+        }
+        else if (string.IsNullOrWhiteSpace(sensor.TargetComponentId))
         {
             errors.Add(Error(
                 MachineProjectLayoutValidationErrorCode.SensorTargetComponentRequired,
@@ -296,6 +319,11 @@ public sealed class MachineProjectLayoutBehaviorBindingValidator
                     component.Id,
                     $"Digital sensor target component '{sensor.TargetComponentId}' must be in the same layout."));
             }
+        }
+
+        if (sensor.DetectionCenterY is { } centerY && !double.IsFinite(centerY))
+        {
+            errors.Add(Error(MachineProjectLayoutValidationErrorCode.SensorDetectionCenterInvalid, layout.Id, component.Id, "Digital sensor detection center Y must be finite."));
         }
 
         if (sensor.OnDelayMilliseconds < 0 || sensor.OffDelayMilliseconds < 0)

@@ -238,8 +238,8 @@ public sealed class SequenceDefinitionEditor
             definition.WorkpieceComponentId = null;
         }
 
-        if (definition.Action is SequenceStepAction.SetSignal
-            or SequenceStepAction.MoveAxis
+        if (definition.Action is SequenceStepAction.Delay
+            or SequenceStepAction.SetSignal
             or SequenceStepAction.TriggerCamera
             or SequenceStepAction.FeedWorkpiece
             or SequenceStepAction.EjectWorkpiece
@@ -247,6 +247,9 @@ public sealed class SequenceDefinitionEditor
         {
             definition.TimeoutMs = 0;
         }
+        if (definition.Action == SequenceStepAction.MoveAxis && !definition.WaitForAxisCompletion) definition.TimeoutMs = 0;
+        if (definition.Action != SequenceStepAction.MoveAxis) definition.WaitForAxisCompletion = false;
+        if (definition.Action != SequenceStepAction.EjectUnitWorkpiece) definition.EjectionDelayMilliseconds = 0;
 
         if (definition.Action is SequenceStepAction.WaitAxisDone
             or SequenceStepAction.WaitVisionResult
@@ -262,10 +265,15 @@ public sealed class SequenceDefinitionEditor
             definition.TimeoutMs = 1000;
         }
 
-        if (definition.Action != SequenceStepAction.WaitVisionResult)
+        if (definition.Action is not (SequenceStepAction.WaitVisionResult or SequenceStepAction.BranchInspection))
         {
             definition.FailureStepId = null;
         }
+        if (definition.Action != SequenceStepAction.TransferUnitWorkpiece) definition.DestinationUnitId = null;
+        if (definition.Action is SequenceStepAction.FeedUnitWorkpiece or SequenceStepAction.ReceiveUnitWorkpiece or SequenceStepAction.BranchInspection) definition.Parameter = string.Empty;
+        if (definition.Action is SequenceStepAction.FeedUnitWorkpiece or SequenceStepAction.ReceiveUnitWorkpiece or SequenceStepAction.TransferUnitWorkpiece && definition.TimeoutMs <= 0) definition.TimeoutMs = 30000;
+        if (definition.Action is SequenceStepAction.BranchInspection or SequenceStepAction.EjectUnitWorkpiece) definition.TimeoutMs = 0;
+        if (definition.Action == SequenceStepAction.EjectUnitWorkpiece && definition.Parameter is not ("auto" or "OK" or "NG")) definition.Parameter = "auto";
     }
 
     public static string? FindDefaultParameter(

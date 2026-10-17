@@ -29,6 +29,67 @@ public sealed class Mch034AutomaticExternalInspectionTests
         new string('1', 40),
         "Clean");
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ManualNumericalTriggerUsesConfirmedInputAndNeverInventsAnExternalVerdict(bool external)
+    {
+        await using var fixture = await CreateFixtureAsync(new NumericalCameraSettings { RecipeName = RecipeId });
+        Assert.True((await fixture.Engine.EnqueueCommandAsync(new StartManualControlCommand())).IsAccepted);
+        Assert.True((await fixture.Engine.EnqueueCommandAsync(new PauseCommand())).IsAccepted);
+        var trigger = await fixture.Engine.EnqueueCommandAsync(TriggerVirtualCameraCommand.CreateNumerical(
+            CameraId, RecipeId, ProjectId, fixture.Engine.CurrentSnapshot.RuntimeGeneration, external));
+        Assert.True(trigger.IsAccepted, trigger.Detail);
+        Assert.True((await fixture.Engine.EnqueueCommandAsync(new StepCommand())).IsAccepted);
+        Assert.True((await fixture.Engine.EnqueueCommandAsync(new StepCommand())).IsAccepted);
+        var snapshot = await WaitForSnapshotAsync(fixture.Engine, value =>
+            Assert.Single(value.Cameras).State == (external ? VirtualCameraState.AwaitingExternalResult : VirtualCameraState.FrameReady));
+        var camera = Assert.Single(snapshot.Cameras);
+        Assert.NotNull(camera.NumericalInput);
+        Assert.Equal(external, camera.NumericalInput.IsExternalInspection);
+        if (external) Assert.Null(camera.Result);
+        else Assert.Equal(PlaceholderInspectionDecision.Pass, camera.Result!.Decision);
+    }
+
+    [Theory]
+    [InlineData(NumericalCameraInputKind.Image2D)]
+    [InlineData(NumericalCameraInputKind.HeightMap3D)]
+    public async Task GeneratedAutomaticRunWaitsForCorrelatedExternalResultAndRetainsItsInput(NumericalCameraInputKind kind)
+    {
+        await using var fixture = await CreateFixtureAsync(new NumericalCameraSettings { InputKind = kind, RecipeName = RecipeId });
+        var arm = await fixture.Engine.EnqueueCommandAsync(new ArmAutomaticExternalInspectionCommand(
+            fixture.RuntimeIdentity, SequenceId, new Dictionary<string, VirtualCameraExternalSource>(), new[] { CameraId }));
+        Assert.True(arm.IsAccepted, arm.Detail);
+        Assert.True((await fixture.Engine.EnqueueCommandAsync(new StartAutomaticRunCommand(waitForExternalResult: true))).IsAccepted);
+        var pending = await WaitForSnapshotAsync(fixture.Engine,
+            snapshot => Assert.Single(snapshot.Cameras).State == VirtualCameraState.AwaitingExternalResult);
+        var capture = Assert.Single(pending.Cameras);
+        Assert.Null(capture.Result);
+        Assert.True(capture.NumericalInput!.IsExternalInspection);
+        Assert.Equal(capture.NumericalInput.Frame, capture.FrameEvidence);
+        Assert.True((await fixture.Engine.EnqueueCommandAsync(
+            CreateResultCommand(fixture, pending, ExternalInspectionResultStatus.Completed, ExternalInspectionOutcome.Pass))).IsAccepted);
+        var completed = await WaitForSnapshotAsync(fixture.Engine,
+            snapshot => Assert.Single(snapshot.Sequences).Status == SequenceExecutionStatus.Completed);
+        var result = Assert.Single(completed.Cameras).Result!;
+        Assert.Equal(PlaceholderInspectionDecision.Pass, result.Decision);
+        Assert.Null(result.InspectionEvidence);
+        Assert.NotNull(result.ExternalResultEvidence);
+        Assert.Same(capture.NumericalInput, result.NumericalInput);
+    }
+
+    [Fact]
+    public async Task NumericalArmRejectsStaticCameraAndKeepsNormalFileSourceArmAvailable()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        var rejected = await fixture.Engine.EnqueueCommandAsync(new ArmAutomaticExternalInspectionCommand(
+            fixture.RuntimeIdentity, SequenceId, new Dictionary<string, VirtualCameraExternalSource>(), new[] { CameraId }));
+        Assert.False(rejected.IsAccepted);
+        var accepted = await fixture.Engine.EnqueueCommandAsync(new ArmAutomaticExternalInspectionCommand(
+            fixture.RuntimeIdentity, SequenceId, new Dictionary<string, VirtualCameraExternalSource> { [CameraId] = CreateSource() }));
+        Assert.True(accepted.IsAccepted, accepted.Detail);
+    }
+
     [Fact]
     public async Task AutomaticExternalRun_ArmsPausesPublishesAndPassesSequence()
     {
@@ -301,7 +362,7 @@ public sealed class Mch034AutomaticExternalInspectionTests
             12,
             "Mono8");
 
-    private static async Task<Fixture> CreateFixtureAsync()
+    private static async Task<Fixture> CreateFixtureAsync(NumericalCameraSettings? numericalInput = null)
     {
         var engine = new FixedStepSimulationEngine(new SimulationSettings
         {
@@ -311,7 +372,7 @@ public sealed class Mch034AutomaticExternalInspectionTests
         });
         await engine.StartAsync();
         var configured = await engine.EnqueueCommandAsync(
-            new ConfigureRuntimeCommand(CreateRuntime(), ProjectId));
+            new ConfigureRuntimeCommand(CreateRuntime(numericalInput), ProjectId));
         Assert.True(configured.IsAccepted, configured.Detail);
         return new(
             engine,
@@ -320,7 +381,7 @@ public sealed class Mch034AutomaticExternalInspectionTests
                 engine.CurrentSnapshot.RuntimeGeneration));
     }
 
-    private static SimulationRuntimeConfiguration CreateRuntime()
+    private static SimulationRuntimeConfiguration CreateRuntime(NumericalCameraSettings? numericalInput = null)
     {
         var definition = new SequenceDefinition
         {
@@ -382,7 +443,7 @@ public sealed class Mch034AutomaticExternalInspectionTests
                     "External Camera",
                     exposureTicks: 1,
                     transferTicks: 1,
-                    PlaceholderInspectionDecision.Pass)
+                    PlaceholderInspectionDecision.Pass, numericalInput)
             },
             new AutomaticRunConfiguration(
                 SequenceId,

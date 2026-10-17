@@ -3,267 +3,379 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
-             xmlns:project="clr-namespace:OpenVisionLab.MachineStudio.View.Project">
+             xmlns:shell="clr-namespace:OpenVisionLab.MachineStudio.View.Shell"
+             xmlns:project="clr-namespace:OpenVisionLab.MachineStudio.View.Project"
+             FontFamily="Segoe UI, Malgun Gothic" FontSize="13" FontWeight="Normal" Foreground="{DynamicResource Text.Primary}">
     <UserControl.Resources>
+        <SolidColorBrush x:Key="Outline.SelectedSurface" Color="{StaticResource Color.Accent.Soft}" />
         <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Style x:Key="OutlineTextStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="LineHeight" Value="18.85" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Control}}" />
+            <Style.Triggers><DataTrigger Binding="{Binding (shell:ShellWindow.IsCompactLayout), RelativeSource={RelativeSource AncestorType=Window}}" Value="True"><Setter Property="FontSize" Value="12.5" /><Setter Property="LineHeight" Value="18.125" /></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="OutlineRowStyle" TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="26" />
+            <Setter Property="Height" Value="Auto" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource Text.Primary}" /><Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Template"><Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="OutlineRowBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="OutlineRowBorder" Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                        <MultiTrigger><MultiTrigger.Conditions><Condition Property="Background" Value="{StaticResource Outline.SelectedSurface}" /><Condition Property="IsMouseOver" Value="True" /></MultiTrigger.Conditions><Setter TargetName="OutlineRowBorder" Property="Background" Value="{StaticResource Outline.SelectedSurface}" /></MultiTrigger>
+                        <Trigger Property="IsPressed" Value="True"><Setter TargetName="OutlineRowBorder" Property="Background" Value="{DynamicResource Surface.Pressed}" /></Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="OutlineRowBorder" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /></Trigger>
+                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /><Setter Property="Opacity" Value="0.6" /></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value></Setter>
+        </Style>
+        <Style x:Key="OutlineDetailStyle" TargetType="TextBlock" BasedOn="{StaticResource OutlineTextStyle}">
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="LineHeight" Value="15.225" />
+            <Setter Property="MinHeight" Value="18.85" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+            <Setter Property="TextTrimming" Value="None" /><Setter Property="ClipToBounds" Value="True" />
+            <Style.Triggers><DataTrigger Binding="{Binding (shell:ShellWindow.IsCompactLayout), RelativeSource={RelativeSource AncestorType=Window}}" Value="True"><Setter Property="FontSize" Value="10.5" /><Setter Property="LineHeight" Value="15.225" /><Setter Property="MinHeight" Value="18.125" /></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="OutlineKindIconStyle" TargetType="TextBlock" BasedOn="{StaticResource OutlineTextStyle}">
+            <Setter Property="Text" Value="{Binding Symbol}" />
+            <Setter Property="Width" Value="18" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Primary}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Item.Component.Kind}" Value="Workpiece">
+                    <Setter Property="FontFamily" Value="Malgun Gothic" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Item.Component.Kind}" Value="MachineFrame">
+                    <Setter Property="Foreground" Value="{DynamicResource Scene.Component.FrameSupport}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Item.Component.Kind}" Value="Conveyor">
+                    <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Setter Property="Text" Value="▭" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Item.Component.Kind}" Value="FeedPosition">
+                    <Setter Property="Foreground" Value="{DynamicResource State.Warning}" /><Setter Property="Text" Value="⇥" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Item.Component.Kind}" Value="ExitPosition">
+                    <Setter Property="Foreground" Value="{DynamicResource Scene.Exit}" /><Setter Property="Text" Value="⇤" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Item.Component.Kind}" Value="LinearStage">
+                    <Setter Property="Foreground" Value="{DynamicResource Scene.IconAxis}" /><Setter Property="Text" Value="↔" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Item.Component.Kind}" Value="RotaryStage">
+                    <Setter Property="Foreground" Value="{DynamicResource Scene.Component.Axis}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Item.Component.Kind}" Value="DigitalSensor">
+                    <Setter Property="Foreground" Value="{DynamicResource State.Warning}" /><Setter Property="Text" Value="◉" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Item.Component.Kind}" Value="PneumaticCylinder">
+                    <Setter Property="Foreground" Value="{DynamicResource Accent.Primary}" /><Setter Property="Text" Value="⇨" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Item.Component.Kind}" Value="Camera">
+                    <Setter Property="FontFamily" Value="Malgun Gothic" />
+                    <Setter Property="Foreground" Value="{DynamicResource State.Vision}" /><Setter Property="Text" Value="▣" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsHeightMapCamera}" Value="True">
+                    <Setter Property="FontFamily" Value="Malgun Gothic" />
+                    <Setter Property="Foreground" Value="{DynamicResource State.Forced}" /><Setter Property="Text" Value="▤" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Item.Component.Kind}" Value="DigitalIo">
+                    <Setter Property="Foreground" Value="{DynamicResource Scene.IconDigitalIo}" /><Setter Property="Text" Value="◧" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="OutlineSearchStyle" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Height" Value="29" /><Setter Property="FontSize" Value="13" />
+            <Setter Property="Background" Value="{DynamicResource Surface.Input}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" /><Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+            <Setter Property="Template"><Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="AccentBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                        <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="AccentBorder" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /></Trigger>
+                        <Trigger Property="IsEnabled" Value="False"><Setter TargetName="AccentBorder" Property="BorderBrush" Value="{DynamicResource TextControlBorderBrushDisabled}" /><Setter Property="Opacity" Value="0.6" /></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value></Setter>
+            <Style.Triggers><DataTrigger Binding="{Binding (shell:ShellWindow.IsCompactLayout), RelativeSource={RelativeSource AncestorType=Window}}" Value="True"><Setter Property="Height" Value="28" /><Setter Property="FontSize" Value="12.5" /></DataTrigger></Style.Triggers>
+        </Style>
+        <DataTemplate x:Key="OutlinePartTemplate">
+            <Button Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                    Command="{Binding DataContext.Layout.SelectEquipmentOutlinePartCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                    CommandParameter="{Binding Item}" AutomationProperties.Name="{Binding AutomationName}" ToolTip="{Binding AutomationName}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource OutlineRowStyle}">
+                        <Setter Property="Padding" Value="38,4,6,4" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Item.Component.Kind}" Value="Workpiece">
+                                <Setter Property="Padding" Value="14,4,6,4" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Item.IsSelected}" Value="True">
+                                <Setter Property="Background" Value="{StaticResource Outline.SelectedSurface}" /><Setter Property="Foreground" Value="{DynamicResource Accent.Primary}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+                <Button.ContextMenu>
+                    <ContextMenu FontFamily="Segoe UI, Malgun Gothic" FontSize="13" FontWeight="Normal" DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                 Tag="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                        <MenuItem StaysOpenOnClick="True">
+                            <MenuItem.Header>
+                                <project:EquipmentOutlineSelectionCheckBox
+                                    IsChecked="{Binding Item.IsSelected, Mode=OneWay}"
+                                    Command="{Binding Tag.Layout.ToggleEquipmentOutlinePartCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                    CommandParameter="{Binding Item}" AutomationProperties.Name="{Binding SelectionAutomationName}">
+                                    <TextBlock Style="{StaticResource OutlineTextStyle}" Text="{Binding SelectionAutomationName}" />
+                                </project:EquipmentOutlineSelectionCheckBox>
+                            </MenuItem.Header>
+                        </MenuItem>
+                    </ContextMenu>
+                </Button.ContextMenu>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="24" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource OutlineKindIconStyle}" />
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Style="{StaticResource OutlineTextStyle}" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Style="{StaticResource OutlineDetailStyle}">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="{}{0} · {1}">
+                                    <Binding Path="Item.Id" />
+                                    <Binding Path="KindText" />
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Button>
+        </DataTemplate>
+        <DataTemplate x:Key="OutlineUnitTemplate">
+            <StackPanel>
+                <Button Padding="26,4,6,4" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        Command="{Binding DataContext.ShowEquipmentUnitCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding UnitId}" IsEnabled="{Binding CanOpenUnit}"
+                        AutomationProperties.ItemStatus="{Binding AutomationItemStatus}" AutomationProperties.Name="{Binding AutomationName}"
+                        ToolTip="{Binding AutomationName}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource OutlineRowStyle}">
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsActive}" Value="True" />
+                                        <Condition Binding="{Binding DataContext.Layout.HasSelection, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Background" Value="{StaticResource Outline.SelectedSurface}" /><Setter Property="Foreground" Value="{DynamicResource Accent.Primary}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <Button.ContextMenu>
+                        <ContextMenu FontFamily="Segoe UI, Malgun Gothic" FontSize="13" FontWeight="Normal" DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                     Tag="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                            <MenuItem AutomationProperties.Name="{Binding RemoveAutomationName}"
+                                      Command="{Binding Tag.RemoveEquipmentUnitCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding UnitId}">
+                                <MenuItem.Header>
+                                    <TextBlock Style="{StaticResource OutlineTextStyle}" Text="{Binding RemoveAutomationName}" />
+                                </MenuItem.Header>
+                            </MenuItem>
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource OutlineTextStyle}" Text="▣" FontFamily="Malgun Gothic" Width="18" TextAlignment="Center" HorizontalAlignment="Left" Foreground="{DynamicResource Accent.Primary}" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Style="{StaticResource OutlineTextStyle}" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding DetailText}" Style="{StaticResource OutlineDetailStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Button>
+                <ItemsControl ItemsSource="{Binding Parts}" ItemTemplate="{StaticResource OutlinePartTemplate}" />
+            </StackPanel>
+        </DataTemplate>
     </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <Border Grid.Row="0"
-                Padding="10"
-                Background="{DynamicResource Surface.Panel}"
-                BorderBrush="{DynamicResource Border.Default}"
-                BorderThickness="0,0,0,1">
-            <StackPanel>
-                <Grid>
-                    <TextBox Height="34"
-                             Padding="8,0,34,0"
-                             VerticalContentAlignment="Center"
-                             Text="{Binding Layout.EquipmentOutlineSearchText, UpdateSourceTrigger=PropertyChanged}"
-                             AutomationProperties.Name="{loc:Loc Key=Equipment.OutlineSearch}" />
-                    <TextBlock Margin="10,0,4,0"
-                               VerticalAlignment="Center"
-                               IsHitTestVisible="False"
-                               Foreground="{DynamicResource Text.Secondary}"
-                               FontSize="11"
-                               Text="{loc:Loc Key=Equipment.OutlineSearch}"
-                               TextTrimming="CharacterEllipsis"
-                               Visibility="{Binding Layout.IsEquipmentOutlineSearchEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <Button Width="26"
-                            MinWidth="26"
-                            MinHeight="0"
-                            Margin="0,3,3,3"
-                            Padding="0"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Stretch"
-                            Background="Transparent"
-                            BorderBrush="Transparent"
-                            BorderThickness="1"
-                            Foreground="{DynamicResource Text.Secondary}"
-                            Command="{Binding Layout.ClearEquipmentOutlineSearchCommand}"
-                            ToolTip="{loc:Loc Key=Equipment.OutlineSearchClear}"
-                            AutomationProperties.Name="{loc:Loc Key=Equipment.OutlineSearchClear}">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Layout.IsEquipmentOutlineSearchEmpty}" Value="False">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                        <TextBlock Text="×" FontSize="16" FontWeight="SemiBold"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Button>
-                </Grid>
-                <UniformGrid Columns="2" Margin="0,8,0,0">
-                <Button MinHeight="34"
-                         Margin="0,0,3,0"
-                         Padding="6,2"
-                         Command="{Binding OpenStationUnitEditorCommand}"
-                         AutomationProperties.Name="{loc:Loc Key=Equipment.OutlineAddUnit}"
-                         Style="{StaticResource PrimaryCommandButtonStyle}">
-                    <TextBlock Text="{loc:Loc Key=Equipment.OutlineAddUnit}"
-                                TextAlignment="Center"
-                                TextWrapping="Wrap" />
+        <Border Grid.Row="0" Padding="10,6,10,8" Background="Transparent"
+                BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1">
+            <Grid>
+                <TextBox x:Name="OutlineSearchTextBox" Style="{StaticResource OutlineSearchStyle}" FontFamily="Segoe UI, Malgun Gothic" FontWeight="Normal" Padding="7,0,28,0" VerticalContentAlignment="Center"
+                         Text="{Binding Layout.EquipmentOutlineSearchText, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.Name="{loc:Loc Key=Equipment.OutlineSearchName}" />
+                <TextBlock Style="{StaticResource OutlineTextStyle}" Margin="8,0,28,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                           Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Equipment.OutlineSearch}"
+                           Visibility="{Binding Layout.IsEquipmentOutlineSearchEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <Button x:Name="OutlineClearSearchButton" Width="24" MinWidth="0" MinHeight="0" Margin="0,3,3,3" Padding="0"
+                        HorizontalAlignment="Right" VerticalAlignment="Stretch" Background="Transparent" BorderBrush="Transparent"
+                        Command="{Binding Layout.ClearEquipmentOutlineSearchCommand}" ToolTip="{loc:Loc Key=Equipment.OutlineSearchClear}"
+                        AutomationProperties.Name="{loc:Loc Key=Equipment.OutlineSearchClear}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Layout.IsEquipmentOutlineSearchEmpty}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <TextBlock Style="{StaticResource OutlineTextStyle}" Text="×" FontSize="13" FontWeight="Normal" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
-                <Button MinHeight="34"
-                         Margin="3,0,0,0"
-                         Padding="6,2"
-                         Command="{Binding OpenEquipmentComponentLibraryDialogCommand}"
-                         AutomationProperties.Name="{loc:Loc Key=Equipment.AddPartButton}"
-                         Style="{StaticResource GlobalCommandButtonStyle}">
-                    <TextBlock Text="{loc:Loc Key=Equipment.AddPartButton}"
-                               TextAlignment="Center"
-                               TextWrapping="Wrap" />
-                </Button>
-                </UniformGrid>
-            </StackPanel>
+            </Grid>
         </Border>
-
-
-        <Grid Grid.Row="1">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Margin="8,5">
-                    <ItemsControl ItemsSource="{Binding Layout.EquipmentOutlineUnits}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Margin="0,4,0,8">
-                                    <Border Margin="0,3,0,5" Padding="5,2"
-                                            BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1"
-                                            Visibility="{Binding ShowStationHeader, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <DockPanel LastChildFill="True">
-                                            <TextBlock DockPanel.Dock="Right" Margin="4,0,0,0"
-                                                       Foreground="{DynamicResource Text.Secondary}"
-                                                       Text="{Binding StationComponentCount}" />
-                                            <TextBlock DockPanel.Dock="Left" Margin="0,0,5,0"
-                                                       Foreground="{DynamicResource Accent.Primary}" Text="▦" />
-                                            <TextBlock Text="{Binding StationName}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                        </DockPanel>
-                                    </Border>
+        <ScrollViewer x:Name="OutlineListScrollViewer" Grid.Row="1" UseLayoutRounding="False" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer.Resources>
+                <Style TargetType="ScrollBar" BasedOn="{StaticResource {x:Type ScrollBar}}">
+                    <Setter Property="Opacity" Value="0" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" Value="True"><Setter Property="Opacity" Value="1" /></DataTrigger>
+                        <DataTrigger Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" Value="True"><Setter Property="Opacity" Value="1" /></DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ScrollViewer.Resources>
+            <StackPanel Margin="6">
+                <Button x:Name="OutlineOverviewButton" Command="{Binding ShowEquipmentOverviewCommand}"
+                        AutomationProperties.Name="{loc:Loc Key=Equipment.OverviewButton}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource OutlineRowStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Layout.IsEquipmentOverviewActive}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource Outline.SelectedSurface}" /><Setter Property="Foreground" Value="{DynamicResource Accent.Primary}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource OutlineTextStyle}" Text="▦" FontFamily="Malgun Gothic" Width="18" TextAlignment="Center" HorizontalAlignment="Left" Foreground="{DynamicResource Accent.Primary}" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Style="{StaticResource OutlineTextStyle}" Text="{loc:Loc Key=Equipment.OverviewButton}" />
+                            <TextBlock Text="{Binding Layout.EquipmentOutlineOverviewDetail}" Style="{StaticResource OutlineDetailStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Button>
+                <ItemsControl ItemsSource="{Binding Layout.EquipmentOutlineProducts}" ItemTemplate="{StaticResource OutlinePartTemplate}" />
+                <ItemsControl ItemsSource="{Binding Layout.EquipmentOutlineStations}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <Button Padding="14,4,6,4" Command="{Binding DataContext.ShowEquipmentStationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding Id}" AutomationProperties.Name="{Binding AutomationName}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource OutlineRowStyle}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource Outline.SelectedSurface}" /><Setter Property="Foreground" Value="{DynamicResource Accent.Primary}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="24" />
                                             <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="34" />
                                         </Grid.ColumnDefinitions>
-                                        <Button Grid.Column="0" Height="Auto" MinHeight="34"
-                                                Padding="6,3"
-                                                HorizontalContentAlignment="Stretch"
-                                                Command="{Binding DataContext.ShowEquipmentUnitCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding UnitId}"
-                                                IsEnabled="{Binding CanOpenUnit}"
-                                                AutomationProperties.ItemStatus="{Binding AutomationItemStatus}"
-                                                AutomationProperties.Name="{Binding AutomationName}">
-                                            <Button.Style>
-                                                <Style TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
-                                                    <Setter Property="Background" Value="Transparent" />
-                                                    <Setter Property="BorderBrush" Value="Transparent" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                                            <Setter Property="Background" Value="{DynamicResource Accent.Soft}" />
-                                                            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                            <DockPanel LastChildFill="True">
-                                                <TextBlock DockPanel.Dock="Right" Margin="5,0,0,0"
-                                                           VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource Text.Secondary}"
-                                                           Text="{Binding ComponentCount}" />
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                                    <TextBlock Margin="0,1,0,0" FontSize="10"
-                                                               Foreground="{DynamicResource Text.Secondary}"
-                                                               Text="{Binding UnitId}"
-                                                               Visibility="{Binding ShowUnitId, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                                </StackPanel>
-                                            </DockPanel>
-                                        </Button>
-                                        <Button Grid.Column="1" Width="30" MinWidth="30" MinHeight="34" Margin="0" Padding="0"
-                                                Command="{Binding DataContext.RemoveEquipmentUnitCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding UnitId}"
-                                                AutomationProperties.Name="{Binding RemoveAutomationName}"
-                                                ToolTip="{loc:Loc Key=Equipment.OutlineRemoveUnit}"
-                                                Visibility="{Binding CanOpenUnit, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                                Style="{StaticResource QuietCommandButtonStyle}">
-                                            <TextBlock Text="×" FontSize="18" VerticalAlignment="Center" HorizontalAlignment="Center" />
-                                        </Button>
+                                        <TextBlock Style="{StaticResource OutlineTextStyle}" Text="▤" FontFamily="Malgun Gothic" Width="18" TextAlignment="Center" HorizontalAlignment="Left" Foreground="{DynamicResource Accent.Primary}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Style="{StaticResource OutlineTextStyle}" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Id}" Style="{StaticResource OutlineDetailStyle}" />
+                                        </StackPanel>
                                     </Grid>
-                                    <ItemsControl ItemsSource="{Binding Parts}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Grid Margin="0,3,0,0">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="36" />
-                                                        <ColumnDefinition Width="*" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Grid>
-                                                        <project:EquipmentOutlineSelectionCheckBox x:Name="PartSelectionBox" Opacity="0"
-                                                                  IsChecked="{Binding Item.IsSelected, Mode=OneWay}"
-                                                                  Command="{Binding DataContext.Layout.ToggleEquipmentOutlinePartCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                  CommandParameter="{Binding Item}"
-                                                                  AutomationProperties.Name="{Binding SelectionAutomationName}" />
-                                                        <Border Width="16" Height="16" Margin="7,0,0,0"
-                                                                HorizontalAlignment="Left" VerticalAlignment="Center"
-                                                                CornerRadius="3"
-                                                                IsHitTestVisible="False">
-                                                            <Border.Style>
-                                                                <Style TargetType="Border">
-                                                                    <Setter Property="BorderBrush" Value="{DynamicResource Text.Secondary}" />
-                                                                    <Setter Property="BorderThickness" Value="1" />
-                                                                    <Setter Property="Background" Value="Transparent" />
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding Item.IsSelected}" Value="True">
-                                                                            <Setter Property="Background" Value="{DynamicResource Accent.Primary}" />
-                                                                            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding IsMouseOver, ElementName=PartSelectionBox}" Value="True">
-                                                                            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding IsPressed, ElementName=PartSelectionBox}" Value="True">
-                                                                            <Setter Property="Background" Value="{DynamicResource Accent.Soft}" />
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding IsKeyboardFocused, ElementName=PartSelectionBox}" Value="True">
-                                                                            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
-                                                                            <Setter Property="BorderThickness" Value="2" />
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Border.Style>
-                                                            <TextBlock Text="✓" FontSize="12" FontWeight="Bold"
-                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                       Foreground="{DynamicResource Surface.Root}"
-                                                                       Visibility="{Binding Item.IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                                        </Border>
-                                                    </Grid>
-                                                    <Button Grid.Column="1" Height="Auto" Padding="6,4" MinHeight="44"
-                                                            HorizontalContentAlignment="Stretch"
-                                                            Command="{Binding DataContext.Layout.SelectEquipmentOutlinePartCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                            CommandParameter="{Binding Item}"
-                                                            AutomationProperties.Name="{Binding AutomationName}">
-                                                        <Button.Style>
-                                                            <Style TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
-                                                                <Setter Property="Background" Value="Transparent" />
-                                                                <Setter Property="BorderBrush" Value="Transparent" />
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding Item.IsSelected}" Value="True">
-                                                                        <Setter Property="Background" Value="{DynamicResource Accent.Soft}" />
-                                                                        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </Button.Style>
-                                                        <StackPanel>
-                                                            <TextBlock Text="{Binding Item.CurrentName}" TextWrapping="Wrap" />
-                                                            <TextBlock Text="{Binding DetailText}" FontSize="10"
-                                                                       Foreground="{DynamicResource Text.Secondary}"
-                                                                       TextWrapping="Wrap" />
-                                                        </StackPanel>
-                                                    </Button>
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <TextBlock Margin="4,8" Text="{loc:Loc Key=Equipment.OutlineNoMatches}"
-                               Foreground="{DynamicResource Text.Secondary}"
-                               TextWrapping="Wrap"
-                               Visibility="{Binding Layout.EquipmentOutlineHasNoMatches, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0"
-                                Visibility="{Binding Layout.EquipmentOutlineHasPages, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <Button Content="{loc:Loc Key=Equipment.OutlinePrevious}"
-                                Command="{Binding Layout.PreviousEquipmentOutlinePageCommand}" />
-                        <TextBlock Margin="8,0" VerticalAlignment="Center"
-                                   Text="{Binding Layout.EquipmentOutlinePageText}" />
-                        <Button Content="{loc:Loc Key=Equipment.OutlineNext}"
-                                Command="{Binding Layout.NextEquipmentOutlinePageCommand}" />
-                    </StackPanel>
+                                </Button>
+                                <ItemsControl ItemsSource="{Binding Units}" ItemTemplate="{StaticResource OutlineUnitTemplate}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <ItemsControl ItemsSource="{Binding Layout.EquipmentOutlineUnassignedParts}" ItemTemplate="{StaticResource OutlinePartTemplate}">
+                    <ItemsControl.Style>
+                        <Style TargetType="ItemsControl">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ItemsControl">
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource OutlineTextStyle}" Margin="5,4" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Equipment.OutlineUnassignedDevices}" FontSize="11" LineHeight="15.95" />
+                                            <ItemsPresenter />
+                                        </StackPanel>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="HasItems" Value="False"><Setter Property="Visibility" Value="Collapsed" /></Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ItemsControl.Style>
+                </ItemsControl>
+                <TextBlock Margin="8" FontSize="11.5" LineHeight="16.675" Text="{loc:Loc Key=Equipment.OutlineEmpty}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource OutlineTextStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding Layout.EquipmentOutlineIsEmpty}" Value="True" />
+                                        <Condition Binding="{Binding Layout.IsEquipmentOutlineSearchEmpty}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <StackPanel Margin="8" Visibility="{Binding Layout.EquipmentOutlineHasNoMatches, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Style="{StaticResource OutlineTextStyle}" Foreground="{DynamicResource Text.Secondary}" FontSize="11.5" LineHeight="16.675" TextWrapping="Wrap">
+                        <Run Text="&quot;" /><Run Text="{Binding Layout.EquipmentOutlineSearchText, Mode=OneWay}" /><Run Text="&quot; " /><Run Text="{loc:Loc Key=Equipment.OutlineNoMatches}" />
+                    </TextBlock>
+                    <Button Margin="0,5,0,0" HorizontalAlignment="Left"
+                            Command="{Binding Layout.ClearEquipmentOutlineSearchCommand}" Style="{StaticResource GlobalCommandButtonStyle}" >
+                        <TextBlock Style="{StaticResource OutlineTextStyle}" Text="{loc:Loc Key=Equipment.OutlineSearchClear}" />
+                    </Button>
                 </StackPanel>
-            </ScrollViewer>
-        </Grid>
-        <Border Grid.Row="2"
-                Padding="8"
-                Background="{DynamicResource Surface.Raised}"
-                BorderBrush="{DynamicResource Border.Default}"
-                BorderThickness="0,1,0,0">
-            <DockPanel LastChildFill="True">
-                <Button DockPanel.Dock="Right" MinHeight="34" Padding="8,0" Margin="6,0,0,0"
-                        Command="{Binding ShowEquipmentOverviewCommand}"
-                        Content="{loc:Loc Key=Equipment.OverviewButton}"
-                        AutomationProperties.Name="{loc:Loc Key=Equipment.OverviewButton}"
-                        Style="{StaticResource GlobalCommandButtonStyle}" />
-                <TextBlock VerticalAlignment="Center" Foreground="{DynamicResource Accent.Primary}"
-                           Text="{Binding Layout.EquipmentOutlineSelectionText}" />
-            </DockPanel>
-        </Border>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0"
+                            Visibility="{Binding Layout.EquipmentOutlineHasPages, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Button Command="{Binding Layout.PreviousEquipmentOutlinePageCommand}" >
+                        <TextBlock Style="{StaticResource OutlineTextStyle}" Text="{loc:Loc Key=Equipment.OutlinePrevious}" />
+                    </Button>
+                    <TextBlock Style="{StaticResource OutlineTextStyle}" Margin="8,0" VerticalAlignment="Center" Text="{Binding Layout.EquipmentOutlinePageText}" />
+                    <Button Command="{Binding Layout.NextEquipmentOutlinePageCommand}" >
+                        <TextBlock Style="{StaticResource OutlineTextStyle}" Text="{loc:Loc Key=Equipment.OutlineNext}" />
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </UserControl>

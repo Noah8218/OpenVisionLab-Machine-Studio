@@ -28,6 +28,76 @@ public sealed class EventJournalAlarmViewAutomationTests
 
     public EventJournalAlarmViewAutomationTests(StudioUiTestHost ui) => _ui = ui;
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TimelineLanguageChangesKeepBothSelectedFiltersVisible(bool selectSpecificFilters)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+            try
+            {
+                OpenVisionLanguageService.SetLanguage(OpenVisionLanguage.Korean, save: false);
+                using var runtimeDebugger = new RuntimeDebuggerViewModel(_ => Task.FromResult(Accepted()));
+                runtimeDebugger.LoadProject(CreateProject(), resetSession: true);
+                runtimeDebugger.ApplyEvent(new SimulationEvent(1, 1, TimeSpan.Zero, "Error", "ERROR", "error"));
+                runtimeDebugger.ApplyEvent(new SimulationEvent(2, 2, TimeSpan.Zero, "Recovery", "RECOVERY", "recovery"));
+                var view = new EventJournalView { DataContext = new EventJournalContext(runtimeDebugger), IsInline = true };
+                var window = new Window
+                {
+                    Width = 1100,
+                    Height = 520,
+                    ShowInTaskbar = false,
+                    ShowActivated = false,
+                    WindowStyle = WindowStyle.None,
+                    Content = view
+                };
+                window.Show();
+                try
+                {
+                    Assert.IsType<TabControl>(view.FindName("EvidenceTabs")).SelectedIndex = 0;
+                    var categoryFilter = Assert.IsType<ComboBox>(view.FindName("DebuggerTimelineFilterComboBox"));
+                    var severityFilter = Assert.IsType<ComboBox>(view.FindName("DebuggerTimelineSeverityFilterComboBox"));
+                    var categoryKey = selectSpecificFilters ? "Error" : string.Empty;
+                    var severityKey = selectSpecificFilters ? "Alarm" : string.Empty;
+                    window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                    categoryFilter.SelectedItem = categoryFilter.Items.OfType<RuntimeTimelineFilterItem>().Single(item => item.Key == categoryKey);
+                    severityFilter.SelectedItem = severityFilter.Items.OfType<RuntimeTimelineFilterItem>().Single(item => item.Key == severityKey);
+                    window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                    AssertTimelineFilterVisible(categoryFilter, categoryKey);
+                    AssertTimelineFilterVisible(severityFilter, severityKey);
+
+                    foreach (var language in new[] { OpenVisionLanguage.English, OpenVisionLanguage.Korean })
+                    {
+                        OpenVisionLanguageService.SetLanguage(language, save: false);
+                        runtimeDebugger.RefreshLocalization();
+                        window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                        AssertTimelineFilterVisible(categoryFilter, categoryKey);
+                        AssertTimelineFilterVisible(severityFilter, severityKey);
+                        Assert.Equal(categoryKey, runtimeDebugger.SelectedTimelineFilter?.Key);
+                        Assert.Equal(severityKey, runtimeDebugger.SelectedTimelineSeverityFilter?.Key);
+
+                        runtimeDebugger.ApplyEvent(new SimulationEvent(3, 3, TimeSpan.Zero, "Recovery", "NEXT_RECOVERY", "recovery"));
+                        window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                        AssertTimelineFilterVisible(categoryFilter, categoryKey);
+                        AssertTimelineFilterVisible(severityFilter, severityKey);
+                        if (selectSpecificFilters) Assert.Equal("ERROR", Assert.Single(runtimeDebugger.Timeline).Code);
+                    }
+                }
+                finally
+                {
+                    window.Close();
+                }
+                return true;
+            }
+            finally
+            {
+                OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
+            }
+        });
+    }
+
     [Fact]
     public async Task TimelineViewFiltersClearsAndAcceptsNewSessionEvents()
     {
@@ -259,6 +329,17 @@ public sealed class EventJournalAlarmViewAutomationTests
         Assert.True(result.historyHasSource);
         Assert.True(result.historyHasFailureCode);
         Assert.True(result.historyHasFailureMessage);
+    }
+
+    private static void AssertTimelineFilterVisible(ComboBox comboBox, string expectedKey)
+    {
+        var selected = Assert.IsType<RuntimeTimelineFilterItem>(comboBox.SelectedItem);
+        Assert.Equal(expectedKey, selected.Key);
+        Assert.False(string.IsNullOrWhiteSpace(selected.DisplayText));
+        var renderedText = Descendants<TextBlock>(comboBox).Where(text => text.IsVisible).Select(text => text.Text)
+            .Concat(Descendants<TextBox>(comboBox).Where(text => text.IsVisible).Select(text => text.Text)).ToArray();
+        Assert.True(renderedText.Contains(selected.DisplayText),
+            $"Selected={selected.DisplayText}; Editable={comboBox.IsEditable}; ComboText={comboBox.Text}; SelectionBox={comboBox.SelectionBoxItem}; Text={string.Join(" | ", renderedText)}");
     }
 
     private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject

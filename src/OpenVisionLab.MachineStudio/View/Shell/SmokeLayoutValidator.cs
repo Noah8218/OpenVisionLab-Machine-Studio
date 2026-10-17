@@ -52,6 +52,8 @@ internal sealed class SmokeLayoutReport
     public required ShellLayoutMetrics Regions { get; init; }
     public required IReadOnlyList<SmokeTextClipIssue> TextClipIssues { get; init; }
     public required IReadOnlyList<string> VisibleHorizontalScrollBars { get; init; }
+    public IReadOnlyList<string> IntentionalHorizontalScrollBars { get; init; } = Array.Empty<string>();
+    public IReadOnlyDictionary<string, double[]>? EquipmentSceneBounds { get; init; }
     public required IReadOnlyList<string> Failures { get; init; }
     public bool IsValid => Failures.Count == 0;
 
@@ -93,6 +95,7 @@ internal static class SmokeLayoutValidator
         var regions = window.CaptureLayoutMetrics();
         var textIssues = FindTextClipIssues(window, dpi.PixelsPerDip);
         var horizontalScrollBars = FindVisibleHorizontalScrollBars(window);
+        var intentionalHorizontalScrollBars = FindVisibleHorizontalScrollBars(window, intentional: true);
         var sceneViewport = EnumerateVisualDescendants(window)
             .OfType<MachineSceneViewport>()
             .FirstOrDefault(viewport => viewport.IsVisible);
@@ -167,6 +170,43 @@ internal static class SmokeLayoutValidator
             failures.Add("The smoke window is not fully contained by the selected monitor.");
         }
 
+        Dictionary<string, double[]>? equipmentSceneBounds = null;
+        var sceneDocument = EnumerateVisualDescendants(window).OfType<SceneDocumentView>().FirstOrDefault(view => view.IsVisible);
+        if (sceneViewport is not null && sceneDocument?.FindName("EquipmentSceneHeading") is FrameworkElement { IsVisible: true } heading)
+        {
+            Rect WindowBounds(FrameworkElement element) => element.TransformToAncestor(window).TransformBounds(new Rect(element.RenderSize));
+            double[] Coordinates(Rect bounds) => [bounds.X, bounds.Y, bounds.Width, bounds.Height];
+            var viewportBounds = WindowBounds(sceneViewport);
+            equipmentSceneBounds = new Dictionary<string, double[]>
+            {
+                ["heading"] = Coordinates(WindowBounds(heading)),
+                ["viewport"] = Coordinates(viewportBounds)
+            };
+            if (!viewportBounds.Contains(WindowBounds(heading))) failures.Add("Equipment scene heading leaves the viewport.");
+            if (sceneDocument.FindName("EquipmentSceneHeader") is FrameworkElement header)
+            {
+                var headerBounds = WindowBounds(header);
+                equipmentSceneBounds["header"] = Coordinates(headerBounds);
+                if (!headerBounds.Contains(WindowBounds(heading))) failures.Add("Equipment scene header clips its heading.");
+                if (sceneDocument.FindName("EquipmentViewToolbarGroup") is FrameworkElement tools && !headerBounds.Contains(WindowBounds(tools)))
+                    failures.Add("Equipment scene header clips the view toolbar.");
+            }
+            var footerBounds = sceneDocument.FindName("EquipmentFooterRegion") is FrameworkElement footer ? WindowBounds(footer) : Rect.Empty;
+            equipmentSceneBounds["footer"] = Coordinates(footerBounds);
+            if (sceneDocument.FindName("EquipmentViewToolbarGroup") is FrameworkElement toolbar)
+                equipmentSceneBounds["toolbar"] = Coordinates(WindowBounds(toolbar));
+            if (sceneViewport.LastRenderedSelectedLabelBounds is { } label)
+            {
+                var selectedLabelBounds = sceneViewport.TransformToAncestor(window).TransformBounds(label);
+                equipmentSceneBounds["selectedLabel"] = Coordinates(selectedLabelBounds);
+                if (WindowBounds(heading).IntersectsWith(selectedLabelBounds) || footerBounds.IntersectsWith(selectedLabelBounds))
+                    failures.Add("Equipment selection label overlaps scene heading or footer.");
+                if (!new Rect(sceneViewport.RenderSize).Contains(label)) failures.Add("Equipment selection label leaves the usable viewport.");
+            }
+            if (sceneDocument.FindName("EquipmentSceneLegend") is FrameworkElement legend)
+                equipmentSceneBounds["legend"] = Coordinates(WindowBounds(legend));
+        }
+
         return new SmokeLayoutReport
         {
             WindowTitle = window.Title,
@@ -193,6 +233,8 @@ internal static class SmokeLayoutValidator
             Regions = regions,
             TextClipIssues = textIssues,
             VisibleHorizontalScrollBars = horizontalScrollBars,
+            IntentionalHorizontalScrollBars = intentionalHorizontalScrollBars,
+            EquipmentSceneBounds = equipmentSceneBounds,
             Failures = failures
         };
     }
@@ -302,7 +344,7 @@ internal static class SmokeLayoutValidator
         return measured.DesiredSize.Height;
     }
 
-    private static IReadOnlyList<string> FindVisibleHorizontalScrollBars(DependencyObject root) =>
+    private static IReadOnlyList<string> FindVisibleHorizontalScrollBars(DependencyObject root, bool intentional = false) =>
         EnumerateVisualDescendants(root)
             .OfType<ScrollBar>()
             .Where(scrollBar =>
@@ -312,6 +354,9 @@ internal static class SmokeLayoutValidator
                 scrollBar.ActualWidth > 1.0 &&
                 scrollBar.ActualHeight > 1.0 &&
                 scrollBar.Maximum > scrollBar.Minimum)
+            .Where(scrollBar => intentional == (scrollBar.TemplatedParent is ScrollViewer
+                { Name: "EquipmentSlotsScrollViewer" or "EquipmentUnitsScrollViewer", DataContext: ViewModel.MainViewModel owner }
+                && owner.Navigation.IsEquipmentWorkspace))
             .Select(scrollBar => $"{Describe(scrollBar)} in {scrollBar.TemplatedParent} / "
                 + $"{((scrollBar.TemplatedParent as FrameworkElement)?.TemplatedParent is FrameworkElement owner ? Describe(owner) : "unknown")}")
             .Distinct(StringComparer.Ordinal)

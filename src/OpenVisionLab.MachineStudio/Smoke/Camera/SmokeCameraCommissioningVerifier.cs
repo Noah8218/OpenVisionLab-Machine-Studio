@@ -509,7 +509,7 @@ internal static class SmokeCameraCommissioningVerifier
         check("cameraControlsResolveDirectOwner",
             UsesCamera(inspector.CameraSelectionComboBox, ItemsControl.ItemsSourceProperty)
             && UsesCamera(inspector.CameraSelectionComboBox, Selector.SelectedValueProperty)
-            && UsesCamera(inspector.CameraRecipeComboBox, Selector.SelectedItemProperty)
+            && UsesCamera(inspector.CameraSourceSettings.CameraRecipeComboBox, Selector.SelectedItemProperty)
             && UsesCamera(inspector.CameraSourceSettings.CameraSourcePixelFormatTextBox, TextBox.TextProperty)
             && UsesCamera(inspector.CameraSourceSettings.CameraSourcePathTextBox, TextBox.TextProperty)
             && UsesCamera(inspector.StartCameraManualControlButton, Button.CommandProperty)
@@ -538,12 +538,12 @@ internal static class SmokeCameraCommissioningVerifier
         if (camera.CurrentCameraRecipes.Count > 1)
         {
             var otherRecipe = camera.CurrentCameraRecipes.First(item => item != originalRecipe);
-            inspector.CameraRecipeComboBox.SetCurrentValue(Selector.SelectedItemProperty, otherRecipe);
+            inspector.CameraSourceSettings.CameraRecipeComboBox.SetCurrentValue(Selector.SelectedItemProperty, otherRecipe);
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             check("recipeSelectionControlToOwner", camera.SelectedCameraRecipe == otherRecipe);
             camera.SelectedCameraRecipe = originalRecipe;
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            check("recipeSelectionOwnerToControl", Equals(inspector.CameraRecipeComboBox.SelectedItem, originalRecipe));
+            check("recipeSelectionOwnerToControl", Equals(inspector.CameraSourceSettings.CameraRecipeComboBox.SelectedItem, originalRecipe));
         }
 
         var widthEditor = SmokeVisualTreeQuery.FindVisualDescendant<global::Wpf.Ui.Controls.NumberBox>(
@@ -766,7 +766,7 @@ internal static class SmokeCameraCommissioningVerifier
         {
             var comboBox = state == "popup-camera"
                 ? inspector.CameraSelectionComboBox
-                : inspector.CameraRecipeComboBox;
+                : inspector.CameraSourceSettings.CameraRecipeComboBox;
             interaction.ActivateWindow();
             comboBox.Focus();
             comboBox.ApplyTemplate();

@@ -84,8 +84,8 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
             _ => CanPullLatestTransaction,
             useCommandManagerRequery: false);
         CancelLatestTransactionCommand = new RelayCommand(
-            async _ => await CancelLatestTransactionAsync(),
-            _ => CanCancelLatestTransaction,
+            async parameter => await CancelLatestTransactionAsync(parameter),
+            parameter => CanCancelLatestTransaction && MatchesCancellationTarget(parameter),
             useCommandManagerRequery: false);
     }
 
@@ -310,8 +310,12 @@ internal sealed class MachineIntegrationTcpControlViewModel : ViewModelBase, IDi
             refreshAfterTransfer: true);
     }
 
-    internal Task CancelLatestTransactionAsync()
+    private bool MatchesCancellationTarget(object? parameter) => parameter is null
+        || parameter is Guid id && _latestTransactionProvider()?.Handoff.TransactionId == id;
+
+    internal Task CancelLatestTransactionAsync(object? expectedTransactionId = null)
     {
+        if (!MatchesCancellationTarget(expectedTransactionId)) return Task.CompletedTask;
         var transaction = _latestTransactionProvider();
         if (transaction is not { HasAcknowledgement: true, HasResult: false })
         {

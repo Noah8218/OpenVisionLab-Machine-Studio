@@ -14,10 +14,12 @@ using OpenVisionLab.Machine.Simulation.Scenarios;
 using OpenVisionLab.Machine.Simulation.Sequences;
 using OpenVisionLab.Machine.Simulation.Snapshots;
 using OpenVisionLab.Machine.Simulation.Workpieces;
+using OpenVisionLab.Machine.Simulation.History;
+using OpenVisionLab.Machine.Core.History;
 
 namespace OpenVisionLab.Machine.Simulation.Engine;
 
-public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEventJournalSource
+public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEventJournalSource, ISimulationRunRecordSource
 {
     private readonly SimulationSettings _settings;
     private readonly Channel<SimulationCommand> _commandChannel;
@@ -37,6 +39,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
     private readonly SimulationAutomaticRunCycleHandler _automaticRunCycleHandler = new();
     private readonly SimulationSequenceCommandHandler _sequenceCommandHandler = new();
     private readonly SimulationRunControlCommandHandler _runControlCommandHandler = new();
+    private readonly SimulationRunRecorder _runRecorder = new();
     private readonly Action<SimulationEngineFaultPoint>? _faultInjector;
     private SimulationCommand? _currentCommand;
     private string? _operationContext;
@@ -143,7 +146,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
             settings.EventBufferCapacity,
             settings.CanonicalEventJournalCapacity ?? settings.EventBufferCapacity);
         _snapshotStore = new LatestSnapshotStore(CreateSnapshot());
-        _physicalRuntimeTick = new SimulationPhysicalRuntimeTick(EmitPhysicalRuntimeEvent);
+        _physicalRuntimeTick = new SimulationPhysicalRuntimeTick(EmitPhysicalRuntimeEvent, _runRecorder.RecordCapture);
         _lifecycle = new SimulationEngineLifecycle(
             _commandChannel,
             _eventPublisher,
@@ -161,6 +164,8 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
     public TimeSpan FixedStep => _settings.FixedStep;
     public ChannelReader<SimulationSnapshot> SnapshotReader => _snapshotStore.Reader;
     public ChannelReader<SimulationEvent> EventReader => _eventPublisher.Reader;
+    public ChannelReader<MachineRunRecord> RunRecordReader => _runRecorder.Reader;
+    public string? ActiveRunId => _runRecorder.ActiveRunId;
     public SimulationEventJournalSnapshot EventJournal => _eventPublisher.JournalSnapshot;
     public Task<SimulationEngineTerminationResult> Termination => _lifecycle.Termination;
 
@@ -248,6 +253,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
             while (!cancellationToken.IsCancellationRequested)
             {
                 var wasPaused = _runMode == SimulationRunMode.Paused;
+                var previousTimeScale = _timeScale;
                 while (_commandChannel.Reader.TryRead(out var command))
                 {
                     _currentCommand = command;
@@ -266,7 +272,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
                     automaticExternalWaitStartedAt = null;
                 }
 
-                if (wasPaused && _runMode != SimulationRunMode.Paused)
+                if ((wasPaused && _runMode != SimulationRunMode.Paused) || previousTimeScale != _timeScale)
                 {
                     timing.Reset(stopwatch.Elapsed);
                 }
@@ -423,6 +429,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
         }
         finally
         {
+            _runRecorder.Complete(termination?.Outcome == SimulationEngineTerminationOutcome.Faulted);
             _lifecycle.FinalizeRun(
                 termination ?? CreateTerminationResult(
                     SimulationEngineTerminationOutcome.Faulted,
@@ -683,6 +690,11 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
                     $"but current runtime is project '{ProjectId ?? "<none>"}' generation {RuntimeGeneration}.");
                 break;
 
+            case StartAutomaticRunCommand when SequenceRuntime.UnitRunActive:
+                result = Reject(command, SimulationCommandErrorCode.AutomaticRunStartRejected, "A unit sequence run is already active.");
+                break;
+
+            case SetSimulationTimeScaleCommand:
             case PlayCommand:
             case PauseCommand:
             case FastForwardCommand:
@@ -693,6 +705,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
                 break;
 
             case ResetCommand:
+                _runRecorder.Stop();
                 ResetRuntime();
                 result = Accept(command, "Runtime state reset to authored initial values.");
                 if (ConditionScenarioRuntime.Profile is not null)
@@ -762,6 +775,8 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
             case StopAxesCommand:
             case SetCylinderCommand:
             case SetConveyorCommand:
+            case SetManualOutputCommand:
+            case SetManualSampleCommand:
             case SetVirtualInputCommand:
             case SetVirtualInputForceCommand:
             case SetDigitalSensorForceCommand:
@@ -780,6 +795,16 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
             && (command is StartSequenceCommand or StartAutomaticRunCommand or RetrySequenceCommand))
         {
             _runtimeState.EnsureWorkpieceRunStarted();
+            if (_activeSequenceId is { } rootId && SequenceRuntime.CompiledSequences[rootId].UnitId is not null)
+            {
+                _runtimeState.BeginUnitRun();
+                SequenceRuntime.BeginUnitRun(rootId);
+            }
+        }
+        if (result.IsAccepted && command is AbortSequenceCommand)
+        {
+            SequenceRuntime.AbortUnitRun();
+            _runtimeState.UnitMaterialFlow?.CancelTransfers();
         }
 
         EmitAtCommandBoundary(
@@ -825,6 +850,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
                 CommandBoundaryTick,
                 CommandBoundaryTime,
                 _controlOwner));
+        if (outcome.TimeScale.HasValue) _timeScale = outcome.TimeScale.Value;
         if (outcome.RunMode.HasValue)
         {
             _runMode = outcome.RunMode.Value;
@@ -986,6 +1012,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
             $"Configured {Axes.Count} axis/axes, {configuration.Channels.Count} signal(s), " +
             $"{Cameras.Count} camera(s), {SequenceRuntime.SequenceExecutors.Count} sequence(s), and " +
             $"{configuration.Layout?.Components.Count ?? 0} layout component(s).";
+        _runRecorder.Configure(configuration.RunRecording);
         if (PickPlaceWorkpiece is not null)
         {
             configurationSummary += " Configured 1 Pick-and-Place workpiece.";
@@ -1250,6 +1277,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
         if (!_runtimeState.TryArmAutomaticExternalInspection(
             command.SequenceId,
             command.Sources,
+            command.NumericalCameraIds,
             out var error))
         {
             return Reject(
@@ -1344,7 +1372,8 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
                 CommandBoundaryTick,
                 CommandBoundaryTime,
                 _runtimeState.ResetRetrySequenceId,
-                AutomaticRunRuntime.Configuration is not null));
+                AutomaticRunRuntime.Configuration is not null,
+                SequenceRuntime.UnitRunActive));
         if (outcome.State is { } state)
         {
             _runMode = state.RunMode;
@@ -1471,77 +1500,93 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
 
         AdvanceAutomaticRunRepeat(eventTick, eventTime);
 
-        if (!pausedForAutomaticExternalInspection
-            && _activeSequenceId is not null
-            && SequenceRuntime.SequenceExecutors.TryGetValue(_activeSequenceId, out var executor)
-            && executor.CaptureSnapshot().Status == SequenceExecutionStatus.Running)
+        foreach (string tickSequenceId in pausedForAutomaticExternalInspection ? Array.Empty<string>() : SequenceRuntime.TickSequenceIds(_activeSequenceId))
         {
-            var context = new DeterministicSequenceRuntimeContext(
-                SignalHub,
-                Axes,
-                Cameras,
-                eventTick,
-                eventTime,
-                EmitSequenceRuntimeEvent,
-                _runtimeState.AutomaticExternalInspectionEnabled,
-                _runtimeState.AutomaticExternalSources,
-                workpieceInstanceIdAccessor: componentId =>
-                    _runtimeState.MachineLayout?.GetWorkpieceInstanceId(componentId),
-                workpieceFeedHandler: _runtimeState.FeedWorkpiece,
-                workpieceEjectHandler: _runtimeState.EjectWorkpiece);
-            var execution = executor.Tick(_settings.FixedStep, context);
-            if (execution.Transitioned)
+            if (SequenceRuntime.SequenceExecutors.TryGetValue(tickSequenceId, out var executor)
+                && executor.CaptureSnapshot().Status == SequenceExecutionStatus.Running)
             {
-                var previousSequenceId = execution.PreviousSequenceId ?? _activeSequenceId;
-                var currentSequenceId = execution.CurrentSequenceId ?? _activeSequenceId;
-                var transitionMessage = string.Equals(
-                        previousSequenceId,
-                        currentSequenceId,
-                        StringComparison.Ordinal)
-                    ? $"{currentSequenceId}: {execution.PreviousStepId} -> {execution.CurrentStepId}."
-                    : $"{previousSequenceId}:{execution.PreviousStepId} -> "
-                      + $"{currentSequenceId}:{execution.CurrentStepId}.";
-                Emit(
-                    "Sequence",
-                    "SequenceStepTransition",
-                    transitionMessage,
-                    tickIndex: eventTick,
-                    simulationTime: eventTime);
-                PauseAtSequenceDebugBoundary(execution, eventTick, eventTime);
+                var context = new DeterministicSequenceRuntimeContext(
+                    SignalHub,
+                    Axes,
+                    Cameras,
+                    eventTick,
+                    eventTime,
+                    EmitSequenceRuntimeEvent,
+                    _runtimeState.AutomaticExternalInspectionEnabled,
+                    _runtimeState.AutomaticExternalSources,
+                    workpieceInstanceIdAccessor: componentId =>
+                        _runtimeState.MachineLayout?.GetWorkpieceInstanceId(componentId),
+                    workpieceFeedHandler: _runtimeState.FeedWorkpiece,
+                    workpieceEjectHandler: _runtimeState.EjectWorkpiece,
+                    unitMaterialFlow: _runtimeState.UnitMaterialFlow,
+                    unitId: SequenceRuntime.CompiledSequences[tickSequenceId].UnitId,
+                    numericalCameraIds: _runtimeState.AutomaticNumericalCameraIds);
+                var execution = executor.Tick(_settings.FixedStep, context);
+                if (execution.Transitioned)
+                {
+                    var previousSequenceId = execution.PreviousSequenceId ?? tickSequenceId;
+                    var currentSequenceId = execution.CurrentSequenceId ?? tickSequenceId;
+                    var transitionMessage = string.Equals(
+                            previousSequenceId,
+                            currentSequenceId,
+                            StringComparison.Ordinal)
+                        ? $"{currentSequenceId}: {execution.PreviousStepId} -> {execution.CurrentStepId}."
+                        : $"{previousSequenceId}:{execution.PreviousStepId} -> "
+                          + $"{currentSequenceId}:{execution.CurrentStepId}.";
+                    Emit(
+                        "Sequence",
+                        "SequenceStepTransition",
+                        transitionMessage,
+                        tickIndex: eventTick,
+                        simulationTime: eventTime);
+                    PauseAtSequenceDebugBoundary(execution, eventTick, eventTime);
+                }
+
+                if (execution.Snapshot.Status == SequenceExecutionStatus.Completed && !SequenceRuntime.UnitRunActive)
+                {
+                    if (_runtimeState.UnitMaterialFlow is { Enabled: true, Supply.TargetCount: not null } material
+                        && (material.HasInFlight || material.Supply.FedCount != material.Supply.TargetCount))
+                    {
+                        var rejected = executor.RejectMaterialCompletion("Supply sequences ended before the requested quantity was fed and every product exited.");
+                        Emit("Sequence", "SequenceFaulted", rejected.Error!.Message, tickIndex: eventTick, simulationTime: eventTime);
+                        FaultAutomaticRun(eventTick, eventTime);
+                        PauseCompletedSemanticStep(SequenceDebugPauseReason.SequenceFaulted, execution.Snapshot.CurrentStepId, eventTick, eventTime);
+                        _runMode = SimulationRunMode.Paused;
+                        continue;
+                    }
+                    Emit(
+                        "Sequence",
+                        "SequenceCompleted",
+                        $"{_activeSequenceId} completed.",
+                        tickIndex: eventTick,
+                        simulationTime: eventTime);
+                    CompleteAutomaticRunCycle(eventTick, eventTime);
+                    PauseCompletedSemanticStep(
+                        SequenceDebugPauseReason.SequenceCompleted,
+                        execution.Snapshot.CurrentStepId,
+                        eventTick,
+                        eventTime);
+                }
+                else if (execution.Snapshot.Status == SequenceExecutionStatus.Faulted)
+                {
+                    SequenceRuntime.AbortUnitRun();
+                    _runtimeState.UnitMaterialFlow?.CancelTransfers();
+                    Emit(
+                        "Sequence",
+                        "SequenceFaulted",
+                        execution.Error?.Message ?? $"{_activeSequenceId} faulted.",
+                        tickIndex: eventTick,
+                        simulationTime: eventTime);
+                    FaultAutomaticRun(eventTick, eventTime);
+                    PauseCompletedSemanticStep(
+                        SequenceDebugPauseReason.SequenceFaulted,
+                        execution.Snapshot.CurrentStepId,
+                        eventTick,
+                        eventTime);
+                }
             }
 
-            if (execution.Snapshot.Status == SequenceExecutionStatus.Completed)
-            {
-                Emit(
-                    "Sequence",
-                    "SequenceCompleted",
-                    $"{_activeSequenceId} completed.",
-                    tickIndex: eventTick,
-                    simulationTime: eventTime);
-                CompleteAutomaticRunCycle(eventTick, eventTime);
-                PauseCompletedSemanticStep(
-                    SequenceDebugPauseReason.SequenceCompleted,
-                    execution.Snapshot.CurrentStepId,
-                    eventTick,
-                    eventTime);
-            }
-            else if (execution.Snapshot.Status == SequenceExecutionStatus.Faulted)
-            {
-                Emit(
-                    "Sequence",
-                    "SequenceFaulted",
-                    execution.Error?.Message ?? $"{_activeSequenceId} faulted.",
-                    tickIndex: eventTick,
-                    simulationTime: eventTime);
-                FaultAutomaticRun(eventTick, eventTime);
-                PauseCompletedSemanticStep(
-                    SequenceDebugPauseReason.SequenceFaulted,
-                    execution.Snapshot.CurrentStepId,
-                    eventTick,
-                    eventTime);
-            }
         }
-
         AdvancePickPlaceWorkpiece(eventTick, eventTime);
 
         _runtimeState.AdvanceTick();
@@ -1726,6 +1771,11 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
     {
         var outcome = _automaticRunCycleHandler.AdvanceRepeat(CreateAutomaticRunCycleContext());
         ApplyAutomaticRunCycleOutcome(outcome, eventTick, eventTime);
+        if (outcome.Events?.Any(operationEvent => operationEvent.Code == "AutomaticRunCycleRestarted") == true)
+        {
+            if (_activeSequenceId is { } sequenceId && SequenceRuntime.CompiledSequences.GetValueOrDefault(sequenceId)?.UnitId is not null) _runtimeState.BeginUnitRun();
+            SequenceRuntime.BeginUnitRun(_activeSequenceId);
+        }
         if (outcome.FaultDetail is not null)
         {
             FaultAutomaticRun(eventTick, eventTime, outcome.FaultDetail);
@@ -1820,6 +1870,7 @@ public sealed class FixedStepSimulationEngine : ISimulationEngine, ISimulationEv
     private void PublishSnapshot()
     {
         var snapshot = CreateSnapshot();
+        _runRecorder.Observe(snapshot);
         _snapshotStore.Publish(snapshot);
     }
 

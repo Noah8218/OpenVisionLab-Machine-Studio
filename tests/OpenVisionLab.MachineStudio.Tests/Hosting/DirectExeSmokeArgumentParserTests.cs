@@ -177,6 +177,27 @@ public sealed class DirectExeSmokeArgumentParserTests
             });
     }
 
+    [Theory]
+    [InlineData("fault-chip-pressed")]
+    [InlineData("target-chip-pressed")]
+    [InlineData("run-options-pressed")]
+    [InlineData("workspace-tab-pressed")]
+    [InlineData("outline-unit-pressed")]
+    [InlineData("outline-device-pressed")]
+    [InlineData("outline-scope-pressed")]
+    [InlineData("outline-part-pressed")]
+    [InlineData("outline-clear-pressed")]
+    [InlineData("scene-slot-toggle-pressed")]
+    [InlineData("scene-manual-pressed")]
+    [InlineData("scene-references-pressed")]
+    [InlineData("scene-menu-pressed")]
+    public void HeaderPressedStatesKeepCapturePrerequisites(string state)
+    {
+        var exception = Assert.Throws<ArgumentException>(() => DirectExeSmokeArgumentParser.ValidateSmokeArguments(new[] { "--smoke-command-state", state }));
+        Assert.Contains("--smoke-command-state-screenshot", exception.Message);
+        DirectExeSmokeArgumentParser.ValidateSmokeArguments(new[] { "--smoke-command-state", state, "--smoke-command-state-screenshot", "pressed.png" });
+    }
+
     [Fact]
     public void CameraFirstUseDerivationPreservesRequestedAndAppliedStates()
     {

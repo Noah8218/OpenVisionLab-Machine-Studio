@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using OpenVisionLab.Machine.Core.Axes;
 using OpenVisionLab.Machine.Core.Sequences;
 using OpenVisionLab.Machine.Sequence.Authoring;
 using OpenVisionLab.Machine.Sequence.Compilation;
@@ -21,7 +22,13 @@ internal sealed class SequenceStepEditorCollection : IDisposable
         SequenceStepAction.FeedWorkpiece,
         SequenceStepAction.EjectWorkpiece,
         SequenceStepAction.WaitVisionResult,
-        SequenceStepAction.CallSubsequence
+        SequenceStepAction.CallSubsequence,
+        SequenceStepAction.Delay,
+        SequenceStepAction.FeedUnitWorkpiece,
+        SequenceStepAction.ReceiveUnitWorkpiece,
+        SequenceStepAction.TransferUnitWorkpiece,
+        SequenceStepAction.EjectUnitWorkpiece,
+        SequenceStepAction.BranchInspection
     };
 
     private readonly SequenceStepTemplateCatalog _templateCatalog;
@@ -59,7 +66,8 @@ internal sealed class SequenceStepEditorCollection : IDisposable
         SequenceDefinition sequence,
         IReadOnlyList<SequenceAuthoringTarget> authoringTargets,
         IReadOnlyList<SequenceAuthoringTarget> workpieceTargets,
-        IReadOnlyList<SequenceExpectedStateTarget> expectedStateTargets)
+        IReadOnlyList<SequenceExpectedStateTarget> expectedStateTargets,
+        IReadOnlyList<VirtualAxisDefinition> axes)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(sequence);
@@ -79,7 +87,8 @@ internal sealed class SequenceStepEditorCollection : IDisposable
                 _templateCatalog,
                 sequenceTargets,
                 workpieceTargets,
-                expectedStateTargets);
+                expectedStateTargets,
+                authoringTargets.Where(target => target.Kind == SequenceAuthoringTargetKind.Unit && target.Id != sequence.UnitId).ToArray()) { AxisDefinitions = axes };
             item.DefinitionChanged += OnStepDefinitionChanged;
             Items.Add(item);
         }

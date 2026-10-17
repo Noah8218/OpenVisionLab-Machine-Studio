@@ -30,7 +30,7 @@ internal sealed class ManualControlCommandWorkflow
             ?? throw new ArgumentNullException(nameof(markManualControlStarted));
     }
 
-    internal async Task StartEquipmentControlAsync()
+    internal async Task<SimulationCommandResult?> StartEquipmentControlAsync(Func<bool>? shouldComplete = null)
     {
         var result = _selectedComponentKind() switch
         {
@@ -38,6 +38,9 @@ internal sealed class ManualControlCommandWorkflow
                 await _dispatcher.DispatchAxisCommandAsync(
                     new StartManualControlCommand(),
                     "Axis.ActionStartManual"),
+            LayoutComponentKind.Camera => await _dispatcher.DispatchCameraCommandAsync(
+                new StartManualControlCommand(),
+                "Camera.ActionStartManual"),
             LayoutComponentKind.DigitalSensor => await _dispatcher.DispatchSensorCommandAsync(
                 new StartManualControlCommand(),
                 "Sensor.ActionStartManual"),
@@ -47,13 +50,28 @@ internal sealed class ManualControlCommandWorkflow
             LayoutComponentKind.Conveyor => await _dispatcher.DispatchConveyorCommandAsync(
                 new StartManualControlCommand(),
                 "Conveyor.ActionStartManual"),
+            LayoutComponentKind.DigitalIo or LayoutComponentKind.FeedPosition => await _dispatcher.DispatchInspectorCommandAsync(new StartManualControlCommand(), "Equipment.StartManualControl"),
             _ => null
         };
 
-        if (result?.IsAccepted == true)
+        if (result?.IsAccepted == true && shouldComplete?.Invoke() != false)
         {
             _markManualControlStarted();
         }
+        return result;
+    }
+
+    internal Task<SimulationCommandResult> PauseManualControlAsync(LayoutComponentKind? preparedKind)
+    {
+        var command = new PauseCommand();
+        return preparedKind switch
+        {
+            LayoutComponentKind.LinearStage or LayoutComponentKind.RotaryStage => _dispatcher.DispatchAxisCommandAsync(command, "Shell.Pause"),
+            LayoutComponentKind.DigitalSensor => _dispatcher.DispatchSensorCommandAsync(command, "Shell.Pause"),
+            LayoutComponentKind.PneumaticCylinder => _dispatcher.DispatchCylinderCommandAsync(command, "Shell.Pause"),
+            LayoutComponentKind.Conveyor => _dispatcher.DispatchConveyorCommandAsync(command, "Shell.Pause"),
+            _ => _dispatcher.DispatchCameraCommandAsync(command, "Shell.Pause")
+        };
     }
 
     internal async Task StartCameraControlAsync()
@@ -66,6 +84,15 @@ internal sealed class ManualControlCommandWorkflow
             _markManualControlStarted();
         }
     }
+
+    internal Task ExecuteInspectorActionAsync(string action) => action switch
+    {
+        "ext" => SetCylinderAsync(true),
+        "ret" => SetCylinderAsync(false),
+        "run" => SetConveyorAsync(true, ConveyorDirection.Forward),
+        "halt" => SetConveyorAsync(false, ConveyorDirection.Forward),
+        _ => Task.CompletedTask
+    };
 
     internal Task SetCylinderAsync(bool extend)
     {

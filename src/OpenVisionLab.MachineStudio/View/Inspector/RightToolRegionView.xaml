@@ -1,4 +1,4 @@
-<UserControl x:Class="OpenVisionLab.MachineStudio.View.Inspector.RightToolRegionView"
+﻿<UserControl x:Class="OpenVisionLab.MachineStudio.View.Inspector.RightToolRegionView" x:Name="InspectorViewRoot"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
@@ -6,27 +6,309 @@
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
-             xmlns:local="clr-namespace:OpenVisionLab.MachineStudio.View.Inspector">
+             xmlns:local="clr-namespace:OpenVisionLab.MachineStudio.View.Inspector"
+             xmlns:shell="clr-namespace:OpenVisionLab.MachineStudio.View.Shell"
+             xmlns:sequence="clr-namespace:OpenVisionLab.MachineStudio.View.Sequence">
+    <UserControl.Style>
+        <Style TargetType="UserControl">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                    <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic, Segoe UI" />
+                    <Setter Property="FontSize" Value="13" />
+                    <Setter Property="Foreground" Value="{DynamicResource EquipmentInspector.Text}" />
+                </DataTrigger>
+            <MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" /><Condition Binding="{Binding (shell:ShellWindow.IsCompactLayout), RelativeSource={RelativeSource AncestorType=shell:ShellWindow}}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="FontSize" Value="12.5" /></MultiDataTrigger></Style.Triggers>
+        </Style>
+    </UserControl.Style>
     <UserControl.Resources>
+        <SolidColorBrush x:Key="EquipmentInspector.Surface" Color="{StaticResource Color.Surface.Panel}" />
+        <SolidColorBrush x:Key="EquipmentInspector.Input" Color="{StaticResource Color.Surface.Input}" />
+        <SolidColorBrush x:Key="EquipmentInspector.Button" Color="{StaticResource Color.Surface.Raised}" />
+        <SolidColorBrush x:Key="EquipmentInspector.Line" Color="{StaticResource Color.Border.Subtle}" />
+        <SolidColorBrush x:Key="EquipmentInspector.ControlLine" Color="{StaticResource Color.Border.Default}" />
+        <SolidColorBrush x:Key="EquipmentInspector.Text" Color="{StaticResource Color.Text.Primary}" />
+        <SolidColorBrush x:Key="EquipmentInspector.Muted" Color="{StaticResource Color.Text.Secondary}" />
+        <SolidColorBrush x:Key="EquipmentInspector.Faint" Color="{StaticResource Color.Text.Secondary}" />
+        <SolidColorBrush x:Key="EquipmentInspector.Accent" Color="{StaticResource Color.Accent.Primary}" />
+        <SolidColorBrush x:Key="EquipmentInspector.Selected" Color="{StaticResource Color.Accent.Soft}" />
+        <SolidColorBrush x:Key="EquipmentInspector.SelectedText" Color="{StaticResource Color.Accent.Primary}" />
+        <SolidColorBrush x:Key="EquipmentInspector.OnAccent" Color="{StaticResource Color.Text.OnAccent}" />
+        <SolidColorBrush x:Key="EquipmentInspector.DisabledText" Color="{StaticResource Color.Text.Disabled}" />
+        <SolidColorBrush x:Key="EquipmentInspector.DisabledSurface" Color="{StaticResource Color.Surface.Disabled}" />
+        <SolidColorBrush x:Key="EquipmentInspector.DisabledLine" Color="{StaticResource Color.Border.Disabled}" />
+        <ResourceDictionary x:Key="R24InputStateResources">
+            <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="{StaticResource Color.Surface.Input}" />
+            <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="{StaticResource Color.Text.Secondary}" />
+            <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="{StaticResource Color.Border.Default}" />
+            <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="{StaticResource Color.Surface.Input}" />
+            <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="{StaticResource Color.Text.Secondary}" />
+            <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled" Color="{StaticResource Color.Border.Default}" />
+        </ResourceDictionary>
         <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <loc:LocalizedFaultKindConverter x:Key="LocalizedFaultKindConverter" />
         <loc:LocalizedForcedValueConverter x:Key="LocalizedForcedValueConverter" />
+        <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                    <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic, Segoe UI" />
+                    <Setter Property="FontSize" Value="{Binding FontSize, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" />
+                    <Setter Property="LineHeight" Value="18.85" />
+                    <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+                </DataTrigger>
+            <MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True" /><Condition Binding="{Binding (shell:ShellWindow.IsCompactLayout), RelativeSource={RelativeSource AncestorType=shell:ShellWindow}}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="LineHeight" Value="18.125" /></MultiDataTrigger></Style.Triggers>
+        </Style>
+        <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                    <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic, Segoe UI" />
+                    <Setter Property="FontSize" Value="12" />
+                    <Setter Property="Background" Value="{StaticResource EquipmentInspector.Input}" />
+                    <Setter Property="Foreground" Value="{StaticResource EquipmentInspector.Muted}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource EquipmentInspector.ControlLine}" />
+                    <Setter Property="BorderThickness" Value="1" />
+                    <Setter Property="Height" Value="28" />
+                    <Setter Property="MinHeight" Value="28" />
+                    <Setter Property="Padding" Value="7,4" />
+                    <Setter Property="VerticalContentAlignment" Value="Center" />
+                </DataTrigger>
+                <MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True" /><Condition Binding="{Binding IsEnabled, RelativeSource={RelativeSource Self}}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Opacity" Value="0.6" /></MultiDataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="ui:NumberBox" BasedOn="{StaticResource {x:Type ui:NumberBox}}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                    <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic, Segoe UI" />
+                    <Setter Property="FontSize" Value="12" />
+                    <Setter Property="Background" Value="{StaticResource EquipmentInspector.Input}" />
+                    <Setter Property="Foreground" Value="{StaticResource EquipmentInspector.Muted}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource EquipmentInspector.ControlLine}" />
+                    <Setter Property="BorderThickness" Value="1" />
+                    <Setter Property="Height" Value="28" />
+                    <Setter Property="MinHeight" Value="28" />
+                    <Setter Property="Padding" Value="7,4" />
+                </DataTrigger>
+                <MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True" /><Condition Binding="{Binding IsEnabled, RelativeSource={RelativeSource Self}}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Opacity" Value="0.6" /></MultiDataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                    <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic, Segoe UI" />
+                    <Setter Property="FontSize" Value="12" />
+                    <Setter Property="Background" Value="{StaticResource EquipmentInspector.Input}" />
+                    <Setter Property="Foreground" Value="{StaticResource EquipmentInspector.Muted}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource EquipmentInspector.ControlLine}" />
+                    <Setter Property="BorderThickness" Value="1" />
+                    <Setter Property="Height" Value="Auto" />
+                    <Setter Property="MinHeight" Value="28" />
+                    <Setter Property="Padding" Value="7,4" />
+                    <Setter Property="VerticalContentAlignment" Value="Center" />
+                </DataTrigger>
+                <MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True" /><Condition Binding="{Binding IsEnabled, RelativeSource={RelativeSource Self}}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Opacity" Value="0.6" /></MultiDataTrigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="InspectorFieldLabelStyle" TargetType="TextBlock">
             <Setter Property="Margin" Value="0,7,0,3" />
             <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                    <Setter Property="Margin" Value="0,9,0,3" />
+                    <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic, Segoe UI" />
+                    <Setter Property="FontSize" Value="12" />
+                    <Setter Property="Foreground" Value="{StaticResource EquipmentInspector.Muted}" />
+                    <Setter Property="LineHeight" Value="17.4" />
+                    <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
+        <Style x:Key="SectionCaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionCaptionStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                    <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic, Segoe UI" />
+                    <Setter Property="FontSize" Value="12" />
+                    <Setter Property="FontWeight" Value="Bold" />
+                    <Setter Property="LineHeight" Value="17.4" />
+                    <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="TelemetryTextStyle" TargetType="TextBlock" BasedOn="{StaticResource TelemetryTextStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                    <Setter Property="FontFamily" Value="Consolas, Cascadia Mono" />
+                    <Setter Property="FontSize" Value="11.5" />
+                    <Setter Property="LineHeight" Value="16.675" />
+                    <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="EquipmentFirstFieldLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource InspectorFieldLabelStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                    <Setter Property="Margin" Value="0,0,0,3" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="EquipmentColumnGapStyle" TargetType="ColumnDefinition">
+            <Setter Property="Width" Value="10" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, ElementName=InspectorViewRoot}" Value="True">
+                    <Setter Property="Width" Value="9" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="EquipmentGeometryFieldStyle" TargetType="StackPanel">
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                    <Setter Property="Margin" Value="0" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="EquipmentHintTextStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                    <Setter Property="FontSize" Value="11.5" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="EquipmentTransformCaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionCaptionStyle}">
+            <Setter Property="Margin" Value="0,10,0,2" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                    <Setter Property="Margin" Value="0,12,0,3" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <DataTemplate x:Key="EquipmentConnectionOptionTemplate">
+            <TextBlock Text="{Binding DisplayName}" FontSize="12" LineHeight="17.4" Foreground="{StaticResource EquipmentInspector.Muted}" TextWrapping="Wrap" />
+        </DataTemplate>
         <Style x:Key="EquipmentInspectorTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
             <Setter Property="Height" Value="{StaticResource Density.InspectorFieldHeight}" />
             <Setter Property="Padding" Value="7,0" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                    <Setter Property="Height" Value="28" />
+                    <Setter Property="MinHeight" Value="28" />
+                    <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic, Segoe UI" />
+                    <Setter Property="FontSize" Value="12" />
+                    <Setter Property="Padding" Value="7,4" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
         <Style x:Key="EquipmentInspectorTabButtonStyle" TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
-            <Setter Property="MinHeight" Value="34" />
-            <Setter Property="Margin" Value="2,0" />
-            <Setter Property="Padding" Value="4,0" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Height" Value="Auto" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+            <Setter Property="Padding" Value="9,3" />
+            <Setter Property="Background" Value="{StaticResource EquipmentInspector.Button}" />
+            <Setter Property="BorderBrush" Value="{StaticResource EquipmentInspector.ControlLine}" />
+            <Setter Property="Foreground" Value="{StaticResource EquipmentInspector.Text}" />
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic, Segoe UI" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="InspectorButtonBorder" Padding="{TemplateBinding Padding}" CornerRadius="5"
+                                Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="InspectorButtonBorder" Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="InspectorButtonBorder" Property="Background" Value="{DynamicResource Surface.Pressed}" /></Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="InspectorButtonBorder" Property="BorderBrush" Value="{StaticResource EquipmentInspector.Accent}" /></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{StaticResource EquipmentInspector.DisabledText}" /><Setter TargetName="InspectorButtonBorder" Property="Background" Value="{StaticResource EquipmentInspector.DisabledSurface}" /><Setter TargetName="InspectorButtonBorder" Property="BorderBrush" Value="{StaticResource EquipmentInspector.DisabledLine}" /></Trigger><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}" Value="{StaticResource EquipmentInspector.Accent}" /><Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource TemplatedParent}}" Value="True" /><Condition Binding="{Binding IsEnabled, RelativeSource={RelativeSource TemplatedParent}}" Value="True" /></MultiDataTrigger.Conditions><Setter TargetName="InspectorButtonBorder" Property="Background" Value="{DynamicResource Accent.Hover}" /></MultiDataTrigger><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}" Value="{StaticResource EquipmentInspector.Accent}" /><Condition Binding="{Binding IsEnabled, RelativeSource={RelativeSource TemplatedParent}}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /><Setter TargetName="InspectorButtonBorder" Property="Background" Value="{DynamicResource Accent.Soft}" /><Setter TargetName="InspectorButtonBorder" Property="BorderBrush" Value="{DynamicResource State.RunningBorder}" /></MultiDataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ContentTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" TextWrapping="Wrap" TextAlignment="Center" FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=Button}}" FontSize="{Binding FontSize, RelativeSource={RelativeSource AncestorType=Button}}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                            <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="LineHeight" Value="17.4" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" /><Style.Triggers><DataTrigger Binding="{Binding FontSize, RelativeSource={RelativeSource AncestorType=Button}}" Value="13"><Setter Property="LineHeight" Value="18.85" /></DataTrigger><DataTrigger Binding="{Binding FontSize, RelativeSource={RelativeSource AncestorType=Button}}" Value="12.5"><Setter Property="LineHeight" Value="18.125" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                        </TextBlock>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
+        <Style x:Key="EquipmentInspectorActionStyle" TargetType="Button" BasedOn="{StaticResource EquipmentInspectorTabButtonStyle}">
+            <Setter Property="Height" Value="Auto" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="{Binding FontSize, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" />
+        </Style>
+        <Style x:Key="EquipmentInspectorApplyStyle" TargetType="Button" BasedOn="{StaticResource EquipmentInspectorActionStyle}">
+            <Setter Property="Height" Value="Auto" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="{Binding FontSize, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Background" Value="{StaticResource EquipmentInspector.Accent}" />
+            <Setter Property="BorderBrush" Value="{StaticResource EquipmentInspector.Accent}" />
+            <Setter Property="Foreground" Value="{StaticResource EquipmentInspector.OnAccent}" />
+        </Style>
+        <Style x:Key="EquipmentInspectorDraftStateStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic, Segoe UI" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="LineHeight" Value="16.675" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{StaticResource EquipmentInspector.Faint}" />
+            <Setter Property="Text" Value="{loc:Loc Key=Equipment.InspectorUnchanged}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasPendingInspectorDraft}" Value="True">
+                    <Setter Property="Text" Value="{loc:Loc Key=R24.UnappliedDraft}" />
+                    <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
+                </DataTrigger>
+            <DataTrigger Binding="{Binding HasPlacementValidationErrors}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="EquipmentInspectorDraftErrorStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic, Segoe UI" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="LineHeight" Value="17.4" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource Self}}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="R24FieldErrorTextStyle" TargetType="TextBlock"><Setter Property="FontSize" Value="11.5" /><Setter Property="LineHeight" Value="16.675" /><Setter Property="Margin" Value="0,3,0,0" /><Setter Property="Foreground" Value="{DynamicResource State.Fault}" /><Setter Property="TextWrapping" Value="Wrap" /><Style.Triggers><DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource Self}}" Value=""><Setter Property="Height" Value="0" /></DataTrigger></Style.Triggers></Style>
+        <Style x:Key="R24ErrorInputStyle" TargetType="TextBox" BasedOn="{StaticResource EquipmentInspectorTextBoxStyle}"><Style.Triggers><DataTrigger Binding="{Binding HasError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /><Setter Property="Background" Value="{DynamicResource State.FaultSurface}" /></DataTrigger></Style.Triggers></Style>
+        <DataTemplate x:Key="EquipmentSettingsFieldTemplate">
+            <StackPanel>
+                <TextBlock FontSize="12" LineHeight="17.4" Margin="0,0,0,3" Foreground="{StaticResource EquipmentInspector.Muted}"><Run Text="{Binding CaptionText, Mode=OneWay}" /><Run Text="{Binding UnitText, Mode=OneWay}" FontSize="11" Foreground="{StaticResource EquipmentInspector.Faint}" /></TextBlock>
+                <Grid>
+                    <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.AutomationId="{Binding Id}" ToolTip="{Binding Value}" Tag="{Binding ErrorText}">
+                        <TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource R24ErrorInputStyle}"><Style.Triggers><DataTrigger Binding="{Binding IsChoice}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></TextBox.Style>
+                    </TextBox>
+                    <ComboBox ItemsSource="{Binding Options}" SelectedValuePath="Id" SelectedValue="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.AutomationId="{Binding Id}" ItemTemplate="{StaticResource EquipmentConnectionOptionTemplate}" Visibility="{Binding IsChoice, Converter={StaticResource BooleanToVisibilityConverter}}" Tag="{Binding ErrorText}"><ComboBox.ItemContainerStyle><Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}"><Setter Property="IsEnabled" Value="{Binding IsEnabled}" /></Style></ComboBox.ItemContainerStyle><ComboBox.Style><Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}"><Style.Triggers><DataTrigger Binding="{Binding HasError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /><Setter Property="Background" Value="{DynamicResource State.FaultSurface}" /></DataTrigger></Style.Triggers></Style></ComboBox.Style></ComboBox>
+                </Grid>
+                <TextBlock Text="{Binding ErrorText}" Style="{StaticResource R24FieldErrorTextStyle}" /><TextBlock Text="{Binding Help}" FontSize="10.5" LineHeight="15.225" Margin="0,3,0,0" Foreground="{StaticResource EquipmentInspector.Faint}" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding Help}" Value=""><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+            </StackPanel>
+        </DataTemplate>
     </UserControl.Resources>
-    <Border Style="{StaticResource PanelSurfaceStyle}">
+    <Border>
+        <Border.Style>
+            <Style TargetType="Border" BasedOn="{StaticResource PanelSurfaceStyle}">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Navigation.IsSequenceWorkspace}" Value="True"><Setter Property="Background" Value="{StaticResource EquipmentInspector.Surface}" /><Setter Property="BorderThickness" Value="0" /></DataTrigger>
+                    <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                        <Setter Property="Background" Value="{StaticResource EquipmentInspector.Surface}" />
+                        <Setter Property="BorderThickness" Value="0" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -35,33 +317,63 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0">
+            <Border Grid.Row="0" Height="Auto">
                 <Border.Style>
                     <Style TargetType="Border" BasedOn="{StaticResource PanelHeaderStyle}">
+                        <Setter Property="Visibility" Value="{Binding IntegrationSetupOnly, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" />
+                        <Setter Property="Padding" Value="12,6" />
+                        <Setter Property="MinHeight" Value="48" />
                         <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsSequenceWorkspace}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                                <Setter Property="MinHeight" Value="0" />
+                                <Setter Property="Padding" Value="12,9" />
+                                <Setter Property="Background" Value="{StaticResource EquipmentInspector.Surface}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource EquipmentInspector.Line}" />
+                                <Setter Property="BorderThickness" Value="0,0,0,1" />
+                            </DataTrigger>
                             <MultiDataTrigger>
                                 <MultiDataTrigger.Conditions>
                                     <Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" />
                                     <Condition Binding="{Binding Layout.HasSelection}" Value="True" />
-                                    <Condition Binding="{Binding IsRunMode}" Value="False" />
                                 </MultiDataTrigger.Conditions>
                                 <Setter Property="Height" Value="Auto" />
                                 <Setter Property="MinHeight" Value="48" />
-                                <Setter Property="Padding" Value="12,6" />
+                                <Setter Property="Padding" Value="12,9,12,0" />
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="BorderThickness" Value="0" />
                             </MultiDataTrigger>
+                            <MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" /><Condition Binding="{Binding Layout.SelectedComponentEditor.ShowWorkpieceProperties}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="MinHeight" Value="0" /><Setter Property="Padding" Value="12,9" /><Setter Property="BorderThickness" Value="0,0,0,1" /></MultiDataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
                 <Grid>
-                    <TextBlock Text="{Binding RightPanelHeaderText}">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Margin="0,6,0,0" Text="{loc:Loc Key=Inspector.EquipmentOverviewHint}" Foreground="{StaticResource EquipmentInspector.Muted}" FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" /><Condition Binding="{Binding Layout.IsEquipmentOverviewActive}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                    <TextBlock x:Name="EquipmentInspectorGenericTitle">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock" BasedOn="{StaticResource PanelHeaderTextStyle}">
+                                <Setter Property="Text" Value="{Binding RightPanelHeaderText}" />
                                 <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions><Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" /><Condition Binding="{Binding Layout.IsEquipmentOverviewActive}" Value="True" /></MultiDataTrigger.Conditions>
+                                        <Setter Property="Text" Value="{loc:Loc Key=Inspector.EquipmentOverview}" />
+                                        <Setter Property="FontSize" Value="{Binding FontSize, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" /><Setter Property="LineHeight" Value="18.85" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+                                        <Setter Property="FontWeight" Value="Bold" />
+                                    </MultiDataTrigger>
+                                    <DataTrigger Binding="{Binding Navigation.IsSequenceWorkspace}" Value="True">
+                                        <Setter Property="Text" Value="{loc:Loc Key=Sequence.StepSettings}" />
+                                    </DataTrigger>
+                                    <MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" /><Condition Binding="{Binding Layout.HasEquipmentScopeSelection}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Collapsed" /></MultiDataTrigger>
                                     <MultiDataTrigger>
                                         <MultiDataTrigger.Conditions>
                                             <Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" />
                                             <Condition Binding="{Binding Layout.HasSelection}" Value="True" />
-                                            <Condition Binding="{Binding IsRunMode}" Value="False" />
                                         </MultiDataTrigger.Conditions>
                                         <Setter Property="Visibility" Value="Collapsed" />
                                     </MultiDataTrigger>
@@ -69,6 +381,16 @@
                             </Style>
                         </TextBlock.Style>
                     </TextBlock>
+                    <StackPanel x:Name="EquipmentScopeInspectorHeader" DataContext="{Binding Layout}">
+                        <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True" /><Condition Binding="{Binding HasEquipmentScopeSelection}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></StackPanel.Style>
+                        <Grid HorizontalAlignment="Left">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="16" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding EquipmentScopeSymbol}" FontSize="13" LineHeight="18.85" VerticalAlignment="Center" />
+                            <TextBlock x:Name="EquipmentScopeTitle" Grid.Column="2" Text="{Binding EquipmentScopeName}" ToolTip="{Binding EquipmentScopeName}" FontSize="13" FontWeight="Bold" LineHeight="18.85" LineStackingStrategy="BlockLineHeight" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Foreground="{StaticResource EquipmentInspector.Text}" />
+                            <TextBlock x:Name="EquipmentScopeIdentity" Grid.Column="4" Text="{Binding EquipmentScopeId}" FontSize="11.5" FontWeight="Normal" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" Foreground="{StaticResource EquipmentInspector.Faint}" />
+                        </Grid>
+                        <TextBlock x:Name="EquipmentScopeHint" Margin="0,6,0,0" Text="{Binding EquipmentScopeHint}" FontSize="11.5" FontWeight="Normal" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" Foreground="{StaticResource EquipmentInspector.Muted}" Visibility="{Binding HasEquipmentUnitScopeSelection, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
                     <Grid DataContext="{Binding Layout.SelectedComponentEditor}">
                         <Grid.Style>
                             <Style TargetType="Grid">
@@ -78,30 +400,46 @@
                                         <MultiDataTrigger.Conditions>
                                             <Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
                                             <Condition Binding="{Binding DataContext.Layout.HasSelection, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
-                                            <Condition Binding="{Binding DataContext.IsRunMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False" />
                                         </MultiDataTrigger.Conditions>
                                         <Setter Property="Visibility" Value="Visible" />
                                     </MultiDataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Grid.Style>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock FontWeight="SemiBold" Text="{Binding PaneTitle}" TextWrapping="Wrap" />
-                            <TextBlock Foreground="{DynamicResource Text.Secondary}" FontSize="11" Text="{Binding Id}" TextWrapping="Wrap" />
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding InspectorSymbol}" Margin="0,0,8,0" Foreground="{Binding InspectorSymbolColor}" VerticalAlignment="Center" />
+                                <Grid x:Name="EquipmentInspectorIdentity" SizeChanged="OnEquipmentInspectorHeaderLayoutChanged" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="EquipmentInspectorTitle" VerticalAlignment="Center" Foreground="{StaticResource EquipmentInspector.Text}" FontWeight="Bold" Text="{Binding InspectorPaneTitle, NotifyOnTargetUpdated=True}" TargetUpdated="OnEquipmentInspectorHeaderLayoutChanged" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding PaneTitle}" />
+                                    <TextBlock x:Name="EquipmentInspectorId" Visibility="{Binding ShowWorkpieceProperties, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{StaticResource EquipmentInspector.Faint}"
+                                               FontSize="11.5" LineHeight="16.675" Text="{Binding Id}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Id}" />
+                                </Grid>
+                                <Border Grid.Column="2" Visibility="{Binding ShowWorkpieceProperties, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" Margin="16,0,0,0" Padding="9,1" MinHeight="22" CornerRadius="12" BorderThickness="1"
+                                        Background="{StaticResource EquipmentInspector.Input}" BorderBrush="{StaticResource EquipmentInspector.ControlLine}" VerticalAlignment="Center">
+                                    <TextBlock x:Name="EquipmentInspectorKind" FontSize="11.5" LineHeight="16.675" Foreground="{StaticResource EquipmentInspector.Text}" Text="{Binding InspectorKindText}" TextWrapping="NoWrap" />
+                                </Border>
+                            </Grid>
+                            <TextBlock x:Name="EquipmentInspectorDescription" FontSize="11.5" LineHeight="16.675" Margin="0,6,0,0" Foreground="{StaticResource EquipmentInspector.Muted}"
+                                       Text="{Binding KindDescription}" TextWrapping="Wrap" />
                         </StackPanel>
-                        <Button Grid.Column="1" Width="30" Height="30" Margin="8,0,0,0"
-                                VerticalAlignment="Center" Content="×"
-                                AutomationProperties.Name="{loc:Loc Key=Shell.CloseProperties}"
-                                Command="{Binding DataContext.Navigation.ToggleInspectorCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                     </Grid>
+                    <Button x:Name="CloseInspectorButton" Grid.Column="1" Width="30" Height="30" Margin="8,0,0,0"
+                            VerticalAlignment="Center" Content="×"
+                            ToolTip="{loc:Loc Key=Shell.CloseProperties}"
+                            AutomationProperties.Name="{loc:Loc Key=Shell.CloseProperties}"
+                            Command="{Binding Navigation.ToggleInspectorCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
+                                <Style.Triggers><DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                 </Grid>
             </Border>
 
-            <Border Grid.Row="1" Padding="8,8" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1">
+            <Border Grid.Row="1" Padding="12,6,12,9" BorderBrush="{StaticResource EquipmentInspector.Line}" BorderThickness="0,0,0,1">
                 <Border.Style>
                     <Style TargetType="Border">
                         <Setter Property="Visibility" Value="Collapsed" />
@@ -110,83 +448,191 @@
                                 <MultiDataTrigger.Conditions>
                                     <Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" />
                                     <Condition Binding="{Binding Layout.HasSelection}" Value="True" />
-                                    <Condition Binding="{Binding IsRunMode}" Value="False" />
                                 </MultiDataTrigger.Conditions>
                                 <Setter Property="Visibility" Value="Visible" />
                             </MultiDataTrigger>
+
+                            <DataTrigger Binding="{Binding Layout.SelectedComponentEditor.ShowWorkpieceProperties}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                            <DataTrigger Binding="{Binding IntegrationSetupOnly, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
-                <UniformGrid Columns="3">
-                    <Button Command="{Binding OpenEquipmentPropertiesCommand}"
-                            Content="{loc:Loc Key=Equipment.PlacementTab}"
-                            AutomationProperties.Name="{loc:Loc Key=Equipment.PlacementTab}">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource EquipmentInspectorTabButtonStyle}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Command="{Binding OpenEquipmentPropertiesCommand}"
+                                Content="{loc:Loc Key=Equipment.PlacementTab}"
+                                AutomationProperties.Name="{loc:Loc Key=Equipment.PlacementTab}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource EquipmentInspectorTabButtonStyle}">
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsEquipmentDriveTabOpen}" Value="False" />
+                                                <Condition Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="False" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Background" Value="{StaticResource EquipmentInspector.Selected}" />
+                                            <Setter Property="BorderBrush" Value="{StaticResource EquipmentInspector.Accent}" />
+                                            <Setter Property="Foreground" Value="{StaticResource EquipmentInspector.SelectedText}" />
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <Button Command="{Binding OpenEquipmentDriveTabCommand}"
+                                Content="{loc:Loc Key=Equipment.SettingsAction}"
+                                AutomationProperties.Name="{loc:Loc Key=Equipment.SettingsAction}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource EquipmentInspectorTabButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsEquipmentDriveTabOpen}" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource EquipmentInspector.Selected}" />
+                                            <Setter Property="BorderBrush" Value="{StaticResource EquipmentInspector.Accent}" />
+                                            <Setter Property="Foreground" Value="{StaticResource EquipmentInspector.SelectedText}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <Button Command="{Binding OpenEquipmentSinglePartCheckCommand}"
+                                Content="{loc:Loc Key=Equipment.SinglePartCheck}"
+                                AutomationProperties.Name="{loc:Loc Key=Equipment.SinglePartCheck}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource EquipmentInspectorTabButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource EquipmentInspector.Selected}" />
+                                            <Setter Property="BorderBrush" Value="{StaticResource EquipmentInspector.Accent}" />
+                                            <Setter Property="Foreground" Value="{StaticResource EquipmentInspector.SelectedText}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock x:Name="EquipmentInspectorLockText" Margin="0,8,0,0" Text="{loc:Loc Key=Equipment.InspectorLocked}" TextWrapping="Wrap"
+                               Foreground="{DynamicResource State.Warning}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsEquipmentDriveTabOpen}" Value="False" />
-                                            <Condition Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="False" />
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter Property="Background" Value="{DynamicResource Accent.Soft}" />
-                                        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
-                                    </MultiDataTrigger>
+                                    <DataTrigger Binding="{Binding IsSceneEditable}" Value="False"><Setter Property="Visibility" Value="Visible" /></DataTrigger><DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </Button.Style>
-                    </Button>
-                    <Button Command="{Binding OpenEquipmentDriveTabCommand}"
-                            Content="{loc:Loc Key=Equipment.DriveTab}"
-                            AutomationProperties.Name="{loc:Loc Key=Equipment.DriveTab}">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource EquipmentInspectorTabButtonStyle}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsEquipmentDriveTabOpen}" Value="True">
-                                        <Setter Property="Background" Value="{DynamicResource Accent.Soft}" />
-                                        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
-                    <Button Command="{Binding OpenEquipmentSinglePartCheckCommand}"
-                            Content="{loc:Loc Key=Equipment.SinglePartCheck}"
-                            AutomationProperties.Name="{loc:Loc Key=Equipment.SinglePartCheck}">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource EquipmentInspectorTabButtonStyle}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="True">
-                                        <Setter Property="Background" Value="{DynamicResource Accent.Soft}" />
-                                        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
-                </UniformGrid>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
             </Border>
 
+            <sequence:SequenceStepInspectorView x:Name="SequenceStepInspector" Grid.Row="0" Grid.RowSpan="4"
+                                                DataContext="{Binding SequenceEditor}">
+                <sequence:SequenceStepInspectorView.Style>
+                    <Style TargetType="sequence:SequenceStepInspectorView">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding DataContext.Navigation.IsSequenceWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+
+                            <DataTrigger Binding="{Binding IntegrationSetupOnly, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </sequence:SequenceStepInspectorView.Style>
+            </sequence:SequenceStepInspectorView>
+
             <ScrollViewer x:Name="DesignInspectorScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <b:Interaction.Behaviors>
+                    <behavior:InspectorScrollContextBehavior>
+                        <behavior:InspectorScrollContextBehavior.Context>
+                            <MultiBinding StringFormat="{}{0}|{1}|{2}|{3}">
+                                <Binding Path="Layout.SelectedItem.Id" />
+                                <Binding Path="IsEquipmentDriveTabOpen" />
+                                <Binding Path="IsEquipmentSinglePartCheckOpen" />
+                                <Binding Path="IsRunMode" />
+                            </MultiBinding>
+                        </behavior:InspectorScrollContextBehavior.Context>
+                    </behavior:InspectorScrollContextBehavior>
+                </b:Interaction.Behaviors>
                 <ScrollViewer.Style>
                     <Style TargetType="ScrollViewer">
                         <Setter Property="Visibility" Value="Visible" />
                         <Style.Triggers>
+
                             <DataTrigger Binding="{Binding IsRunMode}" Value="True">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
+                            <MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" /><Condition Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger>
                             <DataTrigger Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="True">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
+                        <DataTrigger Binding="{Binding Navigation.IsSequenceWorkspace}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                            <DataTrigger Binding="{Binding IntegrationSetupOnly, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </ScrollViewer.Style>
                 <StackPanel>
+                    <Border x:Name="R24ReadOnlyLock" Padding="9,6" Margin="12,12,12,0" CornerRadius="5" BorderBrush="{DynamicResource State.WarningBorder}" BorderThickness="1" Background="{DynamicResource State.PausedSurface}"><Border.Style><Style TargetType="Border"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" /><Condition Binding="{Binding IsSceneEditable}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></Border.Style><TextBlock Text="{loc:Loc Key=R24.RunningLockNote}" TextWrapping="Wrap" FontSize="12" LineHeight="17.4" Foreground="{DynamicResource State.Warning}" /></Border>
+                    <StackPanel x:Name="EquipmentOverviewInspector" Margin="12">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions><Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" /><Condition Binding="{Binding Layout.IsEquipmentOverviewActive}" Value="True" /></MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+
+                        <TextBlock Text="{loc:Loc Key=R40.EquipmentOverviewHint}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" Margin="0,0,0,12" />
+                        <Button x:Name="EquipmentProductSetupButton" Command="{Binding MaterialFlowSettings.OpenCommand}" Content="{loc:Loc Key=R40.ProductSetup}" Style="{StaticResource EquipmentInspectorActionStyle}" HorizontalAlignment="Stretch" />
+                        <Grid Margin="0,12,0,12"><Grid.Resources><Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}"><Style.Triggers><DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True"><Setter Property="FontSize" Value="12" /><Setter Property="LineHeight" Value="17.4" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" /></DataTrigger></Style.Triggers></Style></Grid.Resources>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="4" /><RowDefinition Height="Auto" /><RowDefinition Height="4" /><RowDefinition Height="Auto" /><RowDefinition Height="4" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                            <TextBlock Text="{loc:Loc Key=Properties.Unit}" Foreground="{StaticResource EquipmentInspector.Faint}" /><TextBlock Grid.Column="2" Text="{Binding Layout.EquipmentOverviewUnitCountText}" />
+                            <TextBlock Grid.Row="2" Text="{loc:Loc Key=Inspector.EquipmentDevices}" Foreground="{StaticResource EquipmentInspector.Faint}" /><TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Layout.EquipmentOverviewDeviceCountText}" />
+                            <TextBlock Grid.Row="4" Text="{loc:Loc Key=Properties.Workpiece}" Foreground="{StaticResource EquipmentInspector.Faint}" />
+                            <ItemsControl Grid.Row="4" Grid.Column="2" ItemsSource="{Binding Layout.EquipmentOutlineProducts}"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding Item.CurrentName}" TextWrapping="Wrap" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                            <TextBlock Grid.Row="6" Text="{loc:Loc Key=Inspector.EquipmentRunConditions}" Foreground="{StaticResource EquipmentInspector.Faint}" /><TextBlock Grid.Row="6" Grid.Column="2" Text="{Binding RecipeConnections.DryRun.ReadinessStatusText}" TextWrapping="Wrap" />
+                        </Grid>
+                        <Button x:Name="EquipmentOverviewProcessButton" Margin="0,8,0,0" HorizontalAlignment="Stretch" Command="{Binding Navigation.OpenSequenceEditorCommand}" Content="{loc:Loc Key=R40.EditProcess}" Style="{StaticResource EquipmentInspectorActionStyle}" />
+                        <TextBlock Margin="0,12,0,0" Text="{loc:Loc Key=R40.EquipmentSaveHint}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                        <Button Margin="0,12,0,0" HorizontalAlignment="Stretch" Command="{Binding RecipeConnections.DryRun.ValidateSimulationReadinessCommand}" Content="{loc:Loc Key=Inspector.EquipmentCheckConditions}" Style="{StaticResource EquipmentInspectorActionStyle}" />
+<Border Margin="0,12,0,0" Padding="10" Background="{DynamicResource Surface.Panel}" BorderBrush="{StaticResource EquipmentInspector.Line}" BorderThickness="1" CornerRadius="6"><StackPanel><TextBlock FontSize="12.5" LineHeight="18.125" FontWeight="SemiBold" Foreground="{StaticResource EquipmentInspector.Muted}" Text="{loc:Loc Key=Inspector.EquipmentWorkflowTitle}" Margin="0,0,0,8" /><WrapPanel Margin="0,0,0,-4"><Border Padding="6,1" Margin="0,0,4,4" BorderThickness="1" CornerRadius="4" BorderBrush="{StaticResource EquipmentInspector.Line}"><TextBlock FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" Text="{loc:Loc Key=R24.Flow.Equipment}" /></Border><TextBlock Text="→" Margin="0,0,4,4" Foreground="{StaticResource EquipmentInspector.Faint}" FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" /><Border Padding="6,1" Margin="0,0,4,4" BorderThickness="1" CornerRadius="4" BorderBrush="{StaticResource EquipmentInspector.Line}"><TextBlock FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" Text="{loc:Loc Key=R24.Flow.Sequence}" /></Border><TextBlock Text="→" Margin="0,0,4,4" Foreground="{StaticResource EquipmentInspector.Faint}" FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" /><Border Padding="6,1" Margin="0,0,4,4" BorderThickness="1" CornerRadius="4" BorderBrush="{StaticResource EquipmentInspector.Line}"><TextBlock FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" Text="{loc:Loc Key=R24.Flow.Vision}" /></Border><TextBlock Text="→" Margin="0,0,4,4" Foreground="{StaticResource EquipmentInspector.Faint}" FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" /><Border Padding="6,1" Margin="0,0,4,4" BorderThickness="1" CornerRadius="4" BorderBrush="{StaticResource EquipmentInspector.Line}"><TextBlock FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" Text="{loc:Loc Key=R24.Flow.Run}" /></Border><TextBlock Text="→" Margin="0,0,4,4" Foreground="{StaticResource EquipmentInspector.Faint}" FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" /><Border Padding="6,1" Margin="0,0,4,4" BorderThickness="1" CornerRadius="4" BorderBrush="{StaticResource EquipmentInspector.Line}"><TextBlock FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" Text="{loc:Loc Key=R24.Flow.History}" /></Border></WrapPanel><TextBlock Margin="0,8,0,0" Text="{loc:Loc Key=Inspector.EquipmentApplySaveHint}" FontSize="10.5" LineHeight="15.225" Foreground="{StaticResource EquipmentInspector.Faint}" TextWrapping="Wrap" /></StackPanel></Border></StackPanel>
+                    <StackPanel x:Name="EquipmentScopeInspector" DataContext="{Binding Layout}" Margin="12">
+                        <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True" /><Condition Binding="{Binding HasEquipmentScopeSelection}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></StackPanel.Style>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="9" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock x:Name="EquipmentScopeNameCaption" Margin="0,0,0,3" Text="{Binding EquipmentScopeNameCaption}" FontSize="12" FontWeight="Normal" LineHeight="17.4" LineStackingStrategy="BlockLineHeight" Foreground="{StaticResource EquipmentInspector.Muted}" />
+                                <TextBox x:Name="EquipmentScopeNameValue" Text="{Binding EquipmentScopeName, Mode=OneWay}" ToolTip="{Binding EquipmentScopeName}" IsReadOnly="True" FontWeight="Normal" HorizontalScrollBarVisibility="Hidden" Style="{StaticResource EquipmentInspectorTextBoxStyle}" />
+                            </StackPanel>
+                        </Grid>
+                        <StackPanel Margin="0,9,0,0" Visibility="{Binding HasEquipmentUnitScopeSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock x:Name="EquipmentScopeStationCaption" Margin="0,0,0,3" Text="{Binding EquipmentScopeStationCaption}" FontSize="12" FontWeight="Normal" LineHeight="17.4" LineStackingStrategy="BlockLineHeight" Foreground="{StaticResource EquipmentInspector.Muted}" />
+                            <TextBox x:Name="EquipmentScopeStationValue" Text="{Binding EquipmentScopeStationName, Mode=OneWay}" ToolTip="{Binding EquipmentScopeStationName}" IsReadOnly="True" FontWeight="Normal" HorizontalScrollBarVisibility="Hidden" Style="{StaticResource EquipmentInspectorTextBoxStyle}" />
+                        </StackPanel>
+                        <Grid Margin="0,12,0,0" Visibility="{Binding HasEquipmentUnitScopeSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="4" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                            <TextBlock Text="{loc:Loc Key=Inspector.EquipmentDevices}" FontSize="12" LineHeight="17.4" Foreground="{StaticResource EquipmentInspector.Faint}" />
+                            <TextBlock x:Name="EquipmentScopeDeviceCount" Grid.Column="2" Text="{Binding EquipmentScopeDeviceCountText}" FontSize="12" FontWeight="Normal" LineHeight="17.4" Foreground="{StaticResource EquipmentInspector.Text}" />
+                            <TextBlock Grid.Row="2" Text="{Binding EquipmentScopeStepCaption}" FontSize="12" LineHeight="17.4" Foreground="{StaticResource EquipmentInspector.Faint}" />
+                            <TextBlock x:Name="EquipmentScopeStepCount" Grid.Row="2" Grid.Column="2" Text="{Binding EquipmentScopeStepCountText}" FontSize="12" FontWeight="Normal" LineHeight="17.4" Foreground="{StaticResource EquipmentInspector.Text}" />
+                        </Grid>
+                        <WrapPanel Margin="0,12,0,-6" Visibility="{Binding HasEquipmentUnitScopeSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button x:Name="EquipmentUnitSequenceButton" Margin="0,0,6,6" Content="{Binding EquipmentUnitSequenceActionText}" Style="{StaticResource EquipmentInspectorActionStyle}" Command="{Binding DataContext.Navigation.OpenSequenceEditorCommand, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" />
+                            <Button x:Name="EquipmentUnitDeleteButton" Margin="0,0,6,6" Content="{Binding EquipmentUnitDeleteActionText}" Command="{Binding DataContext.RemoveEquipmentUnitCommand, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" CommandParameter="{Binding EquipmentScopeId}">
+                                <Button.Style><Style TargetType="Button" BasedOn="{StaticResource EquipmentInspectorActionStyle}"><Setter Property="Foreground" Value="{DynamicResource State.Fault}" /></Style></Button.Style>
+                            </Button>
+                        </WrapPanel>
+                    </StackPanel>
                     <ItemsControl Margin="3"
                                   ItemsSource="{Binding Properties.Items}">
                         <ItemsControl.Style>
                             <Style TargetType="ItemsControl">
                                 <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
                                     <DataTrigger Binding="{Binding Layout.HasSelection}" Value="True">
                                         <Setter Property="Visibility" Value="Collapsed" />
                                     </DataTrigger>
@@ -396,19 +842,16 @@
                     </Border>
 
                     <Border x:Name="AxisDriveTuningPanel"
+                            IsEnabled="{Binding IsSceneEditable}"
                             Style="{StaticResource InspectorCardStyle}"
                             Visibility="{Binding HasSelectedAxisDefinition, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel DataContext="{Binding AxisDriveTuningEditor}">
                             <TextBlock Style="{StaticResource SectionCaptionStyle}"
                                        Text="{loc:Loc Key=Axis.AuthoredDriveTuning}" />
-                            <Grid Margin="0,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock FontSize="14" FontWeight="SemiBold" Text="{Binding Name}" />
-                                <TextBlock Grid.Column="1" Margin="8,0,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{Binding Id}" />
-                            </Grid>
+                            <StackPanel Margin="0,0,0,6">
+                                <TextBlock FontSize="14" FontWeight="SemiBold" Text="{Binding Name}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,2,0,0" FontSize="11" Foreground="{DynamicResource Text.Secondary}" Text="{Binding Id}" TextWrapping="Wrap" />
+                            </StackPanel>
 
                             <TextBlock Margin="0,4,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Axis.TravelSetup}" />
                             <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.HomePosition}" />
@@ -418,7 +861,8 @@
                             <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.SoftLimitMax}" />
                             <ui:NumberBox AutomationProperties.AutomationId="AxisSoftLimitMaxNumberBox" Minimum="-1000000" Maximum="1000000" SmallChange="1" Value="{Binding SoftLimitMax, Mode=TwoWay}" />
 
-                            <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Axis.DriveTuning}" />
+                            <Expander x:Name="AxisAdvancedDriveSettings" Header="{loc:Loc Key=Axis.DriveTuning}" Margin="0,10,0,0">
+                                <StackPanel>
                             <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.MaxVelocity}" />
                             <ui:NumberBox AutomationProperties.AutomationId="AxisMaxVelocityNumberBox" Minimum="0.001" Maximum="1000000" SmallChange="1" Value="{Binding MaxVelocity, Mode=TwoWay}" />
                             <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.MaxAcceleration}" />
@@ -434,6 +878,8 @@
                                     Content="{loc:Loc Key=Axis.ResetDriveDefaults}"
                                     Style="{StaticResource GlobalCommandButtonStyle}"
                                     ToolTip="{loc:Loc Key=Axis.ResetDriveDefaultsTooltip}" />
+                                </StackPanel>
+                            </Expander>
 
                             <Border Margin="0,12,0,0" Padding="8,6" Background="{DynamicResource Surface.Panel}" CornerRadius="4">
                                 <TextBlock x:Name="AxisTuningValidationMessage" Text="{Binding ValidationMessage}" TextWrapping="Wrap">
@@ -452,14 +898,25 @@
                         </StackPanel>
                     </Border>
 
+                    <Border x:Name="EquipmentSelectionContextCard" Margin="12,12,12,0" Padding="10" Background="{DynamicResource Accent.Soft}" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="1" CornerRadius="5">
+                        <Border.Style><Style TargetType="Border"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions>
+                            <Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" /><Condition Binding="{Binding Layout.HasSelection}" Value="True" />
+                        </MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></Border.Style>
+                        <StackPanel>
+                            <TextBlock Text="{Binding Layout.EquipmentSelectionDetailText}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                            <Button x:Name="EquipmentContextReferencesButton" Margin="0,8,0,0" Command="{Binding OpenEquipmentSequenceReferencesCommand}"
+                                    Content="{Binding Layout.EquipmentSelectionStepsText}" AutomationProperties.Name="{Binding Layout.EquipmentSelectionStepsText}" Style="{StaticResource EquipmentInspectorActionStyle}" HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                    </Border>
+
                     <Border Visibility="{Binding Layout.HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Border.Style>
                             <Style TargetType="Border" BasedOn="{StaticResource InspectorCardStyle}">
-                                <Setter Property="IsEnabled" Value="True" />
+                                <Setter Property="IsEnabled" Value="{Binding IsSceneEditable}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
                                         <Setter Property="Margin" Value="0" />
-                                        <Setter Property="Padding" Value="14" />
+                                        <Setter Property="Padding" Value="12" />
                                         <Setter Property="Background" Value="Transparent" />
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding IsDryRunPlaybackActive}" Value="True">
@@ -498,50 +955,6 @@
                                 <TextBlock Grid.Column="1" Margin="8,0,0,0" Foreground="{DynamicResource Text.Secondary}" Text="{Binding Id}" />
                             </Grid>
 
-                            <StackPanel>
-                                <StackPanel.Style>
-                                    <Style TargetType="StackPanel">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding DataContext.IsEquipmentDriveTabOpen, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </StackPanel.Style>
-                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Name}" />
-                            <TextBox x:Name="ComponentNameTextBox"
-                                     Style="{StaticResource EquipmentInspectorTextBoxStyle}"
-                                      Text="{Binding DraftName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                      ToolTip="{Binding DraftName}" />
-                            <StackPanel Margin="0,5,0,0"
-                                        Visibility="{Binding HasUnitAssignmentOptions, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Unit}" />
-                                <ComboBox AutomationProperties.Name="{loc:Loc Key=Properties.Unit}"
-                                          ItemsSource="{Binding UnitOptions}"
-                                          DisplayMemberPath="DisplayName"
-                                          SelectedValuePath="Id"
-                                          SelectedValue="{Binding UnitId, Mode=TwoWay}" />
-                            </StackPanel>
-                            <Grid Margin="0,6,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Equipment.CoordinateX}" />
-                                    <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding DraftXText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Equipment.CoordinateHeightY}" />
-                                    <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding DraftBaseElevationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                </StackPanel>
-                            </Grid>
-                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Equipment.CoordinateDepthZ}" />
-                            <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding DraftDepthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{loc:Loc Key=Equipment.PlacementDraftHint}"
-                                       TextWrapping="Wrap" />
                             <Border Margin="0,6,0,0"
                                     Padding="8,6"
                                     Background="{DynamicResource Surface.Panel}"
@@ -574,10 +987,105 @@
                                     </TextBlock.Style>
                                 </TextBlock>
                             </Border>
+                            <StackPanel x:Name="R24ProductModelFields" Resources="{StaticResource R24InputStateResources}" Visibility="{Binding ShowWorkpieceProperties, Converter={StaticResource BooleanToVisibilityConverter}}"><StackPanel><TextBlock Text="{loc:Loc Key=Properties.Name}" FontSize="12" LineHeight="17.4" Foreground="{StaticResource EquipmentInspector.Muted}" Margin="0,0,0,3" /><TextBox MaxLength="60" Text="{Binding DraftName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"  Tag="{Binding PlacementNameError}"><TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource EquipmentInspectorTextBoxStyle}"><Style.Triggers><DataTrigger Binding="{Binding HasPlacementNameError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /><Setter Property="Background" Value="{DynamicResource State.FaultSurface}" /></DataTrigger></Style.Triggers></Style></TextBox.Style></TextBox><TextBlock Text="{Binding PlacementNameError}" Style="{StaticResource R24FieldErrorTextStyle}" /></StackPanel><Grid Margin="0,9,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="9" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><StackPanel><TextBlock FontSize="12" LineHeight="17.4" Foreground="{StaticResource EquipmentInspector.Muted}" Margin="0,0,0,3"><Run Text="{loc:Loc Key=R24.Caption.length}" /><Run Text=" " /><Run Text="{loc:Loc Key=R24.UnitMm}" FontSize="11" Foreground="{StaticResource EquipmentInspector.Faint}" /></TextBlock><TextBox Text="{Binding DraftFootprintWidthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"  Tag="{Binding PlacementLengthError}"><TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource EquipmentInspectorTextBoxStyle}"><Style.Triggers><DataTrigger Binding="{Binding HasPlacementLengthError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /><Setter Property="Background" Value="{DynamicResource State.FaultSurface}" /></DataTrigger></Style.Triggers></Style></TextBox.Style></TextBox><TextBlock Text="{Binding PlacementLengthError}" Style="{StaticResource R24FieldErrorTextStyle}" /></StackPanel><StackPanel Grid.Column="2"><TextBlock FontSize="12" LineHeight="17.4" Foreground="{StaticResource EquipmentInspector.Muted}" Margin="0,0,0,3"><Run Text="{loc:Loc Key=R24.Caption.width}" /><Run Text=" " /><Run Text="{loc:Loc Key=R24.UnitMm}" FontSize="11" Foreground="{StaticResource EquipmentInspector.Faint}" /></TextBlock><TextBox Text="{Binding DraftFootprintDepthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"  Tag="{Binding PlacementDepthError}"><TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource EquipmentInspectorTextBoxStyle}"><Style.Triggers><DataTrigger Binding="{Binding HasPlacementDepthError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /><Setter Property="Background" Value="{DynamicResource State.FaultSurface}" /></DataTrigger></Style.Triggers></Style></TextBox.Style></TextBox><TextBlock Text="{Binding PlacementDepthError}" Style="{StaticResource R24FieldErrorTextStyle}" /></StackPanel></Grid><Grid Margin="0,9,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="9" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><StackPanel><TextBlock FontSize="12" LineHeight="17.4" Foreground="{StaticResource EquipmentInspector.Muted}" Margin="0,0,0,3"><Run Text="{loc:Loc Key=R24.Caption.height}" /><Run Text=" " /><Run Text="{loc:Loc Key=R24.UnitMm}" FontSize="11" Foreground="{StaticResource EquipmentInspector.Faint}" /></TextBlock><TextBox Text="{Binding DraftVerticalHeightText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"  Tag="{Binding PlacementHeightError}"><TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource EquipmentInspectorTextBoxStyle}"><Style.Triggers><DataTrigger Binding="{Binding HasPlacementHeightError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /><Setter Property="Background" Value="{DynamicResource State.FaultSurface}" /></DataTrigger></Style.Triggers></Style></TextBox.Style></TextBox><TextBlock Text="{Binding PlacementHeightError}" Style="{StaticResource R24FieldErrorTextStyle}" /></StackPanel></Grid><Border Margin="0,12,0,0" Padding="10" BorderThickness="1" BorderBrush="{StaticResource EquipmentInspector.Line}" Background="{DynamicResource Surface.Panel}" CornerRadius="6"><StackPanel><TextBlock Text="{loc:Loc Key=R24.ReferenceData}" FontSize="12.5" LineHeight="18.125" FontWeight="SemiBold" Foreground="{StaticResource EquipmentInspector.Muted}" /><Grid Margin="0,20,0,20"><Grid.Resources><Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}"><Style.Triggers><DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True"><Setter Property="FontSize" Value="12" /><Setter Property="LineHeight" Value="17.4" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" /></DataTrigger></Style.Triggers></Style></Grid.Resources><Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="4" /><RowDefinition Height="Auto" /></Grid.RowDefinitions><TextBlock Text="{loc:Loc Key=R24.Reference2D}" Foreground="{StaticResource EquipmentInspector.Muted}" /><TextBlock Grid.Column="2" Text="{Binding ProductReference2DText}" TextWrapping="Wrap" /><TextBlock Grid.Row="2" Text="{loc:Loc Key=R24.Reference3D}" Foreground="{StaticResource EquipmentInspector.Muted}" /><TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding ProductReference3DText}" TextWrapping="Wrap" /></Grid><TextBlock Text="{loc:Loc Key=R24.ReferenceHint}" FontSize="10.5" LineHeight="15.225" Foreground="{StaticResource EquipmentInspector.Faint}" TextWrapping="Wrap" /></StackPanel></Border></StackPanel><StackPanel x:Name="R24EquipmentPlacementFields" Resources="{StaticResource R24InputStateResources}">
+    <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True" /><Condition Binding="{Binding DataContext.IsEquipmentDriveTabOpen, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger><DataTrigger Binding="{Binding ShowWorkpieceProperties}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+<StackPanel><TextBlock Text="{loc:Loc Key=Properties.Name}" FontSize="12" LineHeight="17.4" Margin="0,0,0,3" Foreground="{StaticResource EquipmentInspector.Muted}" /><TextBox x:Name="R24ComponentNameTextBox" MaxLength="60" Text="{Binding DraftName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"  Tag="{Binding PlacementNameError}"><TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource EquipmentInspectorTextBoxStyle}"><Style.Triggers><DataTrigger Binding="{Binding HasPlacementNameError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /><Setter Property="Background" Value="{DynamicResource State.FaultSurface}" /></DataTrigger></Style.Triggers></Style></TextBox.Style></TextBox><TextBlock Text="{Binding PlacementNameError}" Style="{StaticResource R24FieldErrorTextStyle}" /></StackPanel>
+    <StackPanel Margin="0,9,0,0"><TextBlock Text="{loc:Loc Key=Inspector.EquipmentAssignedUnit}" FontSize="12" LineHeight="17.4" Margin="0,0,0,3" Foreground="{StaticResource EquipmentInspector.Muted}" /><ComboBox ItemsSource="{Binding EquipmentUnitOptions}" SelectedValuePath="Id" SelectedValue="{Binding DraftUnitId, Mode=TwoWay}" ItemTemplate="{StaticResource EquipmentConnectionOptionTemplate}" /><TextBlock Text="{Binding PlacementUnitError}" Style="{StaticResource R24FieldErrorTextStyle}" /></StackPanel>
+    <Grid Margin="0,9,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="9" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions><ContentControl Visibility="{Binding ShowEquipmentPlacementX, Converter={StaticResource BooleanToVisibilityConverter}}"><StackPanel><TextBlock FontSize="12" LineHeight="17.4" Margin="0,0,0,3" Foreground="{StaticResource EquipmentInspector.Muted}"><Run Text="{loc:Loc Key=R24.Caption.x}" /><Run Text=" " /><Run Text="{loc:Loc Key=R24.UnitMm}" FontSize="11" Foreground="{StaticResource EquipmentInspector.Faint}" /></TextBlock><TextBox AutomationProperties.AutomationId="EquipmentCoordinateX" Text="{Binding DraftEquipmentXText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"  Tag="{Binding PlacementXError}"><TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource EquipmentInspectorTextBoxStyle}"><Style.Triggers><DataTrigger Binding="{Binding HasPlacementXError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /><Setter Property="Background" Value="{DynamicResource State.FaultSurface}" /></DataTrigger></Style.Triggers></Style></TextBox.Style></TextBox><TextBlock Text="{Binding PlacementXError}" Style="{StaticResource R24FieldErrorTextStyle}" /></StackPanel></ContentControl><ContentControl><ContentControl.Style><Style TargetType="ContentControl"><Setter Property="Grid.Column" Value="2" /><Style.Triggers><DataTrigger Binding="{Binding IsCameraAxisMounted}" Value="True"><Setter Property="Grid.Column" Value="0" /></DataTrigger></Style.Triggers></Style></ContentControl.Style><StackPanel><TextBlock FontSize="12" LineHeight="17.4" Margin="0,0,0,3" Foreground="{StaticResource EquipmentInspector.Muted}"><Run Text="{loc:Loc Key=R24.Caption.y}" /><Run Text=" " /><Run Text="{loc:Loc Key=R24.UnitMm}" FontSize="11" Foreground="{StaticResource EquipmentInspector.Faint}" /></TextBlock><TextBox AutomationProperties.AutomationId="EquipmentCoordinateY" Text="{Binding DraftDepthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"  Tag="{Binding PlacementYError}"><TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource EquipmentInspectorTextBoxStyle}"><Style.Triggers><DataTrigger Binding="{Binding HasPlacementYError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /><Setter Property="Background" Value="{DynamicResource State.FaultSurface}" /></DataTrigger></Style.Triggers></Style></TextBox.Style></TextBox><TextBlock Text="{Binding PlacementYError}" Style="{StaticResource R24FieldErrorTextStyle}" /></StackPanel></ContentControl><ContentControl><ContentControl.Style><Style TargetType="ContentControl"><Setter Property="Visibility" Value="{Binding ShowCameraProperties, Converter={StaticResource BooleanToVisibilityConverter}}" /><Setter Property="Grid.Row" Value="1" /><Setter Property="Margin" Value="0,9,0,0" /><Style.Triggers><DataTrigger Binding="{Binding IsCameraAxisMounted}" Value="True"><Setter Property="Grid.Column" Value="2" /><Setter Property="Grid.Row" Value="0" /><Setter Property="Margin" Value="0" /></DataTrigger></Style.Triggers></Style></ContentControl.Style><StackPanel><TextBlock FontSize="12" LineHeight="17.4" Margin="0,0,0,3" Foreground="{StaticResource EquipmentInspector.Muted}"><Run Text="{loc:Loc Key=R24.Caption.z}" /><Run Text=" " /><Run Text="{loc:Loc Key=R24.UnitMm}" FontSize="11" Foreground="{StaticResource EquipmentInspector.Faint}" /></TextBlock><TextBox AutomationProperties.AutomationId="EquipmentCoordinateZ" Text="{Binding DraftInstallationHeightText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"  Tag="{Binding PlacementZError}"><TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource EquipmentInspectorTextBoxStyle}"><Style.Triggers><DataTrigger Binding="{Binding HasPlacementZError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /><Setter Property="Background" Value="{DynamicResource State.FaultSurface}" /></DataTrigger></Style.Triggers></Style></TextBox.Style></TextBox><TextBlock Text="{Binding PlacementZError}" Style="{StaticResource R24FieldErrorTextStyle}" /></StackPanel></ContentControl></Grid>
+    <Border Margin="0,10,0,0" Padding="9,7" BorderThickness="3,0,0,0" BorderBrush="{DynamicResource State.Vision}" Background="{DynamicResource State.InfoSurface}" CornerRadius="0,4,4,0" Visibility="{Binding IsCameraAxisMounted, Converter={StaticResource BooleanToVisibilityConverter}}"><TextBlock Text="{loc:Loc Key=R24.CameraMountedHint}" FontSize="12" LineHeight="17.4" Foreground="{StaticResource EquipmentInspector.Muted}" TextWrapping="Wrap" /></Border>
+    <TextBlock Margin="0,10,0,0" FontSize="11.5" LineHeight="16.675" Foreground="{StaticResource EquipmentInspector.Faint}" Text="{loc:Loc Key=R24.PlacementHint}" TextWrapping="Wrap" />
+</StackPanel><StackPanel><StackPanel.Style><Style TargetType="StackPanel"><Style.Triggers><DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></StackPanel.Style><StackPanel>
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsEquipmentDriveTabOpen, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                            <TextBlock Style="{StaticResource EquipmentFirstFieldLabelStyle}" Text="{loc:Loc Key=Properties.Name}" />
+                            <TextBox x:Name="ComponentNameTextBox"
 
-                            <TextBlock Margin="0,10,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Inspector.LayoutTransform}" />
+                                      Text="{Binding DraftName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      ToolTip="{Binding DraftName}"  Tag="{Binding PlacementNameError}"><TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource EquipmentInspectorTextBoxStyle}"><Style.Triggers><DataTrigger Binding="{Binding HasPlacementNameError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /><Setter Property="Background" Value="{DynamicResource State.FaultSurface}" /></DataTrigger></Style.Triggers></Style></TextBox.Style></TextBox><TextBlock Text="{Binding PlacementNameError}" Style="{StaticResource R24FieldErrorTextStyle}" />
+                            <StackPanel
+                                        Visibility="{Binding HasUnitAssignmentOptions, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Margin" Value="0,5,0,0" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                                                <Setter Property="Margin" Value="0,3,0,0" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Inspector.EquipmentAssignedUnit}" />
+                                <ComboBox AutomationProperties.Name="{loc:Loc Key=Inspector.EquipmentAssignedUnit}"
+                                          ItemsSource="{Binding UnitOptions}"
+                                          SelectedValuePath="Id"
+                                          SelectedValue="{Binding UnitId, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate><TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap" /></DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                            <Grid>
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Setter Property="Margin" Value="0,6,0,0" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                                                <Setter Property="Margin" Value="0,3,0,0" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Style="{StaticResource EquipmentColumnGapStyle}" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Equipment.CoordinateX}" />
+                                    <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}"
+                                             AutomationProperties.AutomationId="EquipmentCoordinateX"
+                                             AutomationProperties.Name="{loc:Loc Key=Equipment.CoordinateX}"
+                                             Text="{Binding DraftXText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Equipment.InspectorCoordinateY}" />
+                                    <TextBox
+                                             AutomationProperties.AutomationId="EquipmentCoordinateY"
+                                             AutomationProperties.Name="{loc:Loc Key=Equipment.InspectorCoordinateY}"
+                                             Text="{Binding DraftDepthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"  Tag="{Binding PlacementYError}"><TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource EquipmentInspectorTextBoxStyle}"><Style.Triggers><DataTrigger Binding="{Binding HasPlacementYError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /><Setter Property="Background" Value="{DynamicResource State.FaultSurface}" /></DataTrigger></Style.Triggers></Style></TextBox.Style></TextBox><TextBlock Text="{Binding PlacementYError}" Style="{StaticResource R24FieldErrorTextStyle}" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Equipment.InspectorCoordinateZ}" />
+                            <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}"
+                                     AutomationProperties.AutomationId="EquipmentCoordinateZ"
+                                     AutomationProperties.Name="{loc:Loc Key=Equipment.InspectorCoordinateZ}"
+                                     Text="{Binding DraftBaseElevationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:Loc Key=Equipment.PlacementDraftHint}"
+                                       TextWrapping="Wrap">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource EquipmentHintTextStyle}">
+                                        <Setter Property="Margin" Value="0,8,0,0" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                                                <Setter Property="Margin" Value="0,6,0,0" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <TextBlock Style="{StaticResource EquipmentTransformCaptionStyle}" Text="{loc:Loc Key=Inspector.LayoutTransform}" />
                             <TextBlock x:Name="AspectRatioHintText"
                                        Margin="0,0,0,4"
+                                       Style="{StaticResource EquipmentHintTextStyle}"
                                        Foreground="{DynamicResource Text.Secondary}"
                                        Text="{loc:Loc Key=Inspector.AspectRatioHint}"
                                        TextWrapping="Wrap" />
@@ -611,38 +1119,37 @@
                                 </Grid.Style>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Style="{StaticResource EquipmentColumnGapStyle}" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
-                                <StackPanel x:Name="EquipmentDraftRotationField" Grid.Row="0" Grid.Column="0" Margin="0,0,0,8">
-                                    <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Rotation}" />
-                                    <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" x:Name="EquipmentDraftRotationTextBox"
-                                             AutomationProperties.Name="{loc:Loc Key=Properties.Rotation}"
-                                             AutomationProperties.AutomationId="EquipmentDraftRotation"
-                                             Text="{Binding DraftRotationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                </StackPanel>
-                                <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,8">
+                                <StackPanel Grid.Row="0" Grid.Column="0" Style="{StaticResource EquipmentGeometryFieldStyle}">
                                     <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Width}" />
                                     <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" x:Name="EquipmentDraftWidthTextBox"
                                              AutomationProperties.Name="{loc:Loc Key=Properties.Width}"
                                              AutomationProperties.AutomationId="EquipmentDraftWidth"
                                              Text="{Binding DraftFootprintWidthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
-                                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,8">
+                                <StackPanel Grid.Row="0" Grid.Column="2" Style="{StaticResource EquipmentGeometryFieldStyle}">
                                     <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Depth}" />
                                     <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" x:Name="EquipmentDraftDepthTextBox"
                                              AutomationProperties.Name="{loc:Loc Key=Properties.Depth}"
                                              AutomationProperties.AutomationId="EquipmentDraftDepth"
                                              Text="{Binding DraftFootprintDepthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
-                                <StackPanel x:Name="EquipmentDraftVerticalEnvelopeField" Grid.Row="1" Grid.Column="2" Margin="0,0,0,8">
-                                    <TextBlock Margin="0,0,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Inspector.VerticalEnvelope}" />
-                                    <TextBlock x:Name="EquipmentDraftVerticalEnvelopeHint" Margin="0,0,0,4" Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=Inspector.VerticalEnvelopeHint}" TextWrapping="Wrap" />
+                                <StackPanel x:Name="EquipmentDraftRotationField" Grid.Row="1" Grid.Column="0" Style="{StaticResource EquipmentGeometryFieldStyle}">
+                                    <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Rotation}" />
+                                    <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" x:Name="EquipmentDraftRotationTextBox"
+                                             AutomationProperties.Name="{loc:Loc Key=Properties.Rotation}"
+                                             AutomationProperties.AutomationId="EquipmentDraftRotation"
+                                             Text="{Binding DraftRotationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel x:Name="EquipmentDraftVerticalEnvelopeField" Grid.Row="1" Grid.Column="2" Style="{StaticResource EquipmentGeometryFieldStyle}">
                                     <StackPanel x:Name="EquipmentDraftVerticalHeightField">
                                         <TextBlock x:Name="EquipmentDraftVerticalHeightLabel" Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.VerticalHeight}" />
                                         <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" x:Name="EquipmentDraftVerticalHeightTextBox"
@@ -650,10 +1157,23 @@
                                                  AutomationProperties.AutomationId="EquipmentDraftVerticalHeight"
                                                  Text="{Binding DraftVerticalHeightText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
-                                    <TextBlock x:Name="EquipmentDraftVerticalEnvelopeEstimated" Margin="0,4,0,0" Foreground="{DynamicResource State.Warning}"
-                                               Text="{loc:Loc Key=Inspector.VerticalEnvelopeEstimated}" TextWrapping="Wrap"
-                                               Visibility="{Binding IsVerticalEnvelopeEstimated, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                 </StackPanel>
+                                <TextBlock x:Name="EquipmentDraftVerticalEnvelopeHint" Grid.Row="2" Grid.ColumnSpan="3" Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{loc:Loc Key=Equipment.InspectorEnvelopeHint}" TextWrapping="Wrap">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource EquipmentHintTextStyle}">
+                                            <Setter Property="Margin" Value="0,0,0,4" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                                                    <Setter Property="Margin" Value="0,6,0,4" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock x:Name="EquipmentDraftVerticalEnvelopeEstimated" Grid.Row="3" Grid.ColumnSpan="3" Style="{StaticResource EquipmentHintTextStyle}" Foreground="{DynamicResource State.Warning}"
+                                           Text="{loc:Loc Key=Equipment.InspectorEnvelopeEstimated}" TextWrapping="Wrap"
+                                           Visibility="{Binding IsVerticalEnvelopeEstimated, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             </Grid>
 
                             <StackPanel>
@@ -711,9 +1231,9 @@
                                 <Button Command="{Binding NudgeLayoutComponentCommand}" CommandParameter="Down" Content="↓" ToolTip="Move down by one grid step" />
                                 <Button x:Name="NudgeRightButton" Command="{Binding NudgeLayoutComponentCommand}" CommandParameter="Right" Content="→" ToolTip="Move right by one grid step" />
                             </UniformGrid>
-                            </StackPanel>
+                            </StackPanel></StackPanel>
 
-                            <StackPanel>
+                            <StackPanel x:Name="R24EquipmentSettingsPanel" UseLayoutRounding="False">
                                 <StackPanel.Style>
                                     <Style TargetType="StackPanel">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -724,121 +1244,25 @@
                                         </Style.Triggers>
                                     </Style>
                                 </StackPanel.Style>
-                                <TextBlock Foreground="{DynamicResource Text.Secondary}"
-                                           Text="{loc:Loc Key=Equipment.DriveTabHint}"
-                                           TextWrapping="Wrap">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ShowAxisDriveProperties}" Value="True">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-
-                            <StackPanel Visibility="{Binding ShowAxisDriveProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Equipment.AxisDriveDraftHint}" TextWrapping="Wrap" />
-                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Axis.TravelSetup}" />
-                                <TextBlock Foreground="{DynamicResource Text.Secondary}" Text="{Binding AxisUnit}" />
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="10" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-                                    <StackPanel Grid.Row="0" Grid.Column="0">
-                                        <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.SoftLimitMin}" />
-                                        <TextBox x:Name="ComponentAxisMinTextBox" Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding DraftAxisMinText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Row="0" Grid.Column="2">
-                                        <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.SoftLimitMax}" />
-                                        <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding DraftAxisMaxText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Row="1" Grid.Column="0">
-                                        <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.HomePosition}" />
-                                        <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding DraftAxisHomeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Row="1" Grid.Column="2">
-                                        <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Axis.MaxVelocity}" />
-                                        <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding DraftAxisSpeedText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    </StackPanel>
-                                </Grid>
-                            </StackPanel>
-
-                            <StackPanel Visibility="{Binding HasBehaviorBinding, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Simulation}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Behavior}" />
-                                <ComboBox x:Name="BehaviorBindingComboBox"
-                                          ItemsSource="{Binding BehaviorBindingOptions}"
-                                          DisplayMemberPath="DisplayName"
-                                          SelectedValuePath="Id"
-                                          SelectedValue="{Binding BehaviorBindingId, Mode=TwoWay}" />
-                            </StackPanel>
-
-                            <StackPanel Visibility="{Binding ShowSensorProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Sensor}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.OutputChannel}" />
-                                <ComboBox ItemsSource="{Binding DigitalInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding SensorOutputChannelId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.TargetComponent}" />
-                                <ComboBox ItemsSource="{Binding TargetComponentOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding SensorTargetComponentId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.OnDelay}" />
-                                <ui:NumberBox Minimum="0" Maximum="600000" SmallChange="1" Value="{Binding SensorOnDelayMilliseconds, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.OffDelay}" />
-                                <ui:NumberBox Minimum="0" Maximum="600000" SmallChange="1" Value="{Binding SensorOffDelayMilliseconds, Mode=TwoWay}" />
-                            </StackPanel>
-
-                            <StackPanel x:Name="CylinderPropertiesSection" Visibility="{Binding ShowCylinderProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Cylinder}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ExtendCommand}" />
-                                <ComboBox ItemsSource="{Binding DigitalOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding CylinderExtendCommandChannelId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ExtendedSensor}" />
-                                <ComboBox ItemsSource="{Binding DigitalInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding CylinderExtendedSensorChannelId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.RetractedSensor}" />
-                                <ComboBox ItemsSource="{Binding DigitalInputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding CylinderRetractedSensorChannelId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ExtendDuration}" />
-                                <ui:NumberBox Minimum="1" Maximum="600000" SmallChange="1" Value="{Binding CylinderExtendDurationMilliseconds, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.RetractDuration}" />
-                                <ui:NumberBox Minimum="1" Maximum="600000" SmallChange="1" Value="{Binding CylinderRetractDurationMilliseconds, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ExtendedSensorDelay}" />
-                                <ui:NumberBox Minimum="0" Maximum="600000" SmallChange="1" Value="{Binding CylinderExtendedSensorDelayMilliseconds, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.RetractedSensorDelay}" />
-                                <ui:NumberBox Minimum="0" Maximum="600000" SmallChange="1" Value="{Binding CylinderRetractedSensorDelayMilliseconds, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Stroke}" />
-                                <ui:NumberBox Minimum="0.001" Maximum="100000" SmallChange="1" Value="{Binding CylinderStroke, Mode=TwoWay}" />
-                            </StackPanel>
-
-                            <StackPanel Visibility="{Binding ShowConveyorProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Conveyor}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.RunCommand}" />
-                                <ComboBox ItemsSource="{Binding DigitalOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding ConveyorRunCommandChannelId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.ReverseCommand}" />
-                                <ComboBox ItemsSource="{Binding DigitalOutputOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding ConveyorReverseCommandChannelId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Speed}" />
-                                <ui:NumberBox Minimum="0.001" Maximum="100000" SmallChange="1" Value="{Binding ConveyorSpeedUnitsPerSecond, Mode=TwoWay}" />
-                            </StackPanel>
-
-                            <StackPanel Visibility="{Binding ShowWorkpieceProperties, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Margin="0,12,0,2" Style="{StaticResource SectionCaptionStyle}" Text="{loc:Loc Key=Properties.Workpiece}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Type}" />
-                                <TextBox Style="{StaticResource EquipmentInspectorTextBoxStyle}" Text="{Binding WorkpieceType, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.Conveyor}" />
-                                <ComboBox ItemsSource="{Binding ConveyorComponentOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding WorkpieceConveyorComponentId, Mode=TwoWay}" />
-                                <TextBlock Style="{StaticResource InspectorFieldLabelStyle}" Text="{loc:Loc Key=Properties.InspectionState}" />
-                                <ComboBox ItemsSource="{Binding InspectionStateOptions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding WorkpieceInspectionStateId, Mode=TwoWay}" />
-                            </StackPanel>
-                            </StackPanel>
+    <ItemsControl x:Name="R24EquipmentSettingsFields" Resources="{StaticResource R24InputStateResources}" ItemsSource="{Binding SettingsRows}">
+        <ItemsControl.ItemTemplate><DataTemplate><Grid><Grid.Style><Style TargetType="Grid"><Setter Property="Margin" Value="0,0,0,9" /><Style.Triggers><DataTrigger Binding="{Binding IsLast}" Value="True"><Setter Property="Margin" Value="0" /></DataTrigger></Style.Triggers></Style></Grid.Style><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="9" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><ContentControl Grid.ColumnSpan="{Binding FirstColumnSpan}" Content="{Binding First}" ContentTemplate="{StaticResource EquipmentSettingsFieldTemplate}" /><ContentControl Grid.Column="2" Content="{Binding Second}" ContentTemplate="{StaticResource EquipmentSettingsFieldTemplate}"><ContentControl.Style><Style TargetType="ContentControl"><Style.Triggers><DataTrigger Binding="{Binding Second}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></ContentControl.Style></ContentControl></Grid></DataTemplate></ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <ItemsControl x:Name="R24EquipmentSettingsDetails" ItemsSource="{Binding SettingsDetailRows}"><ItemsControl.Style><Style TargetType="ItemsControl"><Setter Property="Margin" Value="0,22,0,8" /><Style.Triggers><DataTrigger Binding="{Binding SettingsFields.Count}" Value="0"><Setter Property="Margin" Value="0,12,0,12" /></DataTrigger><Trigger Property="HasItems" Value="False"><Setter Property="Visibility" Value="Collapsed" /></Trigger></Style.Triggers></Style></ItemsControl.Style><ItemsControl.ItemTemplate><DataTemplate><Grid Margin="0,0,0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Text="{Binding Caption}" FontSize="12" LineHeight="17.4" Foreground="{StaticResource EquipmentInspector.Faint}" /><TextBlock Grid.Column="2" FontSize="12" LineHeight="17.4" TextWrapping="Wrap"><Run Text="{Binding Value, Mode=OneWay}" /><Run Text="{Binding WarningText, Mode=OneWay}" Foreground="{DynamicResource State.Warning}" /></TextBlock></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+    <TextBlock Visibility="{Binding HasSettingsHint, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,10,0,0" Text="{Binding SettingsHint}" FontSize="11.5" LineHeight="16.675" Foreground="{StaticResource EquipmentInspector.Faint}" TextWrapping="Wrap" />
+    <Button Margin="0,10,0,0" HorizontalAlignment="Stretch" Command="{Binding DataContext.OpenEquipmentCameraSettingsCommand, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Content="{loc:Loc Key=R24.CameraSettingsLink}" Style="{StaticResource EquipmentInspectorActionStyle}" Visibility="{Binding ShowCameraProperties, Converter={StaticResource BooleanToVisibilityConverter}}" />
+</StackPanel>
 
                         </StackPanel>
                     </Border>
-                    <Border x:Name="LayerOrderPanel"
-                            Style="{StaticResource InspectorCardStyle}"
-                            Visibility="{Binding Layout.HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Border x:Name="LayerOrderPanel">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource InspectorCardStyle}">
+                                <Setter Property="Visibility" Value="{Binding Layout.HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
                         <StackPanel>
                             <TextBlock Style="{StaticResource SectionCaptionStyle}"
                                        Text="{loc:Loc Key=Inspector.LayerOrder}" />
@@ -877,9 +1301,21 @@
                         </StackPanel>
                     </Border>
 
-                    <Border x:Name="MultiSelectionAlignmentPanel"
-                            Style="{StaticResource InspectorCardStyle}"
-                            Visibility="{Binding Layout.HasMultipleSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Border x:Name="MultiSelectionAlignmentPanel">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource InspectorCardStyle}">
+                                <Setter Property="Visibility" Value="{Binding Layout.HasMultipleSelection, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" />
+                                            <Condition Binding="{Binding IsEquipmentDriveTabOpen}" Value="True" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
                         <StackPanel>
                             <TextBlock FontSize="13"
                                        FontWeight="SemiBold"
@@ -933,7 +1369,7 @@
                 </StackPanel>
             </ScrollViewer>
             <Border Grid.Row="3"
-                    Padding="12,9"
+                    Padding="12,8"
                     BorderThickness="0,1,0,0"
                     BorderBrush="{DynamicResource Border.Subtle}"
                     Background="{DynamicResource Surface.Panel}"
@@ -946,38 +1382,36 @@
                                 <MultiDataTrigger.Conditions>
                                     <Condition Binding="{Binding DataContext.Layout.HasSelection, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
                                     <Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
-                                    <Condition Binding="{Binding DataContext.IsRunMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False" />
                                     <Condition Binding="{Binding DataContext.IsEquipmentSinglePartCheckOpen, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False" />
                                     <Condition Binding="{Binding DataContext.IsEquipmentDriveTabOpen, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False" />
                                 </MultiDataTrigger.Conditions>
                                 <Setter Property="Visibility" Value="Visible" />
                             </MultiDataTrigger>
+
+                            <DataTrigger Binding="{Binding IntegrationSetupOnly, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
                 <StackPanel>
-                    <TextBlock Foreground="{DynamicResource State.Warning}"
-                               Text="{Binding PlacementDraftError}"
-                               TextWrapping="Wrap" />
-                    <Grid Margin="0,6,0,0">
+
+                    <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="6" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0"
-                                Command="{Binding DiscardPlacementDraftCommand}"
-                                Content="{loc:Loc Key=Equipment.PlacementDraftDiscard}" />
-                        <Button Grid.Column="2"
-                                Command="{Binding ApplyPlacementDraftCommand}"
-                                Content="{loc:Loc Key=Equipment.PlacementDraftApply}"
-                                Style="{StaticResource PrimaryCommandButtonStyle}" />
+                        <Button Grid.Column="0" Panel.ZIndex="2" Click="OnInspectorErrorClick" Content="{Binding PlacementValidationSummary}" Foreground="{DynamicResource State.Fault}" Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Left" Style="{StaticResource EquipmentInspectorActionStyle}" Visibility="{Binding HasPlacementValidationErrors, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <TextBlock x:Name="PlacementDraftStateText" Margin="0,0,8,0" VerticalAlignment="Center"
+                                   Style="{StaticResource EquipmentInspectorDraftStateStyle}" />
+                        <Button x:Name="EquipmentPlacementDiscardButton" Grid.Column="1" Command="{Binding DiscardPlacementDraftCommand}" Content="{loc:Loc Key=Equipment.InspectorRevert}" Style="{StaticResource EquipmentInspectorActionStyle}" />
+                        <Button x:Name="EquipmentPlacementApplyButton" Grid.Column="3" Command="{Binding ApplyEquipmentPlacementDraftCommand}" Content="{loc:Loc Key=Equipment.PlacementDraftApply}" Style="{StaticResource EquipmentInspectorApplyStyle}" />
                     </Grid>
                 </StackPanel>
             </Border>
 
             <Border Grid.Row="3"
-                    Padding="12,9"
+                    Padding="12,8"
                     BorderThickness="0,1,0,0"
                     BorderBrush="{DynamicResource Border.Subtle}"
                     Background="{DynamicResource Surface.Panel}"
@@ -990,46 +1424,111 @@
                                 <MultiDataTrigger.Conditions>
                                     <Condition Binding="{Binding DataContext.Layout.HasSelection, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
                                     <Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
-                                    <Condition Binding="{Binding DataContext.IsRunMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False" />
                                     <Condition Binding="{Binding DataContext.IsEquipmentDriveTabOpen, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
-                                    <Condition Binding="{Binding ShowAxisDriveProperties}" Value="True" />
                                 </MultiDataTrigger.Conditions>
                                 <Setter Property="Visibility" Value="Visible" />
                             </MultiDataTrigger>
+
+                            <DataTrigger Binding="{Binding IntegrationSetupOnly, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
                 <StackPanel>
-                    <TextBlock Foreground="{DynamicResource State.Warning}" Text="{Binding AxisDriveDraftError}" TextWrapping="Wrap" />
-                    <Grid Margin="0,6,0,0">
+
+                    <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="6" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0" Command="{Binding DiscardAxisDriveDraftCommand}" Content="{loc:Loc Key=Equipment.PlacementDraftDiscard}" />
-                        <Button Grid.Column="2" Command="{Binding ApplyAxisDriveDraftCommand}" Content="{loc:Loc Key=Equipment.PlacementDraftApply}" Style="{StaticResource PrimaryCommandButtonStyle}" />
+                        <Button Grid.Column="0" Panel.ZIndex="2" Click="OnInspectorErrorClick" Content="{Binding SettingsValidationSummary}" Foreground="{DynamicResource State.Fault}" Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Left" Style="{StaticResource EquipmentInspectorActionStyle}" Visibility="{Binding HasSettingsValidationErrors, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <TextBlock x:Name="AxisDriveDraftStateText" Margin="0,0,8,0" VerticalAlignment="Center"
+                                   ><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Text" Value="{loc:Loc Key=Equipment.InspectorUnchanged}" /><Setter Property="FontSize" Value="11.5" /><Setter Property="LineHeight" Value="16.675" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" /><Setter Property="Foreground" Value="{StaticResource EquipmentInspector.Faint}" /><Style.Triggers><DataTrigger Binding="{Binding HasPendingSettingsDraft}" Value="True"><Setter Property="Text" Value="{loc:Loc Key=R24.UnappliedDraft}" /><Setter Property="Foreground" Value="{DynamicResource State.Warning}" /></DataTrigger><DataTrigger Binding="{Binding HasSettingsValidationErrors}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                        <Button Grid.Column="1" Command="{Binding DiscardSettingsDraftCommand}" Content="{loc:Loc Key=Equipment.InspectorRevert}" Style="{StaticResource EquipmentInspectorActionStyle}" />
+                        <Button Grid.Column="3" Command="{Binding ApplySettingsDraftCommand}" Content="{loc:Loc Key=Equipment.PlacementDraftApply}" Style="{StaticResource EquipmentInspectorApplyStyle}" />
                     </Grid>
                 </StackPanel>
             </Border>
 
-            <ScrollViewer x:Name="RunInspectorScrollViewer"
-                          Grid.Row="2"
-                          VerticalScrollBarVisibility="Auto">
+            <Border Grid.Row="3" Padding="12,8" BorderThickness="0,1,0,0"
+                    BorderBrush="{DynamicResource Border.Subtle}" Background="{DynamicResource Surface.Panel}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" />
+                                    <Condition Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="True" />
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible" />
+                            </MultiDataTrigger>
+
+                            <DataTrigger Binding="{Binding IntegrationSetupOnly, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <TextBlock x:Name="ManualControlScopeText" Foreground="{DynamicResource Text.Secondary}"
+                           FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" Text="{loc:Loc Key=R24.ManualScope}" TextWrapping="Wrap" />
+            </Border>
+
+            <ScrollViewer x:Name="RunInspectorScrollViewer" Grid.Row="2">
+                <b:Interaction.Behaviors>
+                    <behavior:InspectorScrollContextBehavior>
+                        <behavior:InspectorScrollContextBehavior.Context>
+                            <MultiBinding StringFormat="{}{0}|{1}|{2}|{3}">
+                                <Binding Path="Layout.SelectedItem.Id" />
+                                <Binding Path="IsEquipmentDriveTabOpen" />
+                                <Binding Path="IsEquipmentSinglePartCheckOpen" />
+                                <Binding Path="IsRunMode" />
+                            </MultiBinding>
+                        </behavior:InspectorScrollContextBehavior.Context>
+                    </behavior:InspectorScrollContextBehavior>
+                </b:Interaction.Behaviors>
                 <ScrollViewer.Style>
                     <Style TargetType="ScrollViewer">
                         <Setter Property="Visibility" Value="Collapsed" />
+                        <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
                         <Style.Triggers>
+
                             <DataTrigger Binding="{Binding IsRunMode}" Value="True">
                                 <Setter Property="Visibility" Value="Visible" />
                             </DataTrigger>
+                            <MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" /><Condition Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Collapsed" /></MultiDataTrigger>
                             <DataTrigger Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="True">
                                 <Setter Property="Visibility" Value="Visible" />
                             </DataTrigger>
+                        <DataTrigger Binding="{Binding Navigation.IsSequenceWorkspace}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                            <DataTrigger Binding="{Binding IntegrationSetupOnly, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True"><Setter Property="Visibility" Value="Visible" /><Setter Property="VerticalScrollBarVisibility" Value="Disabled" /></DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </ScrollViewer.Style>
-                <StackPanel Margin="4">
+                <StackPanel><StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Margin" Value="4" /><Style.Triggers><DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True"><Setter Property="Margin" Value="0" /></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+                    <StackPanel x:Name="R24EquipmentManualPanel" Resources="{StaticResource R24InputStateResources}" Margin="12,24,12,12" Visibility="{Binding Navigation.IsEquipmentWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}"><Border Padding="9,7" BorderThickness="3,0,0,0" BorderBrush="{DynamicResource State.Vision}" Background="{DynamicResource State.InfoSurface}" CornerRadius="0,4,4,0"><TextBlock FontSize="12" LineHeight="17.4" Text="{loc:Loc Key=R24.ManualNote}" Foreground="{StaticResource EquipmentInspector.Muted}" TextWrapping="Wrap" /></Border><StackPanel Visibility="{Binding Layout.SelectedComponentEditor.ShowAxisDriveProperties, Converter={StaticResource BooleanToVisibilityConverter}}"><Grid Margin="0,24,0,24"><Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /></Grid.RowDefinitions><TextBlock FontSize="12" LineHeight="17.4" Text="{loc:Loc Key=R24.CurrentPosition}" Foreground="{StaticResource EquipmentInspector.Faint}" /><TextBlock Grid.Column="2" FontSize="12" LineHeight="17.4" Text="{Binding EquipmentInspectorPositionText}" TextWrapping="Wrap" /></Grid><Grid Margin="0,0,0,15"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="9" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><StackPanel><TextBlock FontSize="12" LineHeight="17.4" Margin="0,0,0,3" Foreground="{StaticResource EquipmentInspector.Muted}"><Run Text="{loc:Loc Key=R24.Caption.target}" /><Run Text=" " /><Run Text="{loc:Loc Key=R24.UnitMm}" FontSize="11" Foreground="{StaticResource EquipmentInspector.Faint}" /></TextBlock><TextBox x:Name="R24ManualTargetPosition" Text="{Binding AxisCommissioning.AxisTargetPositionText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"><TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}"><Style.Triggers><DataTrigger Binding="{Binding AxisCommissioning.HasAxisTargetPositionError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /></DataTrigger></Style.Triggers></Style></TextBox.Style></TextBox><TextBlock x:Name="R24ManualTargetValidationText" Margin="0,4,0,0" FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" Foreground="{DynamicResource State.Fault}" TextWrapping="Wrap" Text="{Binding AxisCommissioning.AxisTargetPositionValidationText}" Visibility="{Binding AxisCommissioning.HasAxisTargetPositionError, Converter={StaticResource BooleanToVisibilityConverter}}" /></StackPanel><StackPanel Grid.Column="2"><TextBlock FontSize="12" LineHeight="17.4" Margin="0,0,0,3" Foreground="{StaticResource EquipmentInspector.Muted}"><Run Text="{loc:Loc Key=R24.Caption.jog}" /><Run Text=" " /><Run Text="{loc:Loc Key=R24.UnitMm}" FontSize="11" Foreground="{StaticResource EquipmentInspector.Faint}" /></TextBlock><TextBox x:Name="R24ManualJogDistance" Text="{Binding AxisCommissioning.AxisRelativeDistanceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"><TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}"><Style.Triggers><DataTrigger Binding="{Binding AxisCommissioning.HasAxisRelativeDistanceError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /></DataTrigger></Style.Triggers></Style></TextBox.Style></TextBox><TextBlock x:Name="R24ManualJogValidationText" Margin="0,4,0,0" FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" Foreground="{DynamicResource State.Fault}" TextWrapping="Wrap" Text="{Binding AxisCommissioning.AxisRelativeDistanceValidationText}" Visibility="{Binding AxisCommissioning.HasAxisRelativeDistanceError, Converter={StaticResource BooleanToVisibilityConverter}}" /></StackPanel></Grid><WrapPanel><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="home" Content="{loc:Loc Key=R24.MoveHome}" /><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="target" Content="{loc:Loc Key=R24.MoveTarget}" /><Button Margin="0,0,6,6" Style="{StaticResource EquipmentInspectorActionStyle}" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="jog-" Content="JOG −" /><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="jog+" Content="JOG +" /></WrapPanel><WrapPanel Margin="0,6,0,0"><ComboBox FontSize="{Binding FontSize, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" MinWidth="80" Width="Auto" Margin="0,0,6,6" ItemsSource="{Binding InspectorTeachingNames}" SelectedItem="{Binding InspectorTeachingName, Mode=TwoWay}" /><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="teach" Content="{loc:Loc Key=R24.TeachCurrent}" /></WrapPanel><TextBlock Margin="0,6,0,0" Text="{loc:Loc Key=R24.HomeHint}" Foreground="{StaticResource EquipmentInspector.Faint}" FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" /></StackPanel><StackPanel Visibility="{Binding Layout.SelectedComponentEditor.ShowCylinderProperties, Converter={StaticResource BooleanToVisibilityConverter}}"><Grid Margin="0,24,0,24"><Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /></Grid.RowDefinitions><TextBlock FontSize="12" LineHeight="17.4" Text="{loc:Loc Key=R24.State}" Foreground="{StaticResource EquipmentInspector.Faint}" /><TextBlock Grid.Column="2" FontSize="12" LineHeight="17.4" Text="{Binding EquipmentInspectorManualStatusText}" TextWrapping="Wrap" /></Grid><WrapPanel><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="ext" Content="{loc:Loc Key=R24.Extend}" /><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="ret" Content="{loc:Loc Key=R24.Retract}" /></WrapPanel></StackPanel><StackPanel Visibility="{Binding Layout.SelectedComponentEditor.ShowConveyorProperties, Converter={StaticResource BooleanToVisibilityConverter}}"><Grid Margin="0,24,0,24"><Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="4" /><RowDefinition Height="Auto" /></Grid.RowDefinitions><TextBlock FontSize="12" LineHeight="17.4" Text="{loc:Loc Key=R24.RunOutput}" Foreground="{StaticResource EquipmentInspector.Faint}" /><TextBlock Grid.Column="2" FontSize="12" LineHeight="17.4" Text="{Binding EquipmentInspectorManualStatusText}" TextWrapping="Wrap" /><TextBlock Grid.Row="2" FontSize="12" LineHeight="17.4" Text="{loc:Loc Key=R24.Products}" Foreground="{StaticResource EquipmentInspector.Faint}" /><TextBlock Grid.Row="2" Grid.Column="2" FontSize="12" LineHeight="17.4" Text="{Binding EquipmentInspectorProductsText}" TextWrapping="Wrap" /></Grid><WrapPanel><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="run" Content="{loc:Loc Key=R24.RunOn}" /><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="halt" Content="{loc:Loc Key=R24.RunOff}" /><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="placeWp" Content="{loc:Loc Key=R24.PlaceFeedSample}" /><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="clearWp" Content="{loc:Loc Key=R24.ClearSamples}" /></WrapPanel><TextBlock Margin="0,6,0,0" Text="{loc:Loc Key=R24.ConveyorManualHint}" Foreground="{StaticResource EquipmentInspector.Faint}" FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" /></StackPanel><StackPanel Visibility="{Binding Layout.SelectedComponentEditor.ShowSensorProperties, Converter={StaticResource BooleanToVisibilityConverter}}"><Grid Margin="0,24,0,24"><Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="4" /><RowDefinition Height="Auto" /></Grid.RowDefinitions><TextBlock FontSize="12" LineHeight="17.4" Text="{loc:Loc Key=R24.DetectionSignal}" Foreground="{StaticResource EquipmentInspector.Faint}" /><TextBlock Grid.Column="2" FontSize="12" LineHeight="17.4" Text="{Binding EquipmentInspectorManualStatusText}" TextWrapping="Wrap" /><TextBlock Grid.Row="2" FontSize="12" LineHeight="17.4" Text="{loc:Loc Key=R24.Products}" Foreground="{StaticResource EquipmentInspector.Faint}" /><TextBlock Grid.Row="2" Grid.Column="2" FontSize="12" LineHeight="17.4" Text="{Binding EquipmentInspectorProductsText}" TextWrapping="Wrap" /></Grid><WrapPanel><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="placeAtSensor" Content="{loc:Loc Key=R24.PlaceSensorSample}" /><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="clearWp" Content="{loc:Loc Key=R24.Clear}" /></WrapPanel><TextBlock Margin="0,6,0,0" Text="{loc:Loc Key=R24.SensorManualHint}" Foreground="{StaticResource EquipmentInspector.Faint}" FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" /></StackPanel><StackPanel Visibility="{Binding Layout.SelectedComponentEditor.ShowDigitalIoProperties, Converter={StaticResource BooleanToVisibilityConverter}}"><Grid Margin="0,24,0,24"><Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /></Grid.RowDefinitions><TextBlock FontSize="12" LineHeight="17.4" Text="{loc:Loc Key=R24.Output}" Foreground="{StaticResource EquipmentInspector.Faint}" /><TextBlock Grid.Column="2" FontSize="12" LineHeight="17.4" Text="{Binding EquipmentInspectorManualStatusText}" TextWrapping="Wrap" /></Grid><WrapPanel><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="ioOn" Content="{loc:Loc Key=R24.OutputOn}" /><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="ioOff" Content="{loc:Loc Key=R24.OutputOff}" /></WrapPanel></StackPanel><StackPanel Visibility="{Binding Layout.SelectedComponentEditor.ShowFeedPositionProperties, Converter={StaticResource BooleanToVisibilityConverter}}"><WrapPanel Margin="0,12,0,0"><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="placeWp" Content="{loc:Loc Key=R24.PlaceSample}" /><Button Style="{StaticResource EquipmentInspectorActionStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="clearWp" Content="{loc:Loc Key=R24.Clear}" /></WrapPanel></StackPanel><StackPanel Visibility="{Binding Layout.SelectedComponentEditor.ShowCameraProperties, Converter={StaticResource BooleanToVisibilityConverter}}"><WrapPanel Margin="0,12,0,0"><Button Style="{StaticResource EquipmentInspectorApplyStyle}" Margin="0,0,6,6" Command="{Binding EquipmentInspectorManualCommand}" CommandParameter="capture" Content="{loc:Loc Key=R24.TestCapture}" /><Button Margin="0,0,6,6" Style="{StaticResource EquipmentInspectorActionStyle}" Command="{Binding OpenEquipmentCameraSettingsCommand}" Content="{loc:Loc Key=R24.GoVision}" /></WrapPanel><TextBlock Margin="0,6,0,0" Text="{loc:Loc Key=R24.CameraManualHint}" Foreground="{StaticResource EquipmentInspector.Faint}" FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" /></StackPanel><StackPanel Visibility="{Binding Layout.SelectedComponentEditor.ShowNoManualCommand, Converter={StaticResource BooleanToVisibilityConverter}}"><TextBlock Margin="0,12,0,0" Text="{loc:Loc Key=R24.NoManualCommand}" Foreground="{StaticResource EquipmentInspector.Muted}" /></StackPanel></StackPanel><StackPanel Visibility="{Binding Navigation.IsEquipmentWorkspace, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}"><StackPanel x:Name="InspectorNonIntegrationBeforeSetup" Visibility="{Binding IntegrationSetupOnly, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}">
+                    <StackPanel x:Name="ManualCommissioningEntryPanel" Margin="0,0,0,10" DataContext="{Binding ManualEquipment}">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding HasSelectedManualControlTarget}" Value="True" />
+                                            <Condition Binding="{Binding DataContext.IsRunMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False" />
+                                            <Condition Binding="{Binding DataContext.IsEquipmentSinglePartCheckOpen, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock x:Name="ManualEntryControlOwnerText" Text="{Binding ManualControlOwnerText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock x:Name="ManualEntryHintText" Margin="0,4,0,6" Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{Binding ManualControlHintText}" TextWrapping="Wrap" />
+                        <Button x:Name="EnterManualCommissioningButton" Opacity="1" Command="{Binding StartManualEquipmentControlCommand}"
+                                Content="{Binding StartManualControlText}" AutomationProperties.Name="{Binding StartManualControlText}"
+                                Style="{StaticResource PrimaryCommandButtonStyle}" />
+                    </StackPanel>
                     <StackPanel>
                         <StackPanel.Style>
                             <Style TargetType="StackPanel">
@@ -1385,10 +1884,20 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock FontSize="15"
-                                               FontWeight="SemiBold"
-                                               Text="{Binding SelectedEquipmentStatus.Name}"
-                                               TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding SelectedEquipmentStatus.Name}" TextWrapping="Wrap">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                                <Setter Property="FontSize" Value="15" />
+                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True">
+                                                        <Setter Property="FontSize" Value="13" />
+                                                        <Setter Property="FontWeight" Value="Bold" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                     <TextBlock Margin="0,2,0,0"
                                                Foreground="{DynamicResource Text.Secondary}"
                                                Text="{Binding SelectedEquipmentStatus.KindText}" />
@@ -1451,7 +1960,8 @@
                                            Margin="8,7,0,0"
                                            HorizontalAlignment="Right"
                                            Style="{StaticResource TelemetryTextStyle}"
-                                           Text="{Binding SelectedEquipmentStatus.SecondaryValue}" />
+                                           Text="{Binding SelectedEquipmentStatus.SecondaryValue}"
+                                           TextWrapping="Wrap" />
                             </Grid>
                             <StackPanel x:Name="ManualCommissioningPanel"
                                         Margin="0,10,0,0"
@@ -1463,19 +1973,39 @@
                                             <DataTrigger Binding="{Binding HasSelectedManualEquipment}" Value="True">
                                                 <Setter Property="Visibility" Value="Visible" />
                                             </DataTrigger>
-                                        </Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                                <Condition Binding="{Binding DataContext.IsRunMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
                                     </Style>
                                 </StackPanel.Style>
                                 <Separator Margin="0,0,0,8" />
                                 <TextBlock Style="{StaticResource SectionCaptionStyle}"
                                            Text="{loc:Loc Key=Equipment.ManualCommissioning}" />
+                                <TextBlock Margin="0,4,0,0" Text="{Binding ManualControlOwnerText}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,4,0,6" Foreground="{DynamicResource Text.Secondary}"
+                                           Text="{Binding ManualControlHintText}" TextWrapping="Wrap" />
                                 <Button x:Name="StartManualEquipmentControlButton"
                                         Margin="0,3,0,0"
                                         Command="{Binding StartManualEquipmentControlCommand}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
+
                                         Content="{loc:Loc Key=Equipment.StartManualControl}"
                                         ToolTip="{loc:Loc Key=Equipment.StartManualControlTooltip}"
-                                        AutomationProperties.Name="{loc:Loc Key=Equipment.StartManualControl}" />
+                                        AutomationProperties.Name="{loc:Loc Key=Equipment.StartManualControl}" >
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource PrimaryCommandButtonStyle}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CanStartManualEquipmentControl}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
                             </StackPanel>
                             <local:AxisCommissioningPanelView x:Name="AxisCommissioningContent" />
                             <StackPanel x:Name="SensorCommissioningPanel"
@@ -1493,8 +2023,8 @@
                                 </StackPanel.Style>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Foreground="{DynamicResource Text.Secondary}"
                                                Text="{loc:Loc Key=Sensor.ForceState}" />
@@ -1502,7 +2032,8 @@
                                                Grid.Column="1"
                                                Margin="8,0,0,0"
                                                HorizontalAlignment="Right"
-                                               Text="{Binding CurrentSensorForceText}">
+                                               Text="{Binding CurrentSensorForceText}"
+                                               TextWrapping="Wrap">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock" BasedOn="{StaticResource TelemetryTextStyle}">
                                                 <Style.Triggers>
@@ -1518,9 +2049,11 @@
                                     </TextBlock>
                                 </Grid>
                                 <Grid Margin="0,8,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="6" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="6" />
                                         <ColumnDefinition Width="*" />
@@ -1539,7 +2072,9 @@
                                             ToolTip="{loc:Loc Key=Sensor.ForceOffTooltip}"
                                             AutomationProperties.Name="{loc:Loc Key=Sensor.ForceOff}" />
                                     <Button x:Name="ClearSensorForceButton"
-                                            Grid.Column="4"
+                                            Grid.Row="1"
+                                            Grid.ColumnSpan="3"
+                                            Margin="3,6,3,0"
                                             Command="{Binding ClearSensorForceCommand}"
                                             IsEnabled="{Binding CanClearSensorForce}"
                                             Content="{loc:Loc Key=Sensor.ClearForce}"
@@ -1672,6 +2207,21 @@
                                     <DataTrigger Binding="{Binding HasVirtualCamera}" Value="True">
                                         <Setter Property="Visibility" Value="Visible" />
                                     </DataTrigger>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True" />
+                                            <Condition Binding="{Binding DataContext.IsEquipmentSinglePartCheckOpen, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </MultiDataTrigger>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding HasVirtualCamera}" Value="True" />
+                                            <Condition Binding="{Binding DataContext.Navigation.IsEquipmentWorkspace, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="True" />
+                                            <Condition Binding="{Binding DataContext.Layout.SelectedItem.Component.Kind, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="Camera" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </MultiDataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Border.Style>
@@ -1679,11 +2229,6 @@
                             <TextBlock x:Name="CameraSectionAnchor"
                                        Style="{StaticResource SectionCaptionStyle}"
                                        Text="{loc:Loc Key=Camera.Commissioning}" />
-                            <TextBlock Margin="0,2,0,8"
-                                       FontSize="10.5"
-                                       Foreground="{DynamicResource Text.Secondary}"
-                                       Text="{Binding CameraCommissioningHintText}"
-                                       TextWrapping="Wrap" />
                             <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
                                        Text="{loc:Loc Key=Camera.SelectedCamera}" />
                             <ComboBox x:Name="CameraSelectionComboBox"
@@ -1695,11 +2240,6 @@
                                     <behavior:ComboBoxSelectionCommandBehavior Command="{Binding SelectCameraCommand}" />
                                 </b:Interaction.Behaviors>
                             </ComboBox>
-                            <TextBlock Style="{StaticResource InspectorFieldLabelStyle}"
-                                       Text="{loc:Loc Key=Camera.Recipe}" />
-                            <ComboBox x:Name="CameraRecipeComboBox"
-                                      ItemsSource="{Binding CurrentCameraRecipes}"
-                                      SelectedItem="{Binding SelectedCameraRecipe, Mode=TwoWay}" />
                             <local:CameraImageSourceView x:Name="CameraSourceSettings" />
                             <Grid Margin="0,9,0,0">
                                 <Grid.RowDefinitions>
@@ -1757,6 +2297,8 @@
                                        Text="{Binding CurrentCameraFrameText}"
                                        ToolTip="{Binding CurrentCameraFrameText}"
                                        TextWrapping="Wrap" />
+                            <TextBlock Margin="0,4,0,0" TextWrapping="Wrap"
+                                       Text="{Binding DataContext.ManualEquipment.ManualControlOwnerText, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                             <Grid Margin="0,10,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -1811,6 +2353,22 @@
                                        TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
+                    </StackPanel>
+                    <StackPanel>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" />
+                                            <Condition Binding="{Binding IsEquipmentSinglePartCheckOpen}" Value="True" />
+                                            <Condition Binding="{Binding IntegrationSetupOnly, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}}" Value="False" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
                     <Border x:Name="MachineIntegrationPanel"
                             Style="{StaticResource InspectorCardStyle}">
                         <StackPanel>
@@ -2390,15 +2948,16 @@
                             </Grid>
                             <Button x:Name="PublishTwoDImageHandoffButton"
                                     Margin="0,9,0,0"
-                                    Command="{Binding Integration.PublishTwoDImageHandoffCommand}"
-                                    IsEnabled="{Binding Integration.CanPublishTwoDImageHandoff}"
+                                    Command="{Binding Integration.PublishInspectionHandoffCommand}"
+                                    IsEnabled="{Binding Integration.CanPublishInspectionHandoff}"
                                     Style="{StaticResource PrimaryCommandButtonStyle}"
-                                    Content="{loc:Loc Key=Integration.PublishTwoDShort}"
-                                    ToolTip="{loc:Loc Key=Integration.PublishTwoDTooltip}"
+                                    Content="{Binding Integration.PublishInspectionHandoffCaption}"
+                                    ToolTip="{Binding Integration.PublishInspectionHandoffTooltip}"
                                     AutomationProperties.AutomationId="PublishTwoDImageHandoffButton"
-                                    AutomationProperties.Name="{loc:Loc Key=Integration.PublishTwoD}" />
+                                    AutomationProperties.Name="{Binding Integration.PublishInspectionHandoffCaption}" />
                         </StackPanel>
                     </Border>
+                    <StackPanel x:Name="InspectorNonIntegrationAfterSetup" Visibility="{Binding IntegrationSetupOnly, RelativeSource={RelativeSource AncestorType=local:RightToolRegionView}, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}">
                     <Border>
                         <Border.Style>
                             <Style TargetType="Border" BasedOn="{StaticResource InspectorCardStyle}">
@@ -2739,6 +3298,9 @@
                                        TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
+                    </StackPanel>
+                    </StackPanel>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

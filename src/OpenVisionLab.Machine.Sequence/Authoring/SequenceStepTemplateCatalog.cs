@@ -9,7 +9,9 @@ public enum SequenceAuthoringTargetKind
     Axis,
     Camera,
     Workpiece,
-    Subsequence
+    Subsequence,
+    Unit,
+    Conveyor
 }
 
 public sealed record SequenceAuthoringTarget(
@@ -110,6 +112,12 @@ public sealed class SequenceStepTemplateCatalog
                 "",
                 0,
                 SequenceAuthoringTargetKind.Workpiece),
+            Template("delay", "시간 지연 (초)", SequenceStepAction.Delay, "1.5", 0),
+            Template("feed-unit", "유닛 작업물 투입", SequenceStepAction.FeedUnitWorkpiece, "", 30000, SequenceAuthoringTargetKind.Unit),
+            Template("receive-unit", "유닛 작업물 수신", SequenceStepAction.ReceiveUnitWorkpiece, "", 30000, SequenceAuthoringTargetKind.Unit),
+            Template("transfer-unit", "다음 유닛으로 이송 (초)", SequenceStepAction.TransferUnitWorkpiece, "1", 30000, SequenceAuthoringTargetKind.Conveyor),
+            Template("eject-unit", "검사 결과에 따라 배출", SequenceStepAction.EjectUnitWorkpiece, "auto", 0, SequenceAuthoringTargetKind.Unit),
+            Template("branch-inspection", "유닛 검사 OK/NG 분기", SequenceStepAction.BranchInspection, "", 0, SequenceAuthoringTargetKind.Unit),
             Template(
                 "call-subsequence",
                 "Call subsequence",
@@ -136,7 +144,7 @@ public sealed class SequenceStepTemplateCatalog
             .ToHashSet();
 
         return Definitions
-            .Where(template => template.TargetKinds.Any(availableKinds.Contains))
+            .Where(template => template.TargetKinds.Count == 0 || template.TargetKinds.Any(availableKinds.Contains))
             .ToArray();
     }
 
@@ -183,7 +191,7 @@ public sealed class SequenceStepTemplateCatalog
 
         SequenceAuthoringTarget? target = GetTargets(template.Action, targets)
             .FirstOrDefault(candidate => template.TargetKinds.Contains(candidate.Kind));
-        if (target is null)
+        if (target is null && template.TargetKinds.Count != 0)
         {
             return SequenceStepDraftResult.Rejected(
                 $"Template '{template.Name}' has no compatible authored target.");
@@ -191,14 +199,14 @@ public sealed class SequenceStepTemplateCatalog
 
         bool requiresWorkpiece = template.Action is SequenceStepAction.FeedWorkpiece or SequenceStepAction.EjectWorkpiece;
         string parameter = template.Action == SequenceStepAction.MoveAxis
-            ? target.DefaultParameter
+            ? target!.DefaultParameter
             : template.DefaultParameter;
         return SequenceStepDraftResult.Created(new SequenceStepDefinition
         {
             Id = stepId,
             Name = template.Name,
             Action = template.Action,
-            TargetId = requiresWorkpiece ? string.Empty : target.Id,
+            TargetId = requiresWorkpiece ? string.Empty : target?.Id ?? string.Empty,
             Parameter = parameter,
             TimeoutMs = template.DefaultTimeoutMs
         });
@@ -229,6 +237,8 @@ public sealed class SequenceStepTemplateCatalog
         SequenceStepAction.FeedWorkpiece or SequenceStepAction.EjectWorkpiece =>
             [SequenceAuthoringTargetKind.Workpiece],
         SequenceStepAction.CallSubsequence => [SequenceAuthoringTargetKind.Subsequence],
+        SequenceStepAction.FeedUnitWorkpiece or SequenceStepAction.ReceiveUnitWorkpiece or SequenceStepAction.EjectUnitWorkpiece or SequenceStepAction.BranchInspection => [SequenceAuthoringTargetKind.Unit],
+        SequenceStepAction.TransferUnitWorkpiece => [SequenceAuthoringTargetKind.Conveyor],
         _ => Array.Empty<SequenceAuthoringTargetKind>()
     };
 

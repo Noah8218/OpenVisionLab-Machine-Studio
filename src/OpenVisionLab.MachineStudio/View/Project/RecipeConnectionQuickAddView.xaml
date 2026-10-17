@@ -158,12 +158,13 @@
                         </Button>
                     </WrapPanel>
 
-                    <Grid Grid.Row="2" Margin="0,5,0,0">
+                    <Grid Grid.Row="2" Margin="0,12,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
+                            <TextBlock FontWeight="SemiBold" Margin="0,0,0,6" Text="{loc:Loc Key=Connections.SetupPreviewTitle}" />
                             <WrapPanel>
                                 <TextBlock Foreground="{DynamicResource Text.Secondary}"
                                            Text="{Binding RecipeConnections.SummaryText}" />
@@ -186,109 +187,109 @@
                                 <Button x:Name="PreviewSemiconductorStationButton"
                                         Margin="7,0,0,0"
                                         Command="{Binding RecipeConnections.StationSetups.PreviewStationSkeletonCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.StationSkeletonPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
+                                        AutomationProperties.Name="{loc:Loc Key=Connections.StationEntry}"
+                                        Style="{StaticResource QuietCommandButtonStyle}"
                                         ToolTip="{loc:Loc Key=Connections.StationSkeletonPreviewTooltip}">
                                     <StackPanel Orientation="Horizontal">
                                         <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
                                         <TextBlock Margin="5,0,0,0"
-                                                   Text="{loc:Loc Key=Connections.StationSkeletonPreview}" />
+                                                   Text="{loc:Loc Key=Connections.StationEntry}" />
                                     </StackPanel>
                                 </Button>
                                 <Button x:Name="PreviewProcessBlockComposerButton"
                                         Margin="7,0,0,0"
                                         Command="{Binding RecipeConnections.ProcessBlocks.PreviewProcessBlockCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.ProcessBlockPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
+                                        AutomationProperties.Name="{loc:Loc Key=Connections.ProcessEntry}"
+                                        Style="{StaticResource QuietCommandButtonStyle}"
                                 ToolTip="{loc:Loc Key=Connections.ProcessBlockEditPreviewTooltip}">
                                     <StackPanel Orientation="Horizontal">
                                         <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
                                         <TextBlock Margin="5,0,0,0"
-                                                   Text="{loc:Loc Key=Connections.ProcessBlockPreview}" />
+                                                   Text="{loc:Loc Key=Connections.ProcessEntry}" />
                                     </StackPanel>
                                 </Button>
                                 <Button x:Name="PreviewLoadLockSetupButton"
                                         Margin="7,0,0,0"
                                         Command="{Binding RecipeConnections.LoadLocks.PreviewCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.LoadLockSetupPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
+                                        AutomationProperties.Name="{loc:Loc Key=Connections.LoadLockEntry}"
+                                        Style="{StaticResource QuietCommandButtonStyle}"
                                         ToolTip="{loc:Loc Key=Connections.LoadLockSetupPreviewTooltip}">
                                     <StackPanel Orientation="Horizontal">
                                         <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
                                         <TextBlock Margin="5,0,0,0"
-                                                   Text="{loc:Loc Key=Connections.LoadLockSetupPreview}" />
+                                                   Text="{loc:Loc Key=Connections.LoadLockEntry}" />
                                     </StackPanel>
                                 </Button>
                                 <Button x:Name="PreviewWaferHandlerSetupButton"
                                         Margin="7,0,0,0"
                                         Command="{Binding RecipeConnections.SemanticSetups.WaferHandler.PreviewCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.WaferHandlerSetupPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
+                                        AutomationProperties.Name="{loc:Loc Key=Connections.HandlerEntry}"
+                                        Style="{StaticResource QuietCommandButtonStyle}"
                                         ToolTip="{loc:Loc Key=Connections.WaferHandlerSetupPreviewTooltip}">
                                     <StackPanel Orientation="Horizontal">
                                         <ui:SymbolIcon Symbol="Next24" Foreground="{DynamicResource Accent.Primary}" />
-                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.WaferHandlerSetupPreview}" />
+                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.HandlerEntry}" />
                                     </StackPanel>
                                 </Button>
                                 <Button x:Name="PreviewPrealignerSetupButton"
                                         Margin="7,0,0,0"
                                         Command="{Binding RecipeConnections.SemanticSetups.Prealigner.PreviewCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.PrealignerSetupPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
+                                        AutomationProperties.Name="{loc:Loc Key=Connections.PrealignerEntry}"
+                                        Style="{StaticResource QuietCommandButtonStyle}"
                                         ToolTip="{loc:Loc Key=Connections.PrealignerSetupPreviewTooltip}">
                                     <StackPanel Orientation="Horizontal">
                                         <ui:SymbolIcon Symbol="ArrowRotateClockwise24" Foreground="{DynamicResource Accent.Primary}" />
-                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.PrealignerSetupPreview}" />
+                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.PrealignerEntry}" />
                                     </StackPanel>
                                 </Button>
                                 <Button x:Name="PreviewInspectionHandoffSetupButton"
                                         Margin="7,0,0,0"
                                         Command="{Binding RecipeConnections.SemanticSetups.InspectionHandoff.PreviewCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.InspectionHandoffSetupPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
+                                        AutomationProperties.Name="{loc:Loc Key=Connections.InspectionHandoffEntry}"
+                                        Style="{StaticResource QuietCommandButtonStyle}"
                                         ToolTip="{loc:Loc Key=Connections.InspectionHandoffSetupPreviewTooltip}">
                                     <StackPanel Orientation="Horizontal">
                                         <ui:SymbolIcon Symbol="Next24" Foreground="{DynamicResource Accent.Primary}" />
-                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.InspectionHandoffSetupPreview}" />
+                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.InspectionHandoffEntry}" />
                                     </StackPanel>
                                 </Button>
                                 <Button x:Name="PreviewInspectionSortSetupButton"
                                         Margin="7,0,0,0"
                                         Command="{Binding RecipeConnections.SemanticSetups.InspectionSortRouter.PreviewCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.InspectionSortSetupPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
+                                        AutomationProperties.Name="{loc:Loc Key=Connections.InspectionSortEntry}"
+                                        Style="{StaticResource QuietCommandButtonStyle}"
                                         ToolTip="{loc:Loc Key=Connections.InspectionSortSetupPreviewTooltip}">
                                     <StackPanel Orientation="Horizontal">
                                         <ui:SymbolIcon Symbol="Next24" Foreground="{DynamicResource Accent.Primary}" />
-                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.InspectionSortSetupPreview}" />
+                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.InspectionSortEntry}" />
                                     </StackPanel>
                                 </Button>
                                 <Button x:Name="PreviewOhtSetupButton"
                                         Margin="7,0,0,0"
                                         Command="{Binding RecipeConnections.SemanticSetups.OhtHandoff.PreviewCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.OhtSetupPreview}"
-                                        Style="{StaticResource PrimaryCommandButtonStyle}"
+                                        AutomationProperties.Name="{loc:Loc Key=Connections.OhtEntry}"
+                                        Style="{StaticResource QuietCommandButtonStyle}"
                                         ToolTip="{loc:Loc Key=Connections.OhtSetupPreviewTooltip}">
                                     <StackPanel Orientation="Horizontal">
                                         <ui:SymbolIcon Symbol="Next24" Foreground="{DynamicResource Accent.Primary}" />
-                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.OhtSetupPreview}" />
+                                        <TextBlock Margin="5,0,0,0" Text="{loc:Loc Key=Connections.OhtEntry}" />
                                     </StackPanel>
                                 </Button>
                                 <Button x:Name="PreviewRecipeCheckpointTemplateButton"
                                         Margin="7,0,0,0"
                                         Command="{Binding RecipeConnections.CheckpointTemplate.PreviewCommand}"
-                                        AutomationProperties.Name="{loc:Loc Key=Connections.CheckpointTemplatePreview}"
+                                        AutomationProperties.Name="{loc:Loc Key=Connections.CheckpointEntry}"
                                         Style="{StaticResource QuietCommandButtonStyle}"
                                         ToolTip="{loc:Loc Key=Connections.CheckpointTemplatePreviewTooltip}">
                                     <StackPanel Orientation="Horizontal">
                                         <ui:SymbolIcon Symbol="Add24" Foreground="{DynamicResource Accent.Primary}" />
                                         <TextBlock Margin="5,0,0,0"
-                                                   Text="{loc:Loc Key=Connections.CheckpointTemplatePreview}" />
+                                                   Text="{loc:Loc Key=Connections.CheckpointEntry}" />
                                     </StackPanel>
                                 </Button>
                             </WrapPanel>
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <WrapPanel Grid.Column="1" VerticalAlignment="Bottom" MaxWidth="330">
                             <Button x:Name="ValidateSimulationReadinessButton"
                                     Command="{Binding RecipeConnections.DryRun.ValidateSimulationReadinessCommand}"
                                     AutomationProperties.Name="{loc:Loc Key=Connections.CheckReadiness}"
@@ -331,7 +332,7 @@
                                     </TextBlock.Style>
                                 </TextBlock>
                             </Border>
-                        </StackPanel>
+                        </WrapPanel>
                     </Grid>
 
                     <TextBlock Grid.Row="3"

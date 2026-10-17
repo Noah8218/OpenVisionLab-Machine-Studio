@@ -23,7 +23,28 @@ internal sealed class SmokeNativeInput : IDisposable
 
     internal bool IsPointerHeld => _pointerHeld;
 
-    internal void ActivateWindow(Window window) => SetForegroundWindow(new WindowInteropHelper(window).Handle);
+    internal void ActivateWindow(Window window)
+    {
+        if (_pointerHeld) throw new InvalidOperationException("Cannot activate a smoke window while the pointer is held.");
+        var target = new WindowInteropHelper(window).Handle;
+        if (target == IntPtr.Zero) throw new InvalidOperationException("Native input requires a shown smoke window.");
+        var activated = SetForegroundWindow(target);
+        if (GetAncestor(GetForegroundWindow(), GetAncestorRoot) != target)
+            throw new InvalidOperationException($"Native smoke window activation failed. SetForegroundWindow={activated}, Target=0x{target.ToInt64():X}, Foreground=0x{GetForegroundWindow().ToInt64():X}.");
+    }
+
+    internal async Task WaitForForegroundAsync(Window window)
+    {
+        var target = new WindowInteropHelper(window).Handle;
+        Console.WriteLine($"Native command smoke awaiting owned foreground, HWND=0x{target.ToInt64():X}; no input sent while waiting.");
+        for (var attempt = 0; attempt < 300; attempt++)
+        {
+            if (target != IntPtr.Zero && GetAncestor(GetForegroundWindow(), GetAncestorRoot) == target)
+                return;
+            await Task.Delay(100);
+        }
+        throw new TimeoutException($"Native command smoke requires its own foreground window. Target=0x{target.ToInt64():X}, Foreground=0x{GetForegroundWindow().ToInt64():X}.");
+    }
 
     internal void SendMouseEvent(
         uint flags,

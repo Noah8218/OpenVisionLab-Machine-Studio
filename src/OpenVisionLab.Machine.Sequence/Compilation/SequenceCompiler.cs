@@ -8,7 +8,8 @@ public sealed class SequenceCompiler
 {
     public SequenceCompilationResult Compile(
         SequenceDefinition? definition,
-        SequenceCompilationTargets? targets = null)
+        SequenceCompilationTargets? targets = null,
+        int repeatCount = 1)
     {
         if (definition is null)
         {
@@ -16,6 +17,14 @@ public sealed class SequenceCompiler
         }
 
         var errors = new List<SequenceCompilationError>();
+        if (repeatCount is < 1 or > 100)
+        {
+            AddError(errors, SequenceCompilationErrorCode.InvalidNumericParameter, null, "Unit repeat count must be between 1 and 100.");
+        }
+        if (definition.UnitId is { } unitId && (string.IsNullOrWhiteSpace(unitId) || targets is not null && !targets.ContainsUnit(unitId)))
+        {
+            AddError(errors, SequenceCompilationErrorCode.UnexpectedTargetId, null, $"Sequence unit '{unitId}' is not declared.");
+        }
         if (string.IsNullOrWhiteSpace(definition.Id))
         {
             AddError(errors, SequenceCompilationErrorCode.SequenceIdRequired, null, "Sequence id is required.");
@@ -66,7 +75,7 @@ public sealed class SequenceCompiler
             var actionName = source.Action.ToString();
             var isComplete = string.Equals(actionName, "Complete", StringComparison.Ordinal)
                 || source.Action == SequenceStepAction.None;
-            var isWaitVisionResult = string.Equals(actionName, "WaitVisionResult", StringComparison.Ordinal);
+            var isWaitVisionResult = source.Action is SequenceStepAction.WaitVisionResult or SequenceStepAction.BranchInspection;
 
             if (isComplete)
             {
@@ -99,7 +108,7 @@ public sealed class SequenceCompiler
 
             ValidateExpectedStateCheckpoint(source, errors);
 
-            var compiled = CompileStep(source, actionName, nextStepId, errorStepId, failureStepId, targets, errors);
+            var compiled = CompileStep(source, actionName, nextStepId, errorStepId, failureStepId, targets, errors, definition.UnitId);
             if (compiled is not null)
             {
                 compiledSteps.Add(compiled);
@@ -116,7 +125,7 @@ public sealed class SequenceCompiler
                 definition.Id,
                 definition.Name,
                 TimeSpan.FromMilliseconds(definition.WatchdogTimeoutMs),
-                compiledSteps.AsReadOnly()),
+                compiledSteps.AsReadOnly(), definition.UnitId, repeatCount),
             Array.Empty<SequenceCompilationError>());
     }
 
@@ -127,7 +136,8 @@ public sealed class SequenceCompiler
         string? errorStepId,
         string? failureStepId,
         SequenceCompilationTargets? targets,
-        List<SequenceCompilationError> errors)
+        List<SequenceCompilationError> errors,
+        string? unitId)
     {
         var name = string.IsNullOrWhiteSpace(source.Name) ? source.Id : source.Name;
 
@@ -157,6 +167,11 @@ public sealed class SequenceCompiler
             "WaitVisionResult" => CompileWaitVisionResult(source, name, nextStepId, errorStepId, failureStepId, targets, errors),
             nameof(SequenceStepAction.CallSubsequence) => CompileCallSubsequence(source, name, nextStepId, errorStepId, targets, errors),
             nameof(SequenceStepAction.Wait) => CompileLegacyWait(source, name, nextStepId, errorStepId, targets, errors),
+            nameof(SequenceStepAction.Delay) => CompileDelay(source, name, nextStepId, errorStepId, errors),
+            nameof(SequenceStepAction.FeedUnitWorkpiece) or nameof(SequenceStepAction.ReceiveUnitWorkpiece)
+                or nameof(SequenceStepAction.TransferUnitWorkpiece) or nameof(SequenceStepAction.EjectUnitWorkpiece)
+                => CompileUnitOperation(source, name, unitId, nextStepId, errorStepId, targets, errors),
+            nameof(SequenceStepAction.BranchInspection) => CompileInspectionBranch(source, name, unitId, nextStepId, errorStepId, failureStepId, targets, errors),
             "Complete" => CompileComplete(source, name, errors),
             nameof(SequenceStepAction.None) => CompileComplete(source, name, errors),
             _ => Unsupported(source, errors)
@@ -247,14 +262,15 @@ public sealed class SequenceCompiler
     {
         var targetId = RequireTarget(source, errors);
         var targetPosition = ParseFiniteDouble(source, errors);
-        ValidateNoTimeout(source, errors);
+        var timeout = source.WaitForAxisCompletion ? ParseWaitTimeout(source, errors) : TimeSpan.Zero;
+        if (!source.WaitForAxisCompletion) ValidateNoTimeout(source, errors);
         if (targetId is not null)
         {
             ValidateAxis(source.Id, targetId, targets, errors);
         }
 
-        return targetId is not null && targetPosition.HasValue && source.TimeoutMs == 0
-            ? new MoveAxisStep(source.Id, name, targetId, targetPosition.Value, nextStepId, errorStepId)
+        return targetId is not null && targetPosition.HasValue && timeout.HasValue && (source.WaitForAxisCompletion || source.TimeoutMs == 0)
+            ? new MoveAxisStep(source.Id, name, targetId, targetPosition.Value, nextStepId, errorStepId, source.WaitForAxisCompletion, timeout.Value)
             : null;
     }
 
@@ -284,6 +300,71 @@ public sealed class SequenceCompiler
             && (string.IsNullOrWhiteSpace(source.Parameter) || string.Equals(source.Parameter.Trim(), "axisDone", StringComparison.OrdinalIgnoreCase))
                 ? new WaitAxisDoneStep(source.Id, name, targetId, nextStepId, errorStepId, timeout.Value)
                 : null;
+    }
+
+    private static CompiledSequenceStep? CompileUnitOperation(SequenceStepDefinition source, string name, string? unitId, string? nextStepId,
+        string? errorStepId, SequenceCompilationTargets? targets, List<SequenceCompilationError> errors)
+    {
+        int errorCount = errors.Count;
+        bool transfer = source.Action == SequenceStepAction.TransferUnitWorkpiece;
+        bool eject = source.Action == SequenceStepAction.EjectUnitWorkpiece;
+        if (string.IsNullOrWhiteSpace(unitId) || targets is not null && !targets.ContainsUnit(unitId))
+            AddError(errors, SequenceCompilationErrorCode.UnexpectedTargetId, source.Id, "Material steps require a declared owning unit.");
+        if (transfer)
+        {
+            if (string.IsNullOrWhiteSpace(source.TargetId) || targets is not null && !targets.ContainsConveyor(source.TargetId))
+                AddError(errors, SequenceCompilationErrorCode.UnexpectedTargetId, source.Id, "Transfer requires an active-layout conveyor target.");
+            if (string.IsNullOrWhiteSpace(source.DestinationUnitId) || source.DestinationUnitId == unitId
+                || targets is not null && !targets.ContainsUnit(source.DestinationUnitId))
+                AddError(errors, SequenceCompilationErrorCode.UnexpectedTargetId, source.Id, "Transfer requires a different declared destination unit.");
+        }
+        else if (source.TargetId != unitId || !string.IsNullOrWhiteSpace(source.DestinationUnitId))
+            AddError(errors, SequenceCompilationErrorCode.UnexpectedTargetId, source.Id, "The step target must match its owning unit and have no destination.");
+        double? seconds = transfer ? ParseFiniteDouble(source, errors) : eject ? source.EjectionDelayMilliseconds / 1000d : 0;
+        if (source.EjectionDelayMilliseconds is < 0 or > 86400000 || !eject && source.EjectionDelayMilliseconds != 0)
+            AddError(errors, SequenceCompilationErrorCode.InvalidNumericParameter, source.Id, "Ejection delay is only valid for ejection, between 0 and 86400000 ms.");
+        if (seconds is < 0 or > 86400)
+            AddError(errors, SequenceCompilationErrorCode.InvalidNumericParameter, source.Id, "Transfer duration must be between 0 and 86400 seconds.");
+        if (eject && source.Parameter is not ("auto" or "OK" or "NG"))
+            AddError(errors, SequenceCompilationErrorCode.UnexpectedParameter, source.Id, "Ejection route must be auto, OK, or NG.");
+        if (!transfer && !eject && !string.IsNullOrWhiteSpace(source.Parameter))
+            AddError(errors, SequenceCompilationErrorCode.UnexpectedParameter, source.Id, "Feed and receive do not accept a parameter.");
+        var timeout = ParseWaitTimeout(source, errors);
+        return errorCount == errors.Count && seconds.HasValue && timeout.HasValue
+            ? new UnitOperationStep(source.Id, name, source.Action, unitId!, source.DestinationUnitId, transfer ? source.TargetId : null,
+                eject ? source.Parameter : "", TimeSpan.FromSeconds(seconds.Value), nextStepId, errorStepId, timeout.Value) : null;
+    }
+
+    private static CompiledSequenceStep? CompileInspectionBranch(SequenceStepDefinition source, string name, string? unitId, string? nextStepId,
+        string? errorStepId, string? failureStepId, SequenceCompilationTargets? targets, List<SequenceCompilationError> errors)
+    {
+        if (string.IsNullOrWhiteSpace(unitId) || source.TargetId != unitId || targets is not null && !targets.ContainsUnit(unitId))
+        {
+            AddError(errors, SequenceCompilationErrorCode.UnexpectedTargetId, source.Id, "Inspection branch requires its declared owning unit.");
+            return null;
+        }
+        if (!string.IsNullOrWhiteSpace(source.Parameter))
+            AddError(errors, SequenceCompilationErrorCode.UnexpectedParameter, source.Id, "Inspection branch does not accept a parameter.");
+        ValidateNoTimeout(source, errors);
+        return failureStepId is not null && string.IsNullOrWhiteSpace(source.Parameter) && source.TimeoutMs == 0
+            ? new BranchInspectionStep(source.Id, name, unitId, failureStepId, nextStepId, errorStepId) : null;
+    }
+
+    private static CompiledSequenceStep? CompileDelay(SequenceStepDefinition source, string name, string? nextStepId, string? errorStepId, List<SequenceCompilationError> errors)
+    {
+        double? seconds = ParseFiniteDouble(source, errors);
+        if (seconds is < 0 or > 86400)
+        {
+            AddError(errors, SequenceCompilationErrorCode.InvalidNumericParameter, source.Id, "Delay duration must be between 0 and 86400 seconds.");
+            seconds = null;
+        }
+        if (!string.IsNullOrWhiteSpace(source.TargetId))
+        {
+            AddError(errors, SequenceCompilationErrorCode.UnexpectedTargetId, source.Id, "Delay does not accept a target.");
+        }
+        ValidateNoTimeout(source, errors);
+        return seconds.HasValue && string.IsNullOrWhiteSpace(source.TargetId) && source.TimeoutMs == 0
+            ? new DelayStep(source.Id, name, TimeSpan.FromSeconds(seconds.Value), nextStepId, errorStepId) : null;
     }
 
     private static CompiledSequenceStep? CompileLegacyWait(

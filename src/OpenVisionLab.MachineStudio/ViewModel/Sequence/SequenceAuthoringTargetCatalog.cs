@@ -21,11 +21,11 @@ internal sealed record SequenceAuthoringTargetCatalogSnapshot(
 /// </summary>
 internal sealed class SequenceAuthoringTargetCatalog
 {
-    internal SequenceAuthoringTargetCatalogSnapshot Build(MachineProjectDocument project)
+    internal SequenceAuthoringTargetCatalogSnapshot Build(MachineProjectDocument project, string? preferredUnitId = null)
     {
         MachineLayoutDefinition? layout = GetActiveLayout(project);
         return new(
-            BuildAuthoringTargets(project, layout),
+            BuildAuthoringTargets(project, layout, preferredUnitId),
             BuildExpectedStateTargets(project, layout),
             BuildWorkpieceTargets(layout));
     }
@@ -37,6 +37,7 @@ internal sealed class SequenceAuthoringTargetCatalog
             .Where(target => target.Kind != SequenceAuthoringTargetKind.Subsequence
                 || sequence is null
                 || !string.Equals(target.Id, sequence.Id, StringComparison.Ordinal))
+            .Where(target => target.Kind != SequenceAuthoringTargetKind.Unit || target.Id == sequence?.UnitId)
             .ToArray();
 
     internal SequenceCompilationTargets BuildCompilationTargets(MachineProjectDocument project)
@@ -52,7 +53,9 @@ internal sealed class SequenceAuthoringTargetCatalog
             GetActiveLayout(project)?.Components
                 .Where(component => component.Kind == LayoutComponentKind.Workpiece)
                 .Select(component => component.Id)
-                ?? Enumerable.Empty<string>());
+                ?? Enumerable.Empty<string>(),
+            project.Stations.SelectMany(station => station.Units).Select(unit => unit.Id),
+            GetActiveLayout(project)?.Components.Where(component => component.Kind == LayoutComponentKind.Conveyor).Select(component => component.Id) ?? []);
     }
 
     private static IReadOnlyList<SequenceAuthoringTarget> BuildWorkpieceTargets(
@@ -83,9 +86,12 @@ internal sealed class SequenceAuthoringTargetCatalog
 
     private static IReadOnlyList<SequenceAuthoringTarget> BuildAuthoringTargets(
         MachineProjectDocument project,
-        MachineLayoutDefinition? layout)
+        MachineLayoutDefinition? layout,
+        string? preferredUnitId)
     {
         var targets = new List<SequenceAuthoringTarget>();
+        targets.AddRange(project.Stations.SelectMany(station => station.Units).Select(unit =>
+            new SequenceAuthoringTarget(unit.Id, TargetDisplayName(UnitName(unit), unit.Id), SequenceAuthoringTargetKind.Unit)));
         targets.AddRange(project.Channels
             .Where(channel => channel.Kind is ChannelKind.DigitalInput or ChannelKind.DigitalOutput)
             .Select(channel => new SequenceAuthoringTarget(
@@ -96,17 +102,19 @@ internal sealed class SequenceAuthoringTargetCatalog
                     : SequenceAuthoringTargetKind.DigitalOutput)));
         targets.AddRange(project.Axes.Select(axis => new SequenceAuthoringTarget(
             axis.Id,
-            TargetDisplayName(axis.Name, axis.Id),
+            TargetDisplayName(BoundPartName(layout, axis.Id, axis.Name, SequenceAuthoringTargetKind.Axis), axis.Id),
             SequenceAuthoringTargetKind.Axis,
             axis.HomePosition.ToString(System.Globalization.CultureInfo.InvariantCulture))));
         targets.AddRange(project.Devices
             .Where(device => device.Kind == DeviceKind.Camera)
             .Select(device => new SequenceAuthoringTarget(
                 device.Id,
-                TargetDisplayName(device.Name, device.Id),
+                TargetDisplayName(BoundPartName(layout, device.Id, device.Name, SequenceAuthoringTargetKind.Camera), device.Id),
                 SequenceAuthoringTargetKind.Camera)));
         if (layout is not null)
         {
+            targets.AddRange(layout.Components.Where(component => component.Kind == LayoutComponentKind.Conveyor).Select(component =>
+                new SequenceAuthoringTarget(component.Id, TargetDisplayName(component.Name, component.Id), SequenceAuthoringTargetKind.Conveyor)));
             targets.AddRange(layout.Components
                 .Where(component => component.Kind == LayoutComponentKind.Workpiece)
                 .Select(component => new SequenceAuthoringTarget(
@@ -116,8 +124,17 @@ internal sealed class SequenceAuthoringTargetCatalog
         }
         targets.AddRange(project.Sequences.Select(sequence => new SequenceAuthoringTarget(
             sequence.Id,
-            SequenceTargetDisplayName(sequence.Name, sequence.Id),
+            TargetDisplayName(sequence.Name, sequence.Id),
             SequenceAuthoringTargetKind.Subsequence)));
+        if (layout is not null && !string.IsNullOrEmpty(preferredUnitId))
+        {
+            HashSet<string> preferredTargets = layout.Components
+                .Where(component => component.UnitId == preferredUnitId)
+                .SelectMany(component => new[] { component.Id, component.BehaviorBindingId ?? string.Empty })
+                .ToHashSet(StringComparer.Ordinal);
+            preferredTargets.UnionWith(project.Devices.Where(device => preferredTargets.Contains(device.Id)).SelectMany(device => device.ChannelIds));
+            return targets.OrderByDescending(target => preferredTargets.Contains(target.Id)).ToArray();
+        }
         return targets;
     }
 
@@ -128,7 +145,7 @@ internal sealed class SequenceAuthoringTargetCatalog
         var targets = project.Axes
             .Select(axis => new SequenceExpectedStateTarget(
                 axis.Id,
-                TargetDisplayName(axis.Name, axis.Id),
+                TargetDisplayName(BoundPartName(layout, axis.Id, axis.Name, SequenceAuthoringTargetKind.Axis), axis.Id),
                 Enum.GetNames<AxisState>()))
             .ToList();
         if (layout is null)
@@ -167,8 +184,24 @@ internal sealed class SequenceAuthoringTargetCatalog
                 : null;
 
     private static string TargetDisplayName(string? name, string id) =>
-        string.IsNullOrWhiteSpace(name) ? id : $"{name} · {id}";
+        string.IsNullOrWhiteSpace(name) ? id : $"{name} ({id})";
 
-    private static string SequenceTargetDisplayName(string? name, string id) =>
-        string.IsNullOrWhiteSpace(name) ? id : name;
+    internal static string GetName(SequenceAuthoringTarget target)
+    {
+        string suffix = $" ({target.Id})";
+        return target.Name.EndsWith(suffix, StringComparison.Ordinal) ? target.Name[..^suffix.Length] : target.Name;
+    }
+
+    private static string UnitName(MachineUnitDefinition unit) => string.IsNullOrWhiteSpace(unit.SlotName)
+        ? unit.Name
+        : string.IsNullOrWhiteSpace(unit.Name) ? unit.SlotName : $"{unit.Name} / {unit.SlotName}";
+
+    private static string BoundPartName(MachineLayoutDefinition? layout, string id, string fallback, SequenceAuthoringTargetKind kind)
+    {
+        var parts = layout?.Components.Where(component => string.Equals(component.BehaviorBindingId, id, StringComparison.Ordinal)
+            && (kind == SequenceAuthoringTargetKind.Axis
+                ? component.Kind is LayoutComponentKind.LinearStage or LayoutComponentKind.RotaryStage
+                : component.Kind == LayoutComponentKind.Camera)).Take(2).ToArray();
+        return parts?.Length == 1 && !string.IsNullOrWhiteSpace(parts[0].Name) ? parts[0].Name : fallback;
+    }
 }

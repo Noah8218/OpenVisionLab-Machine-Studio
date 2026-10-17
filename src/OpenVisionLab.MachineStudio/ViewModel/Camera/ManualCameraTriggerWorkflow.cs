@@ -166,30 +166,49 @@ internal sealed class ManualCameraTriggerWorkflow
         }
     }
 
+    internal async Task<ManualCameraTriggerResult> ExecuteNumericalAsync(ManualCameraTriggerRequestInput input, CancellationToken cancellationToken)
+    {
+        if (!input.IsAllowed || input.CurrentCamera is not { } camera || input.CameraDefinition?.NumericalInput is not { } settings
+            || settings.Validate() is not null || settings.ConfirmedVersion != settings.Version || settings.RecipeName != input.SelectedRecipe)
+            return new(ManualCameraTriggerOutcome.SourceRejected, "Apply and confirm the numerical capture recipe first.");
+        if (!IsCurrentContext(input.SessionId, input.DocumentRevision, input.ProjectId, input.Snapshot.RuntimeGeneration, input.Snapshot, camera))
+            return new(ManualCameraTriggerOutcome.ContextChanged);
+        cancellationToken.ThrowIfCancellationRequested();
+        var command = TriggerVirtualCameraCommand.CreateNumerical(camera.Id, settings.RecipeName, input.ProjectId, input.Snapshot.RuntimeGeneration,
+            input.WaitForExternalResult);
+        var result = await _dispatchCameraCommand(command, "Camera.ActionTrigger");
+        if (!result.IsAccepted) return new(ManualCameraTriggerOutcome.DispatchRejected, result.Detail);
+        _applyMonitorSnapshot(_getCurrentSnapshot());
+        return new(ManualCameraTriggerOutcome.Accepted);
+    }
+
     internal ValueTask<VirtualFrameDescriptor> AcquireFrameAsync(
         VirtualCameraInspectionRequest request,
         CancellationToken cancellationToken = default) =>
         _acquireFrameAsync(request, cancellationToken);
 
-    private bool IsCurrentContext(ManualCameraTriggerRequest request)
+    private bool IsCurrentContext(ManualCameraTriggerRequest request) =>
+        IsCurrentContext(request.SessionId, request.DocumentRevision, request.ProjectId, request.RuntimeGeneration, request.BaselineSnapshot, request.BaselineCamera);
+
+    private bool IsCurrentContext(string sessionId, long revision, string projectId, long runtimeGeneration, SimulationSnapshot baselineSnapshot, VirtualCameraSnapshot baselineCamera)
     {
         var current = _getCurrentSnapshot();
         var session = _getCurrentSessionIdentity();
         var currentCamera = current.Cameras.FirstOrDefault(camera =>
             string.Equals(
                 camera.Id,
-                request.BaselineCamera.Id,
+                baselineCamera.Id,
                 StringComparison.Ordinal));
         return current.RunMode == SimulationRunMode.Paused
             && current.ControlOwner == SimulationControlOwner.Manual
-            && current.TickIndex == request.BaselineSnapshot.TickIndex
-            && current.SimulationTime == request.BaselineSnapshot.SimulationTime
-            && string.Equals(session.SessionId, request.SessionId, StringComparison.Ordinal)
-            && session.DocumentRevision == request.DocumentRevision
-            && string.Equals(current.ProjectId, request.ProjectId, StringComparison.Ordinal)
-            && current.RuntimeGeneration == request.RuntimeGeneration
+            && current.TickIndex == baselineSnapshot.TickIndex
+            && current.SimulationTime == baselineSnapshot.SimulationTime
+            && string.Equals(session.SessionId, sessionId, StringComparison.Ordinal)
+            && session.DocumentRevision == revision
+            && string.Equals(current.ProjectId, projectId, StringComparison.Ordinal)
+            && current.RuntimeGeneration == runtimeGeneration
             && currentCamera is { }
-            && currentCamera.AcquisitionOrdinal == request.BaselineCamera.AcquisitionOrdinal
-            && currentCamera.State == request.BaselineCamera.State;
+            && currentCamera.AcquisitionOrdinal == baselineCamera.AcquisitionOrdinal
+            && currentCamera.State == baselineCamera.State;
     }
 }

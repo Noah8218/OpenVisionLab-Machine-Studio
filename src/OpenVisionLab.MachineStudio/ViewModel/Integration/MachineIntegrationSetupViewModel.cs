@@ -8,6 +8,7 @@ using OpenVisionLab;
 using OpenVisionLab.Integration.Contracts;
 using OpenVisionLab.Machine.Infrastructure.Integration;
 using OpenVisionLab.Machine.Infrastructure.Vision;
+using OpenVisionLab.Machine.Simulation.Camera;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
@@ -60,6 +61,7 @@ public sealed class MachineIntegrationSetupViewModel : ViewModelBase, IDisposabl
     private readonly Func<string, string?> _selectInspectionRecipe;
     private readonly Func<string, string?> _selectHeightMapSource;
     private readonly Func<bool> _canEditTcpSetup;
+    private readonly Func<bool> _useGeneratedHeightMap;
     private readonly Action<string> _setStatus;
     private readonly Action _clearSessionSharedKey;
     private readonly ObservableCollection<MachineIntegrationRecipeItemViewModel> _recipeCatalogItems = new();
@@ -93,6 +95,7 @@ public sealed class MachineIntegrationSetupViewModel : ViewModelBase, IDisposabl
     private bool _isApplyingSettings;
     private bool _hasUnsavedChanges;
     private bool _disposed;
+    private bool _lastUsesGeneratedHeightMapSource;
 
     internal MachineIntegrationSetupViewModel(
         string? settingsPath,
@@ -102,13 +105,15 @@ public sealed class MachineIntegrationSetupViewModel : ViewModelBase, IDisposabl
         Func<bool> canEditTcpSetup,
         Action<string> setStatus,
         Action clearSessionSharedKey,
-        Func<string, string?>? selectHeightMapSource = null)
+        Func<string, string?>? selectHeightMapSource = null,
+        Func<bool>? useGeneratedHeightMap = null)
     {
         _pathReadiness = pathReadiness ?? throw new ArgumentNullException(nameof(pathReadiness));
         _setupStore = new MachineIntegrationSetupStore(settingsPath);
         _selectExchangeRoot = selectExchangeRoot ?? throw new ArgumentNullException(nameof(selectExchangeRoot));
         _selectInspectionRecipe = selectInspectionRecipe ?? throw new ArgumentNullException(nameof(selectInspectionRecipe));
         _selectHeightMapSource = selectHeightMapSource ?? selectInspectionRecipe;
+        _useGeneratedHeightMap = useGeneratedHeightMap ?? (() => false);
         _canEditTcpSetup = canEditTcpSetup ?? throw new ArgumentNullException(nameof(canEditTcpSetup));
         _setStatus = setStatus ?? throw new ArgumentNullException(nameof(setStatus));
         _clearSessionSharedKey = clearSessionSharedKey ?? throw new ArgumentNullException(nameof(clearSessionSharedKey));
@@ -557,8 +562,9 @@ public sealed class MachineIntegrationSetupViewModel : ViewModelBase, IDisposabl
         }
     }
 
-    public string ThreeDHeightMapSourceStatusText =>
-        IsThreeDSourcePathAvailable()
+    public string ThreeDHeightMapSourceStatusText => UsesGeneratedHeightMapSource
+        ? L("GeneratedHeightSourceAvailable", "선택한 촬영부에서 높이 원본을 생성합니다 · 128 × 128 Float32 · LU. 외부 검사 전송 시 저장합니다.", "The selected camera generates the height input · 128 × 128 Float32 · LU. Explicit handoff saves it.")
+        : IsThreeDSourcePathAvailable()
             ? L(
                 "ThreeDSourceAvailable",
                 "3D HeightMap 원본 파일을 사용할 수 있습니다.",
@@ -588,7 +594,9 @@ public sealed class MachineIntegrationSetupViewModel : ViewModelBase, IDisposabl
         ? L("ThreeDConsumerIdentityValid", "3D 소비자 clean build identity가 유효합니다.", "The 3D consumer clean-build identity is valid.")
         : L("ThreeDConsumerIdentityInvalid", "3D 소비자 버전과 40자리 source commit을 입력하세요.", "Enter the 3D consumer version and its 40-character source commit.");
 
-    public string ThreeDSetupStatusText => !UseThreeDHeightMap
+    public string ThreeDSetupStatusText => UseThreeDHeightMap && UsesGeneratedHeightMapSource
+        ? L("GeneratedHeightSource", "촬영 시 생성하는 128 × 128 Float32 높이 원본 · LU · 외부 결과 대기. LU 레시피와 검사 연결 설정을 저장하세요.", "Generated 128 × 128 Float32 height input · LU · awaiting external inspection. Save the LU recipe and inspection connection setup.")
+        : !UseThreeDHeightMap
         ? L("TwoDSetupActive", "2D/Image 자동 외부 검사 설정을 사용합니다.", "2D/Image automatic external inspection setup is active.")
         : IsThreeDAutomaticSetupReady
             ? L("ThreeDSetupReady", "3D/HeightMap 자동 외부 검사 설정이 준비되었습니다.", "3D/HeightMap automatic external inspection setup is ready.")
@@ -622,23 +630,50 @@ public sealed class MachineIntegrationSetupViewModel : ViewModelBase, IDisposabl
         ? ThreeDConsumerIdentity
         : TwoDConsumerIdentity;
 
-    internal bool IsThreeDAutomaticSetupReady =>
-        UseThreeDHeightMap
-        && !HasUnsavedChanges
-        && IsThreeDSourcePathAvailable()
+    public bool UsesGeneratedHeightMapSource => _useGeneratedHeightMap();
+
+    internal bool IsThreeDInspectionProfileReady =>
+        UseThreeDHeightMap && !HasUnsavedChanges
         && IsThreeDInspectionRecipeAvailable()
         && _pathReadiness.IsInspectionRecipeSupportedByThreeD(ThreeDInspectionRecipePath)
         && ThreeDConsumerIdentity is not null
-        && TryParsePositiveInt(ThreeDHeightMapWidthText, out _)
-        && TryParsePositiveInt(ThreeDHeightMapHeightText, out _)
-        && !string.IsNullOrWhiteSpace(ThreeDHeightMapPixelFormat)
-        && !string.IsNullOrWhiteSpace(ThreeDHeightMapUnit)
         && TryGetThreeDRecipeFrameId(out _)
         && !string.IsNullOrWhiteSpace(ThreeDSequenceId)
         && !string.IsNullOrWhiteSpace(ThreeDStepId)
         && !string.IsNullOrWhiteSpace(ThreeDDeviceId)
-        && HasStoredEvidence(_threeDHeightMapSourceSha256, _threeDHeightMapSourceLength)
         && HasStoredEvidence(_threeDInspectionRecipeSha256, _threeDInspectionRecipeLength);
+
+    internal bool IsThreeDAutomaticSetupReady => IsThreeDInspectionProfileReady
+        && (UsesGeneratedHeightMapSource
+            ? ThreeDHeightMapUnit.Trim() == "LU" && ThreeDRecipeUsesUnit("LU")
+            : IsThreeDSourcePathAvailable()
+                && TryParsePositiveInt(ThreeDHeightMapWidthText, out _)
+                && TryParsePositiveInt(ThreeDHeightMapHeightText, out _)
+                && !string.IsNullOrWhiteSpace(ThreeDHeightMapPixelFormat)
+                && !string.IsNullOrWhiteSpace(ThreeDHeightMapUnit)
+                && HasStoredEvidence(_threeDHeightMapSourceSha256, _threeDHeightMapSourceLength));
+
+    internal MachineIntegrationHeightMapSourceDefinition? CreateGeneratedHeightMapSource(VirtualCameraFrameEvidence frame)
+    {
+        if (!UsesGeneratedHeightMapSource || !IsThreeDAutomaticSetupReady || !TryGetThreeDRecipeFrameId(out var frameId))
+            return null;
+        return new(frame.SourceRelativePath, frame.Width, frame.Height, frame.PixelFormat, "LU", frameId,
+            new(frame.ContentSha256, frame.ContentLength));
+    }
+
+    private bool ThreeDRecipeUsesUnit(string unit)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(ThreeDInspectionRecipePath));
+            return document.RootElement.GetProperty("source").GetProperty("unit").GetString() == unit
+                && document.RootElement.GetProperty("step").GetProperty("unit").GetString() == unit;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException or KeyNotFoundException)
+        {
+            return false;
+        }
+    }
 
     public MachineIntegrationPathReadinessSnapshot Readiness =>
         _pathReadiness.Evaluate(ExchangeRoot, InspectionRecipePath);
@@ -680,7 +715,7 @@ public sealed class MachineIntegrationSetupViewModel : ViewModelBase, IDisposabl
         out MachineIntegrationHeightMapSourceDefinition source)
     {
         source = null!;
-        if (!IsThreeDAutomaticSetupReady || string.IsNullOrWhiteSpace(projectPath))
+        if (UsesGeneratedHeightMapSource || !IsThreeDAutomaticSetupReady || string.IsNullOrWhiteSpace(projectPath))
         {
             return false;
         }
@@ -772,6 +807,14 @@ public sealed class MachineIntegrationSetupViewModel : ViewModelBase, IDisposabl
 
     internal void RefreshCommandState()
     {
+        bool usesGenerated = UsesGeneratedHeightMapSource;
+        if (_lastUsesGeneratedHeightMapSource != usesGenerated)
+        {
+            _lastUsesGeneratedHeightMapSource = usesGenerated;
+            OnPropertyChanged(nameof(UsesGeneratedHeightMapSource));
+            OnPropertyChanged(nameof(ThreeDSetupStatusText));
+            OnPropertyChanged(nameof(ThreeDHeightMapSourceStatusText));
+        }
         BrowseExchangeRootCommand.RaiseCanExecuteChanged();
         BrowseRecipeCommand.RaiseCanExecuteChanged();
         AddRecipeCommand.RaiseCanExecuteChanged();
@@ -882,7 +925,7 @@ public sealed class MachineIntegrationSetupViewModel : ViewModelBase, IDisposabl
                     "3D consumer identity와 Sequence, Step, Device binding을 입력하세요.",
                     "Enter the 3D consumer identity and Sequence, Step, and Device binding."));
             }
-            var threeDSourceEvidence = UseThreeDHeightMap
+            var threeDSourceEvidence = UseThreeDHeightMap && !UsesGeneratedHeightMapSource
                 ? CaptureRequiredThreeDSourceSettings()
                 : CaptureOptionalThreeDSourceSettings();
             var threeDRecipe = UseThreeDHeightMap
@@ -1160,6 +1203,8 @@ public sealed class MachineIntegrationSetupViewModel : ViewModelBase, IDisposabl
 
     private MachineIntegrationArtifactEvidence CaptureRequiredThreeDRecipeEvidence()
     {
+        if (UsesGeneratedHeightMapSource && (ThreeDHeightMapUnit.Trim() != "LU" || !ThreeDRecipeUsesUnit("LU")))
+            throw new ArgumentException(L("GeneratedHeightUnitRequired", "생성 높이 입력은 LU 단위입니다. 원본 단위와 3D 레시피의 source/step 단위를 LU로 설정하세요.", "Generated heights use LU. Set the source and the 3D recipe source/step units to LU."));
         if (!IsThreeDInspectionRecipeAvailable()
             || !_pathReadiness.IsInspectionRecipeSupportedByThreeD(ThreeDInspectionRecipePath)
             || !TryGetThreeDRecipeFrameId(out _))

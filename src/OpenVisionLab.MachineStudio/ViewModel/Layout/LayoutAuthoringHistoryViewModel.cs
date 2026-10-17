@@ -92,8 +92,8 @@ internal sealed class LayoutAuthoringHistoryViewModel : IDisposable
 
     private bool CanEdit => !_disposed && _isEditable() && !_isApplyingProject();
 
-    public LayoutAuthoringState CaptureCurrentState() =>
-        _currentState ??= CaptureState();
+    public LayoutAuthoringState CaptureCurrentState(bool refresh = false) =>
+        refresh ? CaptureState() : _currentState ??= CaptureState();
 
     public void Reset()
     {

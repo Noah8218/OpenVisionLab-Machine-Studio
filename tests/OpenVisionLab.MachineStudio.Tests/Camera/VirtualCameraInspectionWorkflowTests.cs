@@ -30,9 +30,10 @@ public sealed class VirtualCameraInspectionWorkflowTests
         Assert.Equal(4L, frame.ContentLength);
         Assert.Equal(VisionJudgment.OK, inspection.Judgment);
         Assert.Equal(frame.FrameId, inspection.FrameId);
-        Assert.Equal(frame.FrameId, command.FrameEvidence.FrameId);
+        var commandFrame = Assert.IsType<VirtualCameraFrameEvidence>(command.FrameEvidence);
+        Assert.Equal(frame.FrameId, commandFrame.FrameId);
         Assert.Equal(PlaceholderInspectionDecision.Pass, command.InspectionEvidence?.Decision);
-        Assert.Equal(frame.ContentSha256, command.FrameEvidence.ContentSha256);
+        Assert.Equal(frame.ContentSha256, commandFrame.ContentSha256);
         Assert.Equal(inspection.InspectionId, command.InspectionEvidence?.InspectionId);
     }
 

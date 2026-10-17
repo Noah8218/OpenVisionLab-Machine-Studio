@@ -46,11 +46,24 @@ internal static class SmokeButtonPointerState
         Button button,
         SmokeUiInteraction interaction,
         Func<string> hoverFailureMessage,
-        string pressedFailureMessage)
+        string pressedFailureMessage,
+        bool requirePointerOwnership = false)
     {
+        if (requirePointerOwnership)
+        {
+            await FocusAsync(window, button, interaction, "The smoke button could not receive keyboard focus.");
+            interaction.MovePointerToCenter(button);
+            var ownership = interaction.CheckPointerOwnership(window);
+            AssertSmoke(ownership.IsOwned, "Native smoke pointer is outside its owned window: " + ownership.Diagnostic);
+        }
         await HoverAsync(button, interaction, hoverFailureMessage);
         for (var attempt = 0; attempt < 3 && !button.IsPressed; attempt++)
         {
+            if (requirePointerOwnership)
+            {
+                var ownership = interaction.CheckPointerOwnership(window);
+                AssertSmoke(ownership.IsOwned, "Native smoke pointer is outside its owned window: " + ownership.Diagnostic);
+            }
             Mouse.Capture(button, CaptureMode.SubTree);
             Mouse.Synchronize();
             interaction.MouseEvent(MouseEventMove, 1, 0, 0, UIntPtr.Zero);

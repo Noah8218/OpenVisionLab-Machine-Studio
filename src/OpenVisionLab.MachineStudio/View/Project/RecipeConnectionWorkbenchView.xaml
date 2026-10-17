@@ -6,7 +6,10 @@
              xmlns:layouts="clr-namespace:OpenVisionLab.Machine.Core.Layouts;assembly=OpenVisionLab.Machine.Core"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-             xmlns:local="clr-namespace:OpenVisionLab.MachineStudio.View.Project">
+             xmlns:local="clr-namespace:OpenVisionLab.MachineStudio.View.Project"
+             Focusable="True" FocusManager.IsFocusScope="True" KeyboardNavigation.TabNavigation="Cycle"
+             Visibility="{Binding Navigation.IsRecipeConnectionsOpen, Converter={StaticResource BooleanToVisibilityConverter}}"
+             AutomationProperties.Name="{loc:Loc Key=Connections.Title}">
     <UserControl.Resources>
         <Style x:Key="StationSetupTextBoxStyle"
                TargetType="TextBox"
@@ -54,7 +57,16 @@
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
-    <Border Style="{StaticResource PanelSurfaceStyle}">
+    <Grid Background="{DynamicResource Surface.ModalScrim}">
+    <Border x:Name="ConnectionsDialogBorder" Width="1100" Margin="20,30" Padding="0" Background="{DynamicResource Surface.Panel}"
+            BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="1" CornerRadius="9"
+            HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Grid>
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+            <Border Padding="18,13" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1">
+                <TextBlock FontSize="13" FontWeight="SemiBold" Text="{loc:Loc Key=Connections.Title}" />
+            </Border>
+            <Border Grid.Row="1" Margin="8,0">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -62,13 +74,10 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Style="{StaticResource PanelHeaderStyle}">
-                <TextBlock Style="{StaticResource PanelHeaderTextStyle}"
-                           Text="{loc:Loc Key=Connections.Title}" />
-            </Border>
+            <TextBlock Grid.Row="0" Margin="10,8" FontWeight="SemiBold" Text="{loc:Loc Key=Connections.ConnectionListTitle}" />
 
-            <ScrollViewer Grid.Row="1"
-                          MaxHeight="500"
+            <ScrollViewer x:Name="ConnectionSetupScrollViewer" Grid.Row="1"
+                          MaxHeight="420"
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
                 <Border Margin="10,8,10,4"
@@ -751,7 +760,7 @@
                             <WrapPanel Margin="0,8,0,0"
                                        IsEnabled="{Binding RecipeConnections.StationSetups.IsEditable}">
                                 <StackPanel Width="180" Margin="0,0,7,6">
-                                    <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.StationSetupStationName}" />
+                                    <TextBlock FontSize="11" TextWrapping="Wrap" Text="{loc:Loc Key=Connections.StationSetupStationName}" />
                                     <TextBox x:Name="StationSetupNameTextBox"
                                              Margin="0,3,0,0"
                                              Tag="{Binding RecipeConnections.StationSetups.IsStationNameValid}"
@@ -760,7 +769,7 @@
                                              Text="{Binding RecipeConnections.StationSetups.StationName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Width="150" Margin="0,0,7,6">
-                                    <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.StationSetupWaferType}" />
+                                    <TextBlock FontSize="11" TextWrapping="Wrap" Text="{loc:Loc Key=Connections.StationSetupWaferType}" />
                                     <TextBox x:Name="StationSetupWaferTypeTextBox"
                                              Margin="0,3,0,0"
                                              Tag="{Binding RecipeConnections.StationSetups.IsWaferTypeValid}"
@@ -769,7 +778,7 @@
                                              Text="{Binding RecipeConnections.StationSetups.WaferType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Width="104" Margin="0,0,7,6">
-                                    <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.StationSetupAxisTravel}" />
+                                    <TextBlock FontSize="11" TextWrapping="Wrap" Text="{loc:Loc Key=Connections.StationSetupAxisTravel}" />
                                     <TextBox x:Name="StationSetupAxisTravelTextBox"
                                              Margin="0,3,0,0"
                                              Tag="{Binding RecipeConnections.StationSetups.IsAxisTravelValid}"
@@ -778,7 +787,7 @@
                                              Text="{Binding RecipeConnections.StationSetups.AxisTravelText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Width="112" Margin="0,0,7,6">
-                                    <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.StationSetupTransportSpeed}" />
+                                    <TextBlock FontSize="11" TextWrapping="Wrap" Text="{loc:Loc Key=Connections.StationSetupTransportSpeed}" />
                                     <TextBox x:Name="StationSetupTransportSpeedTextBox"
                                              Margin="0,3,0,0"
                                              Tag="{Binding RecipeConnections.StationSetups.IsTransportSpeedValid}"
@@ -787,7 +796,7 @@
                                              Text="{Binding RecipeConnections.StationSetups.TransportSpeedText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Width="106" Margin="0,0,7,6">
-                                    <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.StationSetupEntrySensor}" />
+                                    <TextBlock FontSize="11" TextWrapping="Wrap" Text="{loc:Loc Key=Connections.StationSetupEntrySensor}" />
                                     <TextBox x:Name="StationSetupEntrySensorTextBox"
                                              Margin="0,3,0,0"
                                              Tag="{Binding RecipeConnections.StationSetups.IsEntrySensorPositionValid}"
@@ -796,7 +805,7 @@
                                              Text="{Binding RecipeConnections.StationSetups.EntrySensorPositionText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Width="106" Margin="0,0,7,6">
-                                    <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.StationSetupProcessSensor}" />
+                                    <TextBlock FontSize="11" TextWrapping="Wrap" Text="{loc:Loc Key=Connections.StationSetupProcessSensor}" />
                                     <TextBox x:Name="StationSetupProcessSensorTextBox"
                                              Margin="0,3,0,0"
                                              Tag="{Binding RecipeConnections.StationSetups.IsProcessSensorPositionValid}"
@@ -805,7 +814,7 @@
                                              Text="{Binding RecipeConnections.StationSetups.ProcessSensorPositionText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Width="118" Margin="0,0,0,6">
-                                    <TextBlock FontSize="11" Text="{loc:Loc Key=Connections.StationSetupCylinderTiming}" />
+                                    <TextBlock FontSize="11" TextWrapping="Wrap" Text="{loc:Loc Key=Connections.StationSetupCylinderTiming}" />
                                     <TextBox x:Name="StationSetupCylinderTimingTextBox"
                                              Margin="0,3,0,0"
                                              Tag="{Binding RecipeConnections.StationSetups.IsCylinderTravelTimeValid}"
@@ -1400,16 +1409,22 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.ColumnSpan="2" Orientation="Horizontal">
-                                <TextBlock FontSize="14" FontWeight="SemiBold" Text="{Binding Name}" />
-                                <TextBlock Margin="8,2,0,0"
+                            <Grid Grid.ColumnSpan="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock FontSize="14" FontWeight="SemiBold" Text="{Binding Name}" TextWrapping="Wrap" />
+                                <TextBlock Grid.Column="1" Margin="8,2,0,0"
                                            Foreground="{DynamicResource Text.Secondary}"
                                            Text="{Binding KindText}" />
-                                <TextBlock Margin="8,2,0,0"
+                                <TextBlock Grid.Column="2" Margin="8,2,0,0"
                                            FontFamily="{StaticResource Typography.Telemetry}"
                                            Foreground="{DynamicResource Text.Secondary}"
                                            Text="{Binding ComponentId}" />
-                                <Border Margin="10,0,0,0"
+                                <Border Grid.Column="3" VerticalAlignment="Top" Margin="10,0,0,0"
                                         Padding="7,2"
                                         Background="{DynamicResource Surface.Panel}"
                                         CornerRadius="8">
@@ -1426,7 +1441,7 @@
                                         </TextBlock.Style>
                                     </TextBlock>
                                 </Border>
-                            </StackPanel>
+                            </Grid>
 
                             <TextBlock Grid.Row="1" Margin="0,7,8,0" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Connections.Behavior}" />
                             <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,7,0,0" Text="{Binding BehaviorText}" TextWrapping="Wrap" />
@@ -1536,4 +1551,12 @@
             </ListBox>
         </Grid>
     </Border>
+            <Border Grid.Row="2" Padding="18,10" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0">
+                <Button x:Name="CloseRecipeConnectionsButton" HorizontalAlignment="Right" MinWidth="70"
+                        Command="{Binding Navigation.CloseRecipeConnectionsCommand}" Content="{loc:Loc Key=Connections.CloseDialog}"
+                        AutomationProperties.Name="{loc:Loc Key=Connections.CloseDialog}" Style="{StaticResource QuietCommandButtonStyle}" />
+            </Border>
+        </Grid>
+    </Border>
+    </Grid>
 </UserControl>

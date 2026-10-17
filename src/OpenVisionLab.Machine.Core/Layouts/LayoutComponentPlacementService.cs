@@ -9,19 +9,45 @@ namespace OpenVisionLab.Machine.Core.Layouts;
 /// </summary>
 public sealed class LayoutComponentPlacementService
 {
+    public static Coordinate3D CreateUnitBaseOrigin(int ordinal) => new(ordinal * 225, ordinal * -225, 0);
+
+    public bool ApplyUnitDefault(LayoutComponentDefinition component, Coordinate3D origin)
+    {
+        (double X, double Y)? local = component.Kind switch
+        {
+            LayoutComponentKind.LinearStage => (-50d, 50d),
+            LayoutComponentKind.PneumaticCylinder => (34d, 81d),
+            LayoutComponentKind.DigitalSensor => (-102.5, -43d),
+            LayoutComponentKind.Camera => (56d, -31.5),
+            LayoutComponentKind.Conveyor => (2.5, 2.5),
+            LayoutComponentKind.FeedPosition => (-122.5, 2.5),
+            LayoutComponentKind.ExitPosition => (127.5, 2.5),
+            LayoutComponentKind.DigitalIo => (207.5, 12d),
+            _ => null
+        };
+        if (local is { } position)
+        {
+            component.Transform.X = origin.X + position.X;
+            component.Transform.Y = origin.Y + position.Y;
+            return true;
+        }
+        return false;
+    }
+
     public void Place(
         MachineProjectDocument project,
         MachineLayoutDefinition layout,
         LayoutComponentDefinition component,
         double worldX,
-        double worldY)
+        double worldY,
+        bool snapToGrid = true)
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(layout);
         ArgumentNullException.ThrowIfNull(component);
 
-        var x = SnapLayoutCoordinate(layout, worldX);
-        var y = SnapLayoutCoordinate(layout, worldY);
+        var x = snapToGrid ? SnapLayoutCoordinate(layout, worldX) : worldX;
+        var y = snapToGrid ? SnapLayoutCoordinate(layout, worldY) : worldY;
         component.Transform.X = x;
         component.Transform.Y = y;
 

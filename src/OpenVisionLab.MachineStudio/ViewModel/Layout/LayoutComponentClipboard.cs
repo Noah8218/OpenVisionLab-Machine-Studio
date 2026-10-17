@@ -96,6 +96,8 @@ internal sealed class LayoutComponentClipboard
                 component.Name = $"{component.Name} Copy";
                 component.Transform.X += pasteOffset;
                 component.Transform.Y += pasteOffset;
+                if (component.MaterialConveyorId is { } materialConveyorId)
+                    component.MaterialConveyorId = componentIdMap.GetValueOrDefault(materialConveyorId, materialConveyorId);
                 component.BehaviorBindingId = CloneBehaviorBinding(
                     sourceProject,
                     targetProject,

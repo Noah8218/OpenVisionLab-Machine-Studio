@@ -1,3 +1,5 @@
+using OpenVisionLab.Machine.Core.Sequences;
+
 namespace OpenVisionLab.Machine.Sequence.Compilation;
 
 public enum CompiledSequenceStepKind
@@ -11,7 +13,10 @@ public enum CompiledSequenceStepKind
     EjectWorkpiece,
     WaitVisionResult,
     CallSubsequence,
-    Complete
+    Complete,
+    Delay,
+    UnitOperation,
+    BranchInspection
 }
 
 public abstract record CompiledSequenceStep(
@@ -55,8 +60,10 @@ public sealed record MoveAxisStep(
     string AxisId,
     double TargetPosition,
     string? NextStepId,
-    string? ErrorStepId)
-    : CompiledSequenceStep(Id, Name, NextStepId, ErrorStepId, TimeSpan.Zero)
+    string? ErrorStepId,
+    bool WaitForCompletion = false,
+    TimeSpan MotionTimeout = default)
+    : CompiledSequenceStep(Id, Name, NextStepId, ErrorStepId, MotionTimeout)
 {
     public override CompiledSequenceStepKind Kind => CompiledSequenceStepKind.MoveAxis;
 }
@@ -132,6 +139,25 @@ public sealed record CallSubsequenceStep(
     public override CompiledSequenceStepKind Kind => CompiledSequenceStepKind.CallSubsequence;
 }
 
+public sealed record UnitOperationStep(string Id, string Name, SequenceStepAction Action, string UnitId, string? DestinationUnitId,
+    string? ConveyorId, string Route, TimeSpan Duration, string? NextStepId, string? ErrorStepId, TimeSpan Timeout)
+    : CompiledSequenceStep(Id, Name, NextStepId, ErrorStepId, Timeout)
+{
+    public override CompiledSequenceStepKind Kind => CompiledSequenceStepKind.UnitOperation;
+}
+
+public sealed record BranchInspectionStep(string Id, string Name, string UnitId, string FailureStepId, string? NextStepId, string? ErrorStepId)
+    : CompiledSequenceStep(Id, Name, NextStepId, ErrorStepId, TimeSpan.Zero)
+{
+    public override CompiledSequenceStepKind Kind => CompiledSequenceStepKind.BranchInspection;
+}
+
+public sealed record DelayStep(string Id, string Name, TimeSpan Duration, string? NextStepId, string? ErrorStepId)
+    : CompiledSequenceStep(Id, Name, NextStepId, ErrorStepId, TimeSpan.Zero)
+{
+    public override CompiledSequenceStepKind Kind => CompiledSequenceStepKind.Delay;
+}
+
 public sealed record CompleteStep(string Id, string Name)
     : CompiledSequenceStep(Id, Name, null, null, TimeSpan.Zero)
 {
@@ -146,12 +172,16 @@ public sealed class CompiledSequence
         string id,
         string name,
         TimeSpan watchdogTimeout,
-        IReadOnlyList<CompiledSequenceStep> steps)
+        IReadOnlyList<CompiledSequenceStep> steps,
+        string? unitId = null,
+        int repeatCount = 1)
     {
         Id = id;
         Name = name;
         WatchdogTimeout = watchdogTimeout;
         Steps = steps;
+        UnitId = unitId;
+        RepeatCount = repeatCount;
         EntryStepId = steps[0].Id;
         _stepsById = steps.ToDictionary(step => step.Id, StringComparer.Ordinal);
     }
@@ -159,6 +189,8 @@ public sealed class CompiledSequence
     public string Id { get; }
 
     public string Name { get; }
+    public string? UnitId { get; }
+    public int RepeatCount { get; }
 
     public TimeSpan WatchdogTimeout { get; }
 

@@ -40,12 +40,12 @@ internal sealed class MainMessageDialogHost
         Title = OpenVisionLanguageService.T("Equipment.InspectorDraftTitle", "적용하지 않은 설정 변경", "Unapplied settings changes"),
         Message = OpenVisionLanguageService.T(
             "Equipment.InspectorDraftLeaveMessage",
-            "설정 변경을 적용하거나 버린 뒤 계속하세요. 취소하면 현재 화면에서 편집을 계속합니다.",
+            "적용 후 계속하면 변경 내용을 반영합니다. 적용 안 함을 선택하면 변경 내용을 버리고 계속합니다. 취소하면 현재 화면에서 편집을 계속합니다.",
             "Apply or discard settings changes before continuing. Cancel keeps this editor open."),
         Kind = WpfMessageDialogKind.Question,
         DefaultResult = WpfMessageDialogResult.Cancel,
-        PrimaryButtonText = OpenVisionLanguageService.T("Equipment.PlacementDraftApply", "변경 적용", "Apply changes"),
-        SecondaryButtonText = OpenVisionLanguageService.T("Equipment.PlacementDraftDiscard", "변경 버리기", "Discard changes"),
+        PrimaryButtonText = OpenVisionLanguageService.T("Equipment.InspectorDraftApplyAndContinue", "적용 후 계속", "Apply changes"),
+        SecondaryButtonText = OpenVisionLanguageService.T("Equipment.PlacementDraftDiscard", "적용 안 함", "Discard changes"),
         TertiaryButtonText = OpenVisionLanguageService.T("Project.Cancel", "취소", "Cancel")
     };
 
@@ -122,7 +122,7 @@ internal sealed class MainMessageDialogHost
             var role = impact.ReferenceKind switch
             {
                 LayoutComponentRemovalReferenceKind.Workpiece => OpenVisionLanguageService.T(
-                    "Equipment.RemovalWorkpiece", "작업물", "Workpiece"),
+                    "Equipment.RemovalWorkpiece", "제품", "Workpiece"),
                 LayoutComponentRemovalReferenceKind.ExpectedTarget => OpenVisionLanguageService.T(
                     "Equipment.RemovalExpectedTarget", "기대 대상", "Expected target"),
                 _ => OpenVisionLanguageService.T("Equipment.RemovalTarget", "대상", "Target")
@@ -131,20 +131,20 @@ internal sealed class MainMessageDialogHost
             return $"{index + 1}. {impact.SequenceName} / {impact.StepName} / {role}: {name} ({impact.ComponentId})";
         });
         var impactText = impacts.Count == 0
-            ? OpenVisionLanguageService.T("Equipment.RemovalNoImpacts", "참조하는 동작 연결이 없습니다.", "No sequence connections reference these components.")
-            : OpenVisionLanguageService.T("Equipment.RemovalImpacts", "영향받는 동작 연결", "Affected sequence connections")
+            ? OpenVisionLanguageService.T("Equipment.RemovalNoImpacts", "참조하는 시퀀스 연결이 없습니다.", "No sequence connections reference these components.")
+            : OpenVisionLanguageService.T("Equipment.RemovalImpacts", "영향받는 시퀀스 연결", "Affected sequence connections")
                 + $" ({impacts.Count}){Environment.NewLine}{string.Join(Environment.NewLine, impactLines)}";
 
         return new WpfMessageDialogOptions
         {
             Title = string.Format(CultureInfo.CurrentCulture,
                 components.Count == 1
-                    ? OpenVisionLanguageService.T("Equipment.RemovalTitleSingle", "선택 부품 {0}개를 삭제할까요?", "Delete {0} selected component?")
-                    : OpenVisionLanguageService.T("Equipment.RemovalTitle", "선택 부품 {0}개를 삭제할까요?", "Delete {0} selected components?"),
+                    ? OpenVisionLanguageService.T("Equipment.RemovalTitleSingle", "선택 장치 {0}개를 삭제할까요?", "Delete {0} selected component?")
+                    : OpenVisionLanguageService.T("Equipment.RemovalTitle", "선택 장치 {0}개를 삭제할까요?", "Delete {0} selected components?"),
                 components.Count),
             Message = OpenVisionLanguageService.T(
                 "Equipment.RemovalWarning",
-                "부품을 삭제해도 동작과 장비 정의의 연결은 자동으로 지워지지 않습니다. 영향을 확인하고 필요한 연결을 수정하세요.",
+                "장치를 삭제해도 시퀀스와 장비 정의의 연결은 자동으로 지워지지 않습니다. 영향을 확인하고 필요한 연결을 수정하세요.",
                 "Deleting components does not silently remove sequence or device definitions. Review and repair affected connections.")
                 + $"{Environment.NewLine}{Environment.NewLine}{impactText}",
             Kind = WpfMessageDialogKind.Warning,

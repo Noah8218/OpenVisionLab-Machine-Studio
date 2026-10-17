@@ -94,6 +94,9 @@ internal sealed class EquipmentCommandDispatcher
             "Conveyor.CommandAccepted",
             "Conveyor.CommandRejected");
 
+    internal Task<SimulationCommandResult> DispatchInspectorCommandAsync(SimulationCommand command, string actionKey) =>
+        DispatchAsync(command, actionKey, "Equipment", "Axis.StatusAccepted", "Axis.StatusRejected", "Axis.CommandAccepted", "Axis.CommandRejected");
+
     private async Task<SimulationCommandResult> DispatchAsync(
         SimulationCommand command,
         string actionKey,

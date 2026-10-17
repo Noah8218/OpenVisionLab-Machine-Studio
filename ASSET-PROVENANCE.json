@@ -86,17 +86,6 @@
       "reviewNote": "Project owner attested on 2026-08-19 that OpenVisionLab created the asset with OpenAI GPT, used no external reference material, and authorizes repository inclusion and redistribution; visual review found no logo or model badge."
     },
     {
-      "path": "docs/images/equipment-setup.png",
-      "sha256": "8ba4509ff78caa8e99f1634b4e481b27aeb2e6e472816dfd2e39ac7cb0052dc2",
-      "mediaType": "image/png",
-      "purpose": "Actual WPF equipment setup and oblique scene",
-      "originSummary": "Unedited first-party Machine Studio development-window capture, 2026-09-29, 1920x1032 work area of a 1920x1080 display. Not an HTML render or reconstructed product image.",
-      "firstRecordedCommit": "Introduced by the v0.2.0-dev.62 source update; no release tag.",
-      "vendorReferenceStatus": "none-recorded",
-      "distributionStatus": "approved",
-      "reviewNote": "Project owner requested public README UI illustrations on 2026-09-29. Visually reviewed: only the Machine Studio window, no customer data, credentials, file paths or vendor logos. The image is historical UI evidence, not a complete validation of the source version."
-    },
-    {
       "path": "docs/images/equipment-overview.png",
       "sha256": "2be84723b151f3076887813d5fc931d07a2e6921f40e83443ded3c6c83ea70f9",
       "mediaType": "image/png",
@@ -106,6 +95,72 @@
       "vendorReferenceStatus": "none-recorded",
       "distributionStatus": "approved",
       "reviewNote": "Project owner requested public README UI illustrations on 2026-09-29. Visually reviewed: only the Machine Studio window, no customer data, credentials, file paths or vendor logos. The image is historical UI evidence, not a complete validation of the source version."
+    },
+    {
+      "path": "docs/images/equipment-setup.png",
+      "sha256": "2729e48886899dccf70818c52344075536bcb2a8e63bee1c8bc0e8df67fc6b6a",
+      "mediaType": "image/png",
+      "purpose": "Current equipment setup interface",
+      "originSummary": "Unedited first-party Machine Studio v0.2.0-dev.81 WPF view, rendered in process on 2026-10-18 with owned example data. Native 96 DPI; 1920x1032 working area of a 1920x1080 display. No crop, composite or resizing.",
+      "firstRecordedCommit": "Introduced by the v0.2.0-dev.81 source update.",
+      "vendorReferenceStatus": "none-recorded",
+      "distributionStatus": "approved",
+      "reviewNote": "The project owner requested the current UI README and public source update on 2026-10-18. Visually reviewed for product content and private information. This is interface illustration, not complete desktop interaction qualification."
+    },
+    {
+      "path": "docs/images/process-and-actions.png",
+      "sha256": "2c31bf6af6a57fc1467cd9bc7abd20353ba158719f2468df60c2b35c21ac18e5",
+      "mediaType": "image/png",
+      "purpose": "Current process and actions interface",
+      "originSummary": "Unedited first-party Machine Studio v0.2.0-dev.81 WPF view, rendered in process on 2026-10-18 with owned example data. Native 96 DPI; 1920x1032 working area of a 1920x1080 display. No crop, composite or resizing.",
+      "firstRecordedCommit": "Introduced by the v0.2.0-dev.81 source update.",
+      "vendorReferenceStatus": "none-recorded",
+      "distributionStatus": "approved",
+      "reviewNote": "The project owner requested the current UI README and public source update on 2026-10-18. Visually reviewed for product content and private information. This is interface illustration, not complete desktop interaction qualification."
+    },
+    {
+      "path": "docs/images/capture-and-inspection.png",
+      "sha256": "af72ef355251eb3971da144ff39ea914c6313e60ac1e4c965ad59e61985c2ebd",
+      "mediaType": "image/png",
+      "purpose": "Current capture and inspection interface",
+      "originSummary": "Unedited first-party Machine Studio v0.2.0-dev.81 WPF view, rendered in process on 2026-10-18 with owned example data. Native 96 DPI; 1920x1032 working area of a 1920x1080 display. No crop, composite or resizing.",
+      "firstRecordedCommit": "Introduced by the v0.2.0-dev.81 source update.",
+      "vendorReferenceStatus": "none-recorded",
+      "distributionStatus": "approved",
+      "reviewNote": "The project owner requested the current UI README and public source update on 2026-10-18. Visually reviewed for product content and private information. This is interface illustration, not complete desktop interaction qualification."
+    },
+    {
+      "path": "docs/images/simulation.png",
+      "sha256": "b999ecc2664491aba3932fe25b428a67bd591e85732ebcab38638eed36459dad",
+      "mediaType": "image/png",
+      "purpose": "Current simulation interface",
+      "originSummary": "Unedited first-party Machine Studio v0.2.0-dev.81 WPF view, rendered in process on 2026-10-18 with owned example data. Native 96 DPI; 1920x1032 working area of a 1920x1080 display. No crop, composite or resizing.",
+      "firstRecordedCommit": "Introduced by the v0.2.0-dev.81 source update.",
+      "vendorReferenceStatus": "none-recorded",
+      "distributionStatus": "approved",
+      "reviewNote": "The project owner requested the current UI README and public source update on 2026-10-18. Visually reviewed for product content and private information. This is interface illustration, not complete desktop interaction qualification."
+    },
+    {
+      "path": "docs/images/experiments-and-data.png",
+      "sha256": "e326c0f1921ac5d3a635550930ab5280d1b404e99ecb887a5ddb7cebc5a1b766",
+      "mediaType": "image/png",
+      "purpose": "Current experiments and data interface",
+      "originSummary": "Unedited first-party Machine Studio v0.2.0-dev.81 WPF view, rendered in process on 2026-10-18 with owned example data. Native 96 DPI; 1920x1032 working area of a 1920x1080 display. No crop, composite or resizing.",
+      "firstRecordedCommit": "Introduced by the v0.2.0-dev.81 source update.",
+      "vendorReferenceStatus": "none-recorded",
+      "distributionStatus": "approved",
+      "reviewNote": "The project owner requested the current UI README and public source update on 2026-10-18. Visually reviewed for product content and private information. This is interface illustration, not complete desktop interaction qualification."
+    },
+    {
+      "path": "docs/images/result-analysis.png",
+      "sha256": "1aa42990c6ac4a695b6310a84d317afeca802fba5590a6f688ccb82dcfa4155d",
+      "mediaType": "image/png",
+      "purpose": "Current result analysis interface",
+      "originSummary": "Unedited first-party Machine Studio v0.2.0-dev.81 WPF view, rendered in process on 2026-10-18 with owned example data. Native 96 DPI; 1920x1032 working area of a 1920x1080 display. No crop, composite or resizing.",
+      "firstRecordedCommit": "Introduced by the v0.2.0-dev.81 source update.",
+      "vendorReferenceStatus": "none-recorded",
+      "distributionStatus": "approved",
+      "reviewNote": "The project owner requested the current UI README and public source update on 2026-10-18. Visually reviewed for product content and private information. This is interface illustration, not complete desktop interaction qualification."
     }
   ]
 }

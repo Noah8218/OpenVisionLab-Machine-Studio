@@ -32,4 +32,12 @@ public sealed class LayoutComponentDefinition
 
     [JsonPropertyName("behaviorBindingId")]
     public string? BehaviorBindingId { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("materialConveyorId")]
+    public string? MaterialConveyorId { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("materialRoute")]
+    public string? MaterialRoute { get; set; }
 }

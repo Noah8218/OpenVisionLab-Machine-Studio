@@ -17,18 +17,28 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
     private readonly Action _onBlankLayoutStarted;
     private readonly Action<Exception> _onCommandException;
     private readonly Func<bool> _resolvePendingPlacementDraft;
+    private readonly Func<bool> _canOpenTestScenario;
+    private readonly Func<bool> _canOpenRecipeConnections;
+    private readonly Func<bool> _canOpenManualCommissioning;
+    private bool _isTestScenarioOpen;
+    private bool _isRecipeConnectionsOpen;
     private bool _isCompactLayout;
     private bool _isNarrowLayout;
     private bool _isStartupChoiceVisible;
     private int _selectedDocumentTabIndex;
     private int _selectedWorkspaceIndex;
+    private (int Workspace, int Document, int LeftTab, bool Inspector) _resultsReturn = (0, 0, 0, true);
+    private bool _isResultSettingsOpen;
     private int _selectedExecutionTabIndex;
-    private int _selectedInspectionTabIndex = 1;
     private int _selectedInspectionSettingsTabIndex;
-    private bool _isInspectorOpen;
+    private int _selectedExperimentTabIndex;
+    private int _selectedExperimentCaptureSectionIndex = 1;
+    private bool _isInspectorOpen = true;
     private bool _isEvidenceExpanded;
+    private bool _isSimulationDiagnosticsExpanded;
     private bool _isInspectionSettingsExpanded;
     private int _selectedEvidenceTabIndex;
+    private int _selectedEquipmentEvidenceTabIndex;
     private int _selectedLeftToolTabIndex;
     private OpenVisionLanguageOption _selectedLanguageOption;
     private bool _disposed;
@@ -42,7 +52,10 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
         Action<Exception> onCommandException,
         Func<bool>? canOpenLargeLayoutSample = null,
         Func<Task>? openLargeLayoutSampleAsync = null,
-        Func<bool>? resolvePendingPlacementDraft = null)
+        Func<bool>? resolvePendingPlacementDraft = null,
+        Func<bool>? canOpenTestScenario = null,
+        Func<bool>? canOpenRecipeConnections = null,
+        Func<bool>? canOpenManualCommissioning = null)
     {
         _canStartBlankLayout = canStartBlankLayout ?? throw new ArgumentNullException(nameof(canStartBlankLayout));
         _canOpenBundledSample = canOpenBundledSample ?? throw new ArgumentNullException(nameof(canOpenBundledSample));
@@ -52,6 +65,9 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
         _onBlankLayoutStarted = onBlankLayoutStarted ?? throw new ArgumentNullException(nameof(onBlankLayoutStarted));
         _onCommandException = onCommandException ?? throw new ArgumentNullException(nameof(onCommandException));
         _resolvePendingPlacementDraft = resolvePendingPlacementDraft ?? (() => true);
+        _canOpenTestScenario = canOpenTestScenario ?? (() => true);
+        _canOpenRecipeConnections = canOpenRecipeConnections ?? _canOpenTestScenario;
+        _canOpenManualCommissioning = canOpenManualCommissioning ?? (() => true);
         _isStartupChoiceVisible = isStartupChoiceVisible;
         OpenVisionLanguageService.Load();
         _selectedLanguageOption = LanguageOptions.First(option =>
@@ -80,15 +96,78 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
             _ => IsEvidenceExpanded = !IsEvidenceExpanded,
             _ => !_disposed,
             useCommandManagerRequery: false);
+        SelectEquipmentEvidenceTabCommand = new RelayCommand(parameter =>
+        {
+            if (_disposed || !int.TryParse(parameter?.ToString(), out var index) || index is < 0 or > 3) return;
+            var collapse = IsEvidenceExpanded && SelectedEquipmentEvidenceTabIndex == index;
+            SelectedEquipmentEvidenceTabIndex = index;
+            IsEvidenceExpanded = !collapse;
+        }, _ => !_disposed, useCommandManagerRequery: false);
+        OpenTestScenarioCommand = new RelayCommand(_ =>
+        {
+            if (CanOpenTestScenario) IsTestScenarioOpen = true;
+        }, _ => CanOpenTestScenario);
+        CloseTestScenarioCommand = new RelayCommand(_ =>
+        {
+            if (!_disposed) IsTestScenarioOpen = false;
+        }, _ => !_disposed && IsTestScenarioOpen);
+        OpenRecipeConnectionsCommand = new RelayCommand(_ =>
+        {
+            if (CanOpenRecipeConnections && _resolvePendingPlacementDraft()) IsRecipeConnectionsOpen = true;
+        }, _ => CanOpenRecipeConnections);
+        CloseRecipeConnectionsCommand = new RelayCommand(_ => CloseRecipeConnections(), _ => !_disposed && IsRecipeConnectionsOpen);
+        CloseModalOverlayCommand = new RelayCommand(_ =>
+        {
+            if (IsRecipeConnectionsOpen) CloseRecipeConnections();
+            else if (IsTestScenarioOpen) IsTestScenarioOpen = false;
+        }, _ => !_disposed && IsModalOverlayOpen);
         OpenComponentLibraryCommand = new RelayCommand(
             _ => SelectedLeftToolTabIndex = 1,
             _ => !_disposed,
+            useCommandManagerRequery: false);
+        OpenEquipmentWorkspaceCommand = new RelayCommand(_ =>
+        {
+            if (!_disposed && !IsModalOverlayOpen) IsEquipmentWorkspace = true;
+        }, _ => !_disposed && !IsModalOverlayOpen, useCommandManagerRequery: false);
+        OpenResultsWorkspaceCommand = new RelayCommand(_ =>
+        {
+            if (!_disposed && !IsModalOverlayOpen) IsResultsWorkspace = true;
+        },
+            _ => !_disposed && !IsModalOverlayOpen, useCommandManagerRequery: false);
+        ReturnFromResultsCommand = new RelayCommand(_ =>
+        {
+            if (_disposed || !IsResultsWorkspace || IsModalOverlayOpen) return;
+            var previous = _resultsReturn;
+            SelectWorkspace(previous.Workspace, previous.Document);
+            if (IsResultsWorkspace) return;
+            SelectedLeftToolTabIndex = previous.LeftTab;
+            IsInspectorOpen = previous.Inspector;
+        }, _ => !_disposed && IsResultsWorkspace && !IsModalOverlayOpen, useCommandManagerRequery: false);
+        ReturnToResultsCommand = new RelayCommand(_ =>
+        {
+            if (HasResultSettingsReturn && !IsModalOverlayOpen) OpenResultsWorkspaceCommand.Execute(null);
+        }, _ => HasResultSettingsReturn && !IsModalOverlayOpen, useCommandManagerRequery: false);
+        OpenInspectionStatusCommand = new RelayCommand(_ =>
+        {
+            SelectedInspectionSettingsTabIndex = 3;
+            if (IsNarrowLayout) IsInspectionSettingsExpanded = true;
+        }, _ => !_disposed);
+        OpenManualCommissioningCommand = new RelayCommand(
+            _ =>
+            {
+                if (_disposed || !_canOpenManualCommissioning()) return;
+                IsSimulationWorkspace = true;
+                SelectedExecutionTabIndex = 0;
+                if (IsSimulationWorkspace && !IsSequenceWorkspace) IsInspectorOpen = true;
+            },
+            _ => !_disposed && _canOpenManualCommissioning(),
             useCommandManagerRequery: false);
         OpenSequenceEditorCommand = new RelayCommand(
             _ =>
             {
                 IsSimulationWorkspace = true;
                 SelectedExecutionTabIndex = 1;
+                if (IsSequenceWorkspace) IsInspectorOpen = true;
             },
             _ => !_disposed,
             useCommandManagerRequery: false);
@@ -109,9 +188,71 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
 
     public ICommand ToggleEvidenceDrawerCommand { get; }
 
+    public ICommand SelectEquipmentEvidenceTabCommand { get; }
+
     public ICommand OpenComponentLibraryCommand { get; }
 
+    public ICommand OpenManualCommissioningCommand { get; }
+
     public ICommand OpenSequenceEditorCommand { get; }
+
+    public ICommand OpenInspectionStatusCommand { get; }
+
+    public ICommand OpenResultsWorkspaceCommand { get; }
+
+    public ICommand ReturnFromResultsCommand { get; }
+
+    public ICommand ReturnToResultsCommand { get; }
+
+
+    public ICommand OpenEquipmentWorkspaceCommand { get; }
+
+    public ICommand OpenTestScenarioCommand { get; }
+
+    public ICommand CloseTestScenarioCommand { get; }
+
+    public ICommand OpenRecipeConnectionsCommand { get; }
+
+    public ICommand CloseRecipeConnectionsCommand { get; }
+
+    public ICommand CloseModalOverlayCommand { get; }
+
+    public bool HasResultSettingsReturn => !_disposed && _isResultSettingsOpen && IsInspectionWorkspace;
+
+    public bool IsModalOverlayOpen => IsTestScenarioOpen || IsRecipeConnectionsOpen;
+
+    public bool IsRecipeConnectionsOpen
+    {
+        get => _isRecipeConnectionsOpen;
+        private set
+        {
+            if (!SetProperty(ref _isRecipeConnectionsOpen, value)) return;
+            OnPropertyChanged(nameof(IsModalOverlayOpen));
+            InvalidateCommands();
+        }
+    }
+
+    internal bool CanOpenRecipeConnections => !_disposed && !IsStartupChoiceVisible && !IsModalOverlayOpen && _canOpenRecipeConnections();
+
+    internal void CloseRecipeConnections()
+    {
+        if (!_disposed) IsRecipeConnectionsOpen = false;
+    }
+
+    public bool IsTestScenarioOpen
+    {
+        get => _isTestScenarioOpen;
+        private set
+        {
+            if (!SetProperty(ref _isTestScenarioOpen, value)) return;
+            ((RelayCommand)OpenTestScenarioCommand).RaiseCanExecuteChanged();
+            ((RelayCommand)CloseTestScenarioCommand).RaiseCanExecuteChanged();
+            OnPropertyChanged(nameof(IsModalOverlayOpen));
+            InvalidateCommands();
+        }
+    }
+
+    internal bool CanOpenTestScenario => !_disposed && !IsStartupChoiceVisible && !IsModalOverlayOpen && _canOpenTestScenario();
 
     public bool IsCompactLayout
     {
@@ -130,13 +271,14 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
         get => _selectedDocumentTabIndex;
         set
         {
-            if (value is < 0 or > 3) return;
+            if (value is < 0 or > 4) return;
             if (value == _selectedDocumentTabIndex && value switch
                 {
                     0 => IsEquipmentWorkspace,
                     1 => IsInspectionWorkspace,
                     2 => IsSimulationWorkspace && SelectedExecutionTabIndex == 1,
                     3 => IsResultsWorkspace,
+                    4 => IsExperimentWorkspace,
                     _ => true
                 }) return;
             switch (value)
@@ -154,6 +296,9 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
                 case 3:
                     SelectWorkspace(3, 3);
                     break;
+                case 4:
+                    SelectWorkspace(4, 4);
+                    break;
             }
         }
     }
@@ -163,6 +308,7 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
         0 or 2 => 0,
         1 => 1,
         3 => 2,
+        4 => 3,
         _ => 0
     };
 
@@ -171,13 +317,14 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
         get => _selectedWorkspaceIndex;
         set
         {
-            if (value is < 0 or > 3 || value == _selectedWorkspaceIndex) return;
+            if (value is < 0 or > 4 || value == _selectedWorkspaceIndex) return;
             SelectWorkspace(value, value switch
             {
                 0 => 0,
                 1 => _selectedExecutionTabIndex == 1 ? 2 : 0,
                 2 => 1,
                 3 => 3,
+                4 => 4,
                 _ => 0
             });
         }
@@ -195,16 +342,48 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
         set { if (value) SelectedWorkspaceIndex = 1; }
     }
 
-    public bool IsEquipmentOutlineVisible => (IsEquipmentWorkspace || IsInspectionWorkspace) && SelectedLeftToolTabIndex == 0
-        || IsSimulationWorkspace && SelectedLeftToolTabIndex == 3;
+    public bool IsProcessWorkspace
+    {
+        get => IsSequenceWorkspace;
+        set
+        {
+            if (!value) return;
+            OpenSequenceEditorCommand.Execute(null);
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsSimulationOverviewWorkspace));
+        }
+    }
+
+    public bool IsSimulationOverviewWorkspace
+    {
+        get => IsSimulationWorkspace && !IsSequenceWorkspace;
+        set
+        {
+            if (!value) return;
+            IsSimulationWorkspace = true;
+            if (IsSimulationWorkspace) SelectedExecutionTabIndex = 0;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsProcessWorkspace));
+        }
+    }
+
+    public bool IsEquipmentOutlineVisible => IsEquipmentWorkspace && SelectedLeftToolTabIndex == 0
+        || (IsSimulationWorkspace || IsExperimentWorkspace) && SelectedLeftToolTabIndex == 3;
 
     public int SelectedExecutionTabIndex
     {
         get => IsSimulationWorkspace ? _selectedExecutionTabIndex : 0;
         set
         {
-            if (!IsSimulationWorkspace || value is < 0 or > 2) return;
+            if (!IsSimulationWorkspace || value is < 0 or > 1) return;
+            if (_selectedExecutionTabIndex == value) return;
+            if (!_resolvePendingPlacementDraft()) { OnPropertyChanged(); return; }
             if (!SetProperty(ref _selectedExecutionTabIndex, value)) return;
+            OnPropertyChanged(nameof(IsSequenceWorkspace));
+            OnPropertyChanged(nameof(IsProcessWorkspace));
+            OnPropertyChanged(nameof(IsSimulationOverviewWorkspace));
+            OnPropertyChanged(nameof(IsDockedInspectorOpen));
+            if (value == 1) IsInspectorOpen = true;
             var documentTabIndex = value == 1 ? 2 : 0;
             if (_selectedDocumentTabIndex != documentTabIndex)
             {
@@ -221,22 +400,12 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
         set { if (value) SelectedWorkspaceIndex = 2; }
     }
 
-    public int SelectedInspectionTabIndex
-    {
-        get => _selectedInspectionTabIndex;
-        set
-        {
-            if (value is < 0 or > 1) return;
-            SetProperty(ref _selectedInspectionTabIndex, value);
-        }
-    }
-
     public int SelectedInspectionSettingsTabIndex
     {
         get => _selectedInspectionSettingsTabIndex;
         set
         {
-            if (value is < 0 or > 1) return;
+            if (value is < 0 or > 3) return;
             SetProperty(ref _selectedInspectionSettingsTabIndex, value);
         }
     }
@@ -251,14 +420,32 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
                 OnPropertyChanged();
                 return;
             }
-            SetProperty(ref _isInspectorOpen, value);
+            if (SetProperty(ref _isInspectorOpen, value))
+            {
+                OnPropertyChanged(nameof(IsEquipmentInspectorOpen));
+                OnPropertyChanged(nameof(IsDockedInspectorOpen));
+            }
         }
     }
+
+    public bool IsEquipmentInspectorOpen => IsEquipmentWorkspace && IsInspectorOpen;
+    public bool IsSequenceWorkspace => IsSimulationWorkspace && SelectedExecutionTabIndex == 1;
+    public bool IsDockedInspectorOpen => (IsEquipmentWorkspace || IsSequenceWorkspace) && IsInspectorOpen;
 
     public bool IsEvidenceExpanded
     {
         get => _isEvidenceExpanded;
-        set => SetProperty(ref _isEvidenceExpanded, value);
+        set
+        {
+            if (!SetProperty(ref _isEvidenceExpanded, value)) return;
+            RaiseEquipmentEvidenceSelectionChanged();
+        }
+    }
+
+    public bool IsSimulationDiagnosticsExpanded
+    {
+        get => _isSimulationDiagnosticsExpanded;
+        set => SetProperty(ref _isSimulationDiagnosticsExpanded, value);
     }
 
     public bool IsInspectionSettingsExpanded
@@ -275,6 +462,39 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
             if (value is < 0 or > 3) return;
             SetProperty(ref _selectedEvidenceTabIndex, value);
         }
+    }
+
+    public int SelectedEquipmentEvidenceTabIndex
+    {
+        get => _selectedEquipmentEvidenceTabIndex;
+        set
+        {
+            if (value is < 0 or > 3 || !SetProperty(ref _selectedEquipmentEvidenceTabIndex, value)) return;
+            RaiseEquipmentEvidenceSelectionChanged();
+        }
+    }
+
+    public bool IsEquipmentEventsSelected => IsEvidenceExpanded && SelectedEquipmentEvidenceTabIndex == 0;
+    public bool IsEquipmentRequestsSelected => IsEvidenceExpanded && SelectedEquipmentEvidenceTabIndex == 1;
+    public bool IsEquipmentGenerationSelected => IsEvidenceExpanded && SelectedEquipmentEvidenceTabIndex == 2;
+    public bool IsEquipmentAlarmsSelected => IsEvidenceExpanded && SelectedEquipmentEvidenceTabIndex == 3;
+
+    public bool IsExperimentWorkspace
+    {
+        get => _selectedWorkspaceIndex == 4;
+        set { if (value) SelectedWorkspaceIndex = 4; }
+    }
+
+    public int SelectedExperimentTabIndex
+    {
+        get => _selectedExperimentTabIndex;
+        set { if (value is >= 0 and <= 2) SetProperty(ref _selectedExperimentTabIndex, value); }
+    }
+
+    public int SelectedExperimentCaptureSectionIndex
+    {
+        get => _selectedExperimentCaptureSectionIndex;
+        set { if (value is >= 0 and <= 2) SetProperty(ref _selectedExperimentCaptureSectionIndex, value); }
     }
 
     public bool IsResultsWorkspace
@@ -341,8 +561,51 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
         ((AsyncRelayCommand)OpenLargeLayoutSampleCommand).RaiseCanExecuteChanged();
         ((RelayCommand)ToggleInspectorCommand).RaiseCanExecuteChanged();
         ((RelayCommand)ToggleEvidenceDrawerCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)OpenResultsWorkspaceCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)ReturnFromResultsCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)ReturnToResultsCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)OpenEquipmentWorkspaceCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)SelectEquipmentEvidenceTabCommand).RaiseCanExecuteChanged();
         ((RelayCommand)OpenComponentLibraryCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)OpenManualCommissioningCommand).RaiseCanExecuteChanged();
         ((RelayCommand)OpenSequenceEditorCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)OpenTestScenarioCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)CloseTestScenarioCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)OpenRecipeConnectionsCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)CloseRecipeConnectionsCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)CloseModalOverlayCommand).RaiseCanExecuteChanged();
+    }
+
+    internal void ClearResultSettingsReturn()
+    {
+        if (!_isResultSettingsOpen) return;
+        _isResultSettingsOpen = false;
+        OnPropertyChanged(nameof(HasResultSettingsReturn));
+        InvalidateCommands();
+    }
+
+    internal bool OpenResultCameraSettings()
+    {
+        if (_disposed || !IsResultsWorkspace || IsModalOverlayOpen) return false;
+        IsInspectionWorkspace = true;
+        if (!IsInspectionWorkspace) return false;
+        _isResultSettingsOpen = true;
+        SelectedInspectionSettingsTabIndex = 0;
+        IsInspectionSettingsExpanded = true;
+        IsInspectorOpen = true;
+        OnPropertyChanged(nameof(HasResultSettingsReturn));
+        InvalidateCommands();
+        return true;
+    }
+
+    internal void EnterEquipmentAuthoring()
+    {
+        if (_disposed) return;
+        HideStartupChoice();
+        IsEquipmentWorkspace = true;
+        SelectedLeftToolTabIndex = 0;
+        IsInspectorOpen = true;
+        IsEvidenceExpanded = false;
     }
 
     private void StartBlankLayout()
@@ -352,9 +615,7 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        _isStartupChoiceVisible = false;
-        OnPropertyChanged(nameof(IsStartupChoiceVisible));
-        SelectedLeftToolTabIndex = 1;
+        EnterEquipmentAuthoring();
         _onBlankLayoutStarted();
         InvalidateCommands();
     }
@@ -362,6 +623,7 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
     private void SelectWorkspace(int workspaceIndex, int documentIndex)
     {
         var previousExecutionTabIndex = SelectedExecutionTabIndex;
+        var wasExperimentWorkspace = IsExperimentWorkspace;
         var workspaceChanged = _selectedWorkspaceIndex != workspaceIndex;
         var documentChanged = _selectedDocumentTabIndex != documentIndex;
         if ((workspaceChanged || documentChanged) && !_resolvePendingPlacementDraft())
@@ -369,9 +631,16 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(string.Empty);
             return;
         }
+        if (workspaceChanged && workspaceIndex == 3 && !_isResultSettingsOpen)
+            _resultsReturn = (_selectedWorkspaceIndex, _selectedDocumentTabIndex, _selectedLeftToolTabIndex, IsInspectorOpen);
+        if (workspaceChanged && workspaceIndex != 2 && _isResultSettingsOpen)
+        {
+            _isResultSettingsOpen = false;
+            OnPropertyChanged(nameof(HasResultSettingsReturn));
+        }
         _selectedWorkspaceIndex = workspaceIndex;
         _selectedDocumentTabIndex = documentIndex;
-        if (workspaceChanged && workspaceIndex == 1)
+        if (workspaceChanged && workspaceIndex is 1 or 4)
         {
             SelectedLeftToolTabIndex = 3;
         }
@@ -383,9 +652,9 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
         {
             SelectedLeftToolTabIndex = 0;
         }
-        if (workspaceChanged && IsInspectorOpen)
+        if (workspaceChanged)
         {
-            IsInspectorOpen = false;
+            IsInspectorOpen = workspaceIndex == 0;
         }
         if (documentChanged)
         {
@@ -395,13 +664,27 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
         if (!workspaceChanged) return;
         OnPropertyChanged(nameof(SelectedWorkspaceIndex));
         OnPropertyChanged(nameof(IsEquipmentWorkspace));
+        OnPropertyChanged(nameof(IsEquipmentInspectorOpen));
+        OnPropertyChanged(nameof(IsSequenceWorkspace));
+        OnPropertyChanged(nameof(IsProcessWorkspace));
+        OnPropertyChanged(nameof(IsSimulationOverviewWorkspace));
+        OnPropertyChanged(nameof(IsDockedInspectorOpen));
         OnPropertyChanged(nameof(IsSimulationWorkspace));
         OnPropertyChanged(nameof(IsInspectionWorkspace));
         OnPropertyChanged(nameof(IsResultsWorkspace));
+        if (wasExperimentWorkspace != IsExperimentWorkspace) OnPropertyChanged(nameof(IsExperimentWorkspace));
         OnPropertyChanged(nameof(IsEquipmentOutlineVisible));
         if (previousExecutionTabIndex != SelectedExecutionTabIndex)
             OnPropertyChanged(nameof(SelectedExecutionTabIndex));
         InvalidateCommands();
+    }
+
+    private void RaiseEquipmentEvidenceSelectionChanged()
+    {
+        OnPropertyChanged(nameof(IsEquipmentEventsSelected));
+        OnPropertyChanged(nameof(IsEquipmentRequestsSelected));
+        OnPropertyChanged(nameof(IsEquipmentGenerationSelected));
+        OnPropertyChanged(nameof(IsEquipmentAlarmsSelected));
     }
 
     private void OnLanguageChanged(object? sender, EventArgs e)
@@ -429,6 +712,8 @@ public sealed class ShellNavigationViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        IsTestScenarioOpen = false;
+        IsRecipeConnectionsOpen = false;
         _disposed = true;
         OpenVisionLanguageService.LanguageChanged -= OnLanguageChanged;
         LanguageChanged = null;

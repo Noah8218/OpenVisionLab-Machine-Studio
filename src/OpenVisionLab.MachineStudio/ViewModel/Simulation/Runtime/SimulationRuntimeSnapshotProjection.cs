@@ -41,6 +41,15 @@ internal sealed record SimulationRuntimeSnapshotProjection(
     IReadOnlyList<string> ScheduledFaultTargetIds,
     IReadOnlyList<string> RecoverySequenceIds)
 {
+    internal IReadOnlyList<SequenceExecutionSnapshot> RecipeSequences { get; init; } = Array.Empty<SequenceExecutionSnapshot>();
+    internal int CompletedRecipeSequenceCount => RecipeSequences.Count(sequence => sequence.Status == SequenceExecutionStatus.Completed);
+    internal SequenceExecutionStatus? RecipeStatus => RecipeSequences.Count == 0 ? null
+        : RecipeSequences.Any(sequence => sequence.Status == SequenceExecutionStatus.Faulted) ? SequenceExecutionStatus.Faulted
+        : RecipeSequences.Any(sequence => sequence.Status == SequenceExecutionStatus.Aborted) ? SequenceExecutionStatus.Aborted
+        : RecipeSequences.Any(sequence => sequence.Status == SequenceExecutionStatus.Running) ? SequenceExecutionStatus.Running
+        : CompletedRecipeSequenceCount == RecipeSequences.Count ? SequenceExecutionStatus.Completed
+        : SequenceExecutionStatus.Ready;
+
     internal static SimulationRuntimeSnapshotProjection Empty { get; } = new(
         TimeSpan.Zero,
         0,
@@ -76,6 +85,11 @@ internal sealed record SimulationRuntimeSnapshotProjection(
             .Select(target => target.Id)
             .ToArray();
 
+        var currentSequence = FindActiveSequence(snapshot, selection.ActiveSequenceId);
+        SequenceExecutionSnapshot[] recipeSequences = currentSequence is null ? []
+            : currentSequence.UnitId is null ? [currentSequence]
+            : snapshot.Sequences.Where(sequence => sequence.UnitId is not null).ToArray();
+
         return new(
             snapshot.SimulationTime,
             snapshot.TickIndex,
@@ -88,7 +102,7 @@ internal sealed record SimulationRuntimeSnapshotProjection(
             snapshot.Cameras.FirstOrDefault(camera =>
                 camera.Id == selection.PreferredCameraId)
                 ?? snapshot.Cameras.FirstOrDefault(),
-            FindActiveSequence(snapshot, selection.ActiveSequenceId),
+            currentSequence,
             snapshot.AutomaticRun,
             snapshot.ConditionScenario,
             ReadSignal(snapshot, "di.cycle-start"),
@@ -97,7 +111,10 @@ internal sealed record SimulationRuntimeSnapshotProjection(
             equipmentTargetIds,
             equipmentTargetIds,
             scheduledFaultTargetIds,
-            snapshot.Sequences.Select(sequence => sequence.SequenceId).ToArray());
+            snapshot.Sequences.Select(sequence => sequence.SequenceId).ToArray())
+        {
+            RecipeSequences = recipeSequences
+        };
     }
 
     internal static AxisSnapshot? SelectAxis(

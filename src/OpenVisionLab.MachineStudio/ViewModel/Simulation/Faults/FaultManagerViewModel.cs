@@ -130,7 +130,7 @@ public sealed class FaultManagerViewModel : ViewModelBase, IDisposable
 
     internal void SetEnabled(bool value, bool invalidateCommands)
     {
-        if (IsDisposed || !SetProperty(ref _isEnabled, value))
+        if (IsDisposed || !SetProperty(ref _isEnabled, value, nameof(IsEnabled)))
         {
             return;
         }

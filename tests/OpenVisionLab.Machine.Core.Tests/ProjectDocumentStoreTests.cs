@@ -536,7 +536,7 @@ public class ProjectDocumentStoreTests
     }
 
     [Theory]
-    [InlineData("1.19")]
+    [InlineData("1.20")]
     [InlineData("2.0")]
     [InlineData("future")]
     public void Load_UnsupportedSchema_IsRejected(string schema)

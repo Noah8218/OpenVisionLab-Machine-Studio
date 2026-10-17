@@ -21,6 +21,7 @@ public sealed class DeterministicVirtualCamera
     private VirtualCameraInspectionEvidence? _inspectionEvidence;
     private VirtualCameraExternalResultEvidence? _externalResultEvidence;
     private bool _waitForExternalResult;
+    private NumericalCameraInput? _numericalInput;
 
     public DeterministicVirtualCamera(VirtualCameraConfiguration configuration)
     {
@@ -30,6 +31,8 @@ public sealed class DeterministicVirtualCamera
     public string Id => _configuration.Id;
     public string Name => _configuration.Name;
     public VirtualCameraState State => _state;
+    public bool HasNumericalInput => _configuration.NumericalInput is not null;
+    public string? ReferenceAxisId => _configuration.NumericalInput?.AxisId;
 
     internal string CreateNextAcquisitionId() => string.Concat(
         Id,
@@ -46,7 +49,8 @@ public sealed class DeterministicVirtualCamera
         VirtualCameraInspectionEvidence? inspectionEvidence = null,
         bool waitForExternalResult = false,
         string? workpieceComponentId = null,
-        string? workpieceInstanceId = null)
+        string? workpieceInstanceId = null,
+        double axisOffset = 0)
     {
         if (string.IsNullOrWhiteSpace(recipeId))
         {
@@ -73,6 +77,16 @@ public sealed class DeterministicVirtualCamera
 
         var nextOrdinal = _acquisitionOrdinal + 1;
         var nextAcquisitionId = CreateNextAcquisitionId();
+        NumericalCameraInput? numerical = null;
+        if (_configuration.NumericalInput is { } settings)
+        {
+            if (settings.ConfirmedVersion != settings.Version) return VirtualCameraTriggerResult.Rejected(VirtualCameraTriggerErrorCode.RecipeVersionUnconfirmed, _acquisitionOrdinal);
+            if (recipeId != settings.RecipeName) return VirtualCameraTriggerResult.Rejected(VirtualCameraTriggerErrorCode.RecipeMismatch, _acquisitionOrdinal);
+            if (frameEvidence is not null || inspectionEvidence is not null) return VirtualCameraTriggerResult.Rejected(VirtualCameraTriggerErrorCode.InspectionEvidenceInvalid, _acquisitionOrdinal);
+            numerical = NumericalCameraInput.Generate(settings, Id, nextAcquisitionId, nextOrdinal, axisOffset, waitForExternalResult);
+            frameEvidence = numerical.Frame;
+            inspectionEvidence = waitForExternalResult ? null : numerical.Inspection;
+        }
         if (frameEvidence is not null && !string.Equals(
                 frameEvidence.FrameId,
                 nextAcquisitionId,
@@ -108,6 +122,7 @@ public sealed class DeterministicVirtualCamera
         _exposureTicksRemaining = _configuration.ExposureTicks;
         _transferTicksRemaining = 0;
         _result = null;
+        _numericalInput = numerical;
         _frameEvidence = frameEvidence;
         _inspectionEvidence = inspectionEvidence;
         _externalResultEvidence = null;
@@ -161,7 +176,8 @@ public sealed class DeterministicVirtualCamera
                         _frameEvidence,
                         _inspectionEvidence,
                         WorkpieceComponentId: _currentWorkpieceComponentId,
-                        WorkpieceInstanceId: _currentWorkpieceInstanceId);
+                        WorkpieceInstanceId: _currentWorkpieceInstanceId,
+                        NumericalInput: _numericalInput);
                     _state = VirtualCameraState.FrameReady;
                     transition = VirtualCameraTickTransition.FrameReady;
                     completedAcquisition = _result;
@@ -236,7 +252,8 @@ public sealed class DeterministicVirtualCamera
             _frameEvidence,
             ExternalResultEvidence: evidence,
             WorkpieceComponentId: _currentWorkpieceComponentId,
-            WorkpieceInstanceId: _currentWorkpieceInstanceId);
+            WorkpieceInstanceId: _currentWorkpieceInstanceId,
+            NumericalInput: _numericalInput);
         _state = VirtualCameraState.FrameReady;
         return VirtualCameraExternalResultAdmissionResult.Applied(terminalFailure: false);
     }
@@ -248,6 +265,7 @@ public sealed class DeterministicVirtualCamera
     public VirtualCameraSnapshot Fault()
     {
         _state = VirtualCameraState.Faulted;
+        _numericalInput = null;
         _exposureTicksRemaining = 0;
         _transferTicksRemaining = 0;
         _result = null;
@@ -275,6 +293,7 @@ public sealed class DeterministicVirtualCamera
         _inspectionEvidence = null;
         _externalResultEvidence = null;
         _waitForExternalResult = false;
+        _numericalInput = null;
     }
 
     public VirtualCameraSnapshot CaptureSnapshot() =>
@@ -289,5 +308,6 @@ public sealed class DeterministicVirtualCamera
             _transferTicksRemaining,
             _result,
             _frameEvidence,
-            _externalResultEvidence);
+            _externalResultEvidence,
+            _numericalInput);
 }

@@ -5,15 +5,19 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Devices;
 using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Persistence.Projects;
+using OpenVisionLab.Machine.Sequence.Runtime;
+using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.MachineStudio.Model;
 using OpenVisionLab.MachineStudio.View.Inspector;
 using OpenVisionLab.MachineStudio.View.Scene;
+using OpenVisionLab.MachineStudio.View.Shell;
 using OpenVisionLab.MachineStudio.ViewModel;
 using OpenVisionLab.TestSupport;
 using Xunit;
@@ -28,18 +32,585 @@ public sealed class SceneDocumentViewAutomationTests
     public SceneDocumentViewAutomationTests(StudioUiTestHost ui) => _ui = ui;
 
     [Theory]
+    [InlineData(665, false)]
+    [InlineData(665, true)]
+    [InlineData(705, false)]
+    [InlineData(705, true)]
+    [InlineData(1285, false)]
+    [InlineData(1285, true)]
+    public async Task R24EquipmentSelectionWrapsNameAndDetailAsSeparateItems(double width, bool longName)
+    {
+        await _ui.InvokeTaskAsync(async () =>
+        {
+            var previousLanguage = OpenVisionLanguageService.CurrentLanguage;
+            OpenVisionLanguageService.SetLanguage(OpenVisionLanguage.Korean, save: false);
+            try
+            {
+                var project = new ProjectDocumentStore().Load(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Samples", "AutomaticTransferCell.ovmachine")));
+                var stage = project.Layouts[0].Components.First(component => component.Kind == LayoutComponentKind.LinearStage);
+                stage.Id = "AX-01";
+                stage.Name = longName ? new string('장', 60) : "카메라 이송 축";
+                var before = new ProjectDocumentStore().SerializeForEvidence(project);
+                using var vm = new MainViewModel(project);
+                vm.Navigation.IsEquipmentWorkspace = true; vm.Layout.Select(stage.Id); vm.Layout.ShowOverview();
+                vm.Navigation.IsInspectorOpen = true;
+                var window = new ShellWindow { DataContext = vm, ShowInTaskbar = false, ShowActivated = false };
+                SmokeDpiTestHook.PlaceOnTestMonitor(window, width < 800 ? 1280 : 1920, width < 800 ? 900 : 1032);
+                window.Show();
+                if (width == 665) ((ColumnDefinition)window.FindName("RightWorkspaceColumn")).Width = new GridLength(400);
+                try
+                {
+                    var view = Assert.IsType<SceneDocumentView>(window.FindName("SceneDocumentView"));
+                    async Task Settle()
+                    {
+                        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                        window.UpdateLayout();
+                        new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32).Render(window);
+                        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+                        CaptureWindow(window, $"r24-selection-{width:0}-{longName}");
+                    }
+                    await Settle(); await Settle();
+                    Assert.Equal(width, Assert.IsAssignableFrom<FrameworkElement>(view.FindName("SceneViewport")).ActualWidth, 1);
+                    var name = Assert.IsType<TextBlock>(view.FindName("EquipmentSelectionName"));
+                    var detail = Assert.IsType<TextBlock>(view.FindName("EquipmentSelectionDetail"));
+                    var strip = Assert.IsType<Border>(view.FindName("EquipmentSelectionActions"));
+                    var actions = Assert.IsType<WrapPanel>(view.FindName("EquipmentSelectionCommands"));
+                    Rect Bounds(FrameworkElement e) => e.TransformToAncestor(view).TransformBounds(new Rect(e.RenderSize));
+                    var title = Assert.IsType<TextBlock>(view.FindName("EquipmentSceneTitle"));
+                    var hint = Assert.IsType<TextBlock>(view.FindName("EquipmentSceneHint"));
+                    Assert.InRange(Bounds(title).Left - Bounds(Assert.IsAssignableFrom<FrameworkElement>(view.FindName("SceneViewport"))).Left, 9.5, 10.5);
+                    Assert.InRange(Bounds(hint).Top - Bounds(title).Bottom, 0, 0.5);
+                    Assert.Equal("#FFE4EDF2", title.Foreground.ToString());
+                    Assert.Equal("#FF9FB6C3", hint.Foreground.ToString());
+                    if (width == 665) Assert.InRange(hint.ActualHeight, 33, 34);
+                    Assert.True(strip.IsVisible && name.IsVisible && detail.IsVisible);
+                    Assert.Equal(stage.Name, name.Text); Assert.Contains("리니어 축", detail.Text);
+                    Console.WriteLine($"R24 selection: scene={width}, long={longName}, name={Bounds(name)}, detail={Bounds(detail)}, strip={Bounds(strip)}");
+                    Assert.InRange(Bounds(detail).Left - Bounds(name).Right, 5, 7);
+                    Assert.InRange(strip.ActualWidth, 1, width * 0.6 + 1);
+                    Assert.True(Bounds(detail).Right <= Bounds(actions).Left);
+                    Assert.All(actions.Children.OfType<Button>(), button => Assert.Equal(28, button.ActualHeight));
+                    if (longName)
+                    {
+                        Assert.True(name.ActualHeight > 30 && detail.ActualHeight > 30);
+                        if (width < 800) Assert.True(detail.ActualHeight >= 69.6);
+                    }
+                    else if (width == 665) Assert.InRange(name.ActualHeight, 33, 36);
+                    else Assert.InRange(name.ActualHeight, 17, 18);
+                    Assert.Equal(before, new ProjectDocumentStore().SerializeForEvidence(project));
+                    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(SmokeDpiTestHook.CaptureMonitorEvidence(window)));
+                }
+                finally { window.DataContext = null; window.Close(); }
+            }
+            finally { OpenVisionLanguageService.SetLanguage(previousLanguage, save: false); }
+            return true;
+        });
+    }
+
+    [Theory]
+    [InlineData(1280, 760)]
+    [InlineData(1920, 1040)]
+    public async Task EmptyRecipeNextStepUsesRenderedUnitAndPartCommandsWithoutRunning(double width, double height)
+    {
+        await _ui.InvokeTaskAsync(async () =>
+        {
+            using var vm = new MainViewModel(new MachineProjectDocument { Name = "Previous inspection recipe" });
+            vm.Navigation.IsInspectionWorkspace = true;
+            var window = new ShellWindow { DataContext = vm, Width = width, MinWidth = width, Height = height, ShowActivated = false, ShowInTaskbar = false };
+            window.Show();
+            try
+            {
+                Assert.True(await vm.CreateNewProjectAsync("Recipe entry review"));
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                window.UpdateLayout();
+                Assert.Equal(width, window.ActualWidth, 1);
+                Capture("created");
+                Assert.True(vm.Navigation.IsEquipmentWorkspace);
+                var next = Descendants(window).OfType<Button>().Single(button => button.Name == "EmptyRecipeNextStepButton");
+                Assert.True(next.IsVisible, $"Next-step control visibility: {next.Visibility}, layout={vm.HasAuthoredLayout}");
+                Assert.True(next.IsEnabled, $"Next-step command={next.Command?.CanExecute(null)}, editable={vm.IsSceneEditable}");
+                Assert.Equal(OpenVisionLanguageService.T("Equipment.StationUnitAddButton"), next.Content);
+                Assert.Same(vm.OpenEquipmentComponentLibraryDialogCommand, next.Command);
+                Assert.Same(next, Keyboard.Focus(next));
+                Capture("empty");
+
+                Invoke(next);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.True(vm.IsStationUnitEditorOpen);
+                Invoke(CommandButton(vm.CancelStationUnitEditorCommand));
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.False(vm.IsStationUnitEditorOpen || vm.HasUnsavedChanges);
+
+                Invoke(next);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var unitName = Descendants(window).OfType<TextBox>().Single(box => box.Name == "StationUnitNameTextBox");
+                unitName.Text = "Inspection transfer and positioning unit";
+                PumpBindings();
+                Assert.Equal(unitName.Text, vm.UnitNameDraft);
+                Capture("unit-dialog");
+                Invoke(CommandButton(vm.AddStationUnitCommand));
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.False(vm.IsStationUnitEditorOpen);
+                Assert.NotNull(vm.Layout.ActiveUnitId);
+                Assert.Equal(OpenVisionLanguageService.T("Equipment.AddPartButton"), next.Content);
+                Assert.True(vm.HasUnsavedChanges);
+                Capture("unit-ready");
+
+                Invoke(next);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.True(vm.IsEquipmentComponentLibraryDialogOpen);
+                Capture("part-dialog");
+                var addFrame = Descendants(window).OfType<Button>().Single(button =>
+                    ReferenceEquals(button.Command, vm.AddEquipmentComponentFromLibraryCommand)
+                    && button.CommandParameter is OpenVisionLab.MachineStudio.Model.ComponentLibraryItem { Kind: LayoutComponentKind.MachineFrame });
+                Invoke(addFrame);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.False(vm.IsEquipmentComponentLibraryDialogOpen || next.IsVisible);
+                var frame = Assert.Single(vm.Layout.Items.Where(item => item.Component is not null));
+                Assert.Equal(vm.Layout.ActiveUnitId, frame.Component!.UnitId);
+                Assert.True(vm.HasUnsavedChanges);
+                Assert.True(vm.IsDesignMode);
+                Assert.False(vm.IsRunning);
+                Capture("part-added");
+
+                Button CommandButton(System.Windows.Input.ICommand command) => Descendants(window).OfType<Button>()
+                    .Single(button => button.IsVisible && ReferenceEquals(button.Command, command));
+                static void Invoke(Button button) => Assert.IsAssignableFrom<IInvokeProvider>(new ButtonAutomationPeer(button)
+                    .GetPattern(PatternInterface.Invoke)).Invoke();
+                void Capture(string state)
+                {
+                    CaptureWindow(window, $"recipe-entry-{width:0}x{height:0}-{state}");
+                }
+            }
+            finally
+            {
+                window.DataContext = null;
+                window.Close();
+            }
+            return true;
+        });
+    }
+
+    [Theory]
+    [InlineData(1280, 760)]
+    [InlineData(1920, 1040)]
+    public async Task ManualEntryAppliesDraftMovesAxisAndReturnsToSavedAuthoringThroughRenderedControls(double width, double height)
+    {
+        await _ui.InvokeTaskAsync(async () =>
+        {
+            var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+            OpenVisionLanguageService.SetLanguage(OpenVisionLanguage.Korean, save: false);
+            using var vm = new MainViewModel(new MachineProjectDocument { Name = "Manual entry review" });
+            var window = new ShellWindow { DataContext = vm, Width = width, MinWidth = width, Height = height, ShowActivated = false, ShowInTaskbar = false };
+            window.Show();
+            try
+            {
+                Assert.True(await vm.CreateNewProjectAsync("Manual positioning recipe"));
+                vm.OpenStationUnitEditorCommand.Execute(null);
+                vm.StationNameDraft = "Inspection station";
+                vm.UnitNameDraft = "Transfer and positioning unit";
+                vm.AddStationUnitCommand.Execute(null);
+                vm.AddEquipmentLayoutComponentCommand.Execute(LayoutComponentKind.LinearStage);
+                var stage = Assert.Single(vm.Layout.Items.Where(item => item.Component?.Kind == LayoutComponentKind.LinearStage)).Component!;
+                vm.Layout.Select(stage.Id);
+                vm.Navigation.IsInspectorOpen = true;
+                await IdleAsync();
+                var inspector = Descendants(window).OfType<OpenVisionLab.MachineStudio.View.Inspector.RightToolRegionView>().Single();
+                var manualTab = Descendants(inspector).OfType<Button>().Single(button => ReferenceEquals(button.Command, vm.OpenEquipmentSinglePartCheckCommand));
+                Assert.True(manualTab.IsVisible && manualTab.IsEnabled);
+                Capture("design-before");
+
+                var editor = Assert.IsType<LayoutComponentEditorViewModel>(vm.Layout.SelectedComponentEditor);
+                var originalX = stage.Transform.X;
+                editor.DraftXText = "25";
+                vm.PlacementDraftPrompt = () => PlacementDraftDecision.Cancel;
+                Invoke(manualTab);
+                await WaitAsync(() => !vm.ManualEquipment.IsStartingManualControl);
+                Assert.True(editor.HasPendingPlacementDraft && vm.IsSceneEditable && vm.IsDesignMode);
+                Assert.False(vm.IsRunning);
+                Assert.Equal(originalX, stage.Transform.X);
+                Capture("entry-cancelled");
+
+                vm.PlacementDraftPrompt = () => PlacementDraftDecision.Apply;
+                Invoke(manualTab);
+                await WaitAsync(() => vm.IsEquipmentSinglePartCheckOpen && !editor.HasPendingPlacementDraft && vm.CanStartManualEquipmentControl);
+                var start = Descendants(window).OfType<Button>().Single(button => button.Name == "EnterManualCommissioningButton");
+                Assert.True(start.IsVisible && start.IsEnabled);
+                Assert.Same(vm.ManualEquipment.StartManualEquipmentControlCommand, start.Command);
+                Assert.Equal(OpenVisionLanguageService.T("Equipment.EnterManualCommissioning", "수동 시운전 시작", "Start manual commissioning"), start.Content);
+                Invoke(start);
+                await WaitAsync(() => !vm.ManualEquipment.IsStartingManualControl && vm.IsRunning && vm.IsRunMode);
+                await WaitAsync(() => vm.SceneSnapshots.Latest?.ControlOwner == SimulationControlOwner.Manual);
+                Assert.Equal(25, stage.Transform.X);
+                Assert.False(editor.HasPendingPlacementDraft || vm.IsSceneEditable);
+                Assert.True(vm.IsEquipmentSinglePartCheckOpen && vm.Navigation.IsInspectorOpen && vm.HasUnsavedChanges);
+                var snapshot = vm.SceneSnapshots.Latest!;
+                Assert.False(snapshot.AutomaticRun.IsActive);
+                Assert.DoesNotContain(snapshot.Sequences, sequence => sequence.Status == SequenceExecutionStatus.Running);
+                Assert.Equal(0, Assert.Single(snapshot.Axes).Position, 3);
+                Capture("manual-started");
+
+                var target = Descendants(window).OfType<TextBox>().Single(box => box.Name == "AxisTargetPositionTextBox");
+                var move = Descendants(window).OfType<Button>().Single(button => button.Name == "MoveAxisAbsoluteButton");
+                var inspectorScroll = Descendants(window).OfType<ScrollViewer>().Single(scroll => scroll.Name == "RunInspectorScrollViewer");
+                var diagnostics = Descendants(window).OfType<Expander>().Single(expander => expander.Name == "AxisDriveDiagnostics");
+                var advancedMotion = Descendants(window).OfType<Expander>().Single(expander => expander.Name == "AxisAdvancedMotionControls");
+                Assert.False(diagnostics.IsExpanded || advancedMotion.IsExpanded);
+                Assert.Equal(0, inspectorScroll.VerticalOffset);
+                AssertInsideInspector(target);
+                AssertInsideInspector(move);
+                AssertInsideInspector(Descendants(window).OfType<Button>().Single(button => button.Name == "StopAxisMotionButton"));
+                target.SetCurrentValue(TextBox.TextProperty, "invalid");
+                await IdleAsync();
+                var targetBounds = target.TransformToAncestor(window).TransformBounds(new Rect(target.RenderSize));
+                Assert.True(new Rect(window.RenderSize).Contains(targetBounds));
+                Assert.Equal("invalid", vm.AxisTargetPositionText);
+                Assert.False(move.IsEnabled);
+                Assert.True(vm.HasAxisTargetPositionError);
+                AssertInsideInspector(Descendants(window).OfType<TextBlock>().Single(text => text.Name == "AxisTargetValidationText"));
+                Capture("target-invalid");
+                target.SetCurrentValue(TextBox.TextProperty, "10");
+                await WaitAsync(() => move.IsEnabled);
+                Assert.Equal("10", vm.AxisTargetPositionText);
+                Invoke(move);
+                await WaitAsync(() => Math.Abs(Assert.Single(vm.SceneSnapshots.Latest!.Axes).Position - 10) < 0.001);
+                Assert.False(vm.HasAxisTargetPositionError);
+                Descendants(window).OfType<ScrollViewer>().Single(scroll => scroll.Name == "RunInspectorScrollViewer").ScrollToTop();
+                await IdleAsync();
+                Capture("axis-10");
+
+                vm.IsDesignMode = true;
+                await SmokePerformanceVerifier.WaitForModeAsync(vm, window.Dispatcher, false);
+                Assert.True(vm.IsSceneEditable && vm.HasUnsavedChanges);
+                Assert.False(vm.IsRunning || vm.ManualEquipment.IsManualControlAdmissionLocked);
+                Assert.Equal(stage.Id, vm.Layout.SelectedItem?.Id);
+                Assert.Equal(25, stage.Transform.X);
+                Capture("edit-return");
+
+                var path = Path.Combine(TestStorage.RootPath, $"manual-entry-{width:0}x{height:0}", "manual-positioning.ovmachine");
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                await vm.SaveProjectAsync(path);
+                var store = new ProjectDocumentStore();
+                var saved = store.Load(File.ReadAllText(path));
+                Assert.False(vm.HasUnsavedChanges);
+                Assert.Equal(25, Assert.Single(saved.Layouts.SelectMany(layout => layout.Components)).Transform.X);
+                Assert.True(await vm.OpenProjectAsync(path));
+                Assert.True(vm.IsDesignMode && vm.IsSceneEditable);
+                Assert.False(vm.IsRunning || vm.HasUnsavedChanges);
+                Assert.Equal(stage.Id, Assert.Single(vm.Layout.Items.Where(item => item.Component is not null)).Id);
+
+                void AssertInsideInspector(FrameworkElement element)
+                {
+                    var bounds = element.TransformToAncestor(inspectorScroll).TransformBounds(new Rect(element.RenderSize));
+                    Assert.True(element.IsVisible && bounds.Top >= -0.5 && bounds.Bottom <= inspectorScroll.ViewportHeight + 0.5,
+                        $"{element.Name}: {bounds}, viewport height {inspectorScroll.ViewportHeight}");
+                }
+            }
+            finally
+            {
+                window.DataContext = null;
+                window.Close();
+                OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
+            }
+            return true;
+
+            async Task IdleAsync()
+            {
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                window.UpdateLayout();
+            }
+            async Task WaitAsync(Func<bool> condition)
+            {
+                var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+                while (!condition() && DateTime.UtcNow < deadline) await Task.Delay(20);
+                Assert.True(condition(), "The requested manual commissioning state did not become observable.");
+                await IdleAsync();
+            }
+            static void Invoke(Button button) => Assert.IsAssignableFrom<IInvokeProvider>(new ButtonAutomationPeer(button)
+                .GetPattern(PatternInterface.Invoke)).Invoke();
+            void Capture(string state) => CaptureWindow(window, $"manual-entry-{width:0}x{height:0}-{state}");
+        });
+    }
+
+    private static void CaptureWindow(Window window, string name)
+    {
+        var evidenceDirectory = Environment.GetEnvironmentVariable("OPENVISIONLAB_MACHINE_STUDIO_RECIPE_ENTRY_EVIDENCE");
+        if (string.IsNullOrWhiteSpace(evidenceDirectory)) return;
+        Directory.CreateDirectory(evidenceDirectory);
+        window.UpdateLayout();
+        var bitmap = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(window);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(Path.Combine(evidenceDirectory, $"{name}.png"));
+        encoder.Save(stream);
+    }
+
+    [Theory]
+    [InlineData(1674)]
+    [InlineData(1034)]
+    public async Task MaterialSettingsButtonsMatchCommandsAcrossModeChangesAndRecoverWithoutMutation(double width)
+    {
+        await _ui.InvokeTaskAsync(async () =>
+        {
+            var project = new MachineProjectDocument
+            {
+                Stations = [new() { Id = "station", Name = "Station", Units = [new() { Id = "unit", Name = "Inspection" }] }]
+            };
+            var store = new ProjectDocumentStore();
+            string AuthoredState() => store.SerializeForSave(project, DateTimeOffset.UnixEpoch);
+            var saved = AuthoredState();
+            using var vm = new MainViewModel(project);
+            var view = new SceneDocumentView { DataContext = vm };
+            var window = new Window { Content = view, Width = width, Height = 760, WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false };
+            window.Show();
+            try
+            {
+                PumpBindings();
+                var open = Assert.IsType<MenuItem>(view.FindName("EquipmentMaterialSettingsButton"));
+                Assert.Same(vm.MaterialFlowSettings.OpenCommand, open.Command);
+                var openProvider = Assert.IsAssignableFrom<IInvokeProvider>(new MenuItemAutomationPeer(open).GetPattern(PatternInterface.Invoke));
+                Assert.True(open.IsEnabled);
+                openProvider.Invoke();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var settings = Assert.Single(Descendants(view).OfType<MaterialFlowSettingsView>());
+                var apply = Descendants(settings).OfType<Button>().Single(button => ReferenceEquals(button.Command, vm.MaterialFlowSettings.ApplyCommand));
+                Assert.True(vm.MaterialFlowSettings.IsOpen && apply.IsEnabled);
+                vm.MaterialFlowSettings.WorkpieceName = "Unapplied draft";
+
+                vm.IsRunMode = true;
+                await SmokePerformanceVerifier.WaitForModeAsync(vm, window.Dispatcher, true);
+                Assert.False(open.IsEnabled);
+                Assert.False(apply.IsEnabled);
+                Assert.Equal(vm.MaterialFlowSettings.OpenCommand.CanExecute(null), open.IsEnabled);
+                Assert.Equal(vm.MaterialFlowSettings.ApplyCommand.CanExecute(null), apply.IsEnabled);
+                Assert.Throws<System.Windows.Automation.ElementNotEnabledException>(() => openProvider.Invoke());
+                Assert.Equal(saved, AuthoredState());
+
+                vm.IsRunMode = false;
+                await SmokePerformanceVerifier.WaitForModeAsync(vm, window.Dispatcher, false);
+                Assert.True(open.IsEnabled && apply.IsEnabled);
+                var cancel = Descendants(settings).OfType<Button>().Single(button => ReferenceEquals(button.Command, vm.MaterialFlowSettings.CancelCommand));
+                Assert.IsAssignableFrom<IInvokeProvider>(new ButtonAutomationPeer(cancel).GetPattern(PatternInterface.Invoke)).Invoke();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.False(vm.MaterialFlowSettings.IsOpen);
+                Assert.False(vm.MaterialFlowSettings.ApplyCommand.CanExecute(null));
+                openProvider.Invoke();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.Equal(project.MaterialFlow.WorkpieceName, vm.MaterialFlowSettings.WorkpieceName);
+                Assert.Equal(saved, AuthoredState());
+                Assert.False(vm.HasUnsavedChanges || vm.IsRunning);
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Theory]
     [InlineData(1674)]
     [InlineData(1034)]
     [InlineData(794)]
+    public async Task MaterialSettingsBindingsRejectInvalidRepeatAndReopenSavedValuesWithoutRunning(double width)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var project = new MachineProjectDocument
+            {
+                Stations = [new() { Id = "station", Name = "Station", Units = [new() { Id = "unit", Name = "Inspection Unit" }] }]
+            };
+            using var vm = new MainViewModel(project);
+            var view = new SceneDocumentView { DataContext = vm };
+            var window = new Window { Content = view, Width = width, Height = 538, WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false };
+            window.Show();
+            try
+            {
+                vm.MaterialFlowSettings.OpenCommand.Execute(null);
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                var settings = Assert.Single(Descendants(view).OfType<MaterialFlowSettingsView>());
+                var controls = Descendants(settings).ToArray();
+                var name = controls.OfType<TextBox>().Single(box => box.Name == "MaterialWorkpieceNameTextBox");
+                var repeat = controls.OfType<TextBox>().Single(box => box.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path?.Path == nameof(MaterialFlowSettingsViewModel.RepeatCount));
+                var apply = controls.OfType<Button>().Single(button => ReferenceEquals(button.Command, vm.MaterialFlowSettings.ApplyCommand));
+                name.SetCurrentValue(TextBox.TextProperty, new string('A', 60));
+                repeat.SetCurrentValue(TextBox.TextProperty, "0");
+                PumpBindings();
+                Assert.Equal(name.Text, vm.MaterialFlowSettings.WorkpieceName);
+                Assert.Equal("0", vm.MaterialFlowSettings.RepeatCount);
+                var provider = (IInvokeProvider)new ButtonAutomationPeer(apply).GetPattern(PatternInterface.Invoke);
+                provider.Invoke();
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                Assert.True(vm.MaterialFlowSettings.IsOpen);
+                Assert.Contains("1–100", vm.MaterialFlowSettings.ValidationText);
+                Assert.False(vm.HasUnsavedChanges);
+                var feedback = controls.OfType<TextBlock>().Single(text => text.GetBindingExpression(TextBlock.TextProperty)?.ParentBinding.Path?.Path == nameof(MaterialFlowSettingsViewModel.ValidationText));
+                var feedbackBounds = feedback.TransformToAncestor(settings).TransformBounds(new Rect(feedback.RenderSize));
+                var applyBounds = apply.TransformToAncestor(settings).TransformBounds(new Rect(apply.RenderSize));
+                Assert.True(feedback.IsVisible && feedbackBounds.Bottom <= applyBounds.Top, "Validation feedback must remain visible above Apply in the native workspace height.");
+                var bounds = new Rect(view.RenderSize);
+                foreach (var button in controls.OfType<Button>().Where(button => button.IsVisible))
+                    Assert.True(bounds.Contains(button.TransformToAncestor(view).TransformBounds(new Rect(button.RenderSize))));
+                repeat.SetCurrentValue(TextBox.TextProperty, "3");
+                PumpBindings();
+                provider.Invoke();
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                Assert.False(vm.MaterialFlowSettings.IsOpen);
+                Assert.True(vm.HasUnsavedChanges);
+                Assert.False(vm.IsRunning);
+                var store = new ProjectDocumentStore();
+                var restored = store.Load(store.Save(project));
+                Assert.Equal(new string('A', 60), restored.MaterialFlow.WorkpieceName);
+                Assert.Equal(3, restored.Stations[0].Units[0].RepeatCount);
+                vm.MaterialFlowSettings.OpenCommand.Execute(null);
+                PumpBindings();
+                Assert.Equal("3", repeat.Text);
+                Assert.Equal(restored.MaterialFlow.WorkpieceName, name.Text);
+                vm.MaterialFlowSettings.CancelCommand.Execute(null);
+                Assert.False(vm.IsRunning);
+                return true;
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Theory]
+    [InlineData(1674, OpenVisionLanguage.Korean)]
+    [InlineData(1034, OpenVisionLanguage.Korean)]
+    [InlineData(1674, OpenVisionLanguage.English)]
+    [InlineData(1034, OpenVisionLanguage.English)]
+    public async Task MaterialSettingsLocalizeErrorsAndKeepDraftsAcrossFileReopen(double width, OpenVisionLanguage language)
+    {
+        await _ui.InvokeTaskAsync(async () =>
+        {
+            var previousLanguage = OpenVisionLanguageService.CurrentLanguage;
+            OpenVisionLanguageService.SetLanguage(language, save: false);
+            string unitName = new('U', 80), productName = new('P', 60), slotName = new('S', 60);
+            var project = new MachineProjectDocument
+            {
+                Stations = [new() { Id = "station", Name = "Station", Units = [new() { Id = "unit", Name = unitName }, new() { Id = "output", Name = "Output" }] }]
+            };
+            using var vm = new MainViewModel(project);
+            var view = new SceneDocumentView { DataContext = vm };
+            var window = new Window { Content = view, Width = width, Height = 538, WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false };
+            window.Show();
+            try
+            {
+                PumpBindings();
+                var open = Assert.IsType<MenuItem>(view.FindName("EquipmentMaterialSettingsButton"));
+                Assert.Same(vm.MaterialFlowSettings.OpenCommand, open.Command);
+                Assert.Equal(OpenVisionLanguageService.T("MaterialFlow.SettingsTitle"), open.Header);
+                Assert.IsAssignableFrom<IInvokeProvider>(new MenuItemAutomationPeer(open).GetPattern(PatternInterface.Invoke)).Invoke();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var settings = Assert.Single(Descendants(view).OfType<MaterialFlowSettingsView>());
+                var controls = Descendants(settings).ToArray();
+                var name = controls.OfType<TextBox>().Single(box => box.Name == "MaterialWorkpieceNameTextBox");
+                var slot = controls.OfType<TextBox>().Single(box => box.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path?.Path == nameof(MaterialFlowSettingsViewModel.SlotName));
+                var repeat = controls.OfType<TextBox>().Single(box => box.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path?.Path == nameof(MaterialFlowSettingsViewModel.RepeatCount));
+                var combo = controls.OfType<ComboBox>().Single();
+                var apply = controls.OfType<Button>().Single(button => ReferenceEquals(button.Command, vm.MaterialFlowSettings.ApplyCommand));
+                Assert.Equal(OpenVisionLanguageService.T("MaterialFlow.ProductName"), System.Windows.Automation.AutomationProperties.GetName(name));
+                name.SetCurrentValue(TextBox.TextProperty, productName);
+                slot.SetCurrentValue(TextBox.TextProperty, slotName);
+                repeat.SetCurrentValue(TextBox.TextProperty, "0");
+                PumpBindings();
+                Assert.IsAssignableFrom<IInvokeProvider>(new ButtonAutomationPeer(apply).GetPattern(PatternInterface.Invoke)).Invoke();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var feedback = controls.OfType<TextBlock>().Single(text => text.GetBindingExpression(TextBlock.TextProperty)?.ParentBinding.Path?.Path == nameof(MaterialFlowSettingsViewModel.ValidationText));
+                Assert.Equal(OpenVisionLanguageService.T("MaterialFlow.InvalidSettings"), feedback.Text);
+                Assert.False(vm.HasUnsavedChanges || vm.IsRunning);
+                Assert.Null(project.Simulation.AutomaticRun);
+                await window.Dispatcher.InvokeAsync(window.UpdateLayout, DispatcherPriority.ContextIdle);
+                CaptureWindow(window, $"material-{width}-{language}-long-error");
+                var selectedText = Descendants(combo).OfType<TextBlock>().Single(text => text.Text == unitName);
+                var textBounds = selectedText.TransformToAncestor(combo).TransformBounds(new Rect(selectedText.RenderSize));
+                Assert.True(new Rect(combo.RenderSize).Contains(textBounds), $"Selected unit text {textBounds} must fit inside {combo.RenderSize}.");
+                var glyphs = new FormattedText(selectedText.Text, System.Globalization.CultureInfo.CurrentCulture,
+                    selectedText.FlowDirection, new Typeface(selectedText.FontFamily, selectedText.FontStyle, selectedText.FontWeight, selectedText.FontStretch),
+                    selectedText.FontSize, selectedText.Foreground, VisualTreeHelper.GetDpi(selectedText).PixelsPerDip);
+                if (selectedText.TextWrapping != TextWrapping.NoWrap) glyphs.MaxTextWidth = selectedText.ActualWidth;
+                Assert.True(glyphs.WidthIncludingTrailingWhitespace <= selectedText.ActualWidth + 1 && glyphs.Height <= selectedText.ActualHeight + 1,
+                    $"Selected unit glyphs {glyphs.WidthIncludingTrailingWhitespace}x{glyphs.Height} exceed {selectedText.RenderSize}.");
+                var feedbackBounds = feedback.TransformToAncestor(settings).TransformBounds(new Rect(feedback.RenderSize));
+                var applyBounds = apply.TransformToAncestor(settings).TransformBounds(new Rect(apply.RenderSize));
+                Assert.True(feedback.IsVisible && feedbackBounds.Bottom <= applyBounds.Top);
+                var dialogBorder = controls.OfType<Border>().Single(border => border.Child is DockPanel);
+                Assert.True(new Rect(settings.RenderSize).Contains(dialogBorder.TransformToAncestor(settings).TransformBounds(new Rect(dialogBorder.RenderSize))), "The settings panel must fit in its container.");
+                var dialogBounds = dialogBorder.TransformToAncestor(window).TransformBounds(new Rect(dialogBorder.RenderSize));
+                Assert.True(new Rect(window.RenderSize).Contains(dialogBounds), $"Settings bounds {dialogBounds} exceed actual window {window.RenderSize}.");
+                foreach (var button in controls.OfType<Button>().Where(button => button.IsVisible))
+                    Assert.True(new Rect(view.RenderSize).Contains(button.TransformToAncestor(view).TransformBounds(new Rect(button.RenderSize))));
+
+                combo.IsDropDownOpen = true;
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var item = Assert.IsType<ComboBoxItem>(combo.ItemContainerGenerator.ContainerFromIndex(0));
+                Assert.True(item.IsVisible);
+                Assert.Equal(unitName, ((MachineUnitDefinition)item.Content).Name);
+                CaptureWindow(window, $"material-{width}-{language}-unit-popup");
+                var popupText = Descendants(item).OfType<TextBlock>().Single(text => text.Text == unitName);
+                Assert.True(new Rect(item.RenderSize).Contains(popupText.TransformToAncestor(item).TransformBounds(new Rect(popupText.RenderSize))), "The long unit name must fit in its popup item.");
+                combo.IsDropDownOpen = false;
+                var otherLanguage = language == OpenVisionLanguage.Korean ? OpenVisionLanguage.English : OpenVisionLanguage.Korean;
+                OpenVisionLanguageService.SetLanguage(otherLanguage, save: false);
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.Equal(OpenVisionLanguageService.T("MaterialFlow.InvalidSettings"), feedback.Text);
+                Assert.Equal(productName, name.Text);
+                Assert.Equal(slotName, slot.Text);
+                Assert.False(vm.HasUnsavedChanges || vm.IsRunning);
+                CaptureWindow(window, $"material-{width}-{language}-language-recovery");
+                repeat.SetCurrentValue(TextBox.TextProperty, "3");
+                PumpBindings();
+                Assert.IsAssignableFrom<IInvokeProvider>(new ButtonAutomationPeer(apply).GetPattern(PatternInterface.Invoke)).Invoke();
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.False(vm.MaterialFlowSettings.IsOpen || vm.IsRunning);
+                Assert.True(vm.HasUnsavedChanges);
+                var fileStore = new ProjectDocumentFileStore();
+                var directory = Path.Combine(TestStorage.RootPath, $"material-{width}-{language}");
+                Directory.CreateDirectory(directory);
+                var path = Path.Combine(directory, "material-settings.ovmachine");
+                await fileStore.SaveAsync(project, path);
+                var restored = await fileStore.LoadAsync(path);
+                var savedBytes = await File.ReadAllBytesAsync(path);
+                Assert.Equal(productName, restored.MaterialFlow.WorkpieceName);
+                Assert.Equal(slotName, restored.Stations[0].Units[0].SlotName);
+                Assert.All(restored.Stations[0].Units, unit => Assert.Equal(3, unit.RepeatCount));
+                Assert.Null(restored.Simulation.AutomaticRun);
+                var fresh = new MaterialFlowSettingsViewModel(() => restored, () => "unit", () => true, () => throw new InvalidOperationException("Cancel must not apply."));
+                fresh.OpenCommand.Execute(null);
+                window.Content = new MaterialFlowSettingsView { DataContext = fresh };
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.Equal(productName, fresh.WorkpieceName);
+                Assert.Equal(slotName, fresh.SlotName);
+                Assert.Equal("3", fresh.RepeatCount);
+                fresh.ResetCommand.Execute(null);
+                fresh.CancelCommand.Execute(null);
+                fresh.OpenCommand.Execute(null);
+                Assert.Equal(productName, fresh.WorkpieceName);
+                Assert.Equal(slotName, fresh.SlotName);
+                Assert.Equal(savedBytes, await File.ReadAllBytesAsync(path));
+                Assert.Null(restored.Simulation.AutomaticRun);
+                CaptureWindow(window, $"material-{width}-{language}-file-reopened");
+                return true;
+            }
+            finally
+            {
+                window.Close();
+                OpenVisionLanguageService.SetLanguage(previousLanguage, save: false);
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(1674)]
+    [InlineData(1034)]
+    [InlineData(794)]
+    [InlineData(665)]
     public async Task EquipmentToolbarSeparatesAuthoringAndViewControlsWithoutClipping(double width)
     {
         await _ui.InvokeAsync(() =>
         {
-            using var layout = CreateLayout(out _);
-            using var navigation = new ShellNavigationViewModel(false, () => false, () => false,
-                () => Task.CompletedTask, () => { }, _ => { });
+            var project = new ProjectDocumentStore().Load(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Samples", "R19InspectionFlow.ovmachine")));
+            using var model = new MainViewModel(project);
+            var navigation = model.Navigation;
             navigation.SelectedDocumentTabIndex = 0;
-            var view = new SceneDocumentView { DataContext = new SceneDataContext(layout, navigation, IsSceneEditable: true) };
+            var view = new SceneDocumentView { DataContext = model };
             var window = new Window
             {
                 Width = width, Height = 760, WindowStyle = WindowStyle.None,
@@ -49,29 +620,38 @@ public sealed class SceneDocumentViewAutomationTests
             try
             {
                 window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
-                var authoring = Assert.IsType<WrapPanel>(view.FindName("EquipmentAuthoringToolbar"));
+                navigation.IsCompactLayout = width < 1100;
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                var heading = Assert.IsType<StackPanel>(view.FindName("EquipmentSceneHeading"));
                 var viewing = Assert.IsType<WrapPanel>(view.FindName("EquipmentViewToolbar"));
-                var authoringBounds = authoring.TransformToAncestor(view).TransformBounds(new Rect(authoring.RenderSize));
+                var headingBounds = heading.TransformToAncestor(view).TransformBounds(new Rect(heading.RenderSize));
                 var viewingBounds = viewing.TransformToAncestor(view).TransformBounds(new Rect(viewing.RenderSize));
-                Assert.True(authoring.IsVisible && viewing.IsVisible);
-                Assert.True(authoringBounds.Right <= viewingBounds.Left || authoringBounds.Bottom <= viewingBounds.Top);
-                var header = Assert.IsType<Grid>(viewing.Parent);
-                var headerBounds = header.TransformToAncestor(view).TransformBounds(new Rect(header.RenderSize));
-                Assert.Equal(headerBounds.Right, viewingBounds.Right, precision: 3);
+                Assert.True(heading.IsVisible && viewing.IsVisible);
+                Assert.True(!headingBounds.IntersectsWith(viewingBounds), $"Heading {headingBounds}; toolbar {viewingBounds}; Compact {navigation.IsCompactLayout}");
                 var viewport = Assert.IsType<MachineSceneViewport>(view.FindName("SceneViewport"));
                 var viewportBounds = viewport.TransformToAncestor(view).TransformBounds(new Rect(viewport.RenderSize));
-                var identity = Assert.IsType<Border>(view.FindName("SceneIdentityCard"));
-                var identityBounds = identity.TransformToAncestor(view).TransformBounds(new Rect(identity.RenderSize));
-                var headerBorder = Assert.IsType<Border>(header.Parent);
-                Assert.Equal(headerBounds.Bottom + headerBorder.BorderThickness.Bottom, viewportBounds.Top, precision: 3);
-                Assert.True(viewportBounds.Contains(identityBounds));
-                Assert.False(identity.IsHitTestVisible);
+                Assert.Equal(viewport.ActualWidth * 0.6, heading.MaxWidth, precision: 3);
+                var hint = Assert.IsType<TextBlock>(view.FindName("EquipmentSceneHint"));
+                Assert.Equal("#FF9FB6C3", hint.Foreground.ToString());
+                Assert.True(viewportBounds.Contains(headingBounds));
+                Assert.True(viewportBounds.Contains(viewingBounds));
+                Assert.Equal(5, viewing.Children.Count);
+                Assert.All(viewing.Children.Cast<FrameworkElement>(), control => Assert.Equal(24, control.ActualHeight));
+                var group = Assert.IsType<Border>(view.FindName("EquipmentViewToolbarGroup"));
+                Assert.Equal(new Thickness(1), group.BorderThickness);
+                var header = Assert.IsType<Border>(view.FindName("EquipmentSceneHeader"));
+                var headerBounds = header.TransformToAncestor(view).TransformBounds(new Rect(header.RenderSize));
+                Assert.True(headerBounds.Contains(headingBounds) && headerBounds.Contains(viewingBounds));
+                Assert.Equal(headingBounds.Top, viewingBounds.Top - group.Padding.Top - group.BorderThickness.Top, precision: 1);
+                Assert.Null(header.Background);
+                Assert.Equal(new Thickness(0), header.BorderThickness);
+                Assert.Same(viewport, view.InputHitTest(new Point(headingBounds.Left + 5, headingBounds.Top + 5)));
+                Assert.Same(viewport, view.InputHitTest(new Point(headerBounds.Left + 2, headerBounds.Top + 2)));
+                Assert.Equal(14, Assert.IsType<TextBlock>(view.FindName("EquipmentSceneTitle")).FontSize);
+                Assert.False(Assert.IsType<Border>(view.FindName("SceneIdentityCard")).IsVisible);
                 var visibleBounds = new Rect(view.RenderSize);
-                foreach (var control in authoring.Children.Cast<FrameworkElement>().Concat(viewing.Children.Cast<FrameworkElement>()))
-                {
-                    Assert.True(control.IsVisible);
+                foreach (var control in viewing.Children.Cast<FrameworkElement>())
                     Assert.True(visibleBounds.Contains(control.TransformToAncestor(view).TransformBounds(new Rect(control.RenderSize))));
-                }
                 return true;
             }
             finally
@@ -703,17 +1283,16 @@ public sealed class SceneDocumentViewAutomationTests
         {
             var project = new MachineProjectDocument { Name = "Station focus" };
             using var viewModel = new MainViewModel(project);
-            var view = new SceneDocumentView { DataContext = viewModel };
-            var window = new Window
+            var window = new ShellWindow
             {
-                Width = 900, Height = 700, WindowStyle = WindowStyle.None,
-                ShowInTaskbar = false, Content = view
+                DataContext = viewModel, Width = 1280, Height = 900, ShowInTaskbar = false
             };
             window.Show();
             try
             {
                 window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
-                var launcher = Descendants(view).OfType<Button>().First(button =>
+                var view = Assert.Single(Descendants(window).OfType<SceneDocumentView>());
+                var launcher = Descendants(window).OfType<Button>().First(button =>
                     button.IsVisible && ReferenceEquals(button.Command, viewModel.OpenStationUnitEditorCommand));
                 var before = new ProjectDocumentStore().Serialize(project);
                 for (var attempt = 0; attempt < 2; attempt++)
@@ -746,6 +1325,376 @@ public sealed class SceneDocumentViewAutomationTests
             }
         });
     }
+
+    [Theory]
+    [InlineData(1280, 760)]
+    [InlineData(1920, 1032)]
+    public async Task StationUnitEditorKeepsActionsInsideItsPanelAcrossValidationAndRecovery(int width, int height)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+            OpenVisionLanguageService.SetLanguage(OpenVisionLanguage.Korean, save: false);
+            var store = new ProjectDocumentStore();
+            var project = store.Load(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Samples", "R19InspectionFlow.ovmachine")));
+            var stationIds = project.Stations.Select(station => station.Id).ToHashSet(StringComparer.Ordinal);
+            var sequenceCount = project.Sequences.Count;
+            using var model = new MainViewModel(project);
+            model.ShowEquipmentUnitCommand.Execute("unit-inspection");
+            var window = new ShellWindow { DataContext = model, ShowInTaskbar = false };
+            SmokeDpiTestHook.PlaceOnTestMonitor(window, width, height);
+            window.Show();
+            try
+            {
+                Pump();
+                Assert.Equal(width, window.ActualWidth, 1);
+                Assert.Equal(height, window.ActualHeight, 1);
+                Assert.True(SmokeDpiTestHook.CaptureMonitorEvidence(window).WindowIntersectsMonitor);
+                Assert.True(model.EquipmentMaterialFlow.HasSlots);
+                var scene = Assert.Single(Descendants(window).OfType<SceneDocumentView>());
+                var before = store.Serialize(project);
+                model.OpenStationUnitEditorCommand.Execute(null);
+                Pump();
+                var overlay = Assert.IsType<Grid>(scene.FindName("StationUnitEditorOverlay"));
+                var panel = Assert.Single(overlay.Children.OfType<Border>(), border => border.Child is not null);
+                var cancel = CommandButton(model.CancelStationUnitEditorCommand);
+                var add = CommandButton(model.AddStationUnitCommand);
+                CaptureWindow(window, $"station-actions-{width}x{height}-existing");
+                AssertActionsInsidePanel();
+
+                var unitName = Assert.IsType<TextBox>(scene.FindName("StationUnitNameTextBox"));
+                unitName.SetCurrentValue(TextBox.TextProperty, "");
+                Pump();
+                Assert.NotEmpty(model.StationUnitValidationText);
+                Assert.False(add.IsEnabled);
+                Assert.Equal(before, store.Serialize(project));
+                model.IsCreatingNewStation = true;
+                Pump();
+                CaptureWindow(window, $"station-actions-{width}x{height}-new-error");
+                AssertActionsInsidePanel();
+
+                var stationName = Descendants(overlay).OfType<TextBox>().Single(box =>
+                    box.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path.Path == "StationNameDraft");
+                unitName.SetCurrentValue(TextBox.TextProperty, new string('장', 80));
+                stationName.SetCurrentValue(TextBox.TextProperty, new string('스', 80));
+                Pump();
+                Assert.Equal(unitName.Text, model.UnitNameDraft);
+                Assert.Equal(stationName.Text, model.StationNameDraft);
+                Assert.True(add.IsEnabled);
+                AssertActionsInsidePanel();
+                Invoke(add);
+                Pump();
+                Assert.False(model.IsStationUnitEditorOpen || model.IsRunning);
+                Assert.True(model.HasUnsavedChanges);
+                var created = Assert.Single(project.Stations.Where(station => !stationIds.Contains(station.Id)));
+                Assert.Equal(stationName.Text, created.Name);
+                Assert.Equal(unitName.Text, Assert.Single(created.Units).Name);
+                Assert.Equal(sequenceCount, project.Sequences.Count);
+                return true;
+
+                Button CommandButton(ICommand command) => Descendants(overlay).OfType<Button>()
+                    .Single(button => ReferenceEquals(button.Command, command));
+                static void Invoke(Button button) => Assert.IsAssignableFrom<IInvokeProvider>(new ButtonAutomationPeer(button)
+                    .GetPattern(PatternInterface.Invoke)).Invoke();
+                void Pump() => window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                void AssertActionsInsidePanel()
+                {
+                    var bounds = new Rect(panel.RenderSize);
+                    bounds.Inflate(0.5, 0.5);
+                    foreach (var button in new[] { cancel, add })
+                    {
+                        var buttonBounds = button.TransformToAncestor(panel).TransformBounds(new Rect(button.RenderSize));
+                        Assert.True(button.IsVisible && bounds.Contains(buttonBounds),
+                            $"{button.Content}: {buttonBounds}, panel {bounds}, window {width}x{height}");
+                    }
+                }
+            }
+            finally
+            {
+                window.DataContext = null;
+                window.Close();
+                OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(1280, 760)]
+    [InlineData(1920, 1032)]
+    public async Task StationUnitNewStationChoiceKeepsFocusInsideFullShell(int width, int height)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var store = new ProjectDocumentStore();
+            var project = store.Load(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Samples", "R19InspectionFlow.ovmachine")));
+            using var model = new MainViewModel(project);
+            model.ShowEquipmentUnitCommand.Execute("unit-inspection");
+            var window = new ShellWindow { DataContext = model, ShowInTaskbar = false };
+            SmokeDpiTestHook.PlaceOnTestMonitor(window, width, height);
+            window.Show();
+            try
+            {
+                Pump();
+                var scene = Assert.Single(Descendants(window).OfType<SceneDocumentView>());
+                var launcher = Descendants(window).OfType<Button>().First(button =>
+                    button.IsVisible && ReferenceEquals(button.Command, model.OpenStationUnitEditorCommand));
+                Assert.True(launcher.Focus());
+                model.OpenStationUnitEditorCommand.Execute(null);
+                Pump();
+                var overlay = Assert.IsType<Grid>(scene.FindName("StationUnitEditorOverlay"));
+                var option = Descendants(overlay).OfType<ComboBox>().Single();
+                var stationName = Descendants(overlay).OfType<TextBox>().Single(box =>
+                    box.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path.Path == "StationNameDraft");
+                var before = store.Serialize(project);
+                Assert.True(option.Focus());
+                Pump();
+                Assert.Same(option, Keyboard.FocusedElement);
+                Assert.IsAssignableFrom<IExpandCollapseProvider>(new ComboBoxAutomationPeer(option).GetPattern(PatternInterface.ExpandCollapse)).Expand();
+                Pump();
+                var choicePeers = new ComboBoxAutomationPeer(option).GetChildren()
+                    .Where(peer => peer.GetPattern(PatternInterface.SelectionItem) is ISelectionItemProvider).ToArray();
+                Assert.Equal(option.Items.Count, choicePeers.Length);
+                Assert.IsAssignableFrom<ISelectionItemProvider>(choicePeers[^1].GetPattern(PatternInterface.SelectionItem)).Select();
+                option.IsDropDownOpen = false;
+                Pump();
+                Assert.True(model.IsCreatingNewStation);
+                Assert.Same(option, Keyboard.FocusedElement);
+                Assert.True(option.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)));
+                Pump();
+                Assert.Same(stationName, Keyboard.FocusedElement);
+                for (var tab = 0; tab < 10; tab++)
+                {
+                    Assert.True(((UIElement)Keyboard.FocusedElement).MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)));
+                    Pump();
+                    Assert.Contains((DependencyObject)Keyboard.FocusedElement, Descendants(overlay));
+                }
+                model.CancelStationUnitEditorCommand.Execute(null);
+                Pump();
+                Assert.False(model.IsStationUnitEditorOpen || model.HasUnsavedChanges || model.IsRunning);
+                Assert.Same(launcher, Keyboard.FocusedElement);
+                Assert.Equal(before, store.Serialize(project));
+                return true;
+
+                void Pump() => window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+            }
+            finally
+            {
+                window.DataContext = null;
+                window.Close();
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(1280, 760, OpenVisionLanguage.Korean)]
+    [InlineData(1280, 760, OpenVisionLanguage.English)]
+    [InlineData(1920, 1032, OpenVisionLanguage.Korean)]
+    [InlineData(1920, 1032, OpenVisionLanguage.English)]
+    public async Task StationUnitSelectorWrapsLongExistingStationValues(int width, int height, OpenVisionLanguage language)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+            OpenVisionLanguageService.SetLanguage(language, save: false);
+            var longName = new string(language == OpenVisionLanguage.Korean ? '스' : 'W', 80);
+            var project = new MachineProjectDocument
+            {
+                Name = "Long station selector",
+                Stations = [new() { Id = "station-long", Name = longName, Units = [new() { Id = "unit-long", Name = "Unit" }] }]
+            };
+            using var model = new MainViewModel(project);
+            model.ShowEquipmentUnitCommand.Execute("unit-long");
+            var window = new ShellWindow { DataContext = model, ShowInTaskbar = false };
+            SmokeDpiTestHook.PlaceOnTestMonitor(window, width, height);
+            window.Show();
+            try
+            {
+                Pump();
+                model.OpenStationUnitEditorCommand.Execute(null);
+                Pump();
+                var scene = Assert.Single(Descendants(window).OfType<SceneDocumentView>());
+                var overlay = Assert.IsType<Grid>(scene.FindName("StationUnitEditorOverlay"));
+                var combo = Descendants(overlay).OfType<ComboBox>().Single();
+                var selected = Descendants(combo).OfType<TextBlock>().Single(text => text.Text == longName);
+                CaptureWindow(window, $"unit-selector-{width}-{language}-long-selected");
+                AssertTextInside(selected, combo);
+                combo.IsDropDownOpen = true;
+                Pump();
+                var item = Assert.IsType<ComboBoxItem>(combo.ItemContainerGenerator.ContainerFromIndex(0));
+                var dropdown = Descendants(item).OfType<TextBlock>().Single(text => text.Text == longName);
+                AssertTextInside(dropdown, item);
+                Assert.Equal(TextWrapping.Wrap, dropdown.TextWrapping);
+                combo.IsDropDownOpen = false;
+                Pump();
+                model.CancelStationUnitEditorCommand.Execute(null);
+                Pump();
+                Assert.False(model.HasUnsavedChanges || model.IsRunning || model.IsStationUnitEditorOpen);
+                return true;
+
+                void Pump() => window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                static void AssertTextInside(TextBlock text, FrameworkElement parent)
+                {
+                    var bounds = text.TransformToAncestor(parent).TransformBounds(new Rect(text.RenderSize));
+                    var parentBounds = new Rect(parent.RenderSize);
+                    parentBounds.Inflate(0.5, 0.5);
+                    Assert.True(parentBounds.Contains(bounds), $"Long station text {bounds} exceeds parent {parentBounds}.");
+                    var formatted = new FormattedText(text.Text, System.Globalization.CultureInfo.CurrentCulture, text.FlowDirection,
+                        new Typeface(text.FontFamily, text.FontStyle, text.FontWeight, text.FontStretch), text.FontSize, Brushes.White,
+                        VisualTreeHelper.GetDpi(text).PixelsPerDip);
+                    if (text.TextWrapping != TextWrapping.NoWrap) formatted.MaxTextWidth = Math.Max(1, text.ActualWidth);
+                    Assert.True(formatted.Width <= text.ActualWidth + 0.5 && formatted.Height <= text.ActualHeight + 0.5,
+                        $"Required station glyphs {formatted.Width}x{formatted.Height} exceed {text.ActualWidth}x{text.ActualHeight}.");
+                }
+            }
+            finally
+            {
+                window.DataContext = null;
+                window.Close();
+                OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(1280, 760, OpenVisionLanguage.Korean)]
+    [InlineData(1920, 1032, OpenVisionLanguage.English)]
+    public async Task StationUnitSelectorUsesOneExistingOrNewChoiceAndPreservesDrafts(int width, int height, OpenVisionLanguage language)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+            OpenVisionLanguageService.SetLanguage(language, save: false);
+            var project = new MachineProjectDocument
+            {
+                Name = "Station choice",
+                Stations = [new() { Id = "station-existing", Name = "Existing station", Units = [new() { Id = "unit-existing", Name = "Existing unit" }] }]
+            };
+            using var model = new MainViewModel(project);
+            model.ShowEquipmentUnitCommand.Execute("unit-existing");
+            var window = new ShellWindow { DataContext = model, ShowInTaskbar = false };
+            SmokeDpiTestHook.PlaceOnTestMonitor(window, width, height);
+            window.Show();
+            try
+            {
+                Pump();
+                var before = System.Text.Json.JsonSerializer.Serialize(project);
+                model.OpenStationUnitEditorCommand.Execute(null);
+                Pump();
+                var scene = Assert.Single(Descendants(window).OfType<SceneDocumentView>());
+                var overlay = Assert.IsType<Grid>(scene.FindName("StationUnitEditorOverlay"));
+                var combo = Descendants(overlay).OfType<ComboBox>().Single();
+                var unitName = Assert.IsType<TextBox>(scene.FindName("StationUnitNameTextBox"));
+                var stationName = Descendants(overlay).OfType<TextBox>().Single(box =>
+                    box.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path.Path == "StationNameDraft");
+                var add = Descendants(overlay).OfType<Button>().Single(button => ReferenceEquals(button.Command, model.AddStationUnitCommand));
+                Assert.Equal(project.Stations.Count + 1, combo.Items.Count);
+                Assert.Empty(Descendants(overlay).OfType<CheckBox>());
+                Assert.Equal(language == OpenVisionLanguage.Korean ? "유닛 추가" : "Add unit",
+                    Descendants(overlay).OfType<TextBlock>().Single(text => text.FontSize == 19).Text);
+                unitName.SetCurrentValue(TextBox.TextProperty, new string('U', 80));
+                combo.SelectedIndex = combo.Items.Count - 1;
+                Pump();
+                Assert.True(model.IsCreatingNewStation && stationName.IsVisible && combo.IsEnabled);
+                stationName.SetCurrentValue(TextBox.TextProperty, "");
+                Pump();
+                Assert.False(add.IsEnabled);
+                Assert.NotEmpty(model.StationUnitValidationText);
+                stationName.SetCurrentValue(TextBox.TextProperty, new string('S', 80));
+                Pump();
+                Assert.True(add.IsEnabled);
+                CaptureWindow(window, $"unit-selector-{width}-{language}-new-recovered");
+                Assert.True(combo.Focus());
+                Assert.True(combo.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)));
+                Pump();
+                Assert.Same(stationName, Keyboard.FocusedElement);
+                combo.SelectedIndex = 0;
+                Pump();
+                Assert.False(model.IsCreatingNewStation || stationName.IsVisible);
+                Assert.Equal("station-existing", model.SelectedStationId);
+                Assert.Equal(new string('U', 80), model.UnitNameDraft);
+                Assert.Equal(new string('S', 80), model.StationNameDraft);
+                model.CancelStationUnitEditorCommand.Execute(null);
+                Pump();
+                Assert.Equal(before, System.Text.Json.JsonSerializer.Serialize(project));
+                Assert.False(model.HasUnsavedChanges || model.IsRunning);
+                model.OpenStationUnitEditorCommand.Execute(null);
+                Pump();
+                combo.SelectedIndex = combo.Items.Count - 1;
+                unitName.SetCurrentValue(TextBox.TextProperty, "Added unit");
+                stationName.SetCurrentValue(TextBox.TextProperty, "Added station");
+                Pump();
+                Assert.IsAssignableFrom<IInvokeProvider>(new ButtonAutomationPeer(add).GetPattern(PatternInterface.Invoke)).Invoke();
+                Pump();
+                Assert.False(model.IsStationUnitEditorOpen || model.IsRunning);
+                var createdStation = Assert.Single(project.Stations.Where(station => station.Id != "station-existing"));
+                Assert.Equal("Added station", createdStation.Name);
+                Assert.Equal("Added unit", Assert.Single(createdStation.Units).Name);
+                Assert.True(model.HasUnsavedChanges);
+                return true;
+
+                void Pump() => window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+            }
+            finally
+            {
+                window.DataContext = null;
+                window.Close();
+                OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(1280, 760, OpenVisionLanguage.Korean)]
+    [InlineData(1920, 1032, OpenVisionLanguage.English)]
+    public async Task StationUnitSelectorCancelsObsoleteDraftAfterProjectReplacement(int width, int height, OpenVisionLanguage language)
+    {
+        await _ui.InvokeTaskAsync(async () =>
+        {
+            var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+            OpenVisionLanguageService.SetLanguage(language, save: false);
+            var project = new MachineProjectDocument
+            {
+                Name = "Old station context",
+                Stations = [new() { Id = "station-old", Name = "Station", Units = [new() { Id = "unit-old", Name = "Unit" }] }]
+            };
+            using var model = new MainViewModel(project);
+            model.ShowEquipmentUnitCommand.Execute("unit-old");
+            var window = new ShellWindow { DataContext = model, ShowInTaskbar = false };
+            SmokeDpiTestHook.PlaceOnTestMonitor(window, width, height);
+            window.Show();
+            try
+            {
+                Pump();
+                model.OpenStationUnitEditorCommand.Execute(null);
+                Pump();
+                var before = System.Text.Json.JsonSerializer.Serialize(project);
+                model.NewProjectCommand.Execute(null);
+                Pump();
+                model.CancelNewProjectNameCommand.Execute(null);
+                Pump();
+                Assert.True(model.IsStationUnitEditorOpen);
+                Assert.Equal(before, System.Text.Json.JsonSerializer.Serialize(project));
+                Assert.True(await model.CreateNewProjectAsync("Replacement"));
+                Pump();
+                CaptureWindow(window, $"unit-selector-{width}-{language}-project-replaced");
+                Assert.False(model.IsStationUnitEditorOpen, "A replaced project must not retain the previous unit form.");
+                var fresh = Assert.IsType<MachineProjectDocument>(typeof(MainViewModel)
+                    .GetProperty("CurrentProject", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(model));
+                var freshPayload = System.Text.Json.JsonSerializer.Serialize(fresh);
+                model.AddStationUnitCommand.Execute(null);
+                Assert.Equal(freshPayload, System.Text.Json.JsonSerializer.Serialize(fresh));
+                Assert.False(model.HasUnsavedChanges || model.IsRunning);
+            }
+            finally
+            {
+                window.DataContext = null;
+                window.Close();
+                OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
+            }
+            void Pump() => window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+        });
+    }
+
 
     [Fact]
     public async Task UnitSceneKeepsItsComponentsAcrossPlanAndObliqueViewsAndOverviewRestoresAllUnits()
@@ -819,6 +1768,181 @@ public sealed class SceneDocumentViewAutomationTests
         Assert.True(state.returnedObliqueModeBound);
         Assert.Equal(new[] { "camera-inspection", "camera-loading", "conveyor-inspection" }, state.overviewIds);
         Assert.True(state.overviewRestored);
+    }
+
+    [Theory]
+    [InlineData(1920, true)]
+    [InlineData(1920, false)]
+    [InlineData(1280, true)]
+    [InlineData(1280, false)]
+    public async Task EquipmentSceneLongTitleAndSelectedLabelStaySeparateAcrossInspectorAndResize(int width, bool oblique)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var store = new ProjectDocumentStore();
+            var project = store.Load(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Samples", "R19InspectionFlow.ovmachine")));
+            var unit = project.Stations.SelectMany(station => station.Units).First();
+            unit.Name = "긴 유닛 이름 " + new string('검', 70);
+            var frame = project.Layouts.SelectMany(layout => layout.Components).First(component => component.Kind == LayoutComponentKind.MachineFrame);
+            frame.UnitId = unit.Id;
+            frame.Name = "긴 장치 이름 " + new string('장', 70);
+            frame.Id = "frame-long-" + new string('X', 96);
+            using var model = new MainViewModel(project);
+            model.ShowEquipmentUnitCommand.Execute(unit.Id);
+            model.Layout.Select(frame.Id);
+            if (oblique) model.Layout.ShowObliqueViewCommand.Execute(null); else model.Layout.ShowTopViewCommand.Execute(null);
+            var before = store.SerializeForEvidence(project);
+            var dirty = model.HasUnsavedChanges;
+            var window = new ShellWindow { DataContext = model, Width = width, Height = 900, ShowInTaskbar = false, ShowActivated = false };
+            window.Show();
+            try
+            {
+                var scene = Assert.Single(Descendants(window).OfType<SceneDocumentView>());
+                var viewport = Assert.IsType<MachineSceneViewport>(scene.FindName("SceneViewport"));
+                var title = Assert.IsType<TextBlock>(scene.FindName("EquipmentSceneTitle"));
+                var toggle = Assert.IsType<MenuItem>(scene.FindName("EquipmentInspectorToggleButton"));
+                for (var pass = 0; pass < 3; pass++)
+                {
+                    window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                    viewport.FitToLayout();
+                    window.Dispatcher.Invoke(DispatcherPriority.Render, new Action(() => { }));
+                    var label = Assert.IsType<Rect>(viewport.LastRenderedSelectedLabelBounds);
+                    Assert.True(new Rect(viewport.RenderSize).Contains(label));
+                    var titleBounds = title.TransformToAncestor(scene).TransformBounds(new Rect(title.RenderSize));
+                    var labelBounds = viewport.TransformToAncestor(scene).TransformBounds(label);
+                    Assert.False(titleBounds.IntersectsWith(labelBounds));
+                    Assert.True(title.ActualHeight > 0 && viewport.ActualHeight >= 220);
+                    Assert.Equal($"{unit.Name} · {OpenVisionLanguageService.T(oblique ? "Scene.ViewOblique" : "Scene.ViewPlan")}", title.Text);
+                    var footer = Assert.IsType<Grid>(scene.FindName("EquipmentFooterRegion"));
+                    Assert.False(footer.TransformToAncestor(scene).TransformBounds(new Rect(footer.RenderSize)).IntersectsWith(labelBounds));
+                    Assert.Equal(frame.Id, model.Layout.SelectedItem?.Id);
+                    Assert.Equal(dirty, model.HasUnsavedChanges);
+                    Assert.False(model.IsRunning);
+                    Assert.Equal(before, store.SerializeForEvidence(project));
+                    if (pass == 0)
+                        ((IInvokeProvider)new MenuItemAutomationPeer(toggle).GetPattern(PatternInterface.Invoke)).Invoke();
+                    else if (pass == 1)
+                    {
+                        ((IInvokeProvider)new MenuItemAutomationPeer(toggle).GetPattern(PatternInterface.Invoke)).Invoke();
+                        window.Width = width == 1920 ? 1280 : 1920;
+                    }
+                }
+                return true;
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task EquipmentSceneUnitListsExposeLastRealUnitAndScrollWithoutChangingRecipe(bool hasSlots)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var store = new ProjectDocumentStore();
+            var project = hasSlots
+                ? store.Load(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Samples", "R19InspectionFlow.ovmachine")))
+                : new MachineProjectDocument { Name = "Units without products", Layouts = [new MachineLayoutDefinition { Id = "layout-main", Name = "Main" }],
+                    Stations = [new MachineStationDefinition { Id = "station-main", Name = "Station" }] };
+            if (!hasSlots) project.Simulation.ActiveLayoutId = "layout-main";
+            var station = project.Stations.First();
+            for (var index = 0; index < 8; index++)
+                station.Units.Add(new MachineUnitDefinition { Id = $"unit-scroll-{index}", Name = "긴 유닛 이름 " + new string('검', 70) });
+            using var model = new MainViewModel(project);
+            var before = store.SerializeForEvidence(project);
+            var window = new ShellWindow { DataContext = model, Width = 1280, Height = 900, ShowInTaskbar = false, ShowActivated = false };
+            window.Show();
+            try
+            {
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                var scene = Assert.Single(Descendants(window).OfType<SceneDocumentView>());
+                var scroll = Assert.IsType<ScrollViewer>(scene.FindName(hasSlots ? "EquipmentSlotsScrollViewer" : "EquipmentUnitsScrollViewer"));
+                Assert.False(scroll.IsVisible);
+                var disclosure = Assert.IsType<System.Windows.Controls.Primitives.ToggleButton>(scene.FindName("EquipmentSlotsToggleButton"));
+                ((IToggleProvider)new ToggleButtonAutomationPeer(disclosure).GetPattern(PatternInterface.Toggle)).Toggle();
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                var buttons = Descendants(scroll).OfType<Button>().ToArray();
+                Assert.Equal(project.Stations.Sum(item => item.Units.Count), buttons.Length);
+                Assert.True(scroll.IsVisible && scroll.ScrollableWidth > 0);
+                var last = buttons.Last();
+                last.Focus();
+                last.BringIntoView();
+                scroll.ScrollToRightEnd();
+                scroll.ScrollToBottom();
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                Assert.Equal(scroll.ScrollableWidth, scroll.HorizontalOffset, 1);
+                Assert.Equal(scroll.ScrollableHeight, scroll.VerticalOffset, 1);
+                var bounds = last.TransformToAncestor(scroll).TransformBounds(new Rect(last.RenderSize));
+                Assert.True(bounds.Right <= scroll.ActualWidth && bounds.Left >= 0);
+                if (!hasSlots)
+                {
+                    var expected = model.Layout.UnitOverviewItems.Single(item => item.UnitId == "unit-scroll-7");
+                    var text = Descendants(last).OfType<TextBlock>().ToArray();
+                    foreach (var value in new[] { expected.UnitId, expected.CountText })
+                    {
+                        var required = Assert.Single(text.Where(item => item.Text == value));
+                        var rendered = required.TransformToAncestor(scroll).TransformBounds(new Rect(required.RenderSize));
+                        Assert.True(required.IsVisible && rendered.Height > 0 && rendered.Width > 0);
+                        Assert.True(rendered.Left >= 0 && rendered.Right <= scroll.ViewportWidth + 1);
+                        Assert.True(rendered.Top >= 0 && rendered.Bottom <= scroll.ViewportHeight + 1,
+                            $"Required summary content clipped: {value}, {rendered}, viewport={scroll.ViewportHeight}");
+                    }
+                }
+                ((IInvokeProvider)new ButtonAutomationPeer(last).GetPattern(PatternInterface.Invoke)).Invoke();
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                Assert.Equal("unit-scroll-7", model.Layout.ActiveUnitId);
+                Assert.Equal(before, store.SerializeForEvidence(project));
+                Assert.False(model.HasUnsavedChanges || model.IsRunning);
+                var report = SmokeLayoutValidator.Validate(window, 1280, 900, 100);
+                Assert.NotEmpty(report.IntentionalHorizontalScrollBars);
+                Assert.Empty(report.VisibleHorizontalScrollBars);
+                return true;
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Fact]
+    public async Task EquipmentSceneReferenceButtonShowsRealReferencesAndNavigatesWithoutExecuting()
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var store = new ProjectDocumentStore();
+            var project = store.Load(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Samples", "R19InspectionFlow.ovmachine")));
+            using var model = new MainViewModel(project);
+            model.Layout.Select("wafer-stage");
+            var component = project.Layouts.SelectMany(layout => layout.Components).Single(item => item.Id == "wafer-stage");
+            var expected = project.Sequences.SelectMany(sequence => sequence.Steps.Where(step =>
+                new[] { step.TargetId, step.WorkpieceComponentId, step.ExpectedTargetId }.Any(id =>
+                    !string.IsNullOrWhiteSpace(id) && (id == component.Id || id == component.BehaviorBindingId)))
+                .Select(step => (SequenceId: sequence.Id, StepId: step.Id))).ToArray();
+            Assert.NotEmpty(expected);
+            var before = store.SerializeForEvidence(project);
+            var window = new ShellWindow { DataContext = model, Width = 1280, Height = 900, ShowInTaskbar = false, ShowActivated = false };
+            window.Show();
+            try
+            {
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                var scene = Assert.Single(Descendants(window).OfType<SceneDocumentView>());
+                var button = Assert.IsType<Button>(scene.FindName("EquipmentSequenceReferencesButton"));
+                Assert.Equal(expected, model.Layout.EquipmentSelectionStepReferences);
+                Assert.Equal(model.Layout.EquipmentSelectionStepsText, button.Content);
+                Assert.True(button.IsVisible && button.IsEnabled);
+                ((IInvokeProvider)new ButtonAutomationPeer(button).GetPattern(PatternInterface.Invoke)).Invoke();
+                window.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(window.UpdateLayout));
+                Assert.True(model.Navigation.IsSimulationWorkspace);
+                Assert.Equal(1, model.Navigation.SelectedExecutionTabIndex);
+                Assert.Equal(expected[0].SequenceId, model.SequenceEditor.SelectedSequence?.Id);
+                Assert.Equal(expected[0].StepId, model.SequenceEditor.SelectedStep?.Id);
+                Assert.Equal("wafer-stage", model.Layout.SelectedItem?.Id);
+                Assert.Equal(TimeSpan.Zero, model.SceneSnapshots.Latest!.SimulationTime);
+                Assert.Equal(before, store.SerializeForEvidence(project));
+                Assert.False(model.HasUnsavedChanges || model.IsRunning);
+                return true;
+            }
+            finally { window.Close(); }
+        });
     }
 
     private static MachineLayoutViewModel CreateLayout(out MachineProjectDocument project)

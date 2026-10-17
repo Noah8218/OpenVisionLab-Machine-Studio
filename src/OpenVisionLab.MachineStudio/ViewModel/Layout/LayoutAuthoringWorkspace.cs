@@ -1,6 +1,7 @@
 using System.Windows.Input;
 using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Core.Devices;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
@@ -12,6 +13,7 @@ namespace OpenVisionLab.MachineStudio.ViewModel;
 public sealed class LayoutAuthoringWorkspace : IDisposable
 {
     private readonly MachineLayoutViewModel _layout;
+    private readonly Action<string>? _onComponentAdded;
     private readonly Func<bool> _isSceneEditable;
     private readonly Func<bool> _isApplyingProject;
     private readonly Func<bool> _canExecuteSessionCommand;
@@ -46,8 +48,10 @@ public sealed class LayoutAuthoringWorkspace : IDisposable
         Action<string, string> log,
         Action onDefinitionChanged,
         Func<IReadOnlyList<LayoutComponentDefinition>, IReadOnlyList<LayoutComponentRemovalImpact>, bool> confirmRemoval,
-        Func<bool>? resolvePendingPlacementDraft = null)
+        Func<bool>? resolvePendingPlacementDraft = null,
+        Action<string>? onComponentAdded = null)
     {
+        _onComponentAdded = onComponentAdded;
         _layout = layout ?? throw new ArgumentNullException(nameof(layout));
         _isSceneEditable = isSceneEditable ?? throw new ArgumentNullException(nameof(isSceneEditable));
         _isApplyingProject = isApplyingProject ?? throw new ArgumentNullException(nameof(isApplyingProject));
@@ -81,7 +85,7 @@ public sealed class LayoutAuthoringWorkspace : IDisposable
             log,
             confirmRemoval);
         _selectionCommands = new LayoutSelectionCommandWorkflow(layout, setStatusMessage);
-        _sceneInteraction = new SceneViewportInteractionWorkflow(layout, _mutations.TryAdd);
+        _sceneInteraction = new SceneViewportInteractionWorkflow(layout, (kind, x, y) => _mutations.TryAdd(kind, x, y));
     }
 
     public ICommand AddLayoutComponentCommand => _addLayoutComponentCommand ??=
@@ -130,8 +134,17 @@ public sealed class LayoutAuthoringWorkspace : IDisposable
 
     private bool CanEdit => _isSceneEditable() && !_isApplyingProject();
 
-    public bool TryAddComponent(LayoutComponentKind kind, double? worldX = null, double? worldY = null) =>
-        _resolvePendingPlacementDraft() && _mutations.TryAdd(kind, worldX, worldY);
+    public bool TryAddComponent(LayoutComponentKind kind, double? worldX = null, double? worldY = null, NumericalCameraInputKind? cameraInputKind = null) =>
+        _resolvePendingPlacementDraft() && _mutations.TryAdd(kind, worldX, worldY, cameraInputKind);
+
+    internal bool TryApplyDefinitionChange(Action change)
+    {
+        if (!CanEdit || !_canExecuteSessionCommand()) return false;
+        var before = _history.CaptureCurrentState(refresh: true);
+        change();
+        _history.Commit(before);
+        return true;
+    }
 
     public bool TryMoveSelectionBy(double deltaX, double deltaY) =>
         _canExecuteSessionCommand() && CanEdit && _resolvePendingPlacementDraft() && _selectionCommands.MoveBy(deltaX, deltaY);
@@ -156,7 +169,7 @@ public sealed class LayoutAuthoringWorkspace : IDisposable
     {
         if (parameter is LayoutComponentKind kind)
         {
-            TryAddComponent(kind);
+            _mutations.TryAdd(kind, onAdded: _onComponentAdded);
         }
     }
 

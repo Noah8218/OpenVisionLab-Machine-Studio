@@ -5,9 +5,48 @@
              xmlns:behavior="clr-namespace:OpenVisionLab.MachineStudio.Behavior"
              xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
+             xmlns:shell="clr-namespace:OpenVisionLab.MachineStudio.View.Shell"
              xmlns:project="clr-namespace:OpenVisionLab.MachineStudio.View.Project">
     <UserControl.Resources>
+        <conv:KoreanWordWrappingConverter x:Key="KoreanWordWrappingConverter" />
         <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Style x:Key="OutlineHeaderCaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="13" /><Setter Property="FontWeight" Value="Normal" /><Setter Property="LineHeight" Value="18.85" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" /><Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+            <Style.Triggers><DataTrigger Binding="{Binding (shell:ShellWindow.IsCompactLayout), RelativeSource={RelativeSource AncestorType=Window}}" Value="True"><Setter Property="FontSize" Value="12.5" /><Setter Property="LineHeight" Value="18.125" /></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="OutlineHeaderButtonStyle" TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
+            <Setter Property="Background" Value="{DynamicResource Surface.Raised}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" /><Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+            <Setter Property="Template"><Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="HeaderButtonBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="HeaderButtonBorder" Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                        <Trigger Property="IsPressed" Value="True"><Setter TargetName="HeaderButtonBorder" Property="Background" Value="{DynamicResource Surface.Pressed}" /></Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="HeaderButtonBorder" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /></Trigger>
+                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /><Setter TargetName="HeaderButtonBorder" Property="Background" Value="{DynamicResource Surface.Disabled}" /><Setter TargetName="HeaderButtonBorder" Property="BorderBrush" Value="{DynamicResource Border.Disabled}" /></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value></Setter>
+        </Style>
+        <Style x:Key="InspectionCameraTitleText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="13" /><Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LineHeight" Value="18.85" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" /><Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" />
+            <Style.Triggers><DataTrigger Binding="{Binding DataContext.Navigation.IsCompactLayout, RelativeSource={RelativeSource AncestorType=project:LeftToolRegionView}}" Value="True">
+                <Setter Property="FontSize" Value="12.5" /><Setter Property="LineHeight" Value="18.125" />
+            </DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="InspectionCameraSecondaryText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="10.5" /><Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="LineHeight" Value="15.225" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" /><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="InspectionCameraFocusVisual" TargetType="Control">
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Control">
+                <Border BorderBrush="{DynamicResource Accent.Primary}" BorderThickness="2" CornerRadius="5" Margin="-3" />
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
         <DataTemplate x:Key="LayoutComponentIconTemplate">
             <Viewbox Stretch="Uniform">
                 <Border Width="48"
@@ -122,9 +161,48 @@
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
+        <Style x:Key="HistorySecondaryText" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="FontSize" Value="12" /><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="HistoryRunItem" TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+            <Setter Property="Margin" Value="0,0,0,8" /><Setter Property="Padding" Value="10" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+                <Border x:Name="HistoryRunBorder" Background="{DynamicResource Surface.Raised}" BorderBrush="{DynamicResource Border.Default}" BorderThickness="1" CornerRadius="4" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Stretch" /></Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsSelected" Value="True"><Setter TargetName="HistoryRunBorder" Property="Background" Value="{DynamicResource Surface.Selected}" /><Setter TargetName="HistoryRunBorder" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /><Setter TargetName="HistoryRunBorder" Property="BorderThickness" Value="4,1,1,1" /></Trigger>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="HistoryRunBorder" Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="HistoryRunBorder" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="SequenceUnitItem" TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Margin" Value="0,0,0,8" /><Setter Property="Padding" Value="10" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+                <Border x:Name="SequenceUnitBorder" Background="{DynamicResource Surface.Raised}" BorderBrush="{DynamicResource Border.Default}" BorderThickness="1" CornerRadius="4" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Stretch" /></Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsSelected" Value="True"><Setter TargetName="SequenceUnitBorder" Property="Background" Value="{DynamicResource Surface.Selected}" /><Setter TargetName="SequenceUnitBorder" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /><Setter TargetName="SequenceUnitBorder" Property="BorderThickness" Value="4,1,1,1" /></Trigger>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="SequenceUnitBorder" Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                    <Trigger Property="IsEnabled" Value="False"><Setter TargetName="SequenceUnitBorder" Property="Opacity" Value="0.55" /></Trigger>
+                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="SequenceUnitBorder" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource PanelSurfaceStyle}">
+    <Border x:Name="NavigationPanelSurface">
+        <Border.Style>
+            <Style TargetType="Border" BasedOn="{StaticResource PanelSurfaceStyle}">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Navigation.IsInspectionWorkspace}" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource Surface.Tinted}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" /><Setter Property="BorderThickness" Value="0,0,1,0" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource Surface.Tinted}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" /><Setter Property="BorderThickness" Value="0,0,1,0" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -133,10 +211,90 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0"
+            <Grid x:Name="SequenceUnitNavigation" Grid.RowSpan="4" Margin="10"
+                  Visibility="{Binding Navigation.IsSequenceWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                <TextBlock Text="{loc:Loc Key=Properties.Unit}" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <ListBox x:Name="SequenceUnitList" Grid.Row="1" ItemsSource="{Binding SequenceNavigationItems}"
+                         SelectedValuePath="Key" SelectedValue="{Binding SelectedSequenceNavigationKey, Mode=TwoWay}"
+                         IsEnabled="{Binding CanNavigateSequenceUnits}" Padding="0" Background="Transparent" BorderThickness="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ItemContainerStyle="{StaticResource SequenceUnitItem}" AutomationProperties.Name="{loc:Loc Key=Properties.Unit}">
+                    <ListBox.Template><ControlTemplate TargetType="ListBox">
+                        <Border x:Name="SequenceListSurface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                            <ScrollViewer x:Name="PART_ScrollViewer" Background="Transparent" Padding="{TemplateBinding Padding}" Focusable="False" CanContentScroll="True">
+                                <ItemsPresenter />
+                            </ScrollViewer>
+                        </Border>
+                    </ControlTemplate></ListBox.Template>
+                    <ListBox.ItemTemplate><DataTemplate><StackPanel>
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding ScopeText}" Style="{StaticResource HistorySecondaryText}" Margin="0,4,0,0" />
+                        <TextBlock Text="{Binding Id}" Style="{StaticResource HistorySecondaryText}" />
+                        <TextBlock Text="{Binding StepCountText}" Style="{StaticResource HistorySecondaryText}" Margin="0,4,0,0" />
+                    </StackPanel></DataTemplate></ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+
+            <Grid x:Name="RunHistoryNavigation" Grid.RowSpan="4" DataContext="{Binding RunHistory}" Margin="10"
+                  Visibility="{Binding DataContext.Navigation.IsResultsWorkspace, RelativeSource={RelativeSource AncestorType=project:LeftToolRegionView}, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <TextBlock Text="{loc:Loc RunHistory.ViewTitle}" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <Grid Grid.Row="1" Margin="0,0,0,12"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBlock Text="{loc:Loc Key=Debugger.AlarmHistoryFilter}" Grid.ColumnSpan="2" Style="{StaticResource HistorySecondaryText}" Margin="0,0,0,4" />
+                    <TextBox x:Name="RunHistorySearch" Grid.Row="1" Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{loc:Loc Key=Debugger.AlarmHistoryFilter}" VerticalContentAlignment="Center">
+                        <TextBox.Style><Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}"><Style.Triggers><DataTrigger Binding="{Binding IsBusy}" Value="True"><Setter Property="IsEnabled" Value="False" /></DataTrigger></Style.Triggers></Style></TextBox.Style>
+                    </TextBox>
+                    <Button x:Name="RunHistoryClearSearch" Grid.Row="1" Grid.Column="1" Margin="6,0,0,0" Content="{loc:Loc Key=ProjectTree.ClearSearch}" Command="{Binding ClearSearchCommand}" Style="{StaticResource GlobalCommandButtonStyle}" />
+                </Grid>
+                <ListBox x:Name="SavedRunList" Grid.Row="2" ItemsSource="{Binding VisibleRuns}" SelectedItem="{Binding Selected, Mode=TwoWay}"
+                         ItemContainerStyle="{StaticResource HistoryRunItem}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.ScrollUnit="Pixel" AutomationProperties.Name="{loc:Loc RunHistory.SavedRuns}">
+                    <ListBox.Style><Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
+                        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBox">
+                            <Border x:Name="HistoryListBorder" Padding="1" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
+                                <ScrollViewer x:Name="PART_ScrollViewer" Padding="{TemplateBinding Padding}" Focusable="False" CanContentScroll="True"
+                                              HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}" VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
+                                    <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                                </ScrollViewer>
+                            </Border>
+                        </ControlTemplate></Setter.Value></Setter>
+                        <Style.Triggers><DataTrigger Binding="{Binding IsBusy}" Value="True"><Setter Property="IsEnabled" Value="False" /></DataTrigger></Style.Triggers>
+                    </Style></ListBox.Style>
+                    <ListBox.ItemTemplate><DataTemplate><StackPanel>
+                        <TextBlock Text="{Binding Record.RecipeName}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,6" />
+                        <TextBlock Text="{Binding Outcome}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Title}" Style="{StaticResource HistorySecondaryText}" Margin="0,6,0,4" />
+                        <TextBlock Text="{Binding RunId}" Style="{StaticResource HistorySecondaryText}" />
+                    </StackPanel></DataTemplate></ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock Grid.Row="2" Text="{loc:Loc RunHistory.Empty}" Style="{StaticResource HistorySecondaryText}" Margin="8" Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <TextBlock Grid.Row="2" Text="{loc:Loc Key=ProjectTree.SearchNoMatches}" Style="{StaticResource HistorySecondaryText}" Margin="8" Visibility="{Binding HasNoSearchMatches, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <TextBlock Grid.Row="3" Text="{loc:Loc RunHistory.RetentionScope}" Style="{StaticResource HistorySecondaryText}" Margin="0,12,0,0" />
+            </Grid>
+
+            <Border x:Name="NavigationPanelHeader" Grid.Row="0"
                     Height="Auto"
                     MinHeight="{StaticResource Density.PanelHeaderHeight}"
-                    Style="{StaticResource PanelHeaderStyle}">
+                    >
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource PanelHeaderStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsResultsWorkspace}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsSequenceWorkspace}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsInspectionWorkspace}" Value="True">
+                                <Setter Property="Padding" Value="10,8" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+                                <Setter Property="BorderThickness" Value="0,0,0,1" /><Setter Property="Background" Value="Transparent" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsEquipmentOutlineVisible}" Value="True">
+                                <Setter Property="Padding" Value="10,8,10,0" />
+                                <Setter Property="MinHeight" Value="0" />
+                                <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="Background" Value="Transparent" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -150,35 +308,201 @@
                                     <DataTrigger Binding="{Binding Navigation.IsEquipmentOutlineVisible}" Value="True">
                                         <Setter Property="Visibility" Value="Collapsed" />
                                     </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                    <TextBlock Text="{loc:Loc Key=Workspace.Equipment}"
-                               TextWrapping="Wrap">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource PanelHeaderTextStyle}">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Navigation.IsEquipmentOutlineVisible}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
+                                    <DataTrigger Binding="{Binding Navigation.IsInspectionWorkspace}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </TextBlock.Style>
                     </TextBlock>
-                    <TextBlock Grid.Column="1"
-                             Margin="6,0,0,0"
-                             VerticalAlignment="Center"
-                             Foreground="{DynamicResource Text.Secondary}"
-                             Text="{Binding Layout.EquipmentOutlineCountText}"
-                             Visibility="{Binding Navigation.IsEquipmentOutlineVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock x:Name="EquipmentOutlineTitle" Text="{loc:Loc Key=R40.DeviceNavigation}" FontFamily="Segoe UI, Malgun Gothic" FontWeight="Bold" LineStackingStrategy="BlockLineHeight"
+                               TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource Text.Primary}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource PanelHeaderTextStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" /><Setter Property="FontSize" Value="13" /><Setter Property="LineHeight" Value="18.85" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Navigation.IsEquipmentOutlineVisible}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                <DataTrigger Binding="{Binding (shell:ShellWindow.IsCompactLayout), RelativeSource={RelativeSource AncestorType=Window}}" Value="True"><Setter Property="FontSize" Value="12.5" /><Setter Property="LineHeight" Value="18.125" /></DataTrigger></Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
                     </TextBlock>
+                    <TextBlock x:Name="InspectionCameraListTitle" Text="{loc:Loc Key=Camera.ListTitle}" TextWrapping="Wrap" FontFamily="Segoe UI, Malgun Gothic"
+                               FontWeight="Bold" Foreground="{DynamicResource Text.Primary}" LineStackingStrategy="BlockLineHeight"
+                               Visibility="{Binding Navigation.IsInspectionWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock.Style><Style TargetType="TextBlock">
+                            <Setter Property="FontSize" Value="13" /><Setter Property="LineHeight" Value="18.85" />
+                            <Style.Triggers><DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True"><Setter Property="FontSize" Value="12.5" /><Setter Property="LineHeight" Value="18.125" /></DataTrigger></Style.Triggers>
+                        </Style></TextBlock.Style>
+                    </TextBlock>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                Visibility="{Binding Navigation.IsEquipmentOutlineVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Button x:Name="OutlineAddUnitButton" MinWidth="0" MinHeight="28" Height="Auto" FontFamily="Segoe UI, Malgun Gothic" FontSize="13" FontWeight="Normal" Padding="10,4" Margin="0,0,6,0"
+                                Command="{Binding OpenStationUnitEditorCommand}"
+                                AutomationProperties.Name="{loc:Loc Key=Equipment.OutlineAddUnit}" Style="{StaticResource OutlineHeaderButtonStyle}">
+                            <TextBlock Style="{StaticResource OutlineHeaderCaptionStyle}" Text="{loc:Loc Key=Equipment.OutlineAddUnit}" />
+                        </Button>
+
+                    </StackPanel>
                 </Grid>
             </Border>
 
-            <project:EquipmentOutlineView Grid.Row="2"
-                                           Visibility="{Binding Navigation.IsEquipmentOutlineVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <Border x:Name="EquipmentAuthoringNavigation" Grid.Row="1" Padding="10,10,10,8" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1"
+                    Visibility="{Binding Navigation.IsEquipmentWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <WrapPanel>
+                    <Border Padding="8,6" Margin="0,0,4,4" Background="{DynamicResource Accent.Soft}" BorderBrush="{DynamicResource Accent.Primary}" BorderThickness="0,0,0,2">
+                        <TextBlock Text="{loc:Loc Key=R40.Configuration}" Foreground="{DynamicResource Accent.Primary}" />
+                    </Border>
+                    <Button x:Name="OutlineAddDeviceButton" MinWidth="0" MinHeight="28" Height="Auto" Padding="8,5" Margin="0,0,4,4"
+                            Command="{Binding OpenEquipmentComponentLibraryDialogCommand}" Content="{loc:Loc Key=R40.AddDevice}"
+                            AutomationProperties.Name="{loc:Loc Key=Equipment.AddPartButton}" Style="{StaticResource OutlineHeaderButtonStyle}" />
+                    <Button x:Name="EquipmentRecipeExamplesButton" MinWidth="0" MinHeight="28" Height="Auto" Padding="8,5" Margin="0,0,0,4"
+                            Command="{Binding SemiconductorRecipes.OpenCommand}" Content="{loc:Loc Key=R40.RecipeExamples}"
+                            AutomationProperties.Name="{loc:Loc Key=Gallery.Open}" ToolTip="{loc:Loc Key=Gallery.OpenTooltip}" Style="{StaticResource OutlineHeaderButtonStyle}" />
+                </WrapPanel>
+            </Border>
+
+            <project:EquipmentOutlineView Grid.Row="2">
+                <project:EquipmentOutlineView.Style><Style TargetType="project:EquipmentOutlineView">
+                    <Setter Property="Visibility" Value="{Binding Navigation.IsEquipmentOutlineVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Style.Triggers><DataTrigger Binding="{Binding Navigation.IsSequenceWorkspace}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
+                </Style></project:EquipmentOutlineView.Style>
+            </project:EquipmentOutlineView>
+
+            <Grid x:Name="InspectionAuthoringNavigation" Grid.Row="2" Margin="6"
+                  Visibility="{Binding Navigation.IsInspectionWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                <ListBox x:Name="InspectionCameraList" MaxHeight="280"
+                         Padding="0" Background="Transparent" BorderThickness="0"
+                         ItemsSource="{Binding Camera.VirtualCameras}"
+                         SelectedValuePath="Id"
+                         SelectedValue="{Binding Camera.SelectedCameraId, Mode=OneWay}"
+                         Visibility="{Binding Camera.HasVirtualCamera, Converter={StaticResource BooleanToVisibilityConverter}}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         AutomationProperties.Name="{loc:Loc Key=Camera.ListTitle}">
+                    <b:Interaction.Triggers>
+                        <b:EventTrigger EventName="SelectionChanged">
+                            <b:InvokeCommandAction Command="{Binding Camera.SelectCameraCommand}"
+                                                   CommandParameter="{Binding SelectedItem.Id, ElementName=InspectionCameraList}" />
+                        </b:EventTrigger>
+                    </b:Interaction.Triggers>
+                    <ListBox.Template>
+                        <ControlTemplate TargetType="ListBox">
+                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
+                                <ScrollViewer x:Name="PART_ScrollViewer" Padding="{TemplateBinding Padding}" Focusable="False"
+                                              HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                                              VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}"
+                                              CanContentScroll="{TemplateBinding ScrollViewer.CanContentScroll}">
+                                    <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                                </ScrollViewer>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <MultiTrigger>
+                                    <MultiTrigger.Conditions>
+                                        <Condition Property="IsGrouping" Value="True" />
+                                        <Condition Property="VirtualizingPanel.IsVirtualizingWhenGrouping" Value="False" />
+                                    </MultiTrigger.Conditions>
+                                    <Setter Property="ScrollViewer.CanContentScroll" Value="False" />
+                                </MultiTrigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </ListBox.Template>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Margin" Value="0" />
+                            <Setter Property="Padding" Value="6,4" /><Setter Property="MinHeight" Value="26" /><Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+                            <Setter Property="FocusVisualStyle" Value="{StaticResource InspectionCameraFocusVisual}" />
+                            <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+                            <Setter Property="AutomationProperties.HelpText" Value="{Binding Id}" />
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="BorderBrush" Value="Transparent" />
+                            <Setter Property="BorderThickness" Value="1" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="InspectionCameraItemChrome" Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                                                Padding="{TemplateBinding Padding}" CornerRadius="4" SnapsToDevicePixels="True">
+                                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource Accent.Soft}" /><Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /><Setter Property="Foreground" Value="{DynamicResource Accent.Primary}" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /></Trigger>
+                                <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /></Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <WrapPanel x:Name="InspectionCameraRowTitle">
+                                    <DockPanel MaxWidth="{Binding ActualWidth, ElementName=InspectionCameraRowTitle}">
+                                        <TextBlock x:Name="InspectionCameraRowIcon" DockPanel.Dock="Left" Margin="0,0,4,0">
+                                            <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource InspectionCameraTitleText}">
+                                                <Setter Property="Text" Value="▣" /><Style.Triggers><DataTrigger Binding="{Binding Camera.NumericalInput.InputKind}" Value="HeightMap3D"><Setter Property="Text" Value="▤" /></DataTrigger></Style.Triggers>
+                                            </Style></TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock x:Name="InspectionCameraRowName" Text="{Binding Name}" Style="{StaticResource InspectionCameraTitleText}" />
+                                    </DockPanel>
+                                    <TextBlock x:Name="InspectionCameraRowId" Text="{Binding Id}" Style="{StaticResource InspectionCameraSecondaryText}" FontWeight="SemiBold" Margin="4,0,0,0"
+                                               MaxWidth="{Binding ActualWidth, ElementName=InspectionCameraRowTitle}" />
+                                </WrapPanel>
+                                <TextBlock x:Name="InspectionCameraRowKind" Margin="0,1,0,0">
+                                    <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource InspectionCameraSecondaryText}">
+                                        <Setter Property="Text" Value="{loc:Loc Key=Camera.TwoDImage}" />
+                                        <Style.Triggers><DataTrigger Binding="{Binding Camera.NumericalInput.InputKind}" Value="HeightMap3D"><Setter Property="Text" Value="{loc:Loc Key=Camera.HeightMap3D}" /></DataTrigger></Style.Triggers>
+                                    </Style></TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock Grid.Row="1" Margin="6,12,6,5" Text="{loc:Loc Key=Camera.CaptureStepList}" FontWeight="SemiBold"
+                           Visibility="{Binding Camera.HasVirtualCamera, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              Visibility="{Binding Camera.HasVirtualCamera, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid>
+                        <ItemsControl x:Name="InspectionCaptureSteps" ItemsSource="{Binding Camera.CurrentAcquisitionSteps}">
+                            <ItemsControl.ItemTemplate><DataTemplate>
+                                <Button Command="{Binding DataContext.OpenCameraAcquisitionStepCommand, RelativeSource={RelativeSource AncestorType=project:LeftToolRegionView}}"
+                                        CommandParameter="{Binding}" AutomationProperties.Name="{Binding Caption}" ToolTip="{loc:Loc Key=Camera.OpenCaptureStep}"
+                                        Style="{StaticResource GlobalCommandButtonStyle}" Height="Auto" MinHeight="36" Padding="7,6" Margin="0,0,0,5" HorizontalContentAlignment="Stretch">
+                                    <StackPanel><TextBlock Text="{Binding Caption, Converter={StaticResource KoreanWordWrappingConverter}}" TextWrapping="Wrap" /><TextBlock Text="{Binding LocationText, Converter={StaticResource KoreanWordWrappingConverter}}" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource Text.Secondary}" /></StackPanel>
+                                </Button>
+                            </DataTemplate></ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Margin="6" Text="{loc:Loc Key=Camera.NoCaptureSteps}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}">
+                            <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding Camera.CurrentAcquisitionSteps.Count}" Value="0"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </ScrollViewer>
+                <TextBlock x:Name="InspectionCameraEmptyHint" Grid.RowSpan="3" Margin="10" VerticalAlignment="Top"
+                           Foreground="{DynamicResource Text.Secondary}"
+                           Text="{loc:Loc Key=Camera.EmptyListHint}" TextWrapping="Wrap">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Camera.HasVirtualCamera}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+
 
             <Grid Grid.Row="2">
 
@@ -186,6 +510,11 @@
                     <TabControl.Style>
                         <Style TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">
                             <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsSequenceWorkspace}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                <DataTrigger Binding="{Binding Navigation.IsResultsWorkspace}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                <DataTrigger Binding="{Binding Navigation.IsInspectionWorkspace}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
                                 <DataTrigger Binding="{Binding Navigation.IsEquipmentOutlineVisible}" Value="True">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                 </DataTrigger>
@@ -234,9 +563,9 @@
                                       HorizontalContentAlignment="Stretch"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                 <TreeView.Resources>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#20394B" />
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#20394B" />
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#F3F6F9" />
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="{StaticResource Color.Surface.Selected}" />
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="{StaticResource Color.Surface.Selected}" />
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="{StaticResource Color.Text.Primary}" />
                                 </TreeView.Resources>
                                 <b:Interaction.Behaviors>
                                     <behavior:TreeViewSelectedItemBehavior SelectedItem="{Binding ProjectTree.SelectedNode, Mode=TwoWay}" />
@@ -480,6 +809,9 @@
                             <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Navigation.IsEquipmentOutlineVisible}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Navigation.IsInspectionWorkspace}" Value="True">
                                         <Setter Property="Visibility" Value="Collapsed" />
                                     </DataTrigger>
                                 </Style.Triggers>

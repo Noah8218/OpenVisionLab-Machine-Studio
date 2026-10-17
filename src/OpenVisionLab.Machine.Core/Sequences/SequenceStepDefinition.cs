@@ -17,7 +17,13 @@ public enum SequenceStepAction
     Complete,
     WaitVisionResult,
     FeedWorkpiece,
-    EjectWorkpiece
+    EjectWorkpiece,
+    Delay,
+    FeedUnitWorkpiece,
+    ReceiveUnitWorkpiece,
+    TransferUnitWorkpiece,
+    EjectUnitWorkpiece,
+    BranchInspection
 }
 
 public sealed class SequenceStepDefinition
@@ -36,6 +42,18 @@ public sealed class SequenceStepDefinition
 
     [JsonPropertyName("parameter")]
     public string Parameter { get; set; } = string.Empty;
+
+    [JsonPropertyName("waitForAxisCompletion")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool WaitForAxisCompletion { get; set; }
+
+    [JsonPropertyName("ejectionDelayMilliseconds")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int EjectionDelayMilliseconds { get; set; }
+
+    [JsonPropertyName("destinationUnitId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DestinationUnitId { get; set; }
 
     [JsonPropertyName("workpieceComponentId")]
     public string? WorkpieceComponentId { get; set; }

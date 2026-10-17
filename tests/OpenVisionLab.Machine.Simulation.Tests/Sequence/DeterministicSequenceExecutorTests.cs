@@ -8,6 +8,35 @@ namespace OpenVisionLab.Machine.Simulation.Tests;
 public sealed class DeterministicSequenceExecutorTests
 {
     [Fact]
+    public void DelayUsesOnlyTickTimeAndResetClearsItsProgress()
+    {
+        var definition = new SequenceDefinition
+        {
+            Id = "timed",
+            Steps =
+            {
+                new SequenceStepDefinition { Id = "delay", Action = SequenceStepAction.Delay, Parameter = "1.5" },
+                new SequenceStepDefinition { Id = "complete", Action = SequenceStepAction.Complete }
+            }
+        };
+        var compiled = new SequenceCompiler().Compile(definition);
+        Assert.True(compiled.IsSuccess);
+        var executor = new DeterministicSequenceExecutor(compiled.Sequence!);
+        executor.Start();
+        Assert.Equal("delay", executor.Tick(TimeSpan.FromSeconds(1.49), new FakeContext()).CurrentStepId);
+        Assert.Equal("delay", executor.Tick(TimeSpan.Zero, new FakeContext()).CurrentStepId);
+        Assert.Equal("complete", executor.Tick(TimeSpan.FromSeconds(0.01), new FakeContext()).CurrentStepId);
+        executor.Reset();
+        executor.Start();
+        Assert.Equal("delay", executor.Tick(TimeSpan.FromSeconds(0.01), new FakeContext()).CurrentStepId);
+        foreach (string invalid in new[] { "-1", "NaN", "Infinity", "86401", "not-a-duration" })
+        {
+            definition.Steps[0].Parameter = invalid;
+            Assert.False(new SequenceCompiler().Compile(definition).IsSuccess);
+        }
+    }
+
+    [Fact]
     public void Abort_PreservesBoundaryEvidence_AndResetIsRequiredBeforeRestart()
     {
         var definition = new SequenceDefinition

@@ -24,6 +24,7 @@ internal readonly record struct SimulationRunControlState(
     string? ActiveSequenceId)
 {
     internal string? ResetRetrySequenceId { get; init; }
+    internal bool IsManualControlEntryPending { get; init; }
 
     /// <summary>
     /// True only when the user has explicitly enabled the persisted external
@@ -46,7 +47,7 @@ internal static class SimulationRunControlAdmissionPolicy
 {
     internal static bool CanRun(SimulationRunControlState state)
     {
-        if (state.IsApplyingProject
+        if (state.IsManualControlEntryPending || state.IsApplyingProject
             || state.IsValidationBusy
             || state.IsRunning
             || state.AutomaticExternalInspectionWaiting
@@ -82,20 +83,20 @@ internal static class SimulationRunControlAdmissionPolicy
     }
 
     internal static bool CanPause(SimulationRunControlState state) =>
-        !state.IsApplyingProject
+        !state.IsManualControlEntryPending && !state.IsApplyingProject
             && !state.IsValidationBusy
             && state.IsRunMode
             && (state.IsRunning || state.AutomaticExternalInspectionWaiting);
 
     internal static bool CanAbortSequence(SimulationRunControlState state) =>
-        state.IsRunMode
+        !state.IsManualControlEntryPending && state.IsRunMode
             && !state.IsApplyingProject
             && !state.IsValidationBusy
             && !state.RuntimeDefinitionDirty
             && state.ActiveSequenceStatus == SequenceExecutionStatus.Running;
 
     internal static bool CanRetrySequence(SimulationRunControlState state) =>
-        state.IsRunMode
+        !state.IsManualControlEntryPending && state.IsRunMode
             && !state.IsApplyingProject
             && !state.IsValidationBusy
             && !state.RuntimeDefinitionDirty
@@ -107,7 +108,7 @@ internal static class SimulationRunControlAdmissionPolicy
 
     internal static bool CanStep(SimulationRunControlState state)
     {
-        if (state.IsApplyingProject
+        if (state.IsManualControlEntryPending || state.IsApplyingProject
             || state.IsValidationBusy
             || !state.IsRunMode
             || state.IsRunning
@@ -137,7 +138,7 @@ internal static class SimulationRunControlAdmissionPolicy
     }
 
     internal static bool CanCycleStart(SimulationRunControlState state) =>
-        state.IsRunMode
+        !state.IsManualControlEntryPending && state.IsRunMode
             && !state.IsApplyingProject
             && !state.IsValidationBusy
             && !state.RuntimeDefinitionDirty
@@ -147,7 +148,7 @@ internal static class SimulationRunControlAdmissionPolicy
             && state.ActiveSequenceStatus == SequenceExecutionStatus.Running;
 
     internal static bool CanReset(SimulationRunControlState state) =>
-        !state.IsApplyingProject
+        !state.IsManualControlEntryPending && !state.IsApplyingProject
             && !state.IsValidationBusy
             && state.IsRunMode
             && !state.RuntimeDefinitionDirty;

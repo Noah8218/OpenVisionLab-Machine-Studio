@@ -2,55 +2,124 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
-    <ui:TitleBar Height="32"
-                 Title="{Binding Title}"
-                 Background="{DynamicResource Surface.Root}"
-                 Foreground="{DynamicResource Text.Primary}"
-                 ButtonsForeground="{DynamicResource Text.Secondary}"
-                 ButtonsBackground="Transparent"
-                 ShowMinimize="True"
-                 ShowMaximize="True"
-                 ShowClose="True">
-        <ui:TitleBar.Header>
-            <StackPanel Margin="8,0,10,0" Orientation="Horizontal">
-                <Border Width="18"
-                        Height="18"
-                        VerticalAlignment="Center"
-                        Background="{DynamicResource Accent.Soft}"
-                        BorderBrush="{DynamicResource Accent.Primary}"
-                        BorderThickness="1"
-                        CornerRadius="4">
-                    <TextBlock HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               FontSize="8"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource Accent.Hover}"
-                               Text="OV" />
+             xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
+             xmlns:shell="clr-namespace:OpenVisionLab.MachineStudio.View.Shell"
+             xmlns:chrome="clr-namespace:System.Windows.Shell;assembly=PresentationFramework" Unloaded="OnTitleBarUnloaded" UseLayoutRounding="False">
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="Surface.Root" Color="{StaticResource Color.Surface.Tinted}" />
+        <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Style x:Key="TitleHeaderTextStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="13" />
+            <Setter Property="LineHeight" Value="18.85" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+            <Style.Triggers><DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True"><Setter Property="FontSize" Value="12.5" /><Setter Property="LineHeight" Value="18.125" /></DataTrigger></Style.Triggers>
+        </Style>
+        <Style TargetType="TextBlock" BasedOn="{StaticResource TitleHeaderTextStyle}" />
+        <Style x:Key="HeaderButton" TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
+            <Setter Property="Height" Value="28.85" /><Setter Property="MinHeight" Value="0" /><Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="10,4" /><Setter Property="Margin" Value="8,0,0,0" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" /><Setter Property="Background" Value="{DynamicResource Surface.Raised}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+                <Border x:Name="HeaderButtonBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
-                <TextBlock Margin="7,0,0,0"
-                           MaxWidth="520"
-                           VerticalAlignment="Center"
-                           FontSize="13"
-                           FontWeight="SemiBold"
-                           Text="{Binding Title}"
-                           TextTrimming="CharacterEllipsis" />
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="HeaderButtonBorder" Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="HeaderButtonBorder" Property="Background" Value="{DynamicResource Surface.Pressed}" /></Trigger>
+                    <Trigger Property="IsEnabled" Value="False"><Setter TargetName="HeaderButtonBorder" Property="Background" Value="{DynamicResource Surface.Disabled}" /><Setter TargetName="HeaderButtonBorder" Property="BorderBrush" Value="{DynamicResource Border.Disabled}" /><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+            <Style.Triggers><DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True"><Setter Property="Height" Value="28.125" /></DataTrigger></Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <Border Background="{DynamicResource Surface.Root}" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1">
+    <ui:TitleBar Title="{Binding Title}" Padding="10,0,0,0" Background="{DynamicResource Surface.Root}"
+                 Foreground="{DynamicResource Text.Primary}" ButtonsForeground="{DynamicResource Text.Secondary}"
+                 ButtonsBackground="Transparent" ShowMinimize="True" ShowMaximize="True" ShowClose="True">
+        <ui:TitleBar.Style><Style TargetType="ui:TitleBar" BasedOn="{StaticResource {x:Type ui:TitleBar}}"><Setter Property="Height" Value="39" /><Style.Triggers><DataTrigger Binding="{Binding Navigation.IsNarrowLayout}" Value="True"><Setter Property="Height" Value="63" /></DataTrigger></Style.Triggers></Style></ui:TitleBar.Style>
+        <ui:TitleBar.Header>
+            <StackPanel Margin="0,0,8,0" chrome:WindowChrome.IsHitTestVisibleInChrome="True">
+                <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Orientation" Value="Horizontal" /><Style.Triggers><DataTrigger Binding="{Binding Navigation.IsNarrowLayout}" Value="True"><Setter Property="Orientation" Value="Vertical" /></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+                <StackPanel Orientation="Horizontal">
+                <Border Padding="4,1" VerticalAlignment="Center" Background="Transparent"
+                        BorderBrush="{DynamicResource Accent.Hover}" BorderThickness="1" CornerRadius="4">
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" LineHeight="14.5" FontWeight="Black" Foreground="{DynamicResource Accent.Primary}" Text="OVL" />
+                </Border>
+                <TextBlock Margin="6,0,8,0" VerticalAlignment="Center" FontWeight="Bold" Text="Machine Studio" />
+                <Border BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="1,0,0,0" Padding="10,0,0,0" VerticalAlignment="Center"
+                        Visibility="{Binding Navigation.IsStartupChoiceVisible, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="RecipeTitleText" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding RecipeTitleText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RecipeIdentityText}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource TitleHeaderTextStyle}"><Setter Property="MaxWidth" Value="280" />
+                                    <Style.Triggers><DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True"><Setter Property="MaxWidth" Value="110" /></DataTrigger><DataTrigger Binding="{Binding Navigation.IsNarrowLayout}" Value="True"><Setter Property="MaxWidth" Value="80" /></DataTrigger></Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <Border x:Name="TitleSaveStateChip" Margin="8,0,0,0" Padding="9,1" BorderThickness="1" CornerRadius="12" MinHeight="22" Background="{DynamicResource Surface.Tinted}">
+                            <Border.Style><Style TargetType="Border"><Setter Property="BorderBrush" Value="{DynamicResource State.RunningBorder}" /><Style.Triggers>
+                                <DataTrigger Binding="{Binding HasSavedProjectFile}" Value="False"><Setter Property="BorderBrush" Value="{DynamicResource State.WarningBorder}" /></DataTrigger>
+                                <DataTrigger Binding="{Binding HasUnsavedChanges}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.WarningBorder}" /></DataTrigger>
+                                <DataTrigger Binding="{Binding SequenceEditor.HasPendingStepDraft}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.WarningBorder}" /></DataTrigger>
+                                <DataTrigger Binding="{Binding Layout.SelectedComponentEditor.HasPendingInspectorDraft}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.WarningBorder}" /></DataTrigger>
+                            </Style.Triggers></Style></Border.Style>
+                            <TextBlock x:Name="TitleSaveStateText" FontSize="11.5" LineHeight="16.675" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource TitleHeaderTextStyle}">
+                                        <Setter Property="Text" Value="{Binding ProjectSaveStateText}" /><Setter Property="Foreground" Value="{DynamicResource State.Running}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasSavedProjectFile}" Value="False"><Setter Property="Foreground" Value="{DynamicResource State.Warning}" /></DataTrigger>
+                                            <DataTrigger Binding="{Binding HasUnsavedChanges}" Value="True"><Setter Property="Foreground" Value="{DynamicResource State.Warning}" /></DataTrigger>
+                                            <DataTrigger Binding="{Binding SequenceEditor.HasPendingStepDraft}" Value="True"><Setter Property="Text" Value="{loc:Loc Key=Sequence.StepDraftPending}" /><Setter Property="Foreground" Value="{DynamicResource State.Warning}" /></DataTrigger>
+                                            <DataTrigger Binding="{Binding Layout.SelectedComponentEditor.HasPendingInspectorDraft}" Value="True"><Setter Property="Text" Value="{loc:Loc Key=Sequence.StepDraftPending}" /><Setter Property="Foreground" Value="{DynamicResource State.Warning}" /></DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Border>
+                        <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" FontSize="11.5" LineHeight="16.675" Foreground="{DynamicResource Text.Secondary}" Text="{Binding ProjectRevisionText}" />
+                    </StackPanel>
+                </Border>
+                </StackPanel>
+                <shell:MainMenuView Margin="16,0,0,0" VerticalAlignment="Center" />
             </StackPanel>
         </ui:TitleBar.Header>
         <ui:TitleBar.TrailingContent>
-            <StackPanel Margin="0,0,8,0" Orientation="Horizontal">
-                <TextBlock Margin="0,0,6,0"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource Text.Secondary}"
-                           Text="{loc:Loc Key=Shell.Language}" />
-                <ComboBox Width="84"
-                          Margin="0,0,12,0"
-                          DisplayMemberPath="DisplayName"
-                          ItemsSource="{Binding Navigation.LanguageOptions}"
-                          SelectedItem="{Binding Navigation.SelectedLanguageOption, Mode=TwoWay}"
-                          Style="{StaticResource LanguageComboBoxStyle}"
-                          ToolTip="{loc:Loc Key=Shell.LanguageTooltip}" />
+            <StackPanel Margin="0,0,8,0" Orientation="Horizontal" chrome:WindowChrome.IsHitTestVisibleInChrome="True">
+                <ToggleButton x:Name="FaultSimulationButton" Height="22" Padding="9,1" VerticalAlignment="Center" AutomationProperties.Name="{loc:Loc Key=Shell.FaultSimulation}">
+                    <ToggleButton.Style>
+                        <Style TargetType="ToggleButton" BasedOn="{StaticResource ShellChipToggleStyle}">
+                            <Setter Property="Content" Value="{loc:Loc Key=Shell.FaultSimulationOff}" />
+                            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" /><Setter Property="Background" Value="{DynamicResource Surface.Tinted}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+                            <Setter Property="ContentTemplate"><Setter.Value><DataTemplate><TextBlock Text="{Binding}" FontFamily="Segoe UI, Malgun Gothic" FontSize="11.5" LineHeight="16.675" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" /></DataTemplate></Setter.Value></Setter>
+                            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
+                                <Border x:Name="FaultChipBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="12" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="FaultChipBorder" Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="FaultChipBorder" Property="Background" Value="{DynamicResource Surface.Pressed}" /></Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate></Setter.Value></Setter>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding FaultManager.HasActiveFaults}" Value="True"><Setter Property="Content" Value="{Binding FaultManager.ActiveFaultCountText}" /><Setter Property="Foreground" Value="{DynamicResource State.Warning}" /><Setter Property="BorderBrush" Value="{DynamicResource State.WarningBorder}" /></DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ToggleButton.Style>
+                </ToggleButton>
+                <Popup x:Name="FaultSimulationPopup" Placement="Bottom" HorizontalOffset="0" VerticalOffset="10" PlacementTarget="{Binding ElementName=FaultSimulationButton}"
+                       IsOpen="{Binding IsChecked, ElementName=FaultSimulationButton, Mode=TwoWay}" StaysOpen="True" AllowsTransparency="True" Opened="OnFaultPopupOpened" Closed="OnFaultPopupClosed">
+                    <shell:FaultSimulationPanelView DataContext="{Binding FaultManager}" />
+                </Popup>
+                <Button x:Name="TopUndoButton" Command="{Binding UndoLayoutEditCommand}" AutomationProperties.Name="{loc:Loc Key=Shell.Undo}" Style="{StaticResource HeaderButton}" ToolTip="Ctrl+Z">
+                    <StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="ArrowUndo24" FontSize="13" /><TextBlock Margin="4,0,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="{loc:Loc Key=Shell.Undo}" /></StackPanel>
+                </Button>
+                <Button x:Name="TopRedoButton" Command="{Binding RedoLayoutEditCommand}" AutomationProperties.Name="{loc:Loc Key=Shell.Redo}" Style="{StaticResource HeaderButton}" ToolTip="Ctrl+Y">
+                    <StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="ArrowRedo24" FontSize="13" /><TextBlock Margin="4,0,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="{loc:Loc Key=Shell.Redo}" /></StackPanel>
+                </Button>
+                <Button x:Name="TopSaveButton" Command="{Binding SaveProjectCommand}" AutomationProperties.Name="{loc:Loc Key=Shell.Save}" Style="{StaticResource HeaderButton}" ToolTip="{loc:Loc Key=Shell.SaveTooltip}"><TextBlock Text="{loc:Loc Key=Shell.Save}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" /></Button>
             </StackPanel>
         </ui:TitleBar.TrailingContent>
     </ui:TitleBar>
+    </Border>
 </UserControl>

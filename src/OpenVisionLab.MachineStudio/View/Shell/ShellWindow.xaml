@@ -6,6 +6,7 @@
         xmlns:behavior="clr-namespace:OpenVisionLab.MachineStudio.Behavior"
         xmlns:project="clr-namespace:OpenVisionLab.MachineStudio.View.Project"
         xmlns:scene="clr-namespace:OpenVisionLab.MachineStudio.View.Scene"
+        xmlns:simulation="clr-namespace:OpenVisionLab.MachineStudio.View.Simulation"
         xmlns:inspector="clr-namespace:OpenVisionLab.MachineStudio.View.Inspector"
         xmlns:diagnostics="clr-namespace:OpenVisionLab.MachineStudio.View.Diagnostics"
         xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
@@ -16,6 +17,11 @@
         ExtendsContentIntoTitleBar="True"
         shell:ShellWindow.IsCompactLayout="{Binding Navigation.IsCompactLayout, Mode=TwoWay}"
         shell:ShellWindow.IsNarrowLayout="{Binding Navigation.IsNarrowLayout, Mode=TwoWay}"
+        shell:ShellWindow.IsEquipmentInspectorOpen="{Binding Navigation.IsDockedInspectorOpen}"
+        shell:ShellWindow.IsEquipmentWorkspace="{Binding Navigation.IsEquipmentWorkspace}"
+        shell:ShellWindow.IsSequenceWorkspace="{Binding Navigation.IsSequenceWorkspace}"
+        shell:ShellWindow.IsInspectionWorkspace="{Binding Navigation.IsInspectionWorkspace}"
+        shell:ShellWindow.IsResultsWorkspace="{Binding Navigation.IsResultsWorkspace}"
         WindowStartupLocation="CenterScreen">
     <scene:MachineSceneViewport.LabelOverlayElement>
         <Binding ElementName="RightToolRegionView" />
@@ -25,7 +31,9 @@
             DeleteCommand="{Binding DeleteLayoutComponentCommand}"
             DuplicateCommand="{Binding DuplicateLayoutSelectionCommand}"
             SaveCommand="{Binding SaveProjectCommand}"
-            SaveAsCommand="{Binding SaveProjectAsCommand}" />
+            SaveAsCommand="{Binding SaveProjectAsCommand}"
+            IsModalOverlayOpen="{Binding Navigation.IsModalOverlayOpen}"
+            CloseOverlayCommand="{Binding Navigation.CloseModalOverlayCommand}" />
     </b:Interaction.Behaviors>
     <shell:MachineFluentWindow.InputBindings>
         <KeyBinding Key="N" Modifiers="Control" Command="{Binding NewProjectCommand}" />
@@ -46,6 +54,47 @@
           UseLayoutRounding="True"
           SnapsToDevicePixels="True">
         <Grid.Resources>
+            <Style x:Key="EquipmentInspectorSplitterStyle" TargetType="GridSplitter" BasedOn="{StaticResource {x:Type GridSplitter}}">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                        <Setter Property="Width" Value="Auto" />
+                        <Setter Property="Background" Value="{DynamicResource Surface.Panel}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+                        <Setter Property="BorderThickness" Value="1,0,1,0" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="GridSplitter">
+                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </DataTrigger>
+                    <MultiDataTrigger>
+                        <MultiDataTrigger.Conditions>
+                            <Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" />
+                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True" />
+                        </MultiDataTrigger.Conditions>
+                        <Setter Property="Background" Value="{DynamicResource Border.Subtle}" />
+                    </MultiDataTrigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="SequenceInspectorSplitterStyle" TargetType="GridSplitter" BasedOn="{StaticResource EquipmentInspectorSplitterStyle}">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Navigation.IsSequenceWorkspace}" Value="True">
+                        <Setter Property="Width" Value="Auto" />
+                        <Setter Property="Background" Value="{DynamicResource Surface.Panel}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+                        <Setter Property="BorderThickness" Value="1,0,1,0" />
+                        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="GridSplitter">
+                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
+                        </ControlTemplate></Setter.Value></Setter>
+                    </DataTrigger>
+                    <MultiDataTrigger><MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding Navigation.IsSequenceWorkspace}" Value="True" />
+                        <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True" />
+                    </MultiDataTrigger.Conditions><Setter Property="Background" Value="{DynamicResource Border.Subtle}" /></MultiDataTrigger>
+                </Style.Triggers>
+            </Style>
             <Style x:Key="OpenedRecipeVisibility" TargetType="FrameworkElement">
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding Navigation.IsStartupChoiceVisible}" Value="True">
@@ -55,78 +104,120 @@
             </Style>
         </Grid.Resources>
         <Grid.RowDefinitions>
-            <RowDefinition Height="32" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="0" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="29" />
+            <RowDefinition>
+                <RowDefinition.Style>
+                    <Style TargetType="RowDefinition">
+                        <Setter Property="Height" Value="29" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True"><Setter Property="Height" Value="24" /></DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsSequenceWorkspace}" Value="True"><Setter Property="Height" Value="24" /></DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsInspectionWorkspace}" Value="True"><Setter Property="Height" Value="24" /></DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsResultsWorkspace}" Value="True"><Setter Property="Height" Value="24" /></DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </RowDefinition.Style>
+            </RowDefinition>
         </Grid.RowDefinitions>
 
         <shell:StudioTitleBar Grid.Row="0" />
-        <shell:MainMenuView Grid.Row="1" />
 
         <Grid x:Name="WorkspaceRowsGrid" Grid.Row="2" Style="{StaticResource OpenedRecipeVisibility}">
             <Grid.RowDefinitions>
-                <RowDefinition Height="48" />
-                <RowDefinition Height="Auto" MinHeight="51" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="0" />
                 <RowDefinition Height="2*" MinHeight="240" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition x:Name="BottomWorkspaceRow">
-                    <RowDefinition.Style>
-                        <Style TargetType="RowDefinition">
-                            <Setter Property="Height" Value="0" />
-                            <Setter Property="MinHeight" Value="0" />
-                            <Setter Property="MaxHeight" Value="0" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Navigation.IsEvidenceExpanded}" Value="True">
-                                    <Setter Property="Height" Value="*" />
-                                    <Setter Property="MinHeight" Value="200" />
-                                    <Setter Property="MaxHeight" Value="10000" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </RowDefinition.Style>
+                    <RowDefinition.Style><Style TargetType="RowDefinition">
+                        <Setter Property="Height" Value="31" /><Setter Property="MinHeight" Value="31" /><Setter Property="MaxHeight" Value="31" />
+                        <Style.Triggers><DataTrigger Binding="{Binding Navigation.IsEvidenceExpanded}" Value="True"><Setter Property="Height" Value="221" /><Setter Property="MinHeight" Value="221" /><Setter Property="MaxHeight" Value="221" /></DataTrigger></Style.Triggers>
+                    </Style></RowDefinition.Style>
                 </RowDefinition>
             </Grid.RowDefinitions>
 
-            <Border Padding="8,5" Background="{DynamicResource Surface.Panel}"
-                    BorderBrush="{DynamicResource Border.Default}" BorderThickness="0,0,0,1">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" KeyboardNavigation.TabNavigation="Once">
+            <Grid x:Name="CommonWorkspaceToolbar" MinHeight="44" Background="{DynamicResource Shell.WorkbarSurface}">
+                <Grid.Resources>
+                    <Style x:Key="RunWorkspaceTabStyle" TargetType="RadioButton" BasedOn="{StaticResource WorkspaceTabStyle}">
+                        <Style.Resources>
+                            <SolidColorBrush x:Key="Accent.Soft" Color="{StaticResource Color.Accent.Soft}" /><SolidColorBrush x:Key="Accent.Primary" Color="{StaticResource Color.Accent.Primary}" /><SolidColorBrush x:Key="Text.Secondary" Color="{StaticResource Color.Text.Secondary}" />
+                            <SolidColorBrush x:Key="Surface.Hover" Color="{StaticResource Color.Surface.Hover}" />
+                        </Style.Resources>
+                        <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" />
+                        <Setter Property="Height" Value="43" /><Setter Property="FontSize" Value="13" /><Setter Property="FontWeight" Value="Normal" />
+                        <Setter Property="ContentTemplate"><Setter.Value>
+                            <DataTemplate><TextBlock Text="{Binding}" FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=RadioButton}}" FontSize="{Binding FontSize, RelativeSource={RelativeSource AncestorType=RadioButton}}" FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=RadioButton}}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" /></DataTemplate>
+                        </Setter.Value></Setter>
+                        <Setter Property="Margin" Value="0,0,2,0" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True"><Setter Property="Padding" Value="10,0" /><Setter Property="FontSize" Value="12.5" /></DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Resources>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border x:Name="WorkspaceTabsRegion" Height="44" VerticalAlignment="Bottom" Padding="10,0,0,0" Background="{DynamicResource Shell.WorkbarSurface}" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
+                                    <Setter Property="Grid.ColumnSpan" Value="2" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel Orientation="Horizontal" KeyboardNavigation.TabNavigation="Once">
                         <RadioButton x:Name="EquipmentWorkspaceButton" GroupName="TaskWorkspace"
                                      Content="{loc:Loc Key=Workspace.Equipment}"
                                      IsChecked="{Binding Navigation.IsEquipmentWorkspace, Mode=TwoWay}"
-                                     Style="{StaticResource WorkspaceModeRadioStyle}" />
-                        <RadioButton x:Name="SimulationWorkspaceButton" GroupName="TaskWorkspace"
-                                     Content="{loc:Loc Key=Workspace.Teaching}"
-                                     IsChecked="{Binding Navigation.IsSimulationWorkspace, Mode=TwoWay}"
-                                     Style="{StaticResource WorkspaceModeRadioStyle}" />
+                                     Style="{StaticResource RunWorkspaceTabStyle}" />
+                        <RadioButton x:Name="ProcessWorkspaceButton" GroupName="TaskWorkspace"
+                                     Content="{loc:Loc Key=Process.Workspace}"
+                                     IsChecked="{Binding Navigation.IsProcessWorkspace, Mode=TwoWay}"
+                                     Style="{StaticResource RunWorkspaceTabStyle}" />
                         <RadioButton x:Name="InspectionWorkspaceButton" GroupName="TaskWorkspace"
-                                     Content="{loc:Loc Key=Workspace.Execution}"
+                                     Content="{loc:Loc Key=Camera.Workspace}"
                                      IsChecked="{Binding Navigation.IsInspectionWorkspace, Mode=TwoWay}"
-                                     Style="{StaticResource WorkspaceModeRadioStyle}" />
-                        <RadioButton x:Name="ResultsWorkspaceButton" GroupName="TaskWorkspace"
-                                     Content="{loc:Loc Key=Workspace.Results}"
+                                     Style="{StaticResource RunWorkspaceTabStyle}" />
+                        <RadioButton x:Name="SimulationWorkspaceButton" GroupName="TaskWorkspace"
+                                     Content="{loc:Loc Key=Process.SimulationWorkspace}"
+                                     IsChecked="{Binding Navigation.IsSimulationOverviewWorkspace, Mode=TwoWay}"
+                                     Style="{StaticResource RunWorkspaceTabStyle}" />
+                        <RadioButton x:Name="ExperimentWorkspaceButton" GroupName="TaskWorkspace"
+                                     Content="{loc:Loc Key=Experiment.Workspace}"
+                                     IsChecked="{Binding Navigation.IsExperimentWorkspace, Mode=TwoWay}"
+                                     Style="{StaticResource RunWorkspaceTabStyle}" />
+                        <RadioButton x:Name="ResultsWorkspaceButton" GroupName="TaskWorkspace" Margin="0"
+                                     Content="{loc:Loc Key=RunHistory.AnalysisTitle}"
                                      IsChecked="{Binding Navigation.IsResultsWorkspace, Mode=TwoWay}"
-                                     Style="{StaticResource WorkspaceModeRadioStyle}" />
+                                     Style="{StaticResource RunWorkspaceTabStyle}" />
                     </StackPanel>
-                    <TextBlock Grid.Column="2"
-                               MaxWidth="320"
-                               Margin="12,0,8,0"
-                               VerticalAlignment="Center"
-                               TextAlignment="Right"
-                               TextTrimming="CharacterEllipsis"
-                               Foreground="{DynamicResource Text.Secondary}"
-                               AutomationProperties.Name="{Binding Layout.EquipmentScopeContextText}"
-                               Text="{Binding Layout.EquipmentScopeContextText}" />
-                </Grid>
-            </Border>
-
-            <shell:GlobalCommandBarView Grid.Row="1" Style="{StaticResource OpenedRecipeVisibility}" />
+                </Border>
+                <shell:GlobalCommandBarView x:Name="CommonCommandBar">
+                    <shell:GlobalCommandBarView.Style>
+                        <Style TargetType="{x:Type shell:GlobalCommandBarView}">
+                            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="13" />
+                            <Setter Property="Grid.Column" Value="1" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
+                                    <Setter Property="FontSize" Value="12.5" />
+                                    <Setter Property="Grid.Row" Value="1" />
+                                    <Setter Property="Grid.Column" Value="0" />
+                                    <Setter Property="Grid.ColumnSpan" Value="2" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </shell:GlobalCommandBarView.Style>
+                </shell:GlobalCommandBarView>
+            </Grid>
 
             <Grid x:Name="WorkspaceColumnsGrid" Grid.Row="2" Grid.IsSharedSizeScope="True">
                 <Grid.RowDefinitions>
@@ -143,14 +234,37 @@
                         <Setter Property="MinWidth" Value="300" />
                         <Setter Property="MaxWidth" Value="405" />
                         <Setter Property="MaxHeight" Value="580" />
-                        <Setter Property="Margin" Value="16,88,16,10" />
+                        <Setter Property="Margin" Value="16,68,16,10" />
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
                                 <Setter Property="Width" Value="360" />
-                                <Setter Property="Margin" Value="16,88,16,10" />
+                                <Setter Property="Margin" Value="16,68,16,10" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Navigation.IsSimulationWorkspace}" Value="True">
                                 <Setter Property="Margin" Value="16,138,16,10" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                                <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic, Segoe UI" />
+                                <Setter Property="FontSize" Value="13" />
+                                <Setter Property="Grid.Column" Value="4" />
+                                <Setter Property="Grid.RowSpan" Value="2" />
+                                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                                <Setter Property="Width" Value="Auto" />
+                                <Setter Property="MinWidth" Value="0" />
+                                <Setter Property="MaxWidth" Value="10000" />
+                                <Setter Property="MaxHeight" Value="10000" />
+                                <Setter Property="Margin" Value="0" />
+                            </DataTrigger>
+                            <MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True" /><Condition Binding="{Binding Navigation.IsCompactLayout}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="FontSize" Value="12.5" /></MultiDataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsSequenceWorkspace}" Value="True">
+                                <Setter Property="Grid.Column" Value="4" />
+                                <Setter Property="Grid.RowSpan" Value="2" />
+                                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                                <Setter Property="Width" Value="Auto" />
+                                <Setter Property="MinWidth" Value="0" />
+                                <Setter Property="MaxWidth" Value="10000" />
+                                <Setter Property="MaxHeight" Value="10000" />
+                                <Setter Property="Margin" Value="0" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Navigation.IsInspectorOpen}" Value="False">
                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -161,25 +275,32 @@
                             <DataTrigger Binding="{Binding Navigation.IsResultsWorkspace}" Value="True">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
+                            <DataTrigger Binding="{Binding Navigation.IsExperimentWorkspace}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Grid.Resources>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition x:Name="LeftWorkspaceColumn" Width="240" MinWidth="185" MaxWidth="420" />
-                    <ColumnDefinition Width="4" />
+                    <ColumnDefinition x:Name="LeftWorkspaceSplitterColumn" Width="4" />
                     <ColumnDefinition x:Name="CenterWorkspaceColumn" Width="*" MinWidth="620" />
                     <ColumnDefinition x:Name="RightWorkspaceSplitterColumn" Width="0" />
                     <ColumnDefinition x:Name="RightWorkspaceColumn" Width="0" MinWidth="0" MaxWidth="0" />
                 </Grid.ColumnDefinitions>
 
-                <project:LeftToolRegionView Grid.Column="0" Grid.RowSpan="2" />
-                <GridSplitter Grid.Column="1" Grid.RowSpan="2"
+                <project:LeftToolRegionView x:Name="LeftToolRegionView" Grid.Column="0" Grid.RowSpan="2" />
+                <GridSplitter x:Name="LeftWorkspaceSplitter" Grid.Column="1" Grid.RowSpan="2"
                               HorizontalAlignment="Stretch"
                               VerticalAlignment="Stretch" />
-                <scene:SceneDocumentView Grid.Column="2" Grid.RowSpan="2" />
-                <GridSplitter Grid.Column="3" Visibility="Collapsed"
+                <scene:SceneDocumentView x:Name="SceneDocumentView" Grid.Column="2" Grid.RowSpan="2" />
+                <GridSplitter x:Name="RightWorkspaceSplitter" Grid.Column="3" Visibility="Collapsed"
                               HorizontalAlignment="Stretch"
-                              VerticalAlignment="Stretch" />
+                              VerticalAlignment="Stretch"
+                              ResizeDirection="Columns" ResizeBehavior="PreviousAndNext"
+                              Style="{StaticResource SequenceInspectorSplitterStyle}"
+                              Focusable="True" KeyboardIncrement="16"
+                              AutomationProperties.Name="{loc:Loc Key=Shell.Properties}" />
                 <inspector:RightToolRegionView x:Name="RightToolRegionView"
                                                Panel.ZIndex="5"
                                                Style="{StaticResource WorkspaceInspectorStyle}" />
@@ -191,88 +312,157 @@
                           Background="{DynamicResource Border.Default}"
                           Focusable="True" KeyboardIncrement="16"
                           AutomationProperties.Name="{loc:Loc Key=Diagnostics.Resize}"
-                          Visibility="{Binding Navigation.IsEvidenceExpanded, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                          >
+                <GridSplitter.Style><Style TargetType="GridSplitter" BasedOn="{StaticResource {x:Type GridSplitter}}"><Setter Property="Visibility" Value="Collapsed" /></Style></GridSplitter.Style>
+            </GridSplitter>
             <diagnostics:EventJournalView Grid.Row="4" />
         </Grid>
 
-        <Border Grid.Row="2" Background="{DynamicResource Surface.Root}"
+        <Border x:Name="StartupChoiceOverlay" Grid.Row="0" Grid.RowSpan="4" Panel.ZIndex="50"
+                Background="{DynamicResource Surface.Root}" UseLayoutRounding="False"
                 Visibility="{Binding Navigation.IsStartupChoiceVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Border.Resources>
+                <Style x:Key="StartupBodyTextStyle" TargetType="TextBlock">
+                    <Setter Property="FontFamily" Value="Segoe UI" />
+                    <Setter Property="FontSize" Value="13" />
+                    <Setter Property="FontWeight" Value="Normal" />
+                    <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+                    <Setter Property="LineHeight" Value="18.85" />
+                    <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+                    <Setter Property="TextWrapping" Value="Wrap" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding DataContext.Navigation.IsCompactLayout, RelativeSource={RelativeSource AncestorType=shell:ShellWindow}}" Value="True">
+                            <Setter Property="FontSize" Value="12.5" /><Setter Property="LineHeight" Value="18.125" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+                <Style x:Key="StartupTitleStyle" TargetType="TextBlock">
+                    <Setter Property="FontFamily" Value="Segoe UI" /><Setter Property="FontSize" Value="22" />
+                    <Setter Property="FontWeight" Value="Bold" /><Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+                    <Setter Property="LineHeight" Value="31.9" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+                    <Setter Property="TextWrapping" Value="Wrap" />
+                </Style>
+                <Style x:Key="StartupHeadingStyle" TargetType="TextBlock" BasedOn="{StaticResource StartupTitleStyle}">
+                    <Setter Property="FontSize" Value="16" /><Setter Property="LineHeight" Value="23.2" />
+                </Style>
+                <Style x:Key="StartupCardStyle" TargetType="Border">
+                    <Setter Property="Background" Value="{DynamicResource Surface.Panel}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+                    <Setter Property="BorderThickness" Value="1" /><Setter Property="CornerRadius" Value="8" />
+                </Style>
+                <Style x:Key="StartupButtonStyle" TargetType="Button">
+                    <Setter Property="FontFamily" Value="Segoe UI" /><Setter Property="FontSize" Value="13" />
+                    <Setter Property="FontWeight" Value="Normal" /><Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+                    <Setter Property="Background" Value="{DynamicResource Surface.Raised}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+                    <Setter Property="BorderThickness" Value="1" /><Setter Property="Height" Value="28.85" />
+                    <Setter Property="Padding" Value="10,4" /><Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Button">
+                                <Grid>
+                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5">
+                                        <TextBlock Text="{TemplateBinding Content}" FontSize="{TemplateBinding FontSize}" FontWeight="{TemplateBinding FontWeight}" Foreground="{TemplateBinding Foreground}" Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource StartupBodyTextStyle}" />
+                                    </Border>
+                                    <Border x:Name="StartupButtonFocusCue" Margin="-4" CornerRadius="7" BorderBrush="{DynamicResource Accent.Primary}" BorderThickness="2" IsHitTestVisible="False" Visibility="Collapsed" />
+                                </Grid>
+                                <ControlTemplate.Triggers><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="StartupButtonFocusCue" Property="Visibility" Value="Visible" /></Trigger></ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding DataContext.Navigation.IsCompactLayout, RelativeSource={RelativeSource AncestorType=shell:ShellWindow}}" Value="True"><Setter Property="FontSize" Value="12.5" /><Setter Property="Height" Value="28.125" /></DataTrigger>
+                        <MultiTrigger><MultiTrigger.Conditions><Condition Property="IsMouseOver" Value="True" /><Condition Property="IsEnabled" Value="True" /></MultiTrigger.Conditions><Setter Property="Background" Value="{DynamicResource Surface.Hover}" /></MultiTrigger>
+                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /><Setter Property="Background" Value="{DynamicResource Surface.Disabled}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Disabled}" /></Trigger>
+                    </Style.Triggers>
+                </Style>
+                <Style x:Key="StartupPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource StartupButtonStyle}">
+                    <Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Foreground" Value="{DynamicResource Text.OnAccent}" />
+                    <Setter Property="Background" Value="{DynamicResource Accent.Primary}" /><Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                    <Style.Triggers><Trigger Property="IsPressed" Value="True"><Setter Property="Background" Value="{DynamicResource Accent.Pressed}" /></Trigger>
+                        <MultiTrigger><MultiTrigger.Conditions><Condition Property="IsMouseOver" Value="True" /><Condition Property="IsEnabled" Value="True" /></MultiTrigger.Conditions><Setter Property="Background" Value="{DynamicResource Accent.Hover}" /></MultiTrigger>
+                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /><Setter Property="Background" Value="{DynamicResource Accent.Soft}" /><Setter Property="BorderBrush" Value="{DynamicResource State.RunningBorder}" /></Trigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Resources>
             <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                <Border MaxWidth="1060" Margin="24,32" Padding="28" HorizontalAlignment="Stretch"
-                        Background="{DynamicResource Surface.Raised}" BorderBrush="{DynamicResource Border.Default}"
-                        BorderThickness="1" CornerRadius="8">
+                <Border x:Name="StartupContent" MaxWidth="1040" Margin="0,72,0,40" HorizontalAlignment="Center" VerticalAlignment="Top">
                     <StackPanel KeyboardNavigation.TabNavigation="Local">
-                        <TextBlock FontSize="24" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"
+                        <TextBlock x:Name="StartupTitleText" Style="{StaticResource StartupTitleStyle}"
                                    Text="{loc:Loc Key=RecipeEntry.Title}" TextWrapping="Wrap" />
-                        <TextBlock Margin="0,12,0,24" Foreground="{DynamicResource Text.Secondary}"
+                        <TextBlock x:Name="StartupHintText" Margin="0,6,0,18" Style="{StaticResource StartupBodyTextStyle}"
                                    Text="{loc:Loc Key=RecipeEntry.Hint}" TextWrapping="Wrap" />
-                        <UniformGrid x:Name="StartupCardsPanel" Rows="1" Columns="3">
-                            <Border MinHeight="196" Margin="7" Padding="16"
-                                    CornerRadius="8" Style="{StaticResource PanelSurfaceStyle}">
-                                <StackPanel>
-                                    <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"
-                                               Text="{loc:Loc Key=RecipeEntry.New}" TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource Text.Secondary}"
+                        <UniformGrid x:Name="StartupCardsPanel" Rows="1" Columns="3" Margin="-7,0,-7,0">
+                            <Border MinHeight="160" Margin="7,0" Padding="16"
+                                    CornerRadius="8" Style="{StaticResource StartupCardStyle}">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                    <TextBlock Style="{StaticResource StartupHeadingStyle}"
+                                               Text="{loc:Loc Key=RecipeEntry.NewTitle}" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="1" Margin="0,8,0,0" Style="{StaticResource StartupBodyTextStyle}"
                                                Text="{loc:Loc Key=RecipeEntry.NewDescription}" TextWrapping="Wrap" />
-                                    <Button x:Name="StartBlankLayoutButton" Height="44" Margin="0,16,0,0"
+                                    <Button Grid.Row="2" x:Name="StartBlankLayoutButton" Margin="0,16,0,0"
                                             Command="{Binding NewProjectCommand}" Content="{loc:Loc Key=RecipeEntry.New}"
                                             AutomationProperties.Name="{loc:Loc Key=RecipeEntry.New}"
                                             AutomationProperties.HelpText="{loc:Loc Key=RecipeEntry.NewDescription}"
-                                            Style="{StaticResource PrimaryCommandButtonStyle}" />
-                                </StackPanel>
+                                            Style="{StaticResource StartupPrimaryButtonStyle}" />
+                                </Grid>
                             </Border>
-                            <Border MinHeight="196" Margin="7" Padding="16"
-                                    CornerRadius="8" Style="{StaticResource PanelSurfaceStyle}">
-                                <StackPanel>
-                                    <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"
+                            <Border MinHeight="160" Margin="7,0" Padding="16"
+                                    CornerRadius="8" Style="{StaticResource StartupCardStyle}">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                    <TextBlock Style="{StaticResource StartupHeadingStyle}"
                                                Text="{loc:Loc Key=RecipeEntry.InspectionTitle}" TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource Text.Secondary}"
+                                    <TextBlock Grid.Row="1" Margin="0,8,0,0" Style="{StaticResource StartupBodyTextStyle}"
                                                Text="{loc:Loc Key=RecipeEntry.InspectionDescription}" TextWrapping="Wrap" />
-                                    <Button x:Name="StartSampleButton" Height="44" Margin="0,16,0,0"
+                                    <Button Grid.Row="2" x:Name="StartSampleButton" Margin="0,16,0,0"
                                             Command="{Binding Navigation.OpenBundledSampleCommand}" Content="{loc:Loc Key=RecipeEntry.InspectionOpen}"
                                             AutomationProperties.Name="{loc:Loc Key=RecipeEntry.InspectionOpen}"
                                             AutomationProperties.HelpText="{loc:Loc Key=RecipeEntry.InspectionDescription}"
-                                            Style="{StaticResource QuietCommandButtonStyle}"
+                                            Style="{StaticResource StartupButtonStyle}"
                                             ToolTip="{loc:Loc Key=RecipeEntry.InspectionDescription}" />
-                                </StackPanel>
+                                </Grid>
                             </Border>
-                            <Border MinHeight="196" Margin="7" Padding="16"
-                                    CornerRadius="8" Style="{StaticResource PanelSurfaceStyle}">
-                                <StackPanel>
-                                    <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"
+                            <Border MinHeight="160" Margin="7,0" Padding="16"
+                                    CornerRadius="8" Style="{StaticResource StartupCardStyle}">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                    <TextBlock Style="{StaticResource StartupHeadingStyle}"
                                                Text="{loc:Loc Key=RecipeEntry.LargeTitle}" TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource Text.Secondary}"
+                                    <StackPanel Grid.Row="1" Margin="0,8,0,0">
+                                    <TextBlock Style="{StaticResource StartupBodyTextStyle}"
                                                Text="{loc:Loc Key=RecipeEntry.LargeDescription}" TextWrapping="Wrap" />
-                                    <Button x:Name="StartLargeLayoutSampleButton" Height="44" Margin="0,16,0,0"
+                                    <TextBlock Margin="0,8,0,0" FontSize="12" LineHeight="17.4" Style="{StaticResource StartupBodyTextStyle}"
+                                               Text="{loc:Loc Key=RecipeEntry.LargeHint}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Button Grid.Row="2" x:Name="StartLargeLayoutSampleButton" Margin="0,16,0,0"
                                             Command="{Binding Navigation.OpenLargeLayoutSampleCommand}"
                                             Content="{loc:Loc Key=RecipeEntry.LargeOpen}"
                                             AutomationProperties.Name="{loc:Loc Key=RecipeEntry.LargeOpen}"
                                             AutomationProperties.HelpText="{loc:Loc Key=RecipeEntry.LargeDescription}"
-                                            Style="{StaticResource QuietCommandButtonStyle}" />
-                                    <TextBlock Margin="0,8,0,0" FontSize="12" Foreground="{DynamicResource Text.Secondary}"
-                                               Text="{loc:Loc Key=RecipeEntry.LargeHint}" TextWrapping="Wrap" />
-                                </StackPanel>
+                                            Style="{StaticResource StartupButtonStyle}" />
+
+                                </Grid>
                             </Border>
                         </UniformGrid>
-                        <Border Margin="8,24,8,0" Padding="16" CornerRadius="8"
-                                Style="{StaticResource PanelSurfaceStyle}">
+                        <Border Margin="0,18,0,0" Padding="16" CornerRadius="8"
+                                Style="{StaticResource StartupCardStyle}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"
-                                               Text="{loc:Loc Key=RecipeEntry.Open}" TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource Text.Secondary}"
+                                    <TextBlock Style="{StaticResource StartupHeadingStyle}"
+                                               Text="{loc:Loc Key=RecipeEntry.SavedTitle}" TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,8,0,0" Style="{StaticResource StartupBodyTextStyle}"
                                                Text="{loc:Loc Key=RecipeEntry.OpenDescription}" TextWrapping="Wrap" />
                                 </StackPanel>
-                                <Button x:Name="OpenRecipeButton" Grid.Column="1" MinWidth="168" Height="44"
+                                <Button x:Name="OpenRecipeButton" Grid.Column="1" MinWidth="168"
                                         Margin="24,0,0,0" Command="{Binding OpenProjectCommand}"
                                         Content="{loc:Loc Key=RecipeEntry.Open}"
                                         AutomationProperties.Name="{loc:Loc Key=RecipeEntry.Open}"
                                         AutomationProperties.HelpText="{loc:Loc Key=RecipeEntry.OpenDescription}"
-                                        Style="{StaticResource GlobalCommandButtonStyle}" />
+                                        Style="{StaticResource StartupButtonStyle}" />
                             </Grid>
                         </Border>
                     </StackPanel>
@@ -285,5 +475,7 @@
         <project:NewProjectNameDialogView Grid.Row="0" Grid.RowSpan="4" Panel.ZIndex="120" />
 
         <shell:StudioStatusBarView Grid.Row="3" />
+        <project:RecipeConnectionWorkbenchView x:Name="RecipeConnectionsOverlay" Grid.Row="0" Grid.RowSpan="4" Panel.ZIndex="130" />
+        <simulation:SimulationTestWorkspaceView x:Name="TestScenarioOverlay" Grid.Row="0" Grid.RowSpan="4" Panel.ZIndex="130" />
     </Grid>
 </shell:MachineFluentWindow>

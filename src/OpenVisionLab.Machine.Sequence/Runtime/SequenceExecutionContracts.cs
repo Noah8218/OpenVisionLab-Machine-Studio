@@ -48,7 +48,10 @@ public sealed record SequenceExecutionSnapshot(
     SequenceExecutionError? LastError,
     TimeSpan WatchdogTimeout,
     string? ActiveSequenceId = null,
-    IReadOnlyList<string>? CallStack = null);
+    IReadOnlyList<string>? CallStack = null,
+    string? UnitId = null,
+    int CompletedCycles = 0,
+    int RepeatCount = 1);
 
 public sealed record SequenceExecutionResult(
     SequenceExecutionSnapshot Snapshot,

@@ -24,6 +24,8 @@ public sealed class LocExtension : MarkupExtension
     [ConstructorArgument("key")]
     public string Key { get; set; } = string.Empty;
 
+    public static object RevisionSource => LocalizationBindingSource.Instance;
+
     public override object ProvideValue(IServiceProvider serviceProvider)
     {
         return new Binding(nameof(LocalizationBindingSource.Revision))
@@ -116,29 +118,62 @@ public sealed class LocalizedSequenceNameConverter : IValueConverter
         Binding.DoNothing;
 }
 
-public sealed class LocalizedSequenceActionConverter : IValueConverter
+public sealed class LocalizedSequenceActionConverter : IValueConverter, IMultiValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         value is SequenceStepAction action
             ? OpenVisionLanguageService.T($"Sequence.Action.{action}", action.ToString(), action.ToString())
             : value?.ToString() ?? string.Empty;
 
+    public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (parameter is "description")
+        {
+            if (values.Length == 0 || values[0] is not SequenceStepAction action) return string.Empty;
+            if (action == SequenceStepAction.MoveAxis)
+                return OpenVisionLanguageService.T(values.Length > 2 && values[2] is true ? "R24.StepDescription.MoveAxisWait" : "R24.StepDescription.MoveAxis");
+            string role = action switch
+            {
+                SequenceStepAction.SetChannel => nameof(SequenceStepAction.SetSignal),
+                SequenceStepAction.None => nameof(SequenceStepAction.Complete),
+                SequenceStepAction.Wait => values.Length < 4 || string.IsNullOrWhiteSpace(values[3]?.ToString())
+                    || string.Equals(values[3]?.ToString()?.Trim(), "axisDone", StringComparison.OrdinalIgnoreCase)
+                        ? nameof(SequenceStepAction.WaitAxisDone) : nameof(SequenceStepAction.WaitSignal),
+                _ => action.ToString()
+            };
+            return OpenVisionLanguageService.T($"R24.StepDescription.{role}", string.Empty, string.Empty);
+        }
+        return Convert(values.Length == 0 ? null : values[0], targetType, parameter, culture);
+    }
+
+    public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture) =>
+        targetTypes.Select(_ => Binding.DoNothing).ToArray();
+
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         Binding.DoNothing;
 }
 
-public sealed class LocalizedSequenceTemplateNameConverter : IValueConverter
+public sealed class LocalizedSequenceTemplateNameConverter : IValueConverter, IMultiValueConverter
 {
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value is SequenceStepTemplateDefinition template
-            ? OpenVisionLanguageService.T($"Sequence.Template.{template.Id}", template.Name, template.Name)
-            : value?.ToString() ?? string.Empty;
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is not SequenceStepTemplateDefinition template) return value?.ToString() ?? string.Empty;
+        return parameter is "description"
+            ? OpenVisionLanguageService.T($"R24.StepTemplateDescription.{template.Id}")
+            : OpenVisionLanguageService.T($"Sequence.Template.{template.Id}", template.Name, template.Name);
+    }
+
+    public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture) =>
+        Convert(values.Length == 0 ? null : values[0], targetType, parameter, culture);
+
+    public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture) =>
+        targetTypes.Select(_ => Binding.DoNothing).ToArray();
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         Binding.DoNothing;
 }
 
-public sealed class LocalizedFaultKindConverter : IValueConverter
+public sealed class LocalizedFaultKindConverter : IValueConverter, IMultiValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         value is not OpenVisionLab.MachineStudio.ViewModel.SimulationFaultKindOption option
@@ -148,11 +183,17 @@ public sealed class LocalizedFaultKindConverter : IValueConverter
                 option.Name,
                 option.Name);
 
+    public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture) =>
+        Convert(values.Length == 0 ? null : values[0], targetType, parameter, culture);
+
+    public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture) =>
+        targetTypes.Select(_ => Binding.DoNothing).ToArray();
+
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         Binding.DoNothing;
 }
 
-public sealed class LocalizedForcedValueConverter : IValueConverter
+public sealed class LocalizedForcedValueConverter : IValueConverter, IMultiValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         value is not OpenVisionLab.MachineStudio.ViewModel.FaultForcedValueOption option
@@ -161,6 +202,12 @@ public sealed class LocalizedForcedValueConverter : IValueConverter
                 option.Value ? "Fault.ForceOn" : "Fault.ForceOff",
                 option.Name,
                 option.Name);
+
+    public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture) =>
+        Convert(values.Length == 0 ? null : values[0], targetType, parameter, culture);
+
+    public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture) =>
+        targetTypes.Select(_ => Binding.DoNothing).ToArray();
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         Binding.DoNothing;

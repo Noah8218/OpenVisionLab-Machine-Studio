@@ -5,6 +5,7 @@ using OpenVisionLab.Machine.Core.Projects;
 using OpenVisionLab.Machine.Sequence.Authoring;
 using OpenVisionLab.Machine.Simulation.Compilation;
 using OpenVisionLab.MachineStudio.ViewModel;
+using OpenVisionLab.MachineStudio.Model;
 using Xunit;
 
 namespace OpenVisionLab.MachineStudio.Tests;
@@ -272,6 +273,56 @@ public sealed class RecipeAuthoringWorkspaceTests
     }
 
     [Fact]
+    public void ConnectionStepCancellationRetainsDraftAndValidRetryNavigates()
+    {
+        using var host = new AuthoringHost(LoadTransferCell());
+        host.Load();
+        var row = host.Workspace.Connections.Rows.First(item => item.HasSequenceUse);
+        host.Workspace.Connections.OpenSequenceStepCommand.Execute(row);
+        host.Editor.SelectedStepDraft!.Name = "Pending step name";
+        host.Editor.PendingStepDraftPrompt = () => PlacementDraftDecision.Cancel;
+        host.SelectedTab = -1;
+        var before = Serialize(host.Project);
+
+        host.Workspace.Connections.OpenSequenceStepCommand.Execute(row);
+
+        Assert.Equal(-1, host.SelectedTab);
+        Assert.Equal("Pending step name", host.Editor.SelectedStepDraft.Name);
+        Assert.True(host.Editor.HasPendingStepDraft);
+        Assert.Equal(before, Serialize(host.Project));
+        host.Editor.PendingStepDraftPrompt = () => PlacementDraftDecision.Discard;
+        host.Workspace.Connections.OpenSequenceStepCommand.Execute(row);
+        Assert.Equal(2, host.SelectedTab);
+        Assert.False(host.Editor.HasPendingStepDraft);
+        Assert.Equal(row.FirstSequenceStepId, host.Editor.SelectedStep?.Id);
+        Assert.Equal(before, Serialize(host.Project));
+    }
+
+    [Fact]
+    public void ProcessPlanReturnUsesConnectionEntryAndRetainsUnappliedPreview()
+    {
+        var opens = 0;
+        using var host = new AuthoringHost(LoadProcessPlan(), () => opens++);
+        host.Load();
+        var blocks = host.Workspace.Connections.ProcessBlocks;
+        blocks.PreviewProcessBlockCommand.Execute(null);
+        var before = Serialize(host.Project);
+        var item = blocks.VisibleProcessBlockItems.First(step => step.CanOpenSequenceStep);
+        host.Workspace.Connections.OpenSequenceStepCommand.Execute(item);
+        Assert.Equal(2, host.SelectedTab);
+        Assert.True(host.Workspace.ProcessPlanReview.HasReturnContext);
+
+        host.Workspace.ProcessPlanReview.ReturnToProcessPlanCommand.Execute(null);
+
+        Assert.Equal(1, opens);
+        Assert.Equal(2, host.SelectedTab);
+        Assert.True(blocks.IsProcessBlockPreviewVisible);
+        Assert.Equal(item.StepId, blocks.SelectedProcessBlockItem?.StepId);
+        Assert.Equal(before, Serialize(host.Project));
+        Assert.Empty(host.Calls);
+    }
+
+    [Fact]
     public void CloseDetachesReviewBeforeDeferredDisposalAndLeavesBorrowedEditorsUsable()
     {
         using var host = new AuthoringHost(LoadProcessPlan());
@@ -430,7 +481,7 @@ public sealed class RecipeAuthoringWorkspaceTests
 
     private sealed class AuthoringHost : IDisposable
     {
-        public AuthoringHost(MachineProjectDocument project)
+        public AuthoringHost(MachineProjectDocument project, Action? returnToConnections = null)
         {
             OpenVisionLanguageService.Load();
             Project = project;
@@ -448,7 +499,7 @@ public sealed class RecipeAuthoringWorkspaceTests
                 RefreshCamera,
                 () => Calls.Add("invalidate"),
                 value => Status = value,
-                (_, _) => { });
+                (_, _) => { }, returnToConnections);
         }
 
         public MachineProjectDocument Project { get; set; }

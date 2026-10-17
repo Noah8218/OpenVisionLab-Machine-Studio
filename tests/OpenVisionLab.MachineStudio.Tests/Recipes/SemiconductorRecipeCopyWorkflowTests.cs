@@ -79,7 +79,7 @@ public sealed class SemiconductorRecipeCopyWorkflowTests
     private static string CreateTestDirectory()
     {
         var directory = Path.Combine(
-            @"D:\OpenVisionLab-TestData\OpenVisionLab-Machine-Studio\semiconductor-recipe-copy-workflow-tests",
+            OpenVisionLab.TestSupport.TestStorage.RootPath, "semiconductor-recipe-copy-workflow-tests",
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         return directory;

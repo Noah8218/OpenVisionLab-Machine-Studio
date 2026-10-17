@@ -153,7 +153,7 @@ internal static class SmokeCameraFirstUseVerifier
                     && step.FailureStepId is null);
         }
 
-        viewModel.SelectedDocumentTabIndex = 1;
+        viewModel.Navigation.OpenRecipeConnectionsCommand.Execute(null);
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         await Task.Delay(100);
 

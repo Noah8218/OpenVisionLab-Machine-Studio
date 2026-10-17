@@ -11,6 +11,89 @@ namespace OpenVisionLab.MachineStudio.Tests;
 public sealed class MachineLayoutViewModelTests
 {
     [Fact]
+    public void EquipmentSelectionReferencesUseRealExactTargetsAndCountEachStepOnce()
+    {
+        var component = new LayoutComponentDefinition { Id = "stage", Name = "Positioner", Kind = LayoutComponentKind.LinearStage,
+            BehaviorBindingId = "axis", Transform = new Transform2D(), Size = new Size2D { Width = 30, Height = 20 } };
+        var project = new MachineProjectDocument
+        {
+            Layouts = [new MachineLayoutDefinition { Id = "layout", Name = "Layout", Components = [component] }],
+            Sequences =
+            [
+                new SequenceDefinition { Id = "a", Steps =
+                [
+                    new SequenceStepDefinition { Id = "shared", TargetId = "axis", WorkpieceComponentId = "stage" },
+                    new SequenceStepDefinition { Id = "product", WorkpieceComponentId = "stage" },
+                    new SequenceStepDefinition { Id = "expected", ExpectedTargetId = "axis" },
+                    new SequenceStepDefinition { Id = "prefix", TargetId = "axis.other" }
+                ] },
+                new SequenceDefinition { Id = "b", Steps = [new SequenceStepDefinition { Id = "shared", TargetId = "stage" }] }
+            ]
+        };
+        project.Simulation.ActiveLayoutId = "layout";
+        using var layout = new MachineLayoutViewModel();
+        layout.Load(project);
+        var before = new ProjectDocumentStore().Serialize(project);
+        Assert.Empty(layout.EquipmentSelectionStepReferences);
+        layout.Select(component.Id);
+        Assert.Equal(new[] { ("a", "shared"), ("a", "product"), ("a", "expected"), ("b", "shared") }, layout.EquipmentSelectionStepReferences);
+        Assert.Contains(component.Id, layout.EquipmentSelectionDetailText);
+        var oblique = layout.EquipmentSceneTitleText;
+        layout.ShowTopViewCommand.Execute(null);
+        Assert.NotEqual(oblique, layout.EquipmentSceneTitleText);
+        Assert.EndsWith(OpenVisionLanguageService.T("Scene.ViewPlan"), layout.EquipmentSceneTitleText);
+        Assert.Equal(before, new ProjectDocumentStore().Serialize(project));
+        layout.Select(string.Empty);
+        Assert.Empty(layout.EquipmentSelectionStepReferences);
+    }
+
+    [Fact]
+    public void SignalReferencesUseUniqueExplicitOwnersWithoutParsingChannelIds()
+    {
+        var sensor = new LayoutComponentDefinition { Id = "scene.sensor", Kind = LayoutComponentKind.DigitalSensor, BehaviorBindingId = "owner.actual" };
+        var owner = new OpenVisionLab.Machine.Core.Devices.DeviceDefinition { Id = "owner.actual", Kind = OpenVisionLab.Machine.Core.Devices.DeviceKind.Sensor, ChannelIds = ["unrelated.channel"] };
+        var project = new MachineProjectDocument
+        {
+            Devices = [owner], Layouts = [new MachineLayoutDefinition { Id = "layout", Components = [sensor] }],
+            Sequences =
+            [
+                new SequenceDefinition { Id = "a", Steps =
+                [
+                    new SequenceStepDefinition { Id = "wait", Action = SequenceStepAction.WaitSignal, TargetId = "unrelated.channel", ExpectedTargetId = "unrelated.channel" },
+                    new SequenceStepDefinition { Id = "expected", ExpectedTargetId = "unrelated.channel" },
+                    new SequenceStepDefinition { Id = "prefix", TargetId = "unrelated.channel.suffix" },
+                    new SequenceStepDefinition { Id = "inferred", TargetId = "scene.sensor.det" }
+                ] },
+                new SequenceDefinition { Id = "b", Steps = [new SequenceStepDefinition { Id = "wait", Action = SequenceStepAction.WaitSignal, TargetId = "unrelated.channel" }] }
+            ]
+        };
+        project.Simulation.ActiveLayoutId = "layout";
+        using var layout = new MachineLayoutViewModel();
+        layout.Load(project);
+        var original = new ProjectDocumentStore().Serialize(project);
+        layout.Select(sensor.Id);
+        var expected = new[] { ("a", "wait"), ("a", "expected"), ("b", "wait") };
+        Assert.Equal(sensor.Id + " · " + OpenVisionLanguageService.T("Scene.EquipmentLegendSensor"), layout.EquipmentSelectionDetailText);
+        Assert.Equal(expected, layout.EquipmentSelectionStepReferences);
+        var duplicate = new OpenVisionLab.Machine.Core.Devices.DeviceDefinition { Id = "other.owner", ChannelIds = ["unrelated.channel"] };
+        project.Devices.Add(duplicate);
+        Assert.Empty(layout.EquipmentSelectionStepReferences);
+        project.Devices.Remove(duplicate);
+        Assert.Equal(expected, layout.EquipmentSelectionStepReferences);
+        project.Devices.Add(new OpenVisionLab.Machine.Core.Devices.DeviceDefinition { Id = owner.Id, ChannelIds = ["different.channel"] });
+        Assert.Empty(layout.EquipmentSelectionStepReferences);
+        project.Devices.RemoveAt(project.Devices.Count - 1);
+        sensor.BehaviorBindingId = "missing.owner";
+        Assert.Empty(layout.EquipmentSelectionStepReferences);
+        sensor.BehaviorBindingId = owner.Id;
+        Assert.Equal(expected, layout.EquipmentSelectionStepReferences);
+        Assert.Equal(original, new ProjectDocumentStore().Serialize(project));
+        layout.Load(new MachineProjectDocument { Layouts = [new MachineLayoutDefinition { Id = "other", Components = [new LayoutComponentDefinition { Id = sensor.Id, Kind = sensor.Kind, BehaviorBindingId = owner.Id }] }], Simulation = new SimulationDefinition { ActiveLayoutId = "other" } });
+        layout.Select(sensor.Id);
+        Assert.Empty(layout.EquipmentSelectionStepReferences);
+    }
+
+    [Fact]
     public void EquipmentScopeContextTracksStationAndUnitWithoutChangingProject()
     {
         var unit = new MachineUnitDefinition { Id = "unit-inspection", Name = "Inspection Unit" };
@@ -96,20 +179,54 @@ public sealed class MachineLayoutViewModelTests
             layout.Load(project);
 
             var koreanPart = Assert.Single(layout.EquipmentOutlineUnits.SelectMany(item => item.Parts));
-            Assert.Equal("검사 카메라 / camera-01 / 카메라", koreanPart.AutomationName);
+            Assert.Equal("검사 카메라 / camera-01 / 2D 카메라", koreanPart.AutomationName);
             Assert.Equal("camera-01 선택", koreanPart.SelectionAutomationName);
 
             OpenVisionLanguageService.SetLanguage(OpenVisionLanguage.English, save: false);
             layout.RefreshLocalization();
 
             var englishPart = Assert.Single(layout.EquipmentOutlineUnits.SelectMany(item => item.Parts));
-            Assert.Equal("검사 카메라 / camera-01 / Camera", englishPart.AutomationName);
+            Assert.Equal("검사 카메라 / camera-01 / 2D camera", englishPart.AutomationName);
             Assert.Equal("Select camera-01", englishPart.SelectionAutomationName);
         }
         finally
         {
             OpenVisionLanguageService.SetLanguage(originalLanguage, save: false);
         }
+    }
+
+    [Theory]
+    [InlineData(LayoutComponentKind.DigitalSensor, "센서", "Sensor", "디지털 센서", "Digital sensor")]
+    [InlineData(LayoutComponentKind.PneumaticCylinder, "실린더", "Cylinder", "공압 실린더", "Pneumatic cylinder")]
+    public void EquipmentOutlineKindsUseProposalWordingAndRetainSearchAliases(LayoutComponentKind kind, string korean, string english, string oldKorean, string oldEnglish)
+    {
+        var originalLanguage = OpenVisionLanguageService.CurrentLanguage;
+        try
+        {
+            var component = new LayoutComponentDefinition { Id = "device-01", Name = "Device", Kind = kind, Transform = new Transform2D(), Size = new Size2D { Width = 20, Height = 20 } };
+            var project = new MachineProjectDocument { Layouts = [new MachineLayoutDefinition { Id = "layout", Name = "Layout", Components = [component] }] };
+            project.Simulation.ActiveLayoutId = "layout";
+            using var layout = new MachineLayoutViewModel();
+            layout.Load(project);
+            var before = new ProjectDocumentStore().Serialize(project);
+            foreach (var language in new[] { OpenVisionLanguage.Korean, OpenVisionLanguage.English })
+            {
+                OpenVisionLanguageService.SetLanguage(language, save: false);
+                layout.RefreshLocalization();
+                var expected = language == OpenVisionLanguage.Korean ? korean : english;
+                var oldLabel = language == OpenVisionLanguage.Korean ? oldKorean : oldEnglish;
+                foreach (var query in new[] { expected, oldLabel, "device-01" })
+                {
+                    layout.EquipmentOutlineSearchText = query;
+                    var part = Assert.Single(layout.EquipmentOutlineUnassignedParts);
+                    Assert.Equal(expected, part.KindText);
+                    Assert.Equal(component.Id, part.Item.Id);
+                }
+                layout.ClearEquipmentOutlineSearchCommand.Execute(null);
+            }
+            Assert.Equal(before, new ProjectDocumentStore().Serialize(project));
+        }
+        finally { OpenVisionLanguageService.SetLanguage(originalLanguage, save: false); }
     }
 
     [Fact]
@@ -143,6 +260,8 @@ public sealed class MachineLayoutViewModelTests
         layout.Load(project);
 
         Assert.Equal(61, layout.Items.Count);
+        Assert.Equal(3, layout.EquipmentOverviewUnitCount);
+        Assert.Equal(61, layout.EquipmentOverviewDeviceCount);
         Assert.Equal(60, layout.EquipmentOutlineUnits.SelectMany(unit => unit.Parts).Count());
         Assert.True(layout.EquipmentOutlineHasPages);
         Assert.True(layout.NextEquipmentOutlinePageCommand.CanExecute(null));
@@ -154,6 +273,8 @@ public sealed class MachineLayoutViewModelTests
 
         layout.NextEquipmentOutlinePageCommand.Execute(null);
         var lastPart = Assert.Single(layout.EquipmentOutlineUnits.SelectMany(unit => unit.Parts));
+        Assert.Equal(3, layout.EquipmentOverviewUnitCount);
+        Assert.Equal(61, layout.EquipmentOverviewDeviceCount);
         Assert.False(layout.NextEquipmentOutlinePageCommand.CanExecute(null));
 
         layout.SelectEquipmentOutlinePartCommand.Execute(lastPart.Item);
@@ -932,4 +1053,80 @@ public sealed class MachineLayoutViewModelTests
         Assert.False(editor.TryApplyAxisDriveDraft());
         Assert.Equal(110, axis.MaxVelocity);
     }
+    [Fact]
+    public void R24InspectorDraftValidatesEveryTabBeforeOneDefinitionWriteAndRoundTripsTeaching()
+    {
+        var axis = new VirtualAxisDefinition { Id = "axis", Name = "Axis", Kind = AxisKind.Linear, SoftLimitMin = -50, SoftLimitMax = 250, HomePosition = 0, MaxVelocity = 100 };
+        var component = new LayoutComponentDefinition { Id = "stage", Name = "Stage", Kind = LayoutComponentKind.LinearStage, BehaviorBindingId = axis.Id, Size = new Size2D { Width = 100, Height = 40 } };
+        var definition = new MachineLayoutDefinition { Id = "main", Name = "Main", Components = { component } };
+        var project = new MachineProjectDocument { Layouts = { definition }, Axes = { axis } };
+        project.Simulation.ActiveLayoutId = definition.Id;
+        using var layout = new MachineLayoutViewModel();
+        layout.Load(project);
+        layout.Select(component.Id);
+        var editor = Assert.IsType<LayoutComponentEditorViewModel>(layout.SelectedComponentEditor);
+        var changes = 0;
+        layout.DefinitionChanged += (_, _) => changes++;
+        Assert.Same(editor.ApplyEquipmentPlacementDraftCommand, editor.ApplyEquipmentPlacementDraftCommand);
+        Assert.True(editor.ApplySettingsDraftCommand.CanExecute(null));
+        editor.DraftName = "Changed";
+        editor.SettingsFields.Single(field => field.Id == "home").Value = "300";
+        Assert.False(editor.TryApplyInspectorDraft());
+        Assert.Equal("Stage", component.Name);
+        Assert.Equal(0, axis.HomePosition);
+        Assert.Equal(0, changes);
+        editor.SettingsFields.Single(field => field.Id == "home").Value = "25";
+        editor.SettingsFields.Single(field => field.Id == "teach").Value = "Inspect=120; Inspect=130";
+        Assert.True(editor.TryApplyInspectorDraft());
+        Assert.Equal("Changed", component.Name);
+        Assert.Equal(25, axis.HomePosition);
+        Assert.Equal(130, axis.TeachingPositions!["Inspect"]);
+        Assert.Equal(1, changes);
+        Assert.False(editor.HasPendingInspectorDraft);
+        var store = new ProjectDocumentStore();
+        var reopened = store.Load(store.SerializeForEvidence(project));
+        Assert.Equal(130, reopened.Axes.Single().TeachingPositions!["Inspect"]);
+        editor.SettingsFields.Single(field => field.Id == "speed").Value = "140";
+        axis.MaxVelocity = 110;
+        Assert.False(editor.TryApplySettingsDraft());
+        Assert.Equal(110, axis.MaxVelocity);
+        editor.DiscardSettingsDraft();
+        editor.SettingsFields.Single(field => field.Id == "speed").Value = "150";
+        layout.IsEditable = false;
+        Assert.False(editor.TryApplySettingsDraft());
+        Assert.Equal(110, axis.MaxVelocity);
+    }
+
+    [Fact]
+    public void R24CameraGeometryAppliesAsOneDraftWithoutChangingTheInputSource()
+    {
+        var input = new OpenVisionLab.Machine.Core.Devices.NumericalCameraSettings();
+        var camera = new OpenVisionLab.Machine.Core.Devices.VirtualCameraDefinition { NumericalInput = input };
+        var device = new OpenVisionLab.Machine.Core.Devices.DeviceDefinition { Id = "camera", Name = "Camera", Kind = OpenVisionLab.Machine.Core.Devices.DeviceKind.Camera, Camera = camera };
+        var component = new LayoutComponentDefinition { Id = "camera-layout", Name = "Camera", Kind = LayoutComponentKind.Camera, BehaviorBindingId = device.Id, Size = new Size2D { Width = 35, Height = 35 } };
+        var definition = new MachineLayoutDefinition { Id = "main", Name = "Main", Components = { component } };
+        var project = new MachineProjectDocument { Layouts = { definition }, Devices = { device } };
+        project.Simulation.ActiveLayoutId = definition.Id;
+        using var layout = new MachineLayoutViewModel();
+        layout.Load(project);
+        layout.Select(component.Id);
+        var editor = Assert.IsType<LayoutComponentEditorViewModel>(layout.SelectedComponentEditor);
+        editor.SettingsFields.Single(field => field.Id == "fovW").Value = "160";
+        editor.SettingsFields.Single(field => field.Id == "fovH").Value = "80";
+        editor.SettingsFields.Single(field => field.Id == "resW").Value = "31";
+        editor.SettingsFields.Single(field => field.Id == "resH").Value = "17";
+        Assert.Null(camera.Geometry);
+        editor.SettingsFields.Single(field => field.Id == "resH").Value = "NaN";
+        Assert.False(editor.TryApplySettingsDraft());
+        Assert.Null(camera.Geometry);
+        editor.SettingsFields.Single(field => field.Id == "resH").Value = "17";
+        Assert.True(editor.TryApplySettingsDraft());
+        Assert.Same(input, camera.NumericalInput);
+        Assert.Equal(160, camera.Geometry!.FieldOfViewWidth);
+        Assert.Equal(17, camera.Geometry.ResolutionHeight);
+        var reopened = new ProjectDocumentStore().Load(new ProjectDocumentStore().SerializeForEvidence(project));
+        Assert.Equal(camera.Geometry, reopened.Devices.Single().Camera!.Geometry);
+        Assert.Null(reopened.Devices.Single().Camera!.SingleImageSource);
+    }
+
 }

@@ -19,10 +19,12 @@ internal sealed class MachineProjectRuntimeCameraCompiler
 
     internal IReadOnlyList<VirtualCameraConfiguration> Compile(
         IEnumerable<DeviceDefinition> devices,
-        ICollection<MachineProjectRuntimeCompilationError> errors)
+        ICollection<MachineProjectRuntimeCompilationError> errors,
+        IEnumerable<string>? axisIds = null)
     {
         var cameras = new List<VirtualCameraConfiguration>();
         var ids = new HashSet<string>(StringComparer.Ordinal);
+        var declaredAxes = axisIds?.ToHashSet(StringComparer.Ordinal);
 
         foreach (DeviceDefinition device in devices)
         {
@@ -90,12 +92,38 @@ internal sealed class MachineProjectRuntimeCameraCompiler
 
             try
             {
+                if (authored.NumericalInput is not null && authored.SingleImageSource is not null)
+                    throw new ArgumentException("수치 모의 입력과 파일 입력을 동시에 지정할 수 없습니다.");
+                if (authored.NumericalInput?.AxisId is { } axisId && (string.IsNullOrWhiteSpace(axisId) || declaredAxes is not null && !declaredAxes.Contains(axisId)))
+                    throw new ArgumentException("촬영 기준 축이 프로젝트에 선언되어 있지 않습니다.");
+                if (authored.Geometry is { } declaredGeometry)
+                {
+                    if (declaredGeometry.AxisId is { } mountedAxis && (string.IsNullOrWhiteSpace(mountedAxis) || declaredAxes is not null && !declaredAxes.Contains(mountedAxis)))
+                        throw new ArgumentException("Camera mount axis is not declared in this project.");
+                    var geometryError = ((authored.NumericalInput ?? new NumericalCameraSettings()) with
+                    {
+                        FieldOfView = declaredGeometry.FieldOfViewWidth,
+                        FieldOfViewHeight = declaredGeometry.FieldOfViewHeight,
+                        ResolutionWidth = declaredGeometry.ResolutionWidth,
+                        ResolutionHeight = declaredGeometry.ResolutionHeight,
+                        CameraOffsetX = declaredGeometry.OffsetX,
+                        CameraCenterY = declaredGeometry.CenterY
+                    }).Validate();
+                    if (geometryError is not null) throw new ArgumentException(geometryError);
+                }
+                int generationTicks = 0, responseTicks = 0;
+                if (authored.NumericalInput is { } settings && (!_delayConverter.TryConvertDelayToTicks(settings.GenerationDelayMilliseconds, true, out generationTicks)
+                    || !_delayConverter.TryConvertDelayToTicks(settings.ResponseDelayMilliseconds, true, out responseTicks)))
+                    throw new ArgumentException("생성·응답 지연은 고정 시간 간격의 배수여야 합니다.");
                 cameras.Add(new VirtualCameraConfiguration(
                     device.Id,
                     string.IsNullOrWhiteSpace(device.Name) ? device.Id : device.Name,
                     exposureTicks,
-                    transferTicks,
-                    authored.PlaceholderDecision));
+                    transferTicks + generationTicks + responseTicks,
+                    authored.PlaceholderDecision,
+                    authored.NumericalInput is { } numerical && authored.Geometry is { } geometry
+                        ? numerical with { FieldOfView = geometry.FieldOfViewWidth, FieldOfViewHeight = geometry.FieldOfViewHeight, ResolutionWidth = geometry.ResolutionWidth, ResolutionHeight = geometry.ResolutionHeight, AxisId = geometry.AxisId, CameraOffsetX = geometry.OffsetX, CameraCenterY = geometry.CenterY }
+                        : authored.NumericalInput));
             }
             catch (ArgumentException exception)
             {

@@ -133,12 +133,11 @@ internal sealed class MachineIntegrationParticipant : IDisposable
         Task<MachineIntegrationOperationObservation>? task;
         lock (_gate)
         {
-            if (_currentTask?.IsCompleted == true)
+            task = _currentTask;
+            if (task?.IsCompleted == true)
             {
                 _currentTask = null;
             }
-
-            task = _currentTask;
         }
 
         return task is null
@@ -172,13 +171,22 @@ internal sealed class MachineIntegrationParticipant : IDisposable
         }
     }
 
-    private static async Task<MachineIntegrationOperationObservation> ObserveTaskAsync(
+    private async Task<MachineIntegrationOperationObservation> ObserveTaskAsync(
         Task<MachineIntegrationOperationObservation> task,
         TimeSpan timeout)
     {
         try
         {
-            return await task.WaitAsync(timeout);
+            var result = await task.WaitAsync(timeout);
+            lock (_gate)
+            {
+                if (ReferenceEquals(_currentTask, task))
+                {
+                    _currentTask = null;
+                }
+            }
+
+            return result;
         }
         catch (OperationCanceledException exception)
         {

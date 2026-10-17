@@ -18,12 +18,35 @@ internal sealed class SimulationManualEquipmentCommandHandler
         {
             SetCylinderCommand setCylinder => ApplyManualCylinderCommand(command, setCylinder, context),
             SetConveyorCommand setConveyor => ApplyManualConveyorCommand(command, setConveyor, context),
+            SetManualOutputCommand output => ApplyManualOutputCommand(output, context),
+            SetManualSampleCommand sample => ApplyManualSampleCommand(sample, context),
             _ => SimulationManualControlCommandHandler.Reject(
                 command,
                 context,
                 SimulationCommandErrorCode.UnsupportedCommand,
                 $"Command '{command.GetType().Name}' is not supported by the manual equipment handler.")
         };
+    }
+
+    private static SimulationManualControlOutcome ApplyManualOutputCommand(SetManualOutputCommand command, SimulationManualControlContext context)
+    {
+        if (context.ControlOwner != SimulationControlOwner.Manual)
+            return SimulationManualControlCommandHandler.Reject(command, context, SimulationCommandErrorCode.ControlOwnerNotAllowed, "Manual output requires manual ownership.");
+        var write = context.SignalHub.SetDigitalOutput(command.ChannelId, command.Value, SignalWriteOwner.Manual);
+        return write.IsAccepted
+            ? SimulationManualControlCommandHandler.Accept(command, context, $"Output '{command.ChannelId}' = {command.Value}.")
+            : SimulationManualControlCommandHandler.Reject(command, context,
+                write.ErrorCode == SignalHubErrorCode.ChannelNotFound ? SimulationCommandErrorCode.SignalNotFound : SimulationCommandErrorCode.SignalWriteRejected,
+                $"Output '{command.ChannelId}' write rejected: {write.ErrorCode}.");
+    }
+
+    private static SimulationManualControlOutcome ApplyManualSampleCommand(SetManualSampleCommand command, SimulationManualControlContext context)
+    {
+        if (context.ControlOwner != SimulationControlOwner.Manual)
+            return SimulationManualControlCommandHandler.Reject(command, context, SimulationCommandErrorCode.ControlOwnerNotAllowed, "Manual sample requires manual ownership.");
+        if (context.MachineLayout?.TrySetManualSample(command.X, command.Y, command.Clear, "WP-" + command.CommandId[..8]) != true)
+            return SimulationManualControlCommandHandler.Reject(command, context, SimulationCommandErrorCode.RuntimeConfigurationInvalid, "The layout has no available manual sample, or a transfer owns it.");
+        return SimulationManualControlCommandHandler.Accept(command, context, command.Clear ? "Manual samples cleared." : "Manual sample placed.");
     }
 
     private static SimulationManualControlOutcome ApplyManualCylinderCommand(

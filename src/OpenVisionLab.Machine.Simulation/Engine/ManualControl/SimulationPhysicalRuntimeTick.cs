@@ -14,10 +14,12 @@ internal sealed class SimulationPhysicalRuntimeTick
     private static readonly IReadOnlySet<string> EmptyBlockedCylinderIds =
         new HashSet<string>(StringComparer.Ordinal);
     private readonly Action<string, string, string, long, TimeSpan> _emit;
+    private readonly Action<VirtualCameraSnapshot, long>? _recordCapture;
 
-    internal SimulationPhysicalRuntimeTick(Action<string, string, string, long, TimeSpan> emit)
+    internal SimulationPhysicalRuntimeTick(Action<string, string, string, long, TimeSpan> emit, Action<VirtualCameraSnapshot, long>? recordCapture = null)
     {
         _emit = emit ?? throw new ArgumentNullException(nameof(emit));
+        _recordCapture = recordCapture;
     }
 
     internal void Advance(SimulationPhysicalRuntimeTickContext context)
@@ -120,6 +122,7 @@ internal sealed class SimulationPhysicalRuntimeTick
             }
             else if (cameraTick.Transition == VirtualCameraTickTransition.FrameReady)
             {
+                _recordCapture?.Invoke(cameraTick.Snapshot, context.EventTick);
                 var acquisition = cameraTick.CompletedAcquisition!;
                 string workpieceContext = string.IsNullOrWhiteSpace(acquisition.WorkpieceComponentId)
                     ? string.Empty
@@ -150,6 +153,7 @@ internal sealed class SimulationPhysicalRuntimeTick
             }
             else if (cameraTick.Transition == VirtualCameraTickTransition.ExternalResultPending)
             {
+                _recordCapture?.Invoke(cameraTick.Snapshot, context.EventTick);
                 Emit(
                     "Camera",
                     "CameraExternalResultPending",

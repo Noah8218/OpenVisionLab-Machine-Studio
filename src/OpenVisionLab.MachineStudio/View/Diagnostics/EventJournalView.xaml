@@ -7,10 +7,126 @@
              xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
     <UserControl.Resources>
         <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Style x:Key="BottomTextStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="12" /><Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="LineHeight" Value="17.4" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Control}}" />
+        </Style>
+        <Style x:Key="BottomTabStyle" TargetType="ToggleButton">
+            <Setter Property="Tag" Value="Tab" />
+            <Setter Property="Height" Value="24" /><Setter Property="MinHeight" Value="24" /><Setter Property="MinWidth" Value="0" />
+            <Setter Property="Margin" Value="0,0,4,0" /><Setter Property="Padding" Value="9,1" /><Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource Surface.Raised}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" /><Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="12" /><Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" /><Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template"><Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="BottomButtonBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="BottomButtonBorder" Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                        <MultiTrigger><MultiTrigger.Conditions><Condition Property="IsChecked" Value="True" /><Condition Property="Tag" Value="Tab" /></MultiTrigger.Conditions><Setter TargetName="BottomButtonBorder" Property="Background" Value="{DynamicResource Accent.Soft}" /><Setter TargetName="BottomButtonBorder" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /><Setter Property="Foreground" Value="{DynamicResource Accent.Primary}" /></MultiTrigger>
+                        <Trigger Property="IsPressed" Value="True"><Setter TargetName="BottomButtonBorder" Property="Background" Value="{DynamicResource Surface.Pressed}" /></Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="BottomButtonBorder" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /></Trigger>
+                        <Trigger Property="IsEnabled" Value="False"><Setter TargetName="BottomButtonBorder" Property="Background" Value="{DynamicResource Surface.Disabled}" /><Setter TargetName="BottomButtonBorder" Property="BorderBrush" Value="{DynamicResource Border.Disabled}" /><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /><Setter Property="Cursor" Value="Arrow" /></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value></Setter>
+        </Style>
+        <Style x:Key="BottomDataTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BottomTextStyle}">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+        </Style>
+        <Style x:Key="BottomSmallTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BottomDataTextStyle}">
+            <Setter Property="FontSize" Value="11.5" /><Setter Property="LineHeight" Value="16.675" />
+        </Style>
+        <Style x:Key="BottomOptionalTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BottomSmallTextStyle}">
+            <Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed" /></Trigger><Trigger Property="Text" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></Trigger></Style.Triggers>
+        </Style>
+        <Style x:Key="BottomChipStyle" TargetType="Border">
+            <Setter Property="MinHeight" Value="22" /><Setter Property="CornerRadius" Value="12" /><Setter Property="Padding" Value="9,1" />
+            <Setter Property="Background" Value="{DynamicResource Surface.Tinted}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" /><Setter Property="BorderThickness" Value="1" />
+            <Setter Property="TextElement.Foreground" Value="{DynamicResource Text.Primary}" /><Setter Property="Margin" Value="0,0,6,0" /><Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="BottomStatusChipStyle" TargetType="Border" BasedOn="{StaticResource BottomChipStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding StatusTone}" Value="ok"><Setter Property="BorderBrush" Value="{DynamicResource State.RunningBorder}" /><Setter Property="TextElement.Foreground" Value="{DynamicResource State.Running}" /></DataTrigger>
+                <DataTrigger Binding="{Binding StatusTone}" Value="warn"><Setter Property="BorderBrush" Value="{DynamicResource State.WarningBorder}" /><Setter Property="TextElement.Foreground" Value="{DynamicResource State.Warning}" /></DataTrigger>
+                <DataTrigger Binding="{Binding StatusTone}" Value="bad"><Setter Property="BorderBrush" Value="{DynamicResource State.FaultBorder}" /><Setter Property="TextElement.Foreground" Value="{DynamicResource State.Fault}" /></DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="BottomChipTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BottomSmallTextStyle}">
+            <Setter Property="Foreground" Value="{Binding Path=(TextElement.Foreground), RelativeSource={RelativeSource AncestorType=Border}}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="BottomLifeStyle" TargetType="Border">
+            <Setter Property="CornerRadius" Value="9" /><Setter Property="Padding" Value="6,0" /><Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" /><Setter Property="TextElement.Foreground" Value="{DynamicResource Text.Secondary}" /><Setter Property="Margin" Value="0,0,4,0" />
+            <Style.Triggers><DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /><Setter Property="TextElement.Foreground" Value="{DynamicResource Accent.Primary}" /></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="BottomLifeTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BottomChipTextStyle}">
+            <Setter Property="FontSize" Value="10.5" /><Setter Property="LineHeight" Value="15.225" />
+        </Style>
+        <Style x:Key="BottomActionStyle" TargetType="Button">
+            <Setter Property="MinHeight" Value="28" /><Setter Property="MinWidth" Value="0" /><Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="13" /><Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+            <Setter Property="Background" Value="{DynamicResource Surface.Raised}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" /><Setter Property="BorderThickness" Value="1" /><Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+                <Border x:Name="ActionBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                    <TextBlock Text="{TemplateBinding Content}" FontFamily="{TemplateBinding FontFamily}" FontSize="{TemplateBinding FontSize}" FontWeight="{TemplateBinding FontWeight}" Foreground="{TemplateBinding Foreground}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource BottomDataTextStyle}"><Setter Property="LineHeight" Value="18.85" /><Style.Triggers><DataTrigger Binding="{Binding DataContext.Navigation.IsCompactLayout, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="LineHeight" Value="18.125" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                    </TextBlock>
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ActionBorder" Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="ActionBorder" Property="Background" Value="{DynamicResource Surface.Pressed}" /></Trigger>
+                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ActionBorder" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /></Trigger>
+                    <Trigger Property="IsEnabled" Value="False"><Setter TargetName="ActionBorder" Property="Background" Value="{DynamicResource Surface.Disabled}" /><Setter TargetName="ActionBorder" Property="BorderBrush" Value="{DynamicResource Border.Disabled}" /><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /><Setter Property="Cursor" Value="Arrow" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+            <Style.Triggers><DataTrigger Binding="{Binding DataContext.Navigation.IsCompactLayout, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="FontSize" Value="12.5" /></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="BottomHistoryToggleStyle" TargetType="ToggleButton">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="10.5" /><Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" /><Setter Property="Padding" Value="0" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
+                <StackPanel Orientation="Horizontal"><TextBlock x:Name="HistoryChevron" Style="{StaticResource BottomLifeTextStyle}" Text="▸" Margin="0,0,3,0" Foreground="{TemplateBinding Foreground}" /><TextBlock Style="{StaticResource BottomLifeTextStyle}" Text="{TemplateBinding Content}" FontFamily="{TemplateBinding FontFamily}" FontSize="{TemplateBinding FontSize}" Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" /></StackPanel>
+                <ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="HistoryChevron" Property="Text" Value="▾" /></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="Foreground" Value="{DynamicResource Accent.Primary}" /></Trigger></ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="BottomHistoryStyle" TargetType="Expander">
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Expander">
+                <Grid><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                    <ToggleButton Style="{StaticResource BottomHistoryToggleStyle}" IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" Content="{TemplateBinding Header}" />
+                    <ContentPresenter x:Name="HistoryContent" Grid.Row="1" ContentSource="Content" Visibility="Collapsed" />
+                </Grid><ControlTemplate.Triggers><Trigger Property="IsExpanded" Value="True"><Setter TargetName="HistoryContent" Property="Visibility" Value="Visible" /></Trigger></ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
     </UserControl.Resources>
-    <Border Background="{DynamicResource Surface.Panel}"
-            BorderBrush="{DynamicResource Border.Default}" BorderThickness="0,1,0,0">
+    <Border BorderThickness="0,1,0,0">
+        <Border.Style>
+            <Style TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource Surface.Panel}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+                <Style.Triggers>
+                    <MultiDataTrigger>
+                        <MultiDataTrigger.Conditions>
+                            <Condition Binding="{Binding IsInline, ElementName=JournalView}" Value="False" />
+                        </MultiDataTrigger.Conditions>
+                        <Setter Property="Background" Value="{DynamicResource Surface.Tinted}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+                    </MultiDataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
         <Grid>
+            <Grid x:Name="LegacyJournal">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding IsInline, ElementName=JournalView}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Collapsed" /></MultiDataTrigger></Style.Triggers>
+                    </Style>
+                </Grid.Style>
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
@@ -18,14 +134,15 @@
             <ToggleButton x:Name="EvidenceDrawerToggle"
                           Grid.Row="1"
                           IsChecked="{Binding Navigation.IsEvidenceExpanded, Mode=TwoWay}"
-                          Height="34"
                           Padding="10,0"
                           HorizontalContentAlignment="Stretch"
                           AutomationProperties.Name="{loc:Loc Key=Diagnostics.Toggle}"
                           ToolTip="{loc:Loc Key=Diagnostics.Hint}">
                 <ToggleButton.Style>
                     <Style TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
+                        <Setter Property="Height" Value="34" />
                         <Style.Triggers>
+                            <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True"><Setter Property="Height" Value="25" /></DataTrigger>
                             <DataTrigger Binding="{Binding IsInline, ElementName=JournalView}" Value="True">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
@@ -200,6 +317,16 @@
                         <StackPanel Margin="6">
                             <TextBlock Margin="0,0,0,5" Foreground="{DynamicResource Text.Secondary}"
                                        Text="{loc:Loc Key=Diagnostics.CurrentState}" TextWrapping="Wrap" />
+                            <Border Margin="0,4,0,8" Padding="10" Background="{DynamicResource Surface.Raised}" BorderBrush="{DynamicResource Border.Default}" BorderThickness="1" CornerRadius="4">
+                                <Border.Style><Style TargetType="Border"><Style.Triggers><DataTrigger Binding="{Binding RuntimeDebugger.LastSequenceError}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></Border.Style>
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold" Text="{loc:Loc Key=History.LastSequenceError}" TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,4,0,8" Text="{Binding RuntimeDebugger.LastSequenceError.DisplayText}" TextWrapping="Wrap" />
+                                    <Button x:Name="NavigateAlarmRuntimeErrorButton" HorizontalAlignment="Left" Command="{Binding NavigateRuntimeErrorCommand}"
+                                            CommandParameter="{Binding RuntimeDebugger.LastSequenceError}" Content="{loc:Loc Key=Workspace.NavigateRuntimeError}"
+                                            AutomationProperties.Name="{loc:Loc Key=Workspace.NavigateRuntimeError}" Style="{StaticResource GlobalCommandButtonStyle}" />
+                                </StackPanel>
+                            </Border>
                             <Expander x:Name="DebuggerAlarmsExpander"
                                       Margin="0,7,0,0"
                                       Header="{loc:Loc Key=Debugger.AlarmsRecovery}"
@@ -221,7 +348,7 @@
                                                 <StackPanel Margin="3,3">
                                                     <TextBlock FontWeight="SemiBold"
                                                                Text="{Binding Source}"
-                                                               TextTrimming="CharacterEllipsis"
+                                                               TextWrapping="Wrap"
                                                                ToolTip="{Binding Source}" />
                                                     <TextBlock Text="{Binding State}"
                                                                TextWrapping="Wrap" />
@@ -305,7 +432,7 @@
                                                          <StackPanel Margin="3,3">
                                                              <TextBlock FontWeight="SemiBold"
                                                                         Text="{Binding Source}"
-                                                                        TextTrimming="CharacterEllipsis"
+                                                                        TextWrapping="Wrap"
                                                                         ToolTip="{Binding Source}" />
                                                              <TextBlock Text="{Binding State}"
                                                                         TextWrapping="Wrap" />
@@ -424,6 +551,153 @@
                 </Grid>
                 </TabItem>
             </TabControl>
+            </Grid>
+            <Grid x:Name="EquipmentBottomPanel">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding IsInline, ElementName=JournalView}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.RowDefinitions><RowDefinition Height="30" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                <Grid x:Name="EquipmentBottomHeader" Margin="8,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <StackPanel x:Name="EquipmentBottomTabs" Orientation="Horizontal" VerticalAlignment="Center">
+                        <ToggleButton x:Name="BottomEventsTab" Style="{StaticResource BottomTabStyle}" IsChecked="{Binding Navigation.IsEquipmentEventsSelected, Mode=OneWay}" Command="{Binding Navigation.SelectEquipmentEvidenceTabCommand}" CommandParameter="0" AutomationProperties.Name="{loc:Loc Key=R24.Bottom.Events}"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource BottomTextStyle}" Text="{loc:Loc Key=R24.Bottom.Events}" VerticalAlignment="Center" /><Border Background="{DynamicResource Surface.Raised}" Margin="4,0,0,0" Padding="6,0" CornerRadius="8" VerticalAlignment="Center"><Border.Style><Style TargetType="Border"><Style.Triggers><DataTrigger Binding="{Binding RuntimeDebugger.Timeline.Count}" Value="0"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></Border.Style><TextBlock Style="{StaticResource BottomTextStyle}" FontSize="10.5" LineHeight="15.225" Foreground="{DynamicResource Text.Primary}" Text="{Binding RuntimeDebugger.Timeline.Count}" /></Border></StackPanel></ToggleButton>
+                        <ToggleButton x:Name="BottomRequestsTab" Style="{StaticResource BottomTabStyle}" IsChecked="{Binding Navigation.IsEquipmentRequestsSelected, Mode=OneWay}" Command="{Binding Navigation.SelectEquipmentEvidenceTabCommand}" CommandParameter="1" AutomationProperties.Name="{loc:Loc Key=R24.Bottom.Requests}"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource BottomTextStyle}" Text="{loc:Loc Key=R24.Bottom.Requests}" VerticalAlignment="Center" /><Border Background="{DynamicResource State.WarningBorder}" Margin="4,0,0,0" Padding="6,0" CornerRadius="8" VerticalAlignment="Center"><Border.Style><Style TargetType="Border"><Style.Triggers><DataTrigger Binding="{Binding Integration.PendingInspectionRequestCount}" Value="0"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></Border.Style><TextBlock Style="{StaticResource BottomTextStyle}" FontSize="10.5" LineHeight="15.225" Foreground="{DynamicResource State.Warning}" Text="{Binding Integration.PendingInspectionRequestCount}" /></Border></StackPanel></ToggleButton>
+                        <ToggleButton x:Name="BottomGenerationTab" Style="{StaticResource BottomTabStyle}" IsChecked="{Binding Navigation.IsEquipmentGenerationSelected, Mode=OneWay}" Command="{Binding Navigation.SelectEquipmentEvidenceTabCommand}" CommandParameter="2" AutomationProperties.Name="{loc:Loc Key=R24.Bottom.Generation}"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource BottomTextStyle}" Text="{loc:Loc Key=R24.Bottom.Generation}" VerticalAlignment="Center" /></StackPanel></ToggleButton>
+                        <ToggleButton x:Name="BottomAlarmsTab" Style="{StaticResource BottomTabStyle}" IsChecked="{Binding Navigation.IsEquipmentAlarmsSelected, Mode=OneWay}" Command="{Binding Navigation.SelectEquipmentEvidenceTabCommand}" CommandParameter="3" AutomationProperties.Name="{loc:Loc Key=R24.Bottom.Alarms}"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource BottomTextStyle}" Text="{loc:Loc Key=R24.Bottom.Alarms}" VerticalAlignment="Center" /><Border Background="{DynamicResource State.FaultBorder}" Margin="4,0,0,0" Padding="6,0" CornerRadius="8" VerticalAlignment="Center"><Border.Style><Style TargetType="Border"><Style.Triggers><DataTrigger Binding="{Binding BottomAlarmCount}" Value="0"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></Border.Style><TextBlock x:Name="BottomAlarmCountText" Style="{StaticResource BottomTextStyle}" FontSize="10.5" LineHeight="15.225" Foreground="{DynamicResource State.Fault}" Text="{Binding BottomAlarmCount}" /></Border></StackPanel></ToggleButton>
+                    </StackPanel>
+                    <TextBlock x:Name="BottomRunStatusText" Grid.Column="2" FontSize="11.5" LineHeight="16.675" Foreground="{DynamicResource Text.Secondary}" Margin="4,0,6,0" VerticalAlignment="Center" MaxWidth="300" TextTrimming="CharacterEllipsis">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource BottomTextStyle}">
+                                <Setter Property="Text" Value="{Binding RunHistory.LatestRunStatusText}" />
+                                <Setter Property="ToolTip" Value="{Binding RunHistory.LatestRunStatusText}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsRunning}" Value="True"><Setter Property="Text" Value="{Binding CurrentRunStatusText}" /><Setter Property="ToolTip" Value="{Binding CurrentRunStatusText}" /></DataTrigger>
+                                    <DataTrigger Binding="{Binding RuntimeDebugger.IsPausedForContinuation}" Value="True"><Setter Property="Text" Value="{Binding CurrentRunStatusText}" /><Setter Property="ToolTip" Value="{Binding CurrentRunStatusText}" /></DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <ToggleButton x:Name="BottomOpenCloseButton" Grid.Column="3" Tag="Drawer" Style="{StaticResource BottomTabStyle}" Margin="0" IsChecked="{Binding Navigation.IsEvidenceExpanded, Mode=TwoWay}" AutomationProperties.Name="{loc:Loc Key=Diagnostics.Toggle}">
+                        <TextBlock>
+                            <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource BottomTextStyle}"><Setter Property="Text" Value="{loc:Loc Key=R24.Bottom.Open}" /><Style.Triggers><DataTrigger Binding="{Binding Navigation.IsEvidenceExpanded}" Value="True"><Setter Property="Text" Value="{loc:Loc Key=R24.Bottom.Close}" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                        </TextBlock>
+                    </ToggleButton>
+                </Grid>
+                <Border x:Name="EquipmentBottomBody" Grid.Row="1" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0" Padding="8,4" Visibility="{Binding Navigation.IsEvidenceExpanded, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <Grid>
+                            <Grid Visibility="{Binding Navigation.IsEquipmentEventsSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <ItemsControl x:Name="BottomEventsList" ItemsSource="{Binding RuntimeDebugger.Timeline}">
+                                    <ItemsControl.ItemTemplate><DataTemplate>
+                                        <Border BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1" Padding="0,2">
+                                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="70" /><ColumnDefinition Width="8" /><ColumnDefinition Width="130" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                <TextBlock Style="{StaticResource BottomTextStyle}" Text="{Binding SecondsText}" FontFamily="Consolas" Foreground="{DynamicResource Text.Secondary}" />
+                                                <TextBlock Grid.Column="2" Style="{StaticResource BottomTextStyle}" Text="{Binding SourceText}" Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" />
+                                                <TextBlock Grid.Column="4" Text="{Binding Message}" TextWrapping="Wrap">
+                                                    <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource BottomDataTextStyle}"><Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Severity}" Value="Alarm"><Setter Property="Foreground" Value="{DynamicResource State.Fault}" /></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Severity}" Value="Warning"><Setter Property="Foreground" Value="{DynamicResource State.Warning}" /></DataTrigger>
+                                                    </Style.Triggers></Style></TextBlock.Style>
+                                                </TextBlock>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate></ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="BottomEventsEmpty" Foreground="{DynamicResource Text.Secondary}" FontSize="11.5" LineHeight="16.675" Text="{loc:Loc Key=R24.Bottom.EventsEmpty}" TextWrapping="Wrap">
+                                    <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource BottomTextStyle}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding RuntimeDebugger.Timeline.Count}" Value="0"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                            <Grid Visibility="{Binding Navigation.IsEquipmentRequestsSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <ItemsControl x:Name="BottomRequestsList" ItemsSource="{Binding Integration.TransactionHistoryRows}">
+                                    <ItemsControl.ItemTemplate><DataTemplate>
+                                        <Border BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="1" Background="{DynamicResource Surface.Panel}" CornerRadius="6" Padding="9,7" Margin="0,5">
+                                            <StackPanel>
+                                                <DockPanel LastChildFill="True" Margin="0,0,0,4">
+                                                    <Button DockPanel.Dock="Right" Style="{StaticResource BottomActionStyle}" Content="{Binding CancelCaption}" Command="{Binding DataContext.Integration.CancelLatestTransactionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Handoff.TransactionId}" AutomationProperties.Name="{Binding CancelCaption}">
+                                                        <Button.Visibility><Binding Path="IsPending" Converter="{StaticResource BooleanToVisibilityConverter}" /></Button.Visibility>
+                                                    </Button>
+                                                    <WrapPanel VerticalAlignment="Center">
+                                                        <TextBlock Style="{StaticResource BottomSmallTextStyle}" FontFamily="Consolas" FontWeight="Bold" Text="{Binding ShortTransactionId}" ToolTip="{Binding FullTransactionId}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                        <Border Style="{StaticResource BottomStatusChipStyle}"><TextBlock Style="{StaticResource BottomChipTextStyle}" Text="{Binding BottomStatusText}" /></Border>
+                                                        <Border Style="{StaticResource BottomChipStyle}"><TextBlock Style="{StaticResource BottomChipTextStyle}" Text="{Binding ConsumerText}" /></Border>
+                                                        <Border x:Name="BottomRequestPurposeChip" Style="{StaticResource BottomChipStyle}" Visibility="{Binding HasKnownPurpose, Converter={StaticResource BooleanToVisibilityConverter}}"><TextBlock x:Name="BottomRequestPurposeText" Style="{StaticResource BottomChipTextStyle}" Text="{Binding PurposeText}" /></Border>
+                                                        <Border x:Name="BottomRequestApplicationChip" Visibility="{Binding HasApplicationStatus, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                            <Border.Style><Style TargetType="Border" BasedOn="{StaticResource BottomChipStyle}"><Style.Triggers><DataTrigger Binding="{Binding IsResultApplied}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.RunningBorder}" /><Setter Property="TextElement.Foreground" Value="{DynamicResource State.Running}" /></DataTrigger></Style.Triggers></Style></Border.Style>
+                                                            <TextBlock x:Name="BottomRequestApplicationText" Style="{StaticResource BottomChipTextStyle}" Text="{Binding ApplicationText}" />
+                                                        </Border>
+                                                        <Border x:Name="BottomRequestLateChip" Style="{StaticResource BottomChipStyle}" BorderBrush="{DynamicResource State.FaultBorder}" TextElement.Foreground="{DynamicResource State.Fault}" Visibility="{Binding IsLateResult, Converter={StaticResource BooleanToVisibilityConverter}}"><TextBlock x:Name="BottomRequestLateText" Style="{StaticResource BottomChipTextStyle}" Text="{Binding LateResultText}" /></Border>
+                                                    </WrapPanel>
+                                                </DockPanel>
+                                                <WrapPanel Margin="0,0,0,4">
+                                                    <Border Style="{StaticResource BottomLifeStyle}" Tag="{Binding ShowTransferStage}"><TextBlock Style="{StaticResource BottomLifeTextStyle}" Text="{Binding SentCaption}" /></Border>
+                                                    <Border Style="{StaticResource BottomLifeStyle}" Tag="{Binding ShowAcknowledgementStage}"><TextBlock Style="{StaticResource BottomLifeTextStyle}" Text="{Binding AcknowledgementCaption}" /></Border>
+                                                    <Border Style="{StaticResource BottomLifeStyle}" Tag="{Binding ShowResultStage}"><TextBlock Style="{StaticResource BottomLifeTextStyle}" Text="{Binding ResultCaption}" /></Border>
+                                                    <Border BorderBrush="{DynamicResource State.FaultBorder}" BorderThickness="1" CornerRadius="9" Padding="6,0" Visibility="{Binding HasTerminalError, Converter={StaticResource BooleanToVisibilityConverter}}"><TextBlock Style="{StaticResource BottomLifeTextStyle}" Foreground="{DynamicResource State.Fault}" Text="{Binding BottomStatusText}" /></Border>
+                                                </WrapPanel>
+                                                <TextBlock x:Name="BottomRequestExecutionStatusHint" Style="{StaticResource BottomSmallTextStyle}" Foreground="{DynamicResource Text.Secondary}" Text="{Binding ExecutionStatusHint}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                                                <TextBlock x:Name="BottomRequestContextText" Style="{StaticResource BottomSmallTextStyle}" Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" Margin="0,0,0,4">
+                                                    <Run Text="{Binding SourceIdentityText, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding ImageCaption, Mode=OneWay}" /><Run Text=" " />
+                                                    <Run x:Name="BottomRequestInspectionSource" FontFamily="Consolas" Text="{Binding InspectionSourcePath, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding InspectionRecipePath, Mode=OneWay}" />
+                                                </TextBlock>
+                                                <TextBlock Style="{StaticResource BottomOptionalTextStyle}" Foreground="{DynamicResource State.Fault}" Text="{Binding ErrorText}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                                                <TextBlock Style="{StaticResource BottomOptionalTextStyle}" Text="{Binding MetricsText}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                                                <Expander Style="{StaticResource BottomHistoryStyle}" Header="{Binding HistoryCaption}"><TextBlock x:Name="BottomRequestHistoryText" Style="{StaticResource BottomLifeTextStyle}" Foreground="{DynamicResource Text.Secondary}" Text="{Binding HistoryDetailText}" TextWrapping="Wrap" /></Expander>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate></ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="BottomRequestsEmpty" Foreground="{DynamicResource Text.Secondary}" FontSize="11.5" LineHeight="16.675" Text="{loc:Loc Key=R24.Bottom.RequestsEmpty}" TextWrapping="Wrap">
+                                    <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource BottomTextStyle}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding Integration.TransactionHistoryRows.Count}" Value="0"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                            <TextBlock x:Name="BottomGenerationEmpty" Style="{StaticResource BottomTextStyle}" Foreground="{DynamicResource Text.Secondary}" FontSize="11.5" LineHeight="16.675" Text="{loc:Loc Key=R24.Bottom.GenerationEmpty}" TextWrapping="Wrap" Visibility="{Binding Navigation.IsEquipmentGenerationSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <Grid Visibility="{Binding Navigation.IsEquipmentAlarmsSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <Border x:Name="BottomReadinessRow" Padding="0,3" Visibility="{Binding HasBottomReadinessAlert, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <Grid DataContext="{Binding RecipeConnections.DryRun}">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                            <Border x:Name="BottomReadinessChip">
+                                                <Border.Style><Style TargetType="Border" BasedOn="{StaticResource BottomChipStyle}">
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource State.FaultBorder}" /><Setter Property="TextElement.Foreground" Value="{DynamicResource State.Fault}" />
+                                                    <Style.Triggers><DataTrigger Binding="{Binding IsReadinessStale}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.WarningBorder}" /><Setter Property="TextElement.Foreground" Value="{DynamicResource State.Warning}" /></DataTrigger></Style.Triggers>
+                                                </Style></Border.Style>
+                                                <TextBlock x:Name="BottomReadinessCaption">
+                                                    <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource BottomChipTextStyle}">
+                                                        <Setter Property="Text" Value="{loc:Loc Key=R24.Bottom.Alarms}" />
+                                                        <Style.Triggers><DataTrigger Binding="{Binding IsReadinessStale}" Value="True"><Setter Property="Text" Value="{loc:Loc Key=Equipment.State.Warning}" /></DataTrigger></Style.Triggers>
+                                                    </Style></TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+                                            <TextBlock x:Name="BottomReadinessDetail" Grid.Column="1" Style="{StaticResource BottomSmallTextStyle}" Text="{Binding ReadinessDetailText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+                                    <ItemsControl x:Name="BottomAlarmsList" ItemsSource="{Binding RuntimeDebugger.Alarms}">
+                                        <ItemsControl.ItemTemplate><DataTemplate>
+                                            <Border Padding="0,3">
+                                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                    <Border Style="{StaticResource BottomChipStyle}" BorderBrush="{DynamicResource State.FaultBorder}" TextElement.Foreground="{DynamicResource State.Fault}"><TextBlock Style="{StaticResource BottomChipTextStyle}" Text="{loc:Loc Key=R24.Bottom.Alarms}" /></Border>
+                                                    <TextBlock Grid.Column="1" Style="{StaticResource BottomSmallTextStyle}" TextWrapping="Wrap" VerticalAlignment="Center" ToolTip="{Binding RecoveryText}" Margin="0,0,6,0">
+                                                        <TextBlock.Text><MultiBinding StringFormat="{}{0} · {1}"><Binding Path="Source" /><Binding Path="State" /></MultiBinding></TextBlock.Text>
+                                                    </TextBlock>
+                                                    <Button Grid.Column="2" Content="{Binding FixLocationCaption}" Command="{Binding DataContext.NavigateRuntimeErrorCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding ErrorLocation}">
+                                                        <Button.Style><Style TargetType="Button" BasedOn="{StaticResource BottomActionStyle}"><Style.Triggers><DataTrigger Binding="{Binding ErrorLocation}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></Button.Style>
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate></ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                                <TextBlock x:Name="BottomAlarmsEmpty" Foreground="{DynamicResource Text.Secondary}" FontSize="11.5" LineHeight="16.675" Text="{loc:Loc Key=R24.Bottom.AlarmsEmpty}" TextWrapping="Wrap">
+                                    <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource BottomTextStyle}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding BottomAlarmCount}" Value="0"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                        </Grid>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
         </Grid>
     </Border>
 </UserControl>

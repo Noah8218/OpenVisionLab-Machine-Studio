@@ -1,19 +1,203 @@
 <UserControl x:Class="OpenVisionLab.MachineStudio.View.Simulation.SimulationTestWorkspaceView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
-             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
+             FontFamily="Segoe UI, Malgun Gothic" Foreground="{DynamicResource Text.Primary}" UseLayoutRounding="False"
+             AutomationProperties.Name="{loc:Loc Key=Simulation.TestScenario}"
+             Focusable="True" FocusManager.IsFocusScope="True"
+             KeyboardNavigation.TabNavigation="Cycle"
+             Visibility="{Binding Navigation.IsTestScenarioOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
     <UserControl.Resources>
+        <sys:Double x:Key="CheckBoxWidth">13</sys:Double>
+        <sys:Double x:Key="CheckBoxHeight">13</sys:Double>
+        <sys:Double x:Key="CheckBoxIconSize">10</sys:Double>
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="{StaticResource Color.Accent.Primary}" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="{StaticResource Color.Accent.Hover}" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="{StaticResource Color.Accent.Primary}" />
+        <SolidColorBrush x:Key="CheckBoxCheckBorderBrush" Color="{StaticResource Color.Accent.Primary}" />
+        <SolidColorBrush x:Key="CheckBoxCheckGlyphForeground" Color="{StaticResource Color.Text.OnAccent}" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPointerOver" Color="{StaticResource Color.Surface.Hover}" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPressed" Color="{StaticResource Color.Surface.Pressed}" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedDisabled" Color="{StaticResource Color.Surface.Disabled}" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedDisabled" Color="{StaticResource Color.Border.Disabled}" />
+        <SolidColorBrush x:Key="CheckBoxForegroundUncheckedDisabled" Color="{StaticResource Color.Text.Disabled}" />
+        <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="11.5" /><Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" /><Setter Property="Background" Value="{DynamicResource Surface.Input}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+            <Setter Property="MinHeight" Value="19" /><Setter Property="Padding" Value="0" /><Setter Property="Margin" Value="4,0,0,0" /><Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="ContentTemplate"><Setter.Value><DataTemplate>
+                <TextBlock Text="{Binding}" Margin="1,0,0,0" FontSize="11.5" FontWeight="Normal" LineHeight="16.675" TextWrapping="Wrap"
+                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=CheckBox}}" />
+            </DataTemplate></Setter.Value></Setter>
+            <Style.Triggers>
+                <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /></Trigger>
+                <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /></Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ScenarioDialogTextStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="Normal" /><Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+            <Setter Property="LineHeight" Value="18.85" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsCompactLayout, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                    <Setter Property="FontSize" Value="12.5" />
+                    <Setter Property="LineHeight" Value="18.125" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ScenarioDialogInputStyle" TargetType="TextBox">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="12" /><Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Setter Property="Background" Value="{DynamicResource Surface.Input}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" /><Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CaretBrush" Value="{DynamicResource Text.Secondary}" /><Setter Property="Padding" Value="5,4" /><Setter Property="Height" Value="28" /><Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
+                <Grid>
+                    <Border x:Name="InputBorder" CornerRadius="4" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                        <ScrollViewer x:Name="PART_ContentHost" Focusable="False" Padding="0" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
+                    </Border>
+                    <Border x:Name="InputFocusCue" Margin="-3" CornerRadius="5" BorderBrush="{DynamicResource Accent.Primary}" BorderThickness="2" IsHitTestVisible="False" Visibility="Collapsed" />
+                </Grid>
+                <ControlTemplate.Triggers><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="InputFocusCue" Property="Visibility" Value="Visible" /></Trigger></ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.6" /></Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ScenarioDialogButtonStyle" TargetType="Button">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="13" /><Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" /><Setter Property="Background" Value="{DynamicResource Surface.Raised}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" /><Setter Property="BorderThickness" Value="1" />
+            <Setter Property="MinHeight" Value="28" /><Setter Property="Padding" Value="10,4" /><Setter Property="Cursor" Value="Hand" /><Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ContentTemplate"><Setter.Value><DataTemplate>
+                <TextBlock Text="{Binding}" Style="{StaticResource ScenarioDialogTextStyle}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=Button}}" />
+            </DataTemplate></Setter.Value></Setter>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+                <Grid>
+                    <Border CornerRadius="5" Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
+                    <Border x:Name="ButtonFocusCue" Margin="-4" CornerRadius="6" BorderThickness="2" BorderBrush="{DynamicResource Accent.Primary}" IsHitTestVisible="False" Visibility="Collapsed" />
+                </Grid>
+                <ControlTemplate.Triggers><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ButtonFocusCue" Property="Visibility" Value="Visible" /></Trigger></ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Navigation.IsCompactLayout, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                    <Setter Property="FontSize" Value="12.5" />
+                </DataTrigger>
+                <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                <Trigger Property="IsPressed" Value="True"><Setter Property="Background" Value="{DynamicResource Surface.Pressed}" /></Trigger>
+                <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /><Setter Property="Background" Value="{DynamicResource Surface.Disabled}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Disabled}" /><Setter Property="Cursor" Value="No" /></Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ScenarioDialogCreateButtonStyle" TargetType="Button" BasedOn="{StaticResource ScenarioDialogButtonStyle}">
+            <Setter Property="Background" Value="{DynamicResource Accent.Primary}" /><Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /><Setter Property="Foreground" Value="{DynamicResource Text.OnAccent}" /><Setter Property="FontWeight" Value="SemiBold" />
+            <Style.Triggers><Trigger Property="IsPressed" Value="True"><Setter Property="Background" Value="{DynamicResource Accent.Pressed}" /></Trigger>
+                <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource Accent.Hover}" /></Trigger>
+                <Trigger Property="IsEnabled" Value="False"><Setter Property="Background" Value="{DynamicResource Accent.Soft}" /><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /><Setter Property="BorderBrush" Value="{DynamicResource State.RunningBorder}" /></Trigger>
+            </Style.Triggers>
+        </Style>
+        <SolidColorBrush x:Key="Scenario.InputSurface" Color="{StaticResource Color.Surface.Input}" />
+        <SolidColorBrush x:Key="Scenario.InputBorder" Color="{StaticResource Color.Border.Default}" />
+        <SolidColorBrush x:Key="Scenario.DialogSurface" Color="{StaticResource Color.Surface.Panel}" />
+        <Style x:Key="ScenarioDialogSelectorStyle" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Setter Property="Background" Value="{DynamicResource Scenario.InputSurface}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Scenario.InputBorder}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="InputBorder" Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="4">
+                                <Grid>
+                                    <ToggleButton Style="{x:Null}" OverridesDefaultStyle="True"
+                                                  Focusable="False" IsTabStop="False" ClickMode="Press"
+                                                  IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                        <ToggleButton.Template>
+                                            <ControlTemplate TargetType="ToggleButton">
+                                                <Border Background="Transparent" />
+                                            </ControlTemplate>
+                                        </ToggleButton.Template>
+                                    </ToggleButton>
+                                    <ContentPresenter Margin="7,4,28,4" IsHitTestVisible="False"
+                                                      VerticalAlignment="Center"
+                                                      Content="{TemplateBinding SelectionBoxItem}"
+                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" />
+                                    <TextBlock Margin="0,0,8,0" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               IsHitTestVisible="False" Text="⌄" Foreground="{TemplateBinding Foreground}" />
+                                </Grid>
+                            </Border>
+                            <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}" Focusable="False">
+                                <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        Background="{DynamicResource Scenario.DialogSurface}"
+                                        BorderBrush="{DynamicResource Scenario.InputBorder}" BorderThickness="1" CornerRadius="4">
+                                    <ScrollViewer MaxHeight="{TemplateBinding MaxDropDownHeight}" CanContentScroll="True"
+                                                  HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="InputBorder" Property="BorderBrush" Value="{DynamicResource Accent.Hover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="InputBorder" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="TextBlock" BasedOn="{StaticResource ScenarioDialogTextStyle}" />
+        <Style TargetType="TextBox" BasedOn="{StaticResource ScenarioDialogInputStyle}" />
+        <Style TargetType="ComboBox" BasedOn="{StaticResource ScenarioDialogSelectorStyle}">
+            <Setter Property="MinHeight" Value="28" /><Setter Property="Height" Value="Auto" />
+        </Style>
+        <Style x:Key="SectionCaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource ScenarioDialogTextStyle}">
+            <Setter Property="FontSize" Value="12.5" /><Setter Property="LineHeight" Value="18.125" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+        </Style>
+        <Style x:Key="InspectorCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Surface.Panel}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+            <Setter Property="BorderThickness" Value="1" /><Setter Property="CornerRadius" Value="6" /><Setter Property="Padding" Value="10" />
+        </Style>
         <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <DataTemplate x:Key="ScenarioChoiceTemplate">
+            <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" FontSize="12" LineHeight="17.4" />
+        </DataTemplate>
     </UserControl.Resources>
-    <DockPanel>
-        <TextBlock DockPanel.Dock="Top" Margin="12,10,12,0"
+    <Grid Background="Transparent">
+        <Border Background="{DynamicResource Surface.ModalScrim}" Opacity="0.69" />
+        <Border x:Name="TestScenarioDialogPanel" MaxWidth="1100" Margin="20,30"
+                HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                Background="{DynamicResource Surface.Panel}" BorderBrush="{DynamicResource Border.Default}" BorderThickness="1" CornerRadius="9">
+            <Grid>
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <Border x:Name="TestScenarioDialogHeader" Padding="18,13" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1">
+                    <TextBlock Text="{loc:Loc Key=Simulation.TestScenario}" FontSize="16" LineHeight="23.2" FontWeight="Bold" />
+                </Border>
+    <ScrollViewer x:Name="TestWorkspaceScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled" CanContentScroll="False">
+        <StackPanel>
+            <StackPanel.Style>
+                <Style TargetType="StackPanel">
+                    <Setter Property="Margin" Value="18,14" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ComputedVerticalScrollBarVisibility, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" Value="Visible">
+                            <Setter Property="Margin" Value="18,14,33,14" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </StackPanel.Style>
+        <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,0,0,12"
                    Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap"
                    Text="{loc:Loc Key=Simulation.TestWorkspaceRunHint}"
                    Visibility="{Binding IsRunMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}" />
-    <ScrollViewer x:Name="TestWorkspaceScrollViewer" VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled" CanContentScroll="False">
-        <Grid Margin="12">
+        <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="12" />
@@ -26,6 +210,7 @@
             <Border VerticalAlignment="Top">
                 <Border.Style>
                     <Style TargetType="Border" BasedOn="{StaticResource InspectorCardStyle}">
+                        <Setter Property="Padding" Value="0" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Background" Value="Transparent" />
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding Navigation.IsCompactLayout}" Value="True">
                                 <Setter Property="Grid.ColumnSpan" Value="3" />
@@ -34,30 +219,27 @@
                     </Style>
                 </Border.Style>
                 <StackPanel>
+                    <Border Style="{StaticResource InspectorCardStyle}"><StackPanel>
                     <TextBlock Style="{StaticResource SectionCaptionStyle}"
-                               Text="{loc:Loc Key=Simulation.TestScenario}" />
-                    <TextBlock Margin="0,2,0,8"
+                               Text="{loc:Loc Key=Simulation.ScenarioConditions}" />
+                    <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,2,0,8"
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="{loc:Loc Key=Simulation.TestScenarioHint}"
                                TextWrapping="Wrap" />
-                    <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                    <TextBlock FontSize="12" LineHeight="17.4" Foreground="{DynamicResource Text.Secondary}"
                                Text="{loc:Loc Key=Simulation.ScenarioProfile}" />
                     <ComboBox x:Name="ScenarioProfileComboBox" Margin="0,4,0,0"
                               IsEnabled="{Binding IsScenarioConfigurationEnabled}"
                               ItemsSource="{Binding SimulationWorkspace.ScenarioProfiles}"
+                              ItemTemplate="{StaticResource ScenarioChoiceTemplate}"
                               SelectedItem="{Binding SimulationWorkspace.SelectedScenarioProfile, Mode=TwoWay}">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding Name}" />
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
                     </ComboBox>
-                    <TextBlock Margin="0,8,0,3"
+                    <TextBlock FontSize="12" LineHeight="17.4" Margin="0,8,0,3"
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="{loc:Loc Key=Simulation.RuntimeTarget}" />
                     <ComboBox x:Name="ScenarioTargetComboBox" ItemsSource="{Binding ConditionScenarioTargets}"
                               IsEnabled="{Binding IsScenarioConfigurationEnabled}"
-                              DisplayMemberPath="Name"
+                              ItemTemplate="{StaticResource ScenarioChoiceTemplate}"
                               SelectedValuePath="Id"
                               SelectedValue="{Binding SimulationWorkspace.ScenarioTargetId, Mode=TwoWay}" />
                     <Grid Margin="0,8,0,0">
@@ -67,14 +249,14 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                            <TextBlock FontSize="12" LineHeight="17.4" Foreground="{DynamicResource Text.Secondary}"
                                        Text="{loc:Loc Key=Simulation.Seed}" />
                             <TextBox x:Name="ScenarioSeedTextBox" Margin="0,3,0,0"
                                      IsEnabled="{Binding IsScenarioConfigurationEnabled}"
                                      Text="{Binding SimulationWorkspace.ScenarioSeed, UpdateSourceTrigger=PropertyChanged}" />
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                            <TextBlock FontSize="12" LineHeight="17.4" Foreground="{DynamicResource Text.Secondary}"
                                        Text="{loc:Loc Key=Simulation.DurationTicks}" />
                             <TextBox Margin="0,3,0,0"
                                      IsEnabled="{Binding IsScenarioConfigurationEnabled}"
@@ -84,36 +266,37 @@
                     <WrapPanel Margin="0,10,0,0">
                         <Button Margin="0,0,6,4"
                                 Content="{loc:Loc Key=Simulation.StartScenario}"
-                                Style="{StaticResource PrimaryCommandButtonStyle}"
+                                Style="{StaticResource ScenarioDialogCreateButtonStyle}"
                                 Command="{Binding StartTestScenarioCommand}" />
                         <Button Margin="0,0,6,4"
                                 Content="{loc:Loc Key=Simulation.StopScenario}"
-                                Style="{StaticResource GlobalCommandButtonStyle}"
+                                Style="{StaticResource ScenarioDialogButtonStyle}"
                                 Command="{Binding StopTestScenarioCommand}" />
                         <Button Margin="0,0,6,4"
                                 Content="{loc:Loc Key=Simulation.ReplayScenario}"
-                                Style="{StaticResource GlobalCommandButtonStyle}"
+                                Style="{StaticResource ScenarioDialogButtonStyle}"
                                 Command="{Binding ReplayTestScenarioCommand}" />
                     </WrapPanel>
-                    <TextBlock Margin="0,9,0,0"
+                    <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,9,0,0"
                                FontWeight="SemiBold"
                                Text="{Binding ConditionScenarioStateText}" TextWrapping="Wrap" />
-                    <TextBlock Margin="0,3,0,0"
+                    <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,3,0,0"
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="{Binding ConditionScenarioProgressText}" TextWrapping="Wrap" />
-                    <TextBlock Margin="0,3,0,0"
+                    <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,3,0,0"
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="{Binding ConditionScenarioHealthText}" TextWrapping="Wrap" />
+                    </StackPanel></Border>
                     <Border Margin="0,12,0,0"
                             Padding="10"
-                            Background="{DynamicResource Surface.Root}"
+                            Background="{DynamicResource Surface.Panel}"
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="4">
-                        <StackPanel>
+                        <StackPanel IsEnabled="{Binding IsScenarioConfigurationEnabled}">
                             <TextBlock Style="{StaticResource SectionCaptionStyle}"
                                        Text="{loc:Loc Key=Simulation.ScheduledFaultRecovery}" />
-                            <TextBlock Margin="0,2,0,8"
+                            <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,2,0,8"
                                        Foreground="{DynamicResource Text.Secondary}"
                                        Text="{loc:Loc Key=Simulation.ScheduledFaultRecoveryHint}"
                                        TextWrapping="Wrap" />
@@ -124,25 +307,25 @@
                                       AutomationProperties.Name="{loc:Loc Key=Simulation.EnableScheduledFault}" />
                             <StackPanel Margin="0,8,0,0"
                                         IsEnabled="{Binding SimulationWorkspace.IsScheduledFaultEnabled}">
-                                <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                <TextBlock FontSize="12" LineHeight="17.4" Foreground="{DynamicResource Text.Secondary}"
                                            Text="{loc:Loc Key=Simulation.FaultKind}" />
                                 <ComboBox x:Name="ScheduledFaultKindComboBox"
                                           Margin="0,3,0,0"
                                           ItemsSource="{Binding SimulationWorkspace.AvailableScheduledFaultKinds}"
-                                          DisplayMemberPath="Name"
+                                          ItemTemplate="{StaticResource ScenarioChoiceTemplate}"
                                           SelectedValuePath="Kind"
                                           SelectedValue="{Binding SimulationWorkspace.ScheduledFaultKind, Mode=TwoWay}" />
-                                <TextBlock Margin="0,8,0,0"
+                                <TextBlock FontSize="12" LineHeight="17.4" Margin="0,8,0,0"
                                            Foreground="{DynamicResource Text.Secondary}"
                                            Text="{loc:Loc Key=Simulation.FaultTarget}" />
                                 <ComboBox x:Name="ScheduledFaultTargetComboBox"
                                           Margin="0,3,0,0"
                                           ItemsSource="{Binding ScheduledFaultTargets}"
-                                          DisplayMemberPath="Name"
+                                          ItemTemplate="{StaticResource ScenarioChoiceTemplate}"
                                           SelectedValuePath="Id"
                                           SelectedValue="{Binding SimulationWorkspace.ScheduledFaultTargetId, Mode=TwoWay}" />
                                 <CheckBox x:Name="ScheduledFaultForcedValueCheckBox"
-                                          Margin="0,8,0,0"
+                                          Margin="4,8,0,0"
                                           IsChecked="{Binding SimulationWorkspace.ScheduledFaultForcedValue, Mode=TwoWay}"
                                           Content="{loc:Loc Key=Simulation.StuckInputForceOn}"
                                           AutomationProperties.Name="{loc:Loc Key=Simulation.StuckInputForceOn}"
@@ -154,14 +337,14 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel>
-                                        <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                        <TextBlock FontSize="12" LineHeight="17.4" Foreground="{DynamicResource Text.Secondary}"
                                                    Text="{loc:Loc Key=Simulation.FaultInjectTick}" />
                                         <TextBox x:Name="ScheduledFaultInjectTickTextBox"
                                                  Margin="0,3,0,0"
                                                  Text="{Binding SimulationWorkspace.ScheduledFaultInjectTick, UpdateSourceTrigger=PropertyChanged}" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
-                                        <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                        <TextBlock FontSize="12" LineHeight="17.4" Foreground="{DynamicResource Text.Secondary}"
                                                    Text="{loc:Loc Key=Simulation.FaultHoldTicks}" />
                                         <TextBox x:Name="ScheduledFaultHoldTicksTextBox"
                                                  Margin="0,3,0,0"
@@ -169,21 +352,21 @@
                                     </StackPanel>
                                 </Grid>
                                 <CheckBox x:Name="RestartSequenceAfterFaultCheckBox"
-                                          Margin="0,8,0,0"
+                                          Margin="4,8,0,0"
                                           IsChecked="{Binding SimulationWorkspace.RestartSequenceAfterFault, Mode=TwoWay}"
                                           Content="{loc:Loc Key=Simulation.RestartSequence}"
                                           AutomationProperties.Name="{loc:Loc Key=Simulation.RestartSequence}" />
-                                <TextBlock Margin="0,8,0,3"
+                                <TextBlock FontSize="12" LineHeight="17.4" Margin="0,8,0,3"
                                            Foreground="{DynamicResource Text.Secondary}"
                                            Text="{loc:Loc Key=Simulation.RecoverySequence}" />
                                 <ComboBox x:Name="RecoverySequenceComboBox"
                                           ItemsSource="{Binding RecoverySequences}"
-                                          DisplayMemberPath="Name"
+                                          ItemTemplate="{StaticResource ScenarioChoiceTemplate}"
                                           SelectedValuePath="Id"
                                           SelectedValue="{Binding SimulationWorkspace.RecoverySequenceId, Mode=TwoWay}"
                                           IsEnabled="{Binding SimulationWorkspace.RestartSequenceAfterFault}" />
                             </StackPanel>
-                            <TextBlock Margin="0,8,0,0"
+                            <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,8,0,0"
                                        Foreground="{DynamicResource Text.Secondary}"
                                        Text="{Binding SimulationWorkspace.ScheduledFaultSummary}"
                                        TextWrapping="Wrap" />
@@ -198,7 +381,7 @@
                     <Border Margin="0,12,0,0"
                             Padding="10"
                             IsEnabled="{Binding IsScenarioConfigurationEnabled}"
-                            Background="{DynamicResource Surface.Root}"
+                            Background="{DynamicResource Surface.Panel}"
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="4">
@@ -206,7 +389,7 @@
                             <TextBlock x:Name="ScenarioAssertionsSectionAnchor"
                                        Style="{StaticResource SectionCaptionStyle}"
                                        Text="{loc:Loc Key=Simulation.AcceptanceCriteria}" />
-                            <TextBlock Margin="0,2,0,8"
+                            <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,2,0,8"
                                        Foreground="{DynamicResource Text.Secondary}"
                                        Text="{loc:Loc Key=Simulation.AcceptanceCriteriaHint}"
                                        TextWrapping="Wrap" />
@@ -214,22 +397,18 @@
                                       IsChecked="{Binding SimulationWorkspace.RequireAutomaticCycleCompleted, Mode=TwoWay}"
                                       Content="{loc:Loc Key=Simulation.RequireAutomaticCycleCompleted}"
                                       AutomationProperties.Name="{loc:Loc Key=Simulation.RequireAutomaticCycleCompleted}" />
-                            <Grid Margin="22,6,0,8"
+                            <StackPanel Margin="0,6,0,8"
                                   IsEnabled="{Binding SimulationWorkspace.RequireAutomaticCycleCompleted}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="82" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock VerticalAlignment="Center"
+                                <TextBlock FontSize="12" LineHeight="17.4" VerticalAlignment="Center"
                                            Foreground="{DynamicResource Text.Secondary}"
                                            Text="{loc:Loc Key=Simulation.MinimumCompletedCycles}" />
                                 <TextBox x:Name="MinimumCompletedCyclesTextBox"
-                                         Grid.Column="1"
+                                         Margin="0,3,0,0"
                                          Text="{Binding SimulationWorkspace.MinimumCompletedCycles, UpdateSourceTrigger=PropertyChanged}"
                                          AutomationProperties.Name="{loc:Loc Key=Simulation.MinimumCompletedCycles}" />
-                            </Grid>
+                            </StackPanel>
                             <CheckBox x:Name="NoActiveFaultsAssertionCheckBox"
-                                      Margin="0,0,0,8"
+                                      Margin="4,0,0,8"
                                       IsChecked="{Binding SimulationWorkspace.RequireNoActiveFaults, Mode=TwoWay}"
                                       Content="{loc:Loc Key=Simulation.RequireNoActiveFaults}"
                                       AutomationProperties.Name="{loc:Loc Key=Simulation.RequireNoActiveFaults}" />
@@ -239,28 +418,28 @@
                                       AutomationProperties.Name="{loc:Loc Key=Simulation.RequireFinalEquipmentState}" />
                             <StackPanel Margin="22,6,0,0"
                                         IsEnabled="{Binding SimulationWorkspace.RequireFinalEquipmentState}">
-                                <TextBlock Foreground="{DynamicResource Text.Secondary}"
+                                <TextBlock FontSize="12" LineHeight="17.4" Foreground="{DynamicResource Text.Secondary}"
                                            Text="{loc:Loc Key=Simulation.AssertionTarget}" />
                                 <ComboBox x:Name="FinalEquipmentTargetComboBox"
                                           Margin="0,3,0,0"
                                           ItemsSource="{Binding ConditionScenarioTargets}"
-                                          DisplayMemberPath="Name"
+                                          ItemTemplate="{StaticResource ScenarioChoiceTemplate}"
                                           SelectedValuePath="Id"
                                           SelectedValue="{Binding SimulationWorkspace.FinalEquipmentTargetId, Mode=TwoWay}"
                                           AutomationProperties.Name="{loc:Loc Key=Simulation.AssertionTarget}" />
-                                <TextBlock Margin="0,8,0,0"
+                                <TextBlock FontSize="12" LineHeight="17.4" Margin="0,8,0,0"
                                            Foreground="{DynamicResource Text.Secondary}"
                                            Text="{loc:Loc Key=Simulation.ExpectedFinalState}" />
                                 <TextBox x:Name="FinalEquipmentExpectedStateTextBox"
                                          Margin="0,3,0,0"
                                          Text="{Binding SimulationWorkspace.FinalEquipmentExpectedState, UpdateSourceTrigger=PropertyChanged}"
                                          AutomationProperties.Name="{loc:Loc Key=Simulation.ExpectedFinalState}" />
-                                <TextBlock Margin="0,3,0,0"
+                                <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,3,0,0"
                                            Foreground="{DynamicResource Text.Secondary}"
                                            Text="{loc:Loc Key=Simulation.ExpectedFinalStateHint}"
                                            TextWrapping="Wrap" />
                             </StackPanel>
-                            <TextBlock Margin="0,8,0,0"
+                            <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,8,0,0"
                                        Foreground="{DynamicResource Text.Secondary}"
                                        Text="{Binding SimulationWorkspace.AssertionSummary}" TextWrapping="Wrap" />
                             <TextBlock x:Name="ScenarioAssertionValidationText"
@@ -282,6 +461,7 @@
                                 <Setter Property="Grid.Column" Value="0" />
                                 <Setter Property="Grid.Row" Value="1" />
                                 <Setter Property="Grid.ColumnSpan" Value="3" />
+                                <Setter Property="Margin" Value="0,12,0,0" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -290,13 +470,13 @@
                     <TextBlock x:Name="RepeatValidationSectionAnchor"
                                Style="{StaticResource SectionCaptionStyle}"
                                Text="{loc:Loc Key=Simulation.RepeatValidation}" />
-                    <TextBlock Margin="0,0,0,8"
+                    <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,0,0,8"
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="{loc:Loc Key=Simulation.RepeatValidationHint}"
                                TextWrapping="Wrap" />
-                    <Grid>
-                        <Grid.Style>
-                            <Style TargetType="Grid">
+                    <StackPanel>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
                                 <Setter Property="IsEnabled" Value="True" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsBatchRunning}" Value="True">
@@ -304,73 +484,69 @@
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </Grid.Style>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="82" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock VerticalAlignment="Center"
+                        </StackPanel.Style>
+                        <TextBlock FontSize="12" LineHeight="17.4" VerticalAlignment="Center"
                                    Foreground="{DynamicResource Text.Secondary}"
                                    Text="{loc:Loc Key=Simulation.RepetitionCount}" />
-                        <TextBox x:Name="BatchRepetitionCountTextBox" Grid.Column="1"
+                        <TextBox x:Name="BatchRepetitionCountTextBox" Margin="0,3,0,0"
                                  Text="{Binding SimulationWorkspace.BatchRepetitionCount, UpdateSourceTrigger=PropertyChanged}" />
-                    </Grid>
+                    </StackPanel>
                     <WrapPanel Margin="0,10,0,0">
                         <Button Margin="0,0,6,4"
                                 Content="{loc:Loc Key=Simulation.RunBatch}"
-                                Style="{StaticResource PrimaryCommandButtonStyle}"
+                                Style="{StaticResource ScenarioDialogCreateButtonStyle}"
                                 Command="{Binding RunScenarioBatchCommand}" />
                         <Button Margin="0,0,6,4"
                                 Content="{loc:Loc Key=Simulation.CancelBatch}"
-                                Style="{StaticResource GlobalCommandButtonStyle}"
+                                Style="{StaticResource ScenarioDialogButtonStyle}"
                                 Command="{Binding CancelScenarioBatchCommand}" />
                     </WrapPanel>
-                    <TextBlock x:Name="ScenarioBatchStatusText"
+                    <TextBlock FontSize="11.5" LineHeight="16.675" x:Name="ScenarioBatchStatusText"
                                Margin="0,7,0,0"
                                FontWeight="SemiBold"
                                Text="{Binding BatchStatusText}"
                                TextWrapping="Wrap" />
-                    <TextBlock Margin="0,3,0,0"
+                    <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,3,0,0"
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="{Binding BatchResultText}"
                                TextWrapping="Wrap" />
-                    <TextBlock Margin="0,3,0,0"
+                    <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,3,0,0"
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="{Binding BatchBaselineText}"
                                TextWrapping="Wrap" />
-                    <TextBlock Margin="0,3,0,0"
+                    <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,3,0,0"
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="{Binding BatchArtifactStatusText}"
                                TextWrapping="Wrap" />
-                    <TextBlock Margin="0,7,0,0"
+                    <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,7,0,0"
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="{loc:Loc Key=Simulation.EvidenceExchangeHint}"
                                TextWrapping="Wrap" />
-                    <TextBlock Margin="0,4,0,0"
+                    <TextBlock FontSize="11.5" LineHeight="16.675" Margin="0,4,0,0"
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="{loc:Loc Key=Simulation.ResultReportHint}"
                                TextWrapping="Wrap" />
                     <WrapPanel Margin="0,8,0,0">
                         <Button Margin="0,0,6,4"
                                 Content="{loc:Loc Key=Simulation.ExportEvidence}"
-                                Style="{StaticResource GlobalCommandButtonStyle}"
+                                Style="{StaticResource ScenarioDialogButtonStyle}"
                                 Command="{Binding ExportSimulationEvidenceCommand}"
                                 AutomationProperties.Name="{loc:Loc Key=Simulation.ExportEvidence}" />
                         <Button Margin="0,0,6,4"
                                 Content="{loc:Loc Key=Simulation.ExportReport}"
-                                Style="{StaticResource GlobalCommandButtonStyle}"
+                                Style="{StaticResource ScenarioDialogButtonStyle}"
                                 Command="{Binding ExportSimulationReportCommand}"
                                 AutomationProperties.Name="{loc:Loc Key=Simulation.ExportReport}" />
                         <Button Margin="0,0,6,4"
                                 Content="{loc:Loc Key=Simulation.ImportEvidence}"
-                                Style="{StaticResource GlobalCommandButtonStyle}"
+                                Style="{StaticResource ScenarioDialogButtonStyle}"
                                 Command="{Binding ImportSimulationEvidenceCommand}"
                                 AutomationProperties.Name="{loc:Loc Key=Simulation.ImportEvidence}" />
                     </WrapPanel>
                     <Border x:Name="ScenarioAssertionOutcomesPanel"
                             Margin="0,9,0,0"
                             Padding="9,7"
-                            Background="{DynamicResource Surface.Root}"
+                            Background="{DynamicResource Surface.Panel}"
                             BorderBrush="{DynamicResource Border.Subtle}"
                             BorderThickness="1"
                             CornerRadius="4"
@@ -412,20 +588,28 @@
                     <WrapPanel Margin="0,8,0,0">
                         <Button Margin="0,0,6,4"
                                 Content="{loc:Loc Key=Simulation.AcceptBaseline}"
-                                Style="{StaticResource GlobalCommandButtonStyle}"
+                                Style="{StaticResource ScenarioDialogButtonStyle}"
                                 Command="{Binding AcceptBatchBaselineCommand}" />
                         <Button Margin="0,0,6,4"
                                 Content="{loc:Loc Key=Simulation.ClearBaseline}"
-                                Style="{StaticResource GlobalCommandButtonStyle}"
+                                Style="{StaticResource ScenarioDialogButtonStyle}"
                                 Command="{Binding ClearBatchBaselineCommand}" />
                         <Button Margin="0,0,6,4"
                                 Content="{loc:Loc Key=Simulation.GoToMismatch}"
-                                Style="{StaticResource GlobalCommandButtonStyle}"
+                                Style="{StaticResource ScenarioDialogButtonStyle}"
                                 Command="{Binding NavigateToBatchMismatchCommand}" />
                     </WrapPanel>
                 </StackPanel>
             </Border>
         </Grid>
+        </StackPanel>
     </ScrollViewer>
-    </DockPanel>
+                <Border x:Name="TestScenarioDialogFooter" Grid.Row="2" Padding="18,10" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0">
+                    <Button x:Name="CloseTestScenarioButton" Content="{loc:Loc Key=Gallery.Close}"
+                            HorizontalAlignment="Right" MinWidth="48" Command="{Binding Navigation.CloseTestScenarioCommand}"
+                            Style="{StaticResource ScenarioDialogButtonStyle}" />
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>

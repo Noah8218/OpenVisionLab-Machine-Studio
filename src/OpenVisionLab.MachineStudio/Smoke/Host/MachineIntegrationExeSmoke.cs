@@ -379,7 +379,6 @@ internal static class MachineIntegrationExeSmoke
 
             viewModel.IsRunMode = true;
             viewModel.Navigation.IsInspectionWorkspace = true;
-            viewModel.Navigation.SelectedInspectionTabIndex = 1;
             Check("machineRunModeEnabled", viewModel.IsRunMode);
             ConfigureMachineIntegration(
                 viewModel.Integration,
@@ -727,7 +726,6 @@ internal static class MachineIntegrationExeSmoke
                     viewModel.Integration.LatestTwoDImageUri is { IsFile: true } imageUri
                     && File.Exists(imageUri.LocalPath));
             viewModel.Navigation.IsInspectionWorkspace = true;
-            viewModel.Navigation.SelectedInspectionTabIndex = 1;
                 await window!.Dispatcher.InvokeAsync(() => window.UpdateLayout(), DispatcherPriority.Render);
                 var mmi = SmokeVisualTreeQuery.FindVisualDescendant<MmiOperatorLayoutView>(window);
                 var twoDImage = mmi is null
@@ -1224,7 +1222,6 @@ internal static class MachineIntegrationExeSmoke
                     viewModel.Integration.LatestThreeDImageUri is { IsFile: true } imageUri
                     && File.Exists(imageUri.LocalPath));
             viewModel.Navigation.IsInspectionWorkspace = true;
-            viewModel.Navigation.SelectedInspectionTabIndex = 1;
                 await window!.Dispatcher.InvokeAsync(() => window.UpdateLayout(), DispatcherPriority.Render);
                 var mmi = SmokeVisualTreeQuery.FindVisualDescendant<MmiOperatorLayoutView>(window);
                 var threeDImage = mmi is null
@@ -1592,11 +1589,13 @@ internal static class MachineIntegrationExeSmoke
                     && waitCheckBox.ActualHeight > 0);
 
             viewModel.Navigation.IsInspectionWorkspace = true;
-            viewModel.Navigation.SelectedInspectionTabIndex = 1;
                 await activeWindow.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                var integrationWorkspace = SmokeVisualTreeQuery.FindVisualDescendant<SimulationIntegrationWorkspaceView>(activeWindow)
-                    ?? throw new InvalidOperationException("Machine integration workspace was unavailable.");
-                var applyButton = integrationWorkspace.ApplyIntegrationResultToSimulationButtonControl;
+                viewModel.Navigation.SelectedInspectionSettingsTabIndex = 3;
+                await activeWindow.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var mmi = SmokeVisualTreeQuery.FindVisualDescendant<MmiOperatorLayoutView>(activeWindow)
+                    ?? throw new InvalidOperationException("Machine integration Mmi view was unavailable.");
+                mmi.IntegrationExchangeDetailsExpanderControl.IsExpanded = true;
+                var applyButton = mmi.ApplyIntegrationResultToSimulationButtonControl;
                 applyButton.BringIntoView();
                 await activeWindow.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 Check("applyButtonEnabledAndVisible",
@@ -1962,7 +1961,6 @@ internal static class MachineIntegrationExeSmoke
 
             viewModel.IsRunMode = true;
             viewModel.Navigation.IsInspectionWorkspace = true;
-            viewModel.Navigation.SelectedInspectionTabIndex = 1;
             Check("machineRunModeEnabled", viewModel.IsRunMode);
             ConfigureMachineIntegration(
                 viewModel.Integration,

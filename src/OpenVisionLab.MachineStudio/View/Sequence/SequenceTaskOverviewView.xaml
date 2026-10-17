@@ -1,0 +1,119 @@
+<UserControl x:Class="OpenVisionLab.MachineStudio.View.Sequence.SequenceTaskOverviewView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:OpenVisionLab.MachineStudio.View.Sequence"
+             xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization" Tag="{Binding IsProcessAllUnits}" LayoutUpdated="OnFlowLayoutUpdated">
+    <UserControl.Resources>
+        <conv:KoreanWordWrappingConverter x:Key="KoreanWordWrappingConverter" />
+        <Style x:Key="TaskStepButton" TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Margin" Value="0,3,0,0" />
+            <Setter Property="Padding" Value="8,6" /><Setter Property="Height" Value="Auto" />
+            <Setter Property="MinHeight" Value="30" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsEditingSelection}" Value="True"><Setter Property="Background" Value="{DynamicResource Surface.Selected}" /><Setter Property="FontWeight" Value="SemiBold" /></DataTrigger>
+                <DataTrigger Binding="{Binding IsSearchMatch}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /></DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <Grid x:Name="FlowLayoutState" Tag="{Binding IsProcessSummary}">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+        <TextBlock Margin="12,6" Text="{loc:Loc Key=Process.LaneHint}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}"
+                   Visibility="{Binding IsProcessAllUnits, Converter={StaticResource BooleanToVisibilityConverter}}" />
+        <Border x:Name="RouteDestinationSelectionBar" Grid.Row="1" Margin="6,0,6,6" Padding="10" Background="{DynamicResource Surface.Raised}" BorderBrush="{DynamicResource Accent.Primary}" BorderThickness="1" CornerRadius="6"
+                Visibility="{Binding IsSelectingRouteDestination, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,10,0">
+                    <TextBlock Text="{Binding RouteDestinationSelectionText, Converter={StaticResource KoreanWordWrappingConverter}}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Text="{loc:Loc Key=Process.RouteDestinationHint}" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                </StackPanel>
+                <Button x:Name="CancelRouteDestinationSelectionButton" Grid.Column="1" VerticalAlignment="Top" Content="{loc:Loc Key=Process.CancelRouteDestination}"
+                        Command="{Binding CancelRouteDestinationSelectionCommand}" Style="{StaticResource GlobalCommandButtonStyle}" />
+            </Grid>
+        </Border>
+        <ScrollViewer x:Name="FlowViewport" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Padding="6">
+            <Grid>
+                <Grid.LayoutTransform><ScaleTransform x:Name="FlowScale" ScaleX="{Binding FlowZoom}" ScaleY="{Binding FlowZoom}" /></Grid.LayoutTransform>
+                <TextBlock x:Name="ProcessOverviewEmptyHint" Margin="12" Text="{loc:Loc Key=R24.EmptyUnitSteps}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}">
+                    <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding TaskGroups.Count}" Value="0" /><Condition Binding="{Binding IsProcessAllUnits}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></TextBlock.Style>
+                </TextBlock>
+                <ItemsControl x:Name="ProcessTaskCards" ItemsSource="{Binding ProcessLanes}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate><DataTemplate>
+                        <Border x:Name="FlowLaneFrame" MinWidth="{Binding LaneWidth, RelativeSource={RelativeSource AncestorType={x:Type local:SequenceTaskOverviewView}}}" Margin="0,0,8,0" BorderThickness="1" BorderBrush="{DynamicResource Border.Subtle}" CornerRadius="6">
+                            <StackPanel>
+                                <Border Padding="10,6" Background="{DynamicResource Surface.Raised}" Visibility="{Binding DataContext.IsProcessAllUnits, RelativeSource={RelativeSource AncestorType={x:Type local:SequenceTaskOverviewView}}, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <StackPanel><TextBlock Text="{Binding Name, Converter={StaticResource KoreanWordWrappingConverter}}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding StepCountText}" Foreground="{DynamicResource Text.Secondary}" /></StackPanel>
+                                </Border>
+                                <TextBlock Margin="12" Text="{Binding EmptyText}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}">
+                                    <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding IsEmpty}" Value="True" /><Condition Binding="{Binding DataContext.IsProcessAllUnits, RelativeSource={RelativeSource AncestorType={x:Type local:SequenceTaskOverviewView}}}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></TextBlock.Style>
+                                </TextBlock>
+                                <Grid x:Name="FlowLaneSurface" Loaded="OnLaneLoaded" Unloaded="OnLaneUnloaded">
+                                    <Grid.Style><Style TargetType="Grid"><Style.Triggers><DataTrigger Binding="{Binding IsEmpty}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></Grid.Style>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                    <Canvas x:Name="FlowWires" Grid.RowSpan="3" IsHitTestVisible="False" />
+                                    <TextBlock x:Name="FlowStartMarker" Text="{loc:Loc Key=Shell.CycleStart}" Width="268" TextAlignment="Center" HorizontalAlignment="Left" Margin="24,8,0,0" Foreground="{DynamicResource Text.Secondary}" />
+                                    <ItemsControl x:Name="LaneTaskCards" Grid.Row="1" ItemsSource="{Binding Groups}">
+                                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate><DataTemplate>
+                                            <Border x:Name="FlowNodeCard" Width="268" Margin="24,30" Tag="{Binding IsSelected, NotifyOnTargetUpdated=True}" TargetUpdated="OnCardSelectionUpdated" Loaded="OnCardLoaded" Unloaded="OnCardUnloaded" Padding="10" BorderThickness="2" CornerRadius="7" Background="{DynamicResource Surface.Panel}">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /></DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsExecuting}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Running}" /></DataTrigger>
+                                                            <DataTrigger Binding="{Binding HasIssue}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource State.Fault}" /></DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <StackPanel>
+                                                    <Grid Margin="0,0,0,5"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding RangeText}" FontWeight="SemiBold" Foreground="{DynamicResource Accent.Primary}" Margin="0,0,8,0" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding CategoryText}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                                                    </Grid>
+                                                    <Button Command="{Binding DataContext.SelectOverviewStepCommand, RelativeSource={RelativeSource AncestorType={x:Type local:SequenceTaskOverviewView}}}"
+                                                            CommandParameter="{Binding FirstStep}" AutomationProperties.Name="{Binding Title}" Style="{StaticResource TaskStepButton}">
+                                                        <TextBlock Text="{Binding Title, Converter={StaticResource KoreanWordWrappingConverter}}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                                                    </Button>
+                                                    <TextBlock Text="{Binding TargetText, Converter={StaticResource KoreanWordWrappingConverter}}" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" />
+                                                    <TextBlock Text="{loc:Loc Key=R24.StepExecuting}" Foreground="{DynamicResource State.Running}" FontWeight="SemiBold"
+                                                               Visibility="{Binding IsExecuting, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                    <TextBlock Text="{Binding IssueText}" TextWrapping="Wrap" Foreground="{DynamicResource State.Fault}"
+                                                               Visibility="{Binding HasIssue, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                    <Expander Header="{loc:Loc Key=Process.TaskSteps}" Margin="0,5,0,0" IsExpanded="{Binding IsExpanded, Mode=TwoWay}"
+                                                              Visibility="{Binding IsGroup, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                        <ItemsControl ItemsSource="{Binding Steps}">
+                                                            <ItemsControl.ItemTemplate><DataTemplate>
+                                                                <Button Command="{Binding DataContext.SelectOverviewStepCommand, RelativeSource={RelativeSource AncestorType={x:Type local:SequenceTaskOverviewView}}}"
+                                                                        CommandParameter="{Binding}" Style="{StaticResource TaskStepButton}" AutomationProperties.Name="{Binding DisplayName}">
+                                                                    <StackPanel><TextBlock Text="{Binding DisplayName, Converter={StaticResource KoreanWordWrappingConverter}}" TextWrapping="Wrap" /><TextBlock Text="{Binding StepListParameterText}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" /><TextBlock Text="{Binding StepListStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource State.Warning}" /></StackPanel>
+                                                                </Button>
+                                                            </DataTemplate></ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </Expander>
+                                                    <ItemsControl ItemsSource="{Binding Routes}" Margin="0,7,0,0">
+                                                        <ItemsControl.ItemTemplate><DataTemplate>
+                                                            <Button Command="{Binding DataContext.BeginRouteDestinationSelectionCommand, RelativeSource={RelativeSource AncestorType={x:Type local:SequenceTaskOverviewView}}}"
+                                                                    CommandParameter="{Binding}" Style="{StaticResource TaskStepButton}" AutomationProperties.Name="{Binding Caption}" ToolTip="{loc:Loc Key=Process.EditRoute}">
+                                                                <TextBlock Text="{Binding Caption, Converter={StaticResource KoreanWordWrappingConverter}}" TextWrapping="Wrap" FontSize="11">
+                                                                    <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" /><Style.Triggers><DataTrigger Binding="{Binding IsValid}" Value="False"><Setter Property="Foreground" Value="{DynamicResource State.Fault}" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                                                                </TextBlock>
+                                                            </Button>
+                                                        </DataTemplate></ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate></ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock x:Name="FlowEndMarker" Grid.Row="2" Text="{loc:Loc Key=R24.CycleEnd}" HorizontalAlignment="Center" Margin="8,0,8,12" Foreground="{DynamicResource Text.Secondary}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate></ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

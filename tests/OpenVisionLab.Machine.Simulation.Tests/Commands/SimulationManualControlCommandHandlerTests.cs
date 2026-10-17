@@ -169,4 +169,19 @@ public sealed class SimulationManualControlCommandHandlerTests
         Acceleration = 500,
         Deceleration = 500
     });
+    [Fact]
+    public void InspectorOutputWritesOnlyDigitalOutputUnderManualOwnershipAndRecoversAfterRejection()
+    {
+        var handler = new SimulationManualControlCommandHandler();
+        var hub = DeterministicSignalHub.Create(new[] { new ChannelDefinition { Id = "do", Name = "Output", Kind = ChannelKind.DigitalOutput }, Channel("di") }).Hub!;
+        Assert.False(handler.Apply(new SetManualOutputCommand("do", true), CreateContext(controlOwner: SimulationControlOwner.Definition, signalHub: hub)).Result.IsAccepted);
+        Assert.False(handler.Apply(new SetManualOutputCommand("di", true), CreateContext(signalHub: hub)).Result.IsAccepted);
+        Assert.False(handler.Apply(new SetManualOutputCommand("missing", true), CreateContext(signalHub: hub)).Result.IsAccepted);
+        Assert.True(handler.Apply(new SetManualOutputCommand("do", true), CreateContext(signalHub: hub)).Result.IsAccepted);
+        Assert.True(hub.ReadDigitalSignal("do").Value);
+        Assert.True(handler.Apply(new SetManualOutputCommand("do", false), CreateContext(signalHub: hub)).Result.IsAccepted);
+        Assert.False(hub.ReadDigitalSignal("do").Value);
+        Assert.False(hub.ReadDigitalSignal("di").Value);
+    }
+
 }

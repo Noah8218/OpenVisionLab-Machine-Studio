@@ -36,6 +36,10 @@ internal static class DeterministicSimulationCommandTraceCommandCodec
                 arguments = EmptyArguments;
                 return true;
 
+            case SetSimulationTimeScaleCommand speed:
+                arguments = Serialize(new { timeScale = FormatDouble(speed.TimeScale) });
+                return true;
+
             case FastForwardCommand fastForward:
                 arguments = Serialize(new { tickBudget = fastForward.TickBudget });
                 return true;
@@ -279,6 +283,7 @@ internal static class DeterministicSimulationCommandTraceCommandCodec
         JsonElement arguments) =>
         commandType switch
         {
+            nameof(SetSimulationTimeScaleCommand) => new SetSimulationTimeScaleCommand(RequiredDouble(arguments, "timeScale")),
             nameof(PauseCommand) => new PauseCommand(),
             nameof(FastForwardCommand) => new FastForwardCommand(
                 RequiredPositiveInt(arguments, "tickBudget")),

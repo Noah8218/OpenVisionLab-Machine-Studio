@@ -19,7 +19,9 @@ public enum VirtualCameraTriggerErrorCode
     CameraBusy,
     CameraFaulted,
     FrameEvidenceInvalid,
-    InspectionEvidenceInvalid
+    InspectionEvidenceInvalid,
+    RecipeVersionUnconfirmed,
+    RecipeMismatch
 }
 
 /// <summary>
@@ -33,7 +35,8 @@ public sealed record VirtualCameraConfiguration
         string name,
         int exposureTicks,
         int transferTicks,
-        PlaceholderInspectionDecision placeholderDecision)
+        PlaceholderInspectionDecision placeholderDecision,
+        NumericalCameraSettings? numericalInput = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
 
@@ -66,6 +69,8 @@ public sealed record VirtualCameraConfiguration
         ExposureTicks = exposureTicks;
         TransferTicks = transferTicks;
         PlaceholderDecision = placeholderDecision;
+        if (numericalInput?.Validate() is { } validationError) throw new ArgumentException(validationError, nameof(numericalInput));
+        NumericalInput = numericalInput;
     }
 
     public string Id { get; }
@@ -73,6 +78,7 @@ public sealed record VirtualCameraConfiguration
     public int ExposureTicks { get; }
     public int TransferTicks { get; }
     public PlaceholderInspectionDecision PlaceholderDecision { get; }
+    public NumericalCameraSettings? NumericalInput { get; }
 }
 
 /// <summary>
@@ -312,7 +318,8 @@ public sealed record VirtualCameraAcquisitionResult(
     VirtualCameraInspectionEvidence? InspectionEvidence = null,
     VirtualCameraExternalResultEvidence? ExternalResultEvidence = null,
     string? WorkpieceComponentId = null,
-    string? WorkpieceInstanceId = null);
+    string? WorkpieceInstanceId = null,
+    NumericalCameraInput? NumericalInput = null);
 
 public sealed record VirtualCameraSnapshot(
     string Id,
@@ -325,7 +332,8 @@ public sealed record VirtualCameraSnapshot(
     int TransferTicksRemaining,
     VirtualCameraAcquisitionResult? Result,
     VirtualCameraFrameEvidence? FrameEvidence = null,
-    VirtualCameraExternalResultEvidence? ExternalResultEvidence = null);
+    VirtualCameraExternalResultEvidence? ExternalResultEvidence = null,
+    NumericalCameraInput? NumericalInput = null);
 
 public sealed record VirtualCameraTriggerResult(
     bool IsAccepted,

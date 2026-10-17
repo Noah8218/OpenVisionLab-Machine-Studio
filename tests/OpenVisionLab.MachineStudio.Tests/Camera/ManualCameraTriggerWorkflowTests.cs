@@ -17,6 +17,39 @@ public sealed class ManualCameraTriggerWorkflowTests
 {
     private static readonly TimeSpan FixedStep = TimeSpan.FromMilliseconds(5);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NumericalCaptureDispatchesWithoutFileOrLocalInspectionAndRejectsStaleContext(bool external)
+    {
+        using var fixture = new Fixture();
+        SimulationCommand? dispatched = null;
+        var workflow = fixture.CreateWorkflow((command, _) =>
+        {
+            dispatched = command;
+            return Task.FromResult(Accepted(command));
+        }, _ => { },
+        acquireFrameAsync: (_, _) => throw new InvalidOperationException("Numerical capture must not read a file."),
+        runInspectionAsync: (_, _, _) => throw new InvalidOperationException("Numerical capture must not run the file inspector."));
+        var request = fixture.Request;
+        var input = new ManualCameraTriggerRequestInput(true, request.SessionId, request.DocumentRevision, request.ProjectId,
+            request.ProjectName, request.ProjectPath, request.ProjectJson, request.BuildIdentity, request.SimulationFixedStep,
+            request.BaselineSnapshot, request.BaselineCamera, request.InspectionRequest.RecipeId,
+            new VirtualCameraDefinition { NumericalInput = new NumericalCameraSettings { RecipeName = request.InspectionRequest.RecipeId } },
+            null, 42, external);
+        Assert.Equal(ManualCameraTriggerOutcome.Accepted, (await workflow.ExecuteNumericalAsync(input, CancellationToken.None)).Outcome);
+        var command = Assert.IsType<TriggerVirtualCameraCommand>(dispatched);
+        Assert.True(command.GeneratesNumericalInput);
+        Assert.Equal(external, command.WaitForExternalResult);
+        Assert.Equal(request.RuntimeGeneration, command.RuntimeGeneration);
+        dispatched = null;
+        Assert.Equal(ManualCameraTriggerOutcome.ContextChanged,
+            (await workflow.ExecuteNumericalAsync(input with { DocumentRevision = input.DocumentRevision + 1 }, CancellationToken.None)).Outcome);
+        Assert.Null(dispatched);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => workflow.ExecuteNumericalAsync(input, new CancellationToken(true)));
+        Assert.Null(dispatched);
+    }
+
     [Fact]
     public async Task AcceptedTriggerDispatchesCommandAndRefreshesMonitor()
     {

@@ -29,6 +29,7 @@ public sealed class DeterministicMachineLayout
     private readonly PneumaticCylinderRuntimeState[] _orderedCylinders;
     private readonly ConveyorRuntimeState[] _orderedConveyors;
     private readonly WorkpieceRuntimeState[] _orderedWorkpieces;
+    private readonly List<WorkpieceRuntimeState> _manualSamples = [];
     private readonly LoadLockRuntimeState[] _orderedLoadLocks;
     private readonly WaferHandlerRuntimeState[] _orderedWaferHandlers;
     private readonly InspectionSortRouterRuntimeState[] _orderedInspectionSortRouters;
@@ -132,6 +133,28 @@ public sealed class DeterministicMachineLayout
 
     public string Id => _configuration.Id;
     public string Name => _configuration.Name;
+    internal bool TrySetManualSample(double x, double y, bool clear, string instanceId)
+    {
+        if (!double.IsFinite(x) || !double.IsFinite(y) || _orderedWorkpieces.Length == 0
+            || _orderedWorkpieces.Any(workpiece => workpiece.TransferOwnerId is not null)) return false;
+        if (clear)
+        {
+            foreach (var workpiece in _orderedWorkpieces.Where(workpiece => workpiece.IsPresent)) workpiece.TryEject();
+            _manualSamples.Clear();
+            return true;
+        }
+        if (string.IsNullOrWhiteSpace(instanceId) || _manualSamples.Any(sample => sample.WorkpieceInstanceId == instanceId)) return false;
+        var model = _orderedWorkpieces[0].WorkpieceConfiguration;
+        var sample = new WorkpieceRuntimeState(new WorkpieceRuntimeConfiguration("__manual-sample-" + instanceId, model.Name, model.Type,
+            model.ConveyorComponentId, model.InspectionState, model.BaseTransform, model.Size, initiallyPresent: false));
+        if (!sample.TryFeed(instanceId)) return false;
+        sample.X = x;
+        sample.Y = y;
+        sample.UpdateCarrierPosition((ConveyorRuntimeState)_componentsById[model.ConveyorComponentId]);
+        _manualSamples.Add(sample);
+        return true;
+    }
+
     public bool ContainsCylinder(string? componentId) =>
         !string.IsNullOrWhiteSpace(componentId)
         && _componentsById.TryGetValue(componentId, out LayoutComponentRuntimeState? component)
@@ -234,7 +257,11 @@ public sealed class DeterministicMachineLayout
     /// Restores component poses and actuator state, clears sensor delay
     /// history, and restores simulation-owned feedback to reset values.
     /// </summary>
-    public void Reset() => _runtimeResetter.Reset(ResetSimulationOwnedSignals);
+    public void Reset()
+    {
+        _manualSamples.Clear();
+        _runtimeResetter.Reset(ResetSimulationOwnedSignals);
+    }
 
     internal bool StartWorkpieceRun(string runId)
         => StartWorkpieceRun(runId, out _);
@@ -485,7 +512,7 @@ public sealed class DeterministicMachineLayout
             }
         }
 
-        foreach (var workpiece in _orderedWorkpieces)
+        foreach (var workpiece in _orderedWorkpieces.Concat(_manualSamples))
         {
             var conveyor = (ConveyorRuntimeState)_componentsById[
                 workpiece.WorkpieceConfiguration.ConveyorComponentId];
@@ -517,8 +544,13 @@ public sealed class DeterministicMachineLayout
 
         foreach (var sensor in _orderedSensors)
         {
-            LayoutComponentRuntimeState target = _componentsById[sensor.SensorConfiguration.TargetComponentId];
-            bool rawDetected = CreateBounds(sensor).IntersectsInclusive(CreateBounds(target));
+            var sensorBounds = sensor.SensorConfiguration.DetectionCenterY is { } centerY
+                ? new LayoutAabb(sensor.X - sensor.Configuration.Size.Width / 2, sensor.X + sensor.Configuration.Size.Width / 2,
+                    centerY - sensor.Configuration.Size.Height / 2, centerY + sensor.Configuration.Size.Height / 2)
+                : CreateBounds(sensor);
+            bool rawDetected = sensor.SensorConfiguration.DetectAllProducts
+                ? _orderedWorkpieces.Concat(_manualSamples).Any(workpiece => workpiece.IsPresent && sensorBounds.IntersectsInclusive(CreateBounds(workpiece)))
+                : sensorBounds.IntersectsInclusive(CreateBounds(_componentsById[sensor.SensorConfiguration.TargetComponentId]));
             sensor.ApplyRawDetection(rawDetected);
 
             SignalWriteResult write = _signalHub.SetDigitalInput(
@@ -607,7 +639,8 @@ public sealed class DeterministicMachineLayout
     }
 
     private LayoutComponentSnapshot[] CaptureSnapshotsCore() =>
-        _orderedComponents
+        _orderedComponents.Concat(_manualSamples)
+            .OrderBy(component => component.Configuration.Id, StringComparer.Ordinal)
             .Select(component => component.CaptureSnapshot())
             .ToArray();
 

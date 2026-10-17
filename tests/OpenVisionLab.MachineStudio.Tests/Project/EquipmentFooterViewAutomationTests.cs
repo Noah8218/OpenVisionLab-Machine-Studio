@@ -12,6 +12,7 @@ using OpenVisionLab.Machine.Sequence.Runtime;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Snapshots;
 using OpenVisionLab.Machine.Simulation.Events;
+using OpenVisionLab.Machine.Simulation.Workpieces;
 using OpenVisionLab.Machine.Persistence.Projects;
 using OpenVisionLab.MachineStudio.Model;
 using OpenVisionLab.MachineStudio.View.Inspector;
@@ -44,11 +45,12 @@ public sealed class EquipmentFooterViewAutomationTests
             project.Sequences.Clear();
             using var model = new MainViewModel(project);
             model.Navigation.IsInspectionWorkspace = true;
-            var window = new ShellWindow { DataContext = model, Width = width, Height = height, ShowInTaskbar = false, ShowActivated = false };
+            var window = new ShellWindow { DataContext = model, Width = width, MinWidth = width, Height = height, ShowInTaskbar = false, ShowActivated = false };
             window.Show();
             try
             {
                 Pump(window);
+                Assert.Equal(width, window.ActualWidth, precision: 0);
                 var mmi = Assert.Single(Descendants(window).OfType<MmiOperatorLayoutView>());
                 model.Navigation.IsInspectorOpen = true;
                 Pump(window);
@@ -57,7 +59,9 @@ public sealed class EquipmentFooterViewAutomationTests
                 model.Navigation.IsInspectorOpen = false;
                 var preview = Assert.IsType<ScrollViewer>(mmi.FindName("MmiInspectionPreviewScrollViewer"));
                 Assert.True(preview.IsVisible);
-                if (height == 760) Assert.True(preview.ScrollableHeight > 0);
+                var imageFrame = Assert.IsType<Border>(mmi.FindName("MmiVirtualCameraImageFrame"));
+                Assert.True(double.IsPositiveInfinity(imageFrame.MaxHeight));
+                Assert.True(new Rect(window.RenderSize).Contains(Bounds(imageFrame, window)));
                 var pill = Assert.IsType<Border>(mmi.FindName("MmiInspectionStatusPill"));
                 Assert.InRange(pill.ActualHeight, 16, 34);
                 foreach (var name in new[] { "MmiPublishButton", "MmiRefreshButton", "MmiApplyResultButton" })
@@ -68,22 +72,39 @@ public sealed class EquipmentFooterViewAutomationTests
                 var cameraSource = Assert.IsType<CameraImageSourceView>(mmi.FindName("MmiCameraSourceSettings"));
                 if (model.Navigation.IsNarrowLayout)
                 {
+                    var toggle = Assert.IsType<System.Windows.Controls.Primitives.ToggleButton>(mmi.FindName("MmiInspectionSettingsToggle"));
+                    Assert.False(cameraSource.IsVisible);
+                    ((IToggleProvider)new ToggleButtonAutomationPeer(toggle).GetPattern(PatternInterface.Toggle)).Toggle();
+                    Pump(window);
+                    Assert.True(model.Navigation.IsInspectionSettingsExpanded && cameraSource.IsVisible);
                     var setup = Assert.IsType<ScrollViewer>(mmi.FindName("MmiCaptureSetupScrollViewer"));
+                    var viewport = Descendants(setup).OfType<ScrollContentPresenter>().First();
                     cameraSource.ApplyCameraSourceButton.BringIntoView();
                     Pump(window);
-                    Assert.True(new Rect(0, 0, setup.ViewportWidth, setup.ViewportHeight).Contains(Bounds(cameraSource.ApplyCameraSourceButton, setup)),
+                    Assert.True(new Rect(viewport.RenderSize).Contains(Bounds(cameraSource.ApplyCameraSourceButton, viewport)),
                         $"Apply must fit setup viewport: button={Bounds(cameraSource.ApplyCameraSourceButton, setup)}, viewport={setup.ViewportWidth}x{setup.ViewportHeight}, offset={setup.VerticalOffset}, scrollable={setup.ScrollableHeight}.");
                     Assert.True(new Rect(window.RenderSize).Contains(Bounds(cameraSource.ApplyCameraSourceButton, window)));
                     cameraSource.BrowseCameraSourceButton.BringIntoView();
                     Pump(window);
-                    Assert.True(new Rect(0, 0, setup.ViewportWidth, setup.ViewportHeight).Contains(Bounds(cameraSource.BrowseCameraSourceButton, setup)),
+                    Assert.True(new Rect(viewport.RenderSize).Contains(Bounds(cameraSource.BrowseCameraSourceButton, viewport)),
                         $"Browse must fit setup viewport: button={Bounds(cameraSource.BrowseCameraSourceButton, setup)}, viewport={setup.ViewportWidth}x{setup.ViewportHeight}, offset={setup.VerticalOffset}.");
+                    ((IToggleProvider)new ToggleButtonAutomationPeer(toggle).GetPattern(PatternInterface.Toggle)).Toggle();
+                    Pump(window);
+                    Assert.False(model.Navigation.IsInspectionSettingsExpanded);
+                    Assert.True(preview.IsVisible);
                 }
                 else Assert.True(new Rect(window.RenderSize).Contains(Bounds(cameraSource.ApplyCameraSourceButton, window)));
                 var before = Bounds(Assert.IsType<Button>(mmi.FindName("MmiApplyResultButton")), window);
-                preview.ScrollToBottom();
+                model.Navigation.IsInspectionSettingsExpanded = true;
+                model.Navigation.SelectedInspectionSettingsTabIndex = 3;
                 Pump(window);
-                Assert.Equal(preview.ScrollableHeight, preview.VerticalOffset, precision: 1);
+                var imageBeforeResults = Bounds(imageFrame, window);
+                var results = Assert.IsType<ScrollViewer>(mmi.FindName("MmiExternalImagesScrollViewer"));
+                results.ScrollToBottom();
+                Pump(window);
+                Assert.Equal(results.ScrollableHeight, results.VerticalOffset, precision: 1);
+                Assert.Equal(imageBeforeResults, Bounds(imageFrame, window));
+                Assert.True(imageFrame.IsVisible);
                 Assert.Equal(before, Bounds(Assert.IsType<Button>(mmi.FindName("MmiApplyResultButton")), window));
                 Assert.False(model.IsRunning || model.HasUnsavedChanges);
                 return true;
@@ -108,6 +129,9 @@ public sealed class EquipmentFooterViewAutomationTests
             window.Show();
             try
             {
+                Pump(window);
+                // The history workspace defaults to archived runs. Select the existing session-record tab explicitly.
+                Assert.Single(Descendants(window).OfType<SceneDocumentView>()).ResultsWorkspaceTabs.SelectedIndex = 0;
                 Pump(window);
                 var journal = Assert.Single(Descendants(window).OfType<EventJournalView>().Where(view => view.IsInline));
                 model.Navigation.IsInspectorOpen = true;
@@ -171,24 +195,41 @@ public sealed class EquipmentFooterViewAutomationTests
             using var model = new MainViewModel(project);
             model.Navigation.IsEquipmentWorkspace = true;
             model.Navigation.IsInspectorOpen = true;
-            model.Layout.Select("inspection");
-            var window = new ShellWindow { DataContext = model, Width = width, Height = height, ShowInTaskbar = false, ShowActivated = false };
+            model.Layout.Select(hasWorkpieces ? "inspection" : "belt");
+            var window = new ShellWindow { DataContext = model, Width = width, MinWidth = width, Height = height, ShowInTaskbar = false, ShowActivated = false };
             window.Show();
             try
             {
                 Pump(window);
+                Assert.Equal(width, window.ActualWidth, precision: 0);
                 var scene = Assert.Single(Descendants(window).OfType<SceneDocumentView>());
                 var footer = Assert.IsType<Grid>(scene.FindName("EquipmentFooterRegion"));
                 var slots = Assert.IsType<Border>(scene.FindName("EquipmentMaterialSlots"));
                 var actions = Assert.IsType<Border>(scene.FindName("EquipmentSelectionActions"));
                 var inspector = Assert.Single(Descendants(window).OfType<RightToolRegionView>());
+                Assert.False(slots.IsVisible);
+                var disclosure = Assert.IsType<System.Windows.Controls.Primitives.ToggleButton>(scene.FindName("EquipmentSlotsToggleButton"));
+                var legend = Assert.IsType<WrapPanel>(scene.FindName("EquipmentSceneLegend"));
+                var viewTools = Assert.IsType<Border>(scene.FindName("EquipmentViewToolbarGroup"));
+                var additionalTools = Assert.IsType<StackPanel>(scene.FindName("EquipmentSupplementalActions"));
+                var legendBounds = Bounds(legend, window);
+                var actionBounds = Bounds(actions, window);
+                Assert.InRange(Math.Abs(legendBounds.Bottom - actionBounds.Bottom), 0, 1);
+                Assert.False(legendBounds.IntersectsWith(actionBounds), $"Legend={legendBounds}; selection={actionBounds}");
+                Assert.True(Bounds(additionalTools, window).Bottom < Bounds(footer, window).Top);
+                Assert.True(Bounds(additionalTools, window).Right <= Bounds(viewTools, window).Left);
+                Assert.InRange(Math.Abs(Bounds(additionalTools, window).Top - Bounds(viewTools, window).Top), 0, 6);
+                Assert.False(legend.IsHitTestVisible);
+                if (width >= 1920) Assert.True(legend.ActualHeight < 24, "The normal Wide legend must fit one row.");
+                ((IToggleProvider)new ToggleButtonAutomationPeer(disclosure).GetPattern(PatternInterface.Toggle)).Toggle();
+                Pump(window);
                 Assert.Equal(hasWorkpieces, slots.IsVisible);
                 Assert.True(actions.IsVisible && inspector.IsVisible);
                 var footerBounds = Bounds(footer, window);
                 var inspectorBounds = Bounds(inspector, window);
-                Assert.True(inspectorBounds.Bottom <= footerBounds.Top, $"Inspector={inspectorBounds}; footer={footerBounds}");
-                Assert.Equal(5, Descendants(actions).OfType<Button>().Count());
-                var primary = Descendants(actions).OfType<Button>().Single(button => ReferenceEquals(button.Command, model.OpenEquipmentPropertiesCommand));
+                Assert.False(inspectorBounds.IntersectsWith(footerBounds), $"Inspector={inspectorBounds}; footer={footerBounds}");
+                Assert.Equal(2, Descendants(actions).OfType<Button>().Count());
+                var primary = Descendants(actions).OfType<Button>().Single(button => ReferenceEquals(button.Command, model.OpenEquipmentSinglePartCheckCommand));
                 var primaryCaption = Assert.Single(Descendants(primary).OfType<TextBlock>());
                 Assert.Equal(Assert.IsType<SolidColorBrush>(primary.Foreground).Color, Assert.IsType<SolidColorBrush>(primaryCaption.Foreground).Color);
                 if (!hasWorkpieces)
@@ -199,9 +240,9 @@ public sealed class EquipmentFooterViewAutomationTests
                 }
                 var cards = Descendants(slots).OfType<Button>().ToArray();
                 Assert.Equal(3, cards.Length);
-                if (longName)
+                var scroll = Assert.Single(Descendants(slots).OfType<ScrollViewer>());
+                if (scroll.ScrollableWidth > 0)
                 {
-                    var scroll = Assert.Single(Descendants(slots).OfType<ScrollViewer>());
                     Assert.True(scroll.ScrollableWidth > 0);
                     scroll.ScrollToRightEnd();
                     Pump(window);
@@ -225,7 +266,8 @@ public sealed class EquipmentFooterViewAutomationTests
                 Pump(window);
                 Assert.Equal("unit-feed", model.Layout.ActiveUnitId);
                 Assert.Null(model.Layout.SelectedItem);
-                Assert.False(model.Navigation.IsInspectorOpen);
+                Assert.True(model.Navigation.IsInspectorOpen);
+                Assert.Contains(model.Properties.Items, item => item.Value == "unit-feed");
                 Assert.False(editor.HasPendingInspectorDraft);
                 Assert.False(model.HasUnsavedChanges);
                 Assert.Equal(TimeSpan.Zero, model.SceneSnapshots.Latest!.SimulationTime);
@@ -239,7 +281,7 @@ public sealed class EquipmentFooterViewAutomationTests
                 model.Layout.SelectedItem!.CurrentName = "Renamed workpiece position";
                 Pump(window);
                 Assert.Equal("Renamed workpiece position", model.Layout.EquipmentSelectionNameText);
-                Assert.Contains(Descendants(actions).OfType<TextBlock>(), text => text.Text == "Renamed workpiece position");
+                Assert.Contains(Descendants(actions).OfType<TextBlock>(), text => text.Text.Contains("Renamed workpiece position", StringComparison.Ordinal));
                 Assert.Equal(slotName, model.EquipmentMaterialFlow.Slots[0].Name);
                 var revisionText = Descendants(window).OfType<TextBlock>().Single(text =>
                     text.GetBindingExpression(TextBlock.TextProperty)?.ParentBinding.Path.Path == nameof(MainViewModel.EquipmentFooterStatusText));
@@ -293,17 +335,20 @@ public sealed class EquipmentFooterViewAutomationTests
             using var model = new MainViewModel(project);
             model.Navigation.IsSimulationWorkspace = true;
             model.Navigation.SelectedExecutionTabIndex = 0;
-            var window = new ShellWindow { DataContext = model, Width = width, Height = height, ShowInTaskbar = false, ShowActivated = false };
+            var window = new ShellWindow { DataContext = model, Width = width, MinWidth = width, Height = height, ShowInTaskbar = false, ShowActivated = false };
             window.Show();
             try
             {
                 Pump(window);
+                Assert.Equal(width, window.ActualWidth, precision: 0);
                 var scene = Assert.Single(Descendants(window).OfType<SceneDocumentView>());
                 var slots = Assert.IsType<Border>(scene.FindName("EquipmentMaterialSlots"));
-                var activity = Assert.IsType<Border>(scene.FindName("SimulationUnitActivities"));
+                var activity = Assert.IsType<OpenVisionLab.MachineStudio.View.Simulation.SimulationObservationView>(scene.FindName("SimulationUnitActivities"));
                 Assert.Equal(hasWorkpieces, slots.IsVisible);
-                Assert.Equal(!hasWorkpieces, activity.IsVisible);
-                var cards = Descendants(hasWorkpieces ? slots : activity).OfType<Button>().Where(button => button.IsVisible).ToArray();
+                Assert.True(activity.IsVisible);
+                if (!hasWorkpieces) model.Navigation.IsSimulationDiagnosticsExpanded = true;
+                Pump(window);
+                var cards = Descendants(hasWorkpieces ? (FrameworkElement)slots : activity).OfType<Button>().Where(button => button.IsVisible && ReferenceEquals(button.Command, model.ShowEquipmentUnitCommand)).ToArray();
                 Assert.Equal(3, cards.Length);
                 Assert.All(cards, card => Assert.Same(model.ShowEquipmentUnitCommand, card.Command));
                 var viewing = Assert.IsType<WrapPanel>(scene.FindName("EquipmentViewToolbar"));
@@ -311,9 +356,9 @@ public sealed class EquipmentFooterViewAutomationTests
                 Assert.True(Assert.IsType<Button>(scene.FindName("FitLayoutButton")).IsVisible);
                 var bar = Assert.Single(Descendants(window).OfType<GlobalCommandBarView>());
                 var state = Assert.IsType<TextBlock>(bar.FindName("CommonRunStateText"));
-                var target = Assert.IsType<TextBlock>(bar.FindName("CommonRunTargetText"));
-                Assert.Equal(OpenVisionLanguageService.T("Shell.Editing"), state.Text);
-                Assert.Equal(model.RunTargetText, target.Text);
+                var target = Assert.Single(Descendants(Assert.IsType<System.Windows.Controls.Primitives.ToggleButton>(bar.FindName("RunTargetDetailsButton"))).OfType<TextBlock>());
+                Assert.Equal(OpenVisionLanguageService.T("R24.Editing"), state.Text);
+                Assert.Equal(model.RunTargetSummaryText, target.Text);
                 var stateBounds = Bounds(state, window);
                 var targetBounds = Bounds(target, window);
                 var barBounds = Bounds(bar, window);
@@ -330,10 +375,68 @@ public sealed class EquipmentFooterViewAutomationTests
                 Pump(window);
                 Assert.Equal(OpenVisionLanguageService.T("Equipment.State.Ready"), state.Text);
                 Assert.False(model.IsRunning);
-                var commands = Assert.IsType<WrapPanel>(bar.FindName("CommonRunCommands"));
+                var commands = Assert.IsType<StackPanel>(bar.FindName("CommonRunCommands"));
                 Assert.True(commands.IsVisible);
+                Assert.InRange(bar.ActualHeight, 34, 65);
+                foreach (var control in commands.Children.OfType<FrameworkElement>().Where(control => control.IsVisible))
+                    Assert.True(new Rect(bar.RenderSize).Contains(Bounds(control, bar)), "Run controls must fit the toolbar at both supported widths.");
                 var viewport = Assert.IsType<MachineSceneViewport>(scene.FindName("SceneViewport"));
-                Assert.True(Bounds(viewport, window).Bottom <= Bounds(hasWorkpieces ? slots : activity, window).Top);
+                Assert.True(Bounds(viewport, window).Bottom <= Bounds(hasWorkpieces ? (FrameworkElement)slots : activity, window).Top);
+                return true;
+            }
+            finally { window.DataContext = null; window.Close(); }
+        });
+    }
+
+    [Theory]
+    [InlineData(1920, 1040)]
+    [InlineData(1280, 760)]
+    [InlineData(1000, 720)]
+    public async Task ThreeRunningSlotsKeepTheirRunIdentityAndFitWithoutHorizontalScrolling(double width, double height)
+    {
+        await _ui.InvokeAsync(() =>
+        {
+            var project = EquipmentMaterialFlowViewModelTests.CreateProject();
+            project.MaterialFlow.Enabled = true;
+            project.Sequences = [new SequenceDefinition { Id = "inspect", UnitId = "unit-inspection", Steps =
+                [new SequenceStepDefinition { Id = "capture", Name = "상면 검사 후 높이 촬영 준비를 위한 시간 대기", Action = SequenceStepAction.Delay, Parameter = "1", NextStepId = "complete" },
+                 new SequenceStepDefinition { Id = "complete", Name = "완료", Action = SequenceStepAction.Complete }] }];
+            using var model = new MainViewModel(project);
+            model.Navigation.IsSimulationWorkspace = true;
+            var snapshot = new SimulationSnapshot(TimeSpan.FromSeconds(3), 600, SimulationRunMode.RealTime, SimulationControlOwner.EmbeddedSequence, 1,
+                [], 0, [], [new SequenceExecutionSnapshot("inspect", SequenceExecutionStatus.Running, "capture", 0, TimeSpan.Zero, TimeSpan.Zero, 600, null,
+                    TimeSpan.Zero, UnitId: "unit-inspection", RepeatCount: 3)], [], AutomaticRunSnapshot.NotConfigured, [],
+                unitMaterialSlots: project.Stations[0].Units.Select((unit, index) => new UnitMaterialSlotSnapshot(unit.Id,
+                    $"744143a892f4494485418b56f1ba1d2a/unit-run0003/WP{index + 1:000}", "Occupied", null, 0, null, 0, 2)));
+            var window = new ShellWindow { DataContext = model, Width = width, MinWidth = width, Height = height, ShowInTaskbar = false, ShowActivated = false };
+            window.Show();
+            try
+            {
+                Pump(window);
+                Assert.Equal(width, window.ActualWidth, precision: 0);
+                var materialFlow = new EquipmentMaterialFlowViewModel();
+                materialFlow.Update(project, model.Layout.Items, snapshot);
+                Pump(window);
+                var scene = Assert.Single(Descendants(window).OfType<SceneDocumentView>());
+                var slots = Assert.IsType<Border>(scene.FindName("EquipmentMaterialSlots"));
+                slots.DataContext = new { EquipmentMaterialFlow = materialFlow };
+                model.EquipmentMaterialFlow.Update(project, model.Layout.Items, model.SceneSnapshots.Latest!);
+                Assert.DoesNotContain(model.EquipmentMaterialFlow.Slots, slot => slot.InstanceId.StartsWith("744143a892f4494485418b56f1ba1d2a/", StringComparison.Ordinal));
+                Pump(window);
+                var scroll = Assert.Single(Descendants(slots).OfType<ScrollViewer>());
+                Assert.InRange(scroll.ScrollableWidth, 0, 0.5);
+                var cards = Descendants(slots).OfType<Button>().ToArray();
+                Assert.Equal(3, cards.Length);
+                Assert.All(cards, card => Assert.Same(model.ShowEquipmentUnitCommand, card.Command));
+                for (var index = 0; index < cards.Length; index++)
+                {
+                    var bounds = Bounds(cards[index], slots);
+                    Assert.True(bounds.Left >= 0 && bounds.Right <= slots.ActualWidth, $"All three cards must fit: {bounds}, footer={slots.ActualWidth}.");
+                    var identity = Descendants(cards[index]).OfType<TextBlock>().Single(text => text.Text == $"unit-run0003/WP{index + 1:000}");
+                    Assert.Equal(materialFlow.Slots[index].InstanceId, identity.ToolTip);
+                    Assert.True(Bounds(identity, scroll).Bottom <= scroll.ViewportHeight);
+                }
+                Assert.False(model.HasUnsavedChanges || model.IsRunning);
                 return true;
             }
             finally { window.DataContext = null; window.Close(); }

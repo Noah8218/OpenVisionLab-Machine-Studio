@@ -42,7 +42,8 @@ public sealed class RecipeAuthoringWorkspace : IDisposable
         Action<string> refreshCameraWorkflowPresentation,
         Action invalidateCommands,
         Action<string> setStatus,
-        Action<string, string> log)
+        Action<string, string> log,
+        Action? returnToConnections = null)
     {
         _layout = layout ?? throw new ArgumentNullException(nameof(layout));
         _sequenceEditor = sequenceEditor ?? throw new ArgumentNullException(nameof(sequenceEditor));
@@ -107,7 +108,11 @@ public sealed class RecipeAuthoringWorkspace : IDisposable
             () => Connections.ProcessBlocks.ProcessBlockItems,
             TryOpenConnectionSequenceStepForReview,
             stepId => Connections.ProcessBlocks.SelectProcessBlockStep(stepId)?.StepText,
-            _selectDocumentTab,
+            index =>
+            {
+                if (index == 1 && returnToConnections is not null) returnToConnections();
+                else _selectDocumentTab(index);
+            },
             _setStatus);
         Playback = new RecipeDryRunPlaybackViewModel(
             isDesignMode,
@@ -124,14 +129,14 @@ public sealed class RecipeAuthoringWorkspace : IDisposable
 
     private void OpenConnectionSequenceStep(string sequenceId, string stepId)
     {
-        ProcessPlanReview.Clear();
-        TryOpenConnectionSequenceStep(sequenceId, stepId);
+        if (TryOpenConnectionSequenceStep(sequenceId, stepId)) ProcessPlanReview.Clear();
     }
 
     private bool TryOpenConnectionSequenceStep(string sequenceId, string stepId)
     {
+        if (!_sequenceEditor.ResolvePendingStepDraft()) return false;
         _sequenceEditor.SelectStep(sequenceId, stepId);
-        if (_sequenceEditor.SelectedStep is null)
+        if (_sequenceEditor.SelectedSequence?.Id != sequenceId || _sequenceEditor.SelectedStep?.Id != stepId)
         {
             _setStatus(OpenVisionLanguageService.T("Connections.OpenStepRejectedStatus"));
             return false;

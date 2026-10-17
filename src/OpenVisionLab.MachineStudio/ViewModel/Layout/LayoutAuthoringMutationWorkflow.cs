@@ -1,5 +1,7 @@
+using System.Globalization;
 using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Core.Devices;
 
 namespace OpenVisionLab.MachineStudio.ViewModel;
 
@@ -69,7 +71,7 @@ internal sealed class LayoutAuthoringMutationWorkflow
         _confirmRemoval = confirmRemoval;
     }
 
-    internal bool TryAdd(LayoutComponentKind kind, double? worldX = null, double? worldY = null)
+    internal bool TryAdd(LayoutComponentKind kind, double? worldX = null, double? worldY = null, NumericalCameraInputKind? cameraInputKind = null, Action<string>? onAdded = null)
     {
         if (!_isSceneEditable()
             || _isApplyingProject()
@@ -87,7 +89,8 @@ internal sealed class LayoutAuthoringMutationWorkflow
             _layout.SelectedItem?.Id,
             worldX,
             worldY,
-            _selectedUnitIdProvider());
+            _selectedUnitIdProvider(),
+            cameraInputKind);
         if (!result.IsSuccess)
         {
             HandleAddFailure(result.Failure);
@@ -99,8 +102,9 @@ internal sealed class LayoutAuthoringMutationWorkflow
         _updateRunToolAvailability();
         _refreshDefinitionPresentation(component.Id);
         _history.Commit(before);
-        _setStatusMessage($"Added {component.Name}");
+        _setStatusMessage(string.Format(CultureInfo.CurrentCulture, OpenVisionLanguageService.T("Layout.AddedStatus"), component.Name));
         _log("Layout", $"Added {component.Kind} '{component.Id}'");
+        onAdded?.Invoke(component.Id);
         return true;
     }
 
@@ -149,11 +153,14 @@ internal sealed class LayoutAuthoringMutationWorkflow
             {
                 case LayoutComponentRemovalFailureKind.SensorDependency when result.BlockingComponent is not null:
                     _setStatusMessage(
-                        $"Remove sensor '{result.BlockingComponent.Name}' before removing {components[0].Name}");
+                        string.Format(CultureInfo.CurrentCulture, OpenVisionLanguageService.T("Layout.RemovalSensorDependency"), result.BlockingComponent.Name, components[0].Name));
                     break;
                 case LayoutComponentRemovalFailureKind.WorkpieceDependency when result.BlockingComponent is not null:
                     _setStatusMessage(
-                        $"Remove workpiece '{result.BlockingComponent.Name}' before removing {components[0].Name}");
+                        string.Format(CultureInfo.CurrentCulture, OpenVisionLanguageService.T("Layout.RemovalWorkpieceDependency"), result.BlockingComponent.Name, components[0].Name));
+                    break;
+                case LayoutComponentRemovalFailureKind.MaterialPositionDependency when result.BlockingComponent is not null:
+                    _setStatusMessage(string.Format(CultureInfo.CurrentCulture, OpenVisionLanguageService.T("MaterialFlow.RemovalDependency"), result.BlockingComponent.Name, components[0].Name));
                     break;
             }
 
@@ -166,9 +173,9 @@ internal sealed class LayoutAuthoringMutationWorkflow
         _history.Commit(before);
         _setStatusMessage(result.RemovedComponents.Count == 1
             ? result.RemovedComponents[0].Kind is LayoutComponentKind.DigitalSensor or LayoutComponentKind.PneumaticCylinder
-                ? $"Removed {result.RemovedComponents[0].Name}; its device and channel definitions were retained"
-                : $"Removed {result.RemovedComponents[0].Name}"
-            : $"Removed {result.RemovedComponents.Count} components; device and sequence definitions were retained");
+                ? string.Format(CultureInfo.CurrentCulture, OpenVisionLanguageService.T("Layout.RemovedDeviceRetainedStatus"), result.RemovedComponents[0].Name)
+                : string.Format(CultureInfo.CurrentCulture, OpenVisionLanguageService.T("Layout.RemovedStatus"), result.RemovedComponents[0].Name)
+            : string.Format(CultureInfo.CurrentCulture, OpenVisionLanguageService.T("Layout.RemovedComponentsRetainedStatus"), result.RemovedComponents.Count));
         _log("Layout", $"Removed {string.Join(", ", ids)} without cascading into project definitions");
         return true;
     }

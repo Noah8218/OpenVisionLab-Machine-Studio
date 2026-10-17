@@ -1,12 +1,67 @@
-<UserControl x:Class="OpenVisionLab.MachineStudio.View.Shell.StudioStatusBarView"
+<UserControl x:Class="OpenVisionLab.MachineStudio.View.Shell.StudioStatusBarView" x:Name="StatusBarViewRoot"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization">
-    <Border Background="{DynamicResource Surface.Root}"
-            BorderBrush="{DynamicResource Border.Default}"
-            BorderThickness="0,1,0,0">
+             xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
+             xmlns:local="clr-namespace:OpenVisionLab.MachineStudio.View.Shell">
+    <UserControl.Style>
+        <Style TargetType="local:StudioStatusBarView">
+            <Style.Triggers>
+                <Trigger Property="IsR24Workspace" Value="True"><Setter Property="UseLayoutRounding" Value="False" /></Trigger>
+                <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True"><Setter Property="IsR24Workspace" Value="True" /></DataTrigger>
+                <DataTrigger Binding="{Binding Navigation.IsSequenceWorkspace}" Value="True"><Setter Property="IsR24Workspace" Value="True" /></DataTrigger>
+                <DataTrigger Binding="{Binding Navigation.IsInspectionWorkspace}" Value="True"><Setter Property="IsR24Workspace" Value="True" /></DataTrigger>
+                <DataTrigger Binding="{Binding Navigation.IsResultsWorkspace}" Value="True"><Setter Property="IsR24Workspace" Value="True" /></DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Style>
+    <UserControl.Resources>
+        <Style x:Key="StatusTextStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Style.Triggers><DataTrigger Binding="{Binding IsR24Workspace, ElementName=StatusBarViewRoot}" Value="True"><Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="11.5" /><Setter Property="LineHeight" Value="16.675" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" /></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="StatusTelemetryStyle" TargetType="TextBlock" BasedOn="{StaticResource TelemetryTextStyle}">
+            <Style.Triggers><DataTrigger Binding="{Binding IsR24Workspace, ElementName=StatusBarViewRoot}" Value="True"><Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="11.5" /><Setter Property="LineHeight" Value="16.675" /></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="EquipmentStatusFieldStyle" TargetType="TextBlock" BasedOn="{StaticResource StatusTextStyle}">
+            <Setter Property="Margin" Value="14,0,0,0" />
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="LineHeight" Value="16.675" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+            <Setter Property="Visibility" Value="{Binding IsR24Workspace, ElementName=StatusBarViewRoot, Converter={StaticResource BooleanToVisibilityConverter}}" />
+        </Style>
+        <Style x:Key="EquipmentExternalWaitStyle" TargetType="TextBlock" BasedOn="{StaticResource EquipmentStatusFieldStyle}">
+            <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsR24Workspace, ElementName=StatusBarViewRoot}" Value="True" />
+                        <Condition Binding="{Binding IsEquipmentExternalInspectionWaiting}" Value="True" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Visibility" Value="Visible" />
+                </MultiDataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="TextBlock" BasedOn="{StaticResource StatusTextStyle}" />
+    </UserControl.Resources>
+    <Border BorderThickness="0,1,0,0">
+        <Border.Style>
+            <Style TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource Surface.Root}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsR24Workspace, ElementName=StatusBarViewRoot}" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource Surface.Tinted}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
         <Grid Margin="10,0">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -22,31 +77,54 @@
                 <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource GlobalCommandButtonStyle}">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                            <DataTrigger Binding="{Binding IsR24Workspace, ElementName=StatusBarViewRoot}" Value="True">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Button.Style>
             </Button>
-            <TextBlock Grid.Column="1"
-                       MaxWidth="280"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource Text.Secondary}"
-                       TextTrimming="CharacterEllipsis"
-                       ToolTip="{Binding ProjectStatusText}">
+            <TextBlock x:Name="CommonSaveStateText" Grid.Column="1" Margin="0,0,12,0" VerticalAlignment="Center">
                 <TextBlock.Style>
-                    <Style TargetType="TextBlock">
-                        <Setter Property="Text" Value="{Binding ProjectStatusText}" />
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource StatusTextStyle}">
+                        <Setter Property="Text" Value="{Binding ProjectSaveStateText}" />
+                        <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
-                                <Setter Property="Text" Value="{Binding EquipmentFooterStatusText}" />
+                            <DataTrigger Binding="{Binding IsR24Workspace, ElementName=StatusBarViewRoot}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                            <DataTrigger Binding="{Binding HasUnsavedChanges}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding SequenceEditor.HasPendingStepDraft}" Value="True">
+                                <Setter Property="Text" Value="{loc:Loc Key=Sequence.StepDraftPending}" />
+                                <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Layout.SelectedComponentEditor.HasPendingInspectorDraft}" Value="True">
+                                <Setter Property="Text" Value="{loc:Loc Key=Sequence.StepDraftPending}" />
+                                <Setter Property="Foreground" Value="{DynamicResource State.Warning}" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </TextBlock.Style>
             </TextBlock>
-            <TextBlock Grid.Column="2"
+            <TextBlock x:Name="StatusRecipeSummaryText" Grid.Column="2"
+                       MaxWidth="280"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource Text.Secondary}"
+                       TextTrimming="CharacterEllipsis"
+                       ToolTip="{Binding RecipeTitleText}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource StatusTextStyle}">
+                        <Setter Property="Text" Value="{Binding RecipeTitleText}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsR24Workspace, ElementName=StatusBarViewRoot}" Value="True">
+                                <Setter Property="Text" Value="{Binding EquipmentFooterStatusText}" />
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Grid.Column="3"
                        Margin="16,0,12,0"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource Text.Secondary}"
@@ -54,9 +132,9 @@
                        TextTrimming="CharacterEllipsis"
                        ToolTip="{Binding SelectionStatusText}">
                 <TextBlock.Style>
-                    <Style TargetType="TextBlock">
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource StatusTextStyle}">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                            <DataTrigger Binding="{Binding IsR24Workspace, ElementName=StatusBarViewRoot}" Value="True">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
                         </Style.Triggers>
@@ -64,29 +142,42 @@
                 </TextBlock.Style>
             </TextBlock>
 
-            <TextBlock Grid.Column="3"
-                       Margin="10,0"
-                       VerticalAlignment="Center"
-                       Style="{StaticResource TelemetryTextStyle}"
-                       Text="{Binding SimulationStatusText}" />
-            <TextBlock Grid.Column="4"
+            <StackPanel x:Name="StatusSimulationTelemetry" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Grid.Column" Value="4" /><Setter Property="Margin" Value="10,0" /><Style.Triggers><DataTrigger Binding="{Binding IsR24Workspace, ElementName=StatusBarViewRoot}" Value="True"><Setter Property="Grid.Column" Value="0" /><Setter Property="Margin" Value="0" /></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+                <TextBlock x:Name="StatusSimulationTimeText" FontFamily="Segoe UI, Malgun Gothic" FontSize="11.5"
+                           LineHeight="16.675" LineStackingStrategy="BlockLineHeight" Foreground="{DynamicResource Text.Secondary}"
+                           Text="{Binding SimulationSecondsStatusText}" />
+                <TextBlock x:Name="StatusSimulationSpeedText" Margin="14,0,0,0" FontFamily="Segoe UI, Malgun Gothic" FontSize="11.5"
+                           LineHeight="16.675" LineStackingStrategy="BlockLineHeight" Foreground="{DynamicResource Text.Secondary}"
+                           Text="{Binding SimulationSpeedText}" />
+                <TextBlock x:Name="StatusEquipmentExternalWaitText" Style="{StaticResource EquipmentExternalWaitStyle}" Text="{Binding EquipmentExternalInspectionWaitText}" />
+                <TextBlock x:Name="StatusEquipmentVerdictText" Style="{StaticResource EquipmentStatusFieldStyle}" Text="{Binding EquipmentVerdictStatusText}" />
+                <TextBlock x:Name="StatusEquipmentTwoDText" Style="{StaticResource EquipmentStatusFieldStyle}" Text="{Binding EquipmentTwoDStatusText}" />
+                <TextBlock x:Name="StatusEquipmentThreeDText" Style="{StaticResource EquipmentStatusFieldStyle}" Text="{Binding EquipmentThreeDStatusText}" />
+                <TextBlock x:Name="StatusEquipmentAiText" Style="{StaticResource EquipmentStatusFieldStyle}" Text="{Binding EquipmentAiStatusText}" />
+            </StackPanel>
+            <TextBlock Grid.Column="5"
                        Margin="10,0"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource Text.Secondary}"
                        Text="{Binding FixedStepStatusText}">
                 <TextBlock.Style>
-                    <Style TargetType="TextBlock">
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource StatusTextStyle}">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding Navigation.IsEquipmentWorkspace}" Value="True">
+                            <DataTrigger Binding="{Binding IsR24Workspace, ElementName=StatusBarViewRoot}" Value="True">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </TextBlock.Style>
             </TextBlock>
-            <TextBlock Grid.Column="4" Margin="10,0" VerticalAlignment="Center"
+            <TextBlock x:Name="StatusEquipmentSelectionText" Grid.Column="4" Margin="14,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Right"
+                       FontFamily="Segoe UI, Malgun Gothic" FontSize="11.5" LineHeight="16.675" LineStackingStrategy="BlockLineHeight"
+                       Foreground="{DynamicResource Text.Secondary}" Text="{Binding EquipmentSelectionStatusText}" TextTrimming="None"
+                       Visibility="{Binding IsR24Workspace, ElementName=StatusBarViewRoot, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <TextBlock x:Name="StatusEquipmentSimulationOnlyText" Grid.Column="5" Margin="14,0,0,0" VerticalAlignment="Center"
                        Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=Equipment.SimulationOnly}"
-                       Visibility="{Binding Navigation.IsEquipmentWorkspace, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                       Visibility="{Binding IsR24Workspace, ElementName=StatusBarViewRoot, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </Grid>
     </Border>
 </UserControl>

@@ -1,0 +1,238 @@
+<Window x:Class="OpenVisionLab.MachineStudio.View.Sequence.SequenceStepTemplateDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:conv="clr-namespace:OpenVisionLab.MachineStudio.Converter"
+        xmlns:loc="clr-namespace:OpenVisionLab.MachineStudio.Localization"
+        xmlns:shell="clr-namespace:OpenVisionLab.MachineStudio.View.Shell"
+        Title="{loc:Loc Key=R24.AddStepTitle}" Width="900" SizeToContent="Height" MaxHeight="900"
+        WindowStartupLocation="CenterOwner" WindowStyle="None" ResizeMode="NoResize"
+        AllowsTransparency="True" Background="Transparent" ShowInTaskbar="False"
+        FontFamily="Segoe UI, Malgun Gothic" Foreground="{DynamicResource Text.Primary}" UseLayoutRounding="False">
+    <Window.Style>
+        <Style TargetType="Window">
+            <Setter Property="FontSize" Value="13" />
+            <Style.Triggers><DataTrigger Binding="{Binding Owner.(shell:ShellWindow.IsCompactLayout), RelativeSource={RelativeSource Self}}" Value="True"><Setter Property="FontSize" Value="12.5" /></DataTrigger></Style.Triggers>
+        </Style>
+    </Window.Style>
+    <Window.Resources>
+        <conv:KoreanWordWrappingConverter x:Key="AxisNameWrapping" />
+        <loc:LocalizedSequenceTemplateNameConverter x:Key="TemplateNameConverter" />
+        <Style x:Key="DialogTextStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI, Malgun Gothic" /><Setter Property="FontSize" Value="{Binding FontSize, RelativeSource={RelativeSource AncestorType=Window}}" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" /><Setter Property="LineHeight" Value="18.85" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Owner.(shell:ShellWindow.IsCompactLayout), RelativeSource={RelativeSource AncestorType=Window}}" Value="True"><Setter Property="LineHeight" Value="18.125" /></DataTrigger>
+                <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType=Button}}" Value="False"><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /></DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="TemplateButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" /><Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" /><Setter Property="Padding" Value="6,4" />
+            <Setter Property="MinHeight" Value="26" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+                <Border x:Name="ButtonBorder" Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
+                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" />
+                </Border>
+            </ControlTemplate></Setter.Value></Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                <Trigger Property="IsPressed" Value="True"><Setter Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource Accent.Primary}" /></Trigger>
+                <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}" /><Setter Property="Background" Value="{DynamicResource Surface.Disabled}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Disabled}" /></Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="DialogCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource TemplateButtonStyle}">
+            <Setter Property="Background" Value="{DynamicResource Surface.Raised}" /><Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" /><Setter Property="Padding" Value="10,4" /><Setter Property="MinHeight" Value="28" /><Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="ContentTemplate"><Setter.Value><DataTemplate><TextBlock Text="{Binding}" Style="{StaticResource DialogTextStyle}" /></DataTemplate></Setter.Value></Setter>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5"><ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" /></Border></ControlTemplate></Setter.Value></Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource Surface.Hover}" /></Trigger>
+                <Trigger Property="IsPressed" Value="True"><Setter Property="Background" Value="{DynamicResource Surface.Pressed}" /></Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+    <Border Padding="0" Background="{DynamicResource Surface.Panel}" BorderBrush="{DynamicResource Border.Default}" BorderThickness="1" CornerRadius="9">
+        <Grid>
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+            <Border Padding="18,13" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1">
+                <TextBlock Style="{StaticResource DialogTextStyle}" FontSize="16" FontWeight="Bold" LineHeight="23.2" TextWrapping="Wrap"><Run Text="{loc:Loc Key=R24.AddStepTitle}" /><Run Text=" — " /><Run Text="{Binding SequenceUnitNameText, Mode=OneWay, Converter={StaticResource AxisNameWrapping}}" /></TextBlock>
+            </Border>
+            <ScrollViewer Grid.Row="1" Padding="18,14" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource DialogTextStyle}" FontSize="11.5" LineHeight="16.675" Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" Margin="0,0,0,10" Text="{loc:Loc Key=R24.AddStepHint}" />
+                    <Border x:Name="AxisStepAuthoring" Padding="12" Margin="0,0,0,14" BorderThickness="1" BorderBrush="{DynamicResource Border.Default}" CornerRadius="5">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.AxisStepTitle}" FontWeight="SemiBold" Margin="0,0,0,8" />
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.AxisStepTarget}" />
+                            <ComboBox x:Name="AxisStepTarget" ItemsSource="{Binding AxisStepTargets}" SelectedValuePath="Id" SelectedValue="{Binding AxisStepTargetId, Mode=TwoWay}" IsEnabled="{Binding CanChooseStepTemplate}" MinHeight="28" Margin="0,3,0,8" AutomationProperties.Name="{loc:Loc Key=R40.AxisStepTarget}">
+                                <ComboBox.ItemTemplate><DataTemplate><TextBlock TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"><TextBlock.Text><MultiBinding StringFormat="{}{0} — {1}"><Binding Path="Id" /><Binding Path="Name" /></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=Sequence.Action}" />
+                            <ComboBox x:Name="AxisStepTemplate" ItemsSource="{Binding AxisStepTemplates}" SelectedValuePath="Id" SelectedValue="{Binding AxisStepTemplateId, Mode=TwoWay}" IsEnabled="{Binding CanChooseStepTemplate}" MinHeight="28" Margin="0,3,0,8" AutomationProperties.Name="{loc:Loc Key=Sequence.Action}">
+                                <ComboBox.ItemTemplate><DataTemplate><TextBlock Style="{StaticResource DialogTextStyle}"><TextBlock.Text><MultiBinding Converter="{StaticResource TemplateNameConverter}"><Binding /><Binding Path="Revision" Source="{x:Static loc:LocExtension.RevisionSource}" /></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.AxisStepPreview}" FontWeight="SemiBold" />
+                            <TextBlock x:Name="AxisStepPreviewTarget" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding AxisStepTarget.Name, Converter={StaticResource AxisNameWrapping}}" Margin="0,3,0,4" />
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R24.StepListValue}" Margin="0,0,8,0" />
+                                <TextBlock x:Name="AxisStepPreviewValue" Grid.Column="1" Style="{StaticResource DialogTextStyle}" Text="{Binding AxisStepPreviewValue}" />
+                                <TextBlock x:Name="AxisStepTimeoutLabel" Grid.Column="2" Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.AxisStepTimeoutLabel}" Margin="12,0,8,0" />
+                                <TextBlock x:Name="AxisStepPreviewTimeout" Grid.Column="3" Style="{StaticResource DialogTextStyle}" Text="{Binding AxisStepPreviewTimeout}" />
+                            </Grid>
+                            <TextBlock Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{loc:Loc Key=R40.AxisStepHint}" Foreground="{DynamicResource Text.Secondary}" Margin="0,8,0,8" />
+                            <Button x:Name="AddAxisStepButton" HorizontalAlignment="Right" Style="{StaticResource DialogCloseButtonStyle}" Content="{loc:Loc Key=R24.AddStepTitle}" Command="{Binding AddAxisStepCommand}" />
+                        </StackPanel>
+                    </Border>
+                    <Expander x:Name="CameraStepAuthoring" Header="{loc:Loc Key=R40.CameraStepTitle}" IsExpanded="False" Margin="0,0,0,14">
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.CameraStepTarget}" />
+                            <ComboBox x:Name="CameraStepTarget" ItemsSource="{Binding CameraStepTargets}" SelectedValuePath="Id" SelectedValue="{Binding CameraStepTargetId, Mode=TwoWay}" IsEnabled="{Binding CanChooseStepTemplate}" MinHeight="28" Margin="0,3,0,8" AutomationProperties.Name="{loc:Loc Key=R40.CameraStepTarget}">
+                                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" /></DataTemplate></ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=Sequence.Action.TriggerCamera}" FontWeight="SemiBold" />
+                            <TextBlock x:Name="CameraStepPreviewTarget" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding CameraStepTarget.Name, Converter={StaticResource AxisNameWrapping}}" Margin="0,3,0,4" />
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R24.Inspector.CameraRecipeId}" Margin="0,0,8,0" />
+                                <TextBlock x:Name="CameraStepPreviewRecipe" Grid.Column="1" Style="{StaticResource DialogTextStyle}" Text="{Binding CameraStepPreviewRecipe}" />
+                                <TextBlock Grid.Column="2" Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.AxisStepTimeoutLabel}" Margin="12,0,8,0" />
+                                <TextBlock x:Name="CameraStepPreviewTimeout" Grid.Column="3" Style="{StaticResource DialogTextStyle}" Text="{Binding CameraStepPreviewTimeout}" />
+                            </Grid>
+                            <TextBlock x:Name="CameraStepHint" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding CameraStepHint}" Foreground="{DynamicResource Text.Secondary}" Margin="0,8,0,8" />
+                            <Button x:Name="AddCameraStepButton" HorizontalAlignment="Right" Style="{StaticResource DialogCloseButtonStyle}" Content="{loc:Loc Key=R24.AddStepTitle}" Command="{Binding AddCameraStepCommand}" />
+                        </StackPanel>
+                    </Expander>
+                    <Expander x:Name="SignalStepAuthoring" Header="{loc:Loc Key=R40.SignalStepTitle}" IsExpanded="False" Margin="0,0,0,14">
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.SignalStepTarget}" />
+                            <ComboBox x:Name="SignalStepTarget" ItemsSource="{Binding SignalStepTargets}" SelectedValuePath="Id" SelectedValue="{Binding SignalStepTargetId, Mode=TwoWay}" IsSynchronizedWithCurrentItem="False" IsEnabled="{Binding CanChooseStepTemplate}" MinHeight="28" Margin="0,3,0,8" AutomationProperties.Name="{loc:Loc Key=R40.SignalStepTarget}">
+                                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" /></DataTemplate></ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=Sequence.Action}" />
+                            <ComboBox x:Name="SignalStepTemplate" ItemsSource="{Binding SignalStepTemplates}" SelectedValuePath="Id" SelectedValue="{Binding SignalStepTemplateId, Mode=TwoWay}" IsSynchronizedWithCurrentItem="False" IsEnabled="{Binding CanChooseStepTemplate}" MinHeight="28" Margin="0,3,0,8" AutomationProperties.Name="{loc:Loc Key=Sequence.Action}">
+                                <ComboBox.ItemTemplate><DataTemplate><TextBlock Style="{StaticResource DialogTextStyle}"><TextBlock.Text><MultiBinding Converter="{StaticResource TemplateNameConverter}"><Binding /><Binding Path="Revision" Source="{x:Static loc:LocExtension.RevisionSource}" /></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.AxisStepPreview}" FontWeight="SemiBold" />
+                            <TextBlock x:Name="SignalStepPreviewKind" Style="{StaticResource DialogTextStyle}" Text="{Binding SignalStepTargetKindText}" Margin="0,3,0,0" />
+                            <TextBlock x:Name="SignalStepPreviewTarget" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding SignalStepTarget.Name, Converter={StaticResource AxisNameWrapping}}" Margin="0,3,0,4" />
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R24.StepListValue}" Margin="0,0,8,0" />
+                                <TextBlock x:Name="SignalStepPreviewValue" Grid.Column="1" Style="{StaticResource DialogTextStyle}" Text="{Binding SignalStepPreviewValue}" />
+                                <TextBlock Grid.Column="2" Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.AxisStepTimeoutLabel}" Margin="12,0,8,0" />
+                                <TextBlock x:Name="SignalStepPreviewTimeout" Grid.Column="3" Style="{StaticResource DialogTextStyle}" Text="{Binding SignalStepPreviewTimeout}" />
+                            </Grid>
+                            <TextBlock x:Name="SignalStepHint" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding SignalStepHint}" Foreground="{DynamicResource Text.Secondary}" Margin="0,8,0,8" />
+                            <Button x:Name="AddSignalStepButton" HorizontalAlignment="Right" Style="{StaticResource DialogCloseButtonStyle}" Content="{loc:Loc Key=R24.AddStepTitle}" Command="{Binding AddSignalStepCommand}" />
+                        </StackPanel>
+                    </Expander>
+                    <Expander x:Name="SubsequenceStepAuthoring" Header="{loc:Loc Key=Sequence.Action.CallSubsequence}" IsExpanded="False" Margin="0,0,0,14">
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.SubsequenceStepTarget}" />
+                            <ComboBox x:Name="SubsequenceStepTarget" ItemsSource="{Binding SubsequenceStepTargets}" SelectedValuePath="Id" SelectedValue="{Binding SubsequenceStepTargetId, Mode=TwoWay}" IsSynchronizedWithCurrentItem="False" IsEnabled="{Binding CanChooseStepTemplate}" MinHeight="28" Margin="0,3,0,8" AutomationProperties.Name="{loc:Loc Key=R40.SubsequenceStepTarget}">
+                                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" /></DataTemplate></ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock x:Name="SubsequenceStepAction" Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=Sequence.Action.CallSubsequence}" FontWeight="SemiBold" />
+                            <TextBlock x:Name="SubsequenceStepPreviewTarget" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding SubsequenceStepTarget.Name, Converter={StaticResource AxisNameWrapping}}" Margin="0,3,0,4" />
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.AxisStepTimeoutLabel}" Margin="0,0,8,0" />
+                                <TextBlock x:Name="SubsequenceStepPreviewTimeout" Grid.Column="1" Style="{StaticResource DialogTextStyle}" Text="{Binding SubsequenceStepPreviewTimeout}" />
+                            </Grid>
+                            <TextBlock x:Name="SubsequenceStepHint" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding SubsequenceStepHint}" Foreground="{DynamicResource Text.Secondary}" Margin="0,8,0,8" />
+                            <Button x:Name="AddSubsequenceStepButton" HorizontalAlignment="Right" Style="{StaticResource DialogCloseButtonStyle}" Content="{loc:Loc Key=R24.AddStepTitle}" Command="{Binding AddSubsequenceStepCommand}" />
+                        </StackPanel>
+                    </Expander>
+                    <Expander x:Name="UnitStepAuthoring" Header="{loc:Loc Key=R40.UnitStepTitle}" IsExpanded="False" Margin="0,0,0,14">
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.UnitStepTarget}" />
+                            <TextBlock x:Name="UnitStepTarget" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding UnitStepTargetText, Converter={StaticResource AxisNameWrapping}}" Margin="0,3,0,8" />
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=Sequence.Action}" />
+                            <ComboBox x:Name="UnitStepTemplate" ItemsSource="{Binding UnitStepTemplates}" SelectedValuePath="Id" SelectedValue="{Binding UnitStepTemplateId, Mode=TwoWay}" IsSynchronizedWithCurrentItem="False" IsEnabled="{Binding CanChooseStepTemplate}" MinHeight="28" Margin="0,3,0,8" AutomationProperties.Name="{loc:Loc Key=Sequence.Action}">
+                                <ComboBox.ItemTemplate><DataTemplate><TextBlock Style="{StaticResource DialogTextStyle}"><TextBlock.Text><MultiBinding Converter="{StaticResource TemplateNameConverter}"><Binding /><Binding Path="Revision" Source="{x:Static loc:LocExtension.RevisionSource}" /></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.AxisStepPreview}" FontWeight="SemiBold" />
+                            <Grid Margin="0,3,0,4">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R24.StepListValue}" Margin="0,0,8,0" />
+                                <TextBlock x:Name="UnitStepPreviewValue" Grid.Column="1" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding UnitStepPreviewValue}" />
+                                <TextBlock Grid.Column="2" Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.AxisStepTimeoutLabel}" Margin="12,0,8,0" />
+                                <TextBlock x:Name="UnitStepPreviewTimeout" Grid.Column="3" Style="{StaticResource DialogTextStyle}" Text="{Binding UnitStepPreviewTimeout}" />
+                            </Grid>
+                            <TextBlock x:Name="UnitStepHint" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding UnitStepHint}" Foreground="{DynamicResource Text.Secondary}" Margin="0,8,0,8" />
+                            <Button x:Name="AddUnitStepButton" HorizontalAlignment="Right" Style="{StaticResource DialogCloseButtonStyle}" Content="{loc:Loc Key=R24.AddStepTitle}" Command="{Binding AddUnitStepCommand}" />
+                        </StackPanel>
+                    </Expander>
+                    <Expander x:Name="TransferStepAuthoring" Header="{loc:Loc Key=R40.TransferStepTitle}" IsExpanded="False" Margin="0,0,0,14">
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.UnitStepTarget}" />
+                            <TextBlock x:Name="TransferStepOwner" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding UnitStepTargetText, Converter={StaticResource AxisNameWrapping}}" Margin="0,3,0,8" />
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.TransferStepTarget}" />
+                            <ComboBox x:Name="TransferStepTarget" ItemsSource="{Binding TransferStepTargets}" SelectedValuePath="Id" SelectedValue="{Binding TransferStepTargetId, Mode=TwoWay}" IsSynchronizedWithCurrentItem="False" IsEnabled="{Binding CanChooseStepTemplate}" MinHeight="28" Margin="0,3,0,8" AutomationProperties.Name="{loc:Loc Key=R40.TransferStepTarget}">
+                                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" /></DataTemplate></ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=Sequence.DestinationUnit}" />
+                            <ComboBox x:Name="TransferStepDestination" ItemsSource="{Binding TransferStepDestinations}" SelectedValuePath="Id" SelectedValue="{Binding TransferStepDestinationId, Mode=TwoWay}" IsSynchronizedWithCurrentItem="False" IsEnabled="{Binding CanChooseStepTemplate}" MinHeight="28" Margin="0,3,0,8" AutomationProperties.Name="{loc:Loc Key=Sequence.DestinationUnit}">
+                                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" /></DataTemplate></ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.AxisStepPreview}" FontWeight="SemiBold" />
+                            <TextBlock x:Name="TransferStepPreviewTarget" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding TransferStepTarget.Name, Converter={StaticResource AxisNameWrapping}}" Margin="0,3,0,0" />
+                            <TextBlock x:Name="TransferStepPreviewDestination" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding TransferStepDestination.Name, Converter={StaticResource AxisNameWrapping}}" Margin="0,3,0,4" />
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R24.Inspector.TransferTime}" Margin="0,0,8,0" />
+                                <TextBlock x:Name="TransferStepPreviewValue" Grid.Column="1" Style="{StaticResource DialogTextStyle}" Text="{Binding TransferStepPreviewValue}" />
+                                <TextBlock Grid.Column="2" Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.AxisStepTimeoutLabel}" Margin="12,0,8,0" />
+                                <TextBlock x:Name="TransferStepPreviewTimeout" Grid.Column="3" Style="{StaticResource DialogTextStyle}" Text="{Binding TransferStepPreviewTimeout}" />
+                            </Grid>
+                            <TextBlock x:Name="TransferStepHint" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding TransferStepHint}" Foreground="{DynamicResource Text.Secondary}" Margin="0,8,0,8" />
+                            <Button x:Name="AddTransferStepButton" HorizontalAlignment="Right" Style="{StaticResource DialogCloseButtonStyle}" Content="{loc:Loc Key=R24.AddStepTitle}" Command="{Binding AddTransferStepCommand}" />
+                        </StackPanel>
+                    </Expander>
+                    <Expander x:Name="WorkpieceStepAuthoring" Header="{loc:Loc Key=R40.WorkpieceStepTitle}" IsExpanded="False" Margin="0,0,0,14">
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.WorkpieceStepTarget}" />
+                            <ComboBox x:Name="WorkpieceStepTarget" ItemsSource="{Binding WorkpieceStepTargets}" SelectedValuePath="Id" SelectedValue="{Binding WorkpieceStepTargetId, Mode=TwoWay}" IsSynchronizedWithCurrentItem="False" IsEnabled="{Binding CanChooseStepTemplate}" MinHeight="28" Margin="0,3,0,8" AutomationProperties.Name="{loc:Loc Key=R40.WorkpieceStepTarget}">
+                                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" /></DataTemplate></ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=Sequence.Action}" />
+                            <ComboBox x:Name="WorkpieceStepTemplate" ItemsSource="{Binding WorkpieceStepTemplates}" SelectedValuePath="Id" SelectedValue="{Binding WorkpieceStepTemplateId, Mode=TwoWay}" IsSynchronizedWithCurrentItem="False" IsEnabled="{Binding CanChooseStepTemplate}" MinHeight="28" Margin="0,3,0,8" AutomationProperties.Name="{loc:Loc Key=Sequence.Action}">
+                                <ComboBox.ItemTemplate><DataTemplate><TextBlock Style="{StaticResource DialogTextStyle}"><TextBlock.Text><MultiBinding Converter="{StaticResource TemplateNameConverter}"><Binding /><Binding Path="Revision" Source="{x:Static loc:LocExtension.RevisionSource}" /></MultiBinding></TextBlock.Text></TextBlock></DataTemplate></ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.AxisStepPreview}" FontWeight="SemiBold" />
+                            <TextBlock x:Name="WorkpieceStepPreviewTarget" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding WorkpieceStepTarget.Name, Converter={StaticResource AxisNameWrapping}}" Margin="0,3,0,4" />
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource DialogTextStyle}" Text="{loc:Loc Key=R40.AxisStepTimeoutLabel}" Margin="0,0,8,0" />
+                                <TextBlock x:Name="WorkpieceStepPreviewTimeout" Grid.Column="1" Style="{StaticResource DialogTextStyle}" Text="{Binding WorkpieceStepPreviewTimeout}" />
+                            </Grid>
+                            <TextBlock x:Name="WorkpieceStepHint" Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Text="{Binding WorkpieceStepHint, Converter={StaticResource AxisNameWrapping}}" Foreground="{DynamicResource Text.Secondary}" Margin="0,8,0,8" />
+                            <Button x:Name="AddWorkpieceStepButton" HorizontalAlignment="Right" Style="{StaticResource DialogCloseButtonStyle}" Content="{loc:Loc Key=R24.AddStepTitle}" Command="{Binding AddWorkpieceStepCommand}" />
+                        </StackPanel>
+                    </Expander>
+                    <TextBlock Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}" Text="{loc:Loc Key=R40.StepDirectAddHint}" Margin="0,0,0,8" />
+                    <ItemsControl ItemsSource="{Binding Templates}">
+                        <ItemsControl.ItemTemplate><DataTemplate>
+                            <Button Style="{StaticResource TemplateButtonStyle}" Command="{Binding DataContext.AddStepCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Click="CloseDialog">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource DialogTextStyle}" TextWrapping="Wrap">
+                                        <TextBlock.Text><MultiBinding Converter="{StaticResource TemplateNameConverter}"><Binding /><Binding Path="Revision" Source="{x:Static loc:LocExtension.RevisionSource}" /></MultiBinding></TextBlock.Text>
+                                    </TextBlock>
+                                    <TextBlock FontSize="10.5" Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap">
+                                        <TextBlock.Text><MultiBinding Converter="{StaticResource TemplateNameConverter}" ConverterParameter="description"><Binding /><Binding Path="Revision" Source="{x:Static loc:LocExtension.RevisionSource}" /></MultiBinding></TextBlock.Text>
+                                        <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource DialogTextStyle}"><Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed" /></Trigger></Style.Triggers></Style></TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate></ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+            <Border Grid.Row="2" Padding="18,10" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0">
+                <Button HorizontalAlignment="Right" IsCancel="True" Style="{StaticResource DialogCloseButtonStyle}" Content="{loc:Loc Key=R24.Close}" Click="CloseDialog" />
+            </Border>
+        </Grid>
+    </Border>
+</Window>

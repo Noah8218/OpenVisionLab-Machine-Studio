@@ -9,6 +9,19 @@ namespace OpenVisionLab.MachineStudio.Tests;
 public sealed class SceneViewportProjectionTests
 {
     [Fact]
+    public void NewUnitOriginsAlignHorizontallyInTheObliqueViewWithoutChangingLocalGeometry()
+    {
+        var projection = SceneViewportProjection.CreateEmpty(800, 600, isObliqueView: true);
+        var origins = Enumerable.Range(0, 3).Select(LayoutComponentPlacementService.CreateUnitBaseOrigin).ToArray();
+        var points = origins.Select(origin => projection.ToScreen(origin.X, origin.Y)).ToArray();
+        Assert.All(points, point => Assert.Equal(points[0].Y, point.Y, precision: 8));
+        Assert.True(points[1].X > points[0].X && points[2].X > points[1].X);
+        var local = projection.ToScreen(45, -35, 70) - projection.ToScreen(0, 0);
+        foreach (var origin in origins)
+            Assert.InRange((projection.ToScreen(origin.X + 45, origin.Y - 35, 70) - projection.ToScreen(origin.X, origin.Y) - local).Length, 0, .000001);
+    }
+
+    [Fact]
     public void FitProjectionRoundTripsWorldAndScreenCoordinates()
     {
         var projection = SceneViewportProjection.Create(
@@ -112,6 +125,62 @@ public sealed class SceneViewportProjectionTests
         Assert.InRange(combinedDelta.Y, 39.999999, 40.000001);
     }
 
+    [Theory]
+    [InlineData(0, 35)]
+    [InlineData(90, 70)]
+    [InlineData(180, 15)]
+    [InlineData(270, -40)]
+    [InlineData(359, -80)]
+    public void OrbitProjectionRoundTripsEachSideAndUnderside(double yaw, double pitch)
+    {
+        var projection = SceneViewportProjection.Create([new(100, -25, 80, 40, 20, -10, 125)], 640, 420, true, yaw, pitch);
+        var screen = projection.ToScreen(112, -18, 35);
+        var restored = projection.ToWorld(screen, 35);
+        Assert.InRange((restored - new Point(112, -18)).Length, 0, 0.000001);
+        Assert.InRange(screen.X, 0, 640);
+        Assert.InRange(screen.Y, 0, 420);
+    }
+
+    [Fact]
+    public void OrbitKeepsItsPivotStableThroughZoomPanAndAFullTurn()
+    {
+        var projection = SceneViewportProjection.Create([new(10, 20, 100, 60, 0, -25, 90)], 640, 420, true);
+        var pivot = new Point(10, 20);
+        var screen = projection.ToScreen(10, 20, 20);
+        var orbit = projection.OrbitAt(pivot, 20, new Vector(280, -75));
+        Assert.InRange((orbit.ToScreen(10, 20, 20) - screen).Length, 0, .000001);
+        Assert.NotEqual(projection.ToScreen(50, 20, 20), orbit.ToScreen(50, 20, 20));
+        var turned = projection.OrbitAt(pivot, 20, new Vector(360 / .35, 0));
+        Assert.InRange((turned.ToScreen(50, 20, 20) - projection.ToScreen(50, 20, 20)).Length, 0, .000001);
+        var zoomed = orbit.ZoomAt(screen, 2).Translate(new Vector(15, -12));
+        Assert.Equal(orbit.YawDegrees, zoomed.YawDegrees);
+        Assert.Equal(orbit.PitchDegrees, zoomed.PitchDegrees);
+        Assert.InRange((zoomed.ToScreen(10, 20, 20) - (screen + new Vector(15, -12))).Length, 0, .000001);
+    }
+
+    [Fact]
+    public void DepthIncreasesTowardTheEyeAlongTheSameProjectedRay()
+    {
+        foreach (var (yawDegrees, pitchDegrees) in new[] { (45d, SceneViewportProjection.DefaultPitchDegrees), (0d, 65d), (180d, -40d), (275d, 15d) })
+        {
+            var projection = SceneViewportProjection.CreateEmpty(640, 420, true, yawDegrees, pitchDegrees);
+            double yaw = yawDegrees * Math.PI / 180, pitch = pitchDegrees * Math.PI / 180;
+            double x = 100 * Math.Sin(yaw) * Math.Cos(pitch), y = 100 * Math.Cos(yaw) * Math.Cos(pitch), elevation = 100 * Math.Sin(pitch);
+            Assert.InRange((projection.ToScreen(x, y, elevation) - projection.ToScreen(0, 0, 0)).Length, 0, .000001);
+            Assert.Equal(100, projection.Depth(x, y, elevation), precision: 8);
+        }
+    }
+
+    [Fact]
+    public void SideOnCameraRejectsAnAmbiguousEditingPlaneAndNonFiniteOrbitDoesNotChangeTheView()
+    {
+        var projection = SceneViewportProjection.Create([new(0, 0, 100, 50, 0, 0, 20)], 640, 420, true, 180, 0);
+        Assert.False(projection.CanMapToWorld);
+        Assert.Throws<InvalidOperationException>(() => projection.ToWorld(new Point(200, 100)));
+        Assert.Equal(projection, projection.OrbitAt(default, 0, new Vector(double.NaN, 0)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => SceneViewportProjection.Create([], 640, 420, true, 0, double.PositiveInfinity));
+    }
+
     [Fact]
     public async Task PlanViewportHitTestSelectsRotatedComponentAndClearsOnEmptySpace()
     {
@@ -165,4 +234,27 @@ public sealed class SceneViewportProjectionTests
         thread.Start();
         return completion.Task;
     }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void EquipmentProjectionUsesTheR24ViewBoxAndRetainsInverseAfterZoom(bool oblique)
+    {
+        var items = new[] { new SceneViewportGeometry(100, 20, 200, 80, BaseElevation: 0, VerticalHeight: 80) };
+        var compact = SceneViewportProjection.CreateEquipment(items, 1000, 600, oblique);
+        var wide = SceneViewportProjection.CreateEquipment(items, 1500, 900, oblique);
+        Assert.True(compact.IsEquipmentPresentation);
+        var point = compact.ToScreen(110, 35, 20);
+        var scaled = wide.ToScreen(110, 35, 20);
+        Assert.Equal(point.X * 1.5, scaled.X, 8);
+        Assert.Equal(point.Y * 1.5, scaled.Y, 8);
+        var restored = compact.ToWorld(point, 20);
+        Assert.Equal(110, restored.X, 8);
+        Assert.Equal(35, restored.Y, 8);
+        var zoomed = compact.ZoomAt(point, 1.7).Translate(new Vector(5, 9));
+        Assert.True(zoomed.IsEquipmentPresentation);
+        var after = zoomed.ToWorld(zoomed.ToScreen(110, 35, 20), 20);
+        Assert.Equal(110, after.X, 8);
+        Assert.Equal(35, after.Y, 8);
+    }
+
 }

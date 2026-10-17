@@ -3,6 +3,8 @@ using OpenVisionLab.Machine.IO.Channels;
 using OpenVisionLab.Machine.Sequence.Runtime;
 using OpenVisionLab.Machine.Simulation.Axis;
 using OpenVisionLab.Machine.Simulation.Camera;
+using OpenVisionLab.Machine.Simulation.Workpieces;
+using OpenVisionLab.Machine.Sequence.Compilation;
 
 namespace OpenVisionLab.Machine.Simulation.Engine;
 
@@ -18,10 +20,13 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
     private readonly long _eventTick;
     private readonly TimeSpan _eventTime;
     private readonly bool _waitForExternalResult;
+    private readonly IReadOnlyCollection<string> _numericalCameraIds;
     private readonly IReadOnlyDictionary<string, VirtualCameraExternalSource> _externalSources;
     private readonly Func<string, string?>? _workpieceInstanceIdAccessor;
     private readonly Func<string, SequenceContextOperationResult>? _workpieceFeedHandler;
     private readonly Func<string, SequenceContextOperationResult>? _workpieceEjectHandler;
+    private readonly UnitMaterialFlowRuntime? _unitMaterialFlow;
+    private readonly string? _unitId;
 
     public DeterministicSequenceRuntimeContext(
         DeterministicSignalHub signalHub,
@@ -34,7 +39,10 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
         IReadOnlyDictionary<string, VirtualCameraExternalSource>? externalSources = null,
         Func<string, string?>? workpieceInstanceIdAccessor = null,
         Func<string, SequenceContextOperationResult>? workpieceFeedHandler = null,
-        Func<string, SequenceContextOperationResult>? workpieceEjectHandler = null)
+        Func<string, SequenceContextOperationResult>? workpieceEjectHandler = null,
+        UnitMaterialFlowRuntime? unitMaterialFlow = null,
+        string? unitId = null,
+        IReadOnlyCollection<string>? numericalCameraIds = null)
     {
         _signalHub = signalHub;
         _axes = axes;
@@ -43,11 +51,14 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
         _eventTime = eventTime;
         _emit = emit;
         _waitForExternalResult = waitForExternalResult;
+        _numericalCameraIds = numericalCameraIds ?? Array.Empty<string>();
         _externalSources = externalSources
             ?? new Dictionary<string, VirtualCameraExternalSource>(StringComparer.Ordinal);
         _workpieceInstanceIdAccessor = workpieceInstanceIdAccessor;
         _workpieceFeedHandler = workpieceFeedHandler;
         _workpieceEjectHandler = workpieceEjectHandler;
+        _unitMaterialFlow = unitMaterialFlow;
+        _unitId = unitId;
     }
 
     public SequenceSignalReadResult ReadSignal(string signalId)
@@ -162,7 +173,13 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
         }
 
         string? workpieceInstanceId = null;
-        if (!string.IsNullOrWhiteSpace(workpieceComponentId))
+        if (_unitId is not null && _unitMaterialFlow is not null && string.IsNullOrWhiteSpace(workpieceComponentId))
+        {
+            if (!_unitMaterialFlow.BeginCapture(_unitId, cameraId, out workpieceInstanceId))
+                return SequenceCameraTriggerResult.Failure(SequenceContextErrorCode.Rejected, "The unit slot has no active workpiece to inspect.");
+            if (_unitMaterialFlow.Enabled) workpieceComponentId = _unitId;
+        }
+        else if (!string.IsNullOrWhiteSpace(workpieceComponentId))
         {
             workpieceInstanceId = _workpieceInstanceIdAccessor?.Invoke(workpieceComponentId);
             if (string.IsNullOrWhiteSpace(workpieceInstanceId))
@@ -174,7 +191,7 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
         }
 
         VirtualCameraFrameEvidence? frameEvidence = null;
-        if (_waitForExternalResult)
+        if (_waitForExternalResult && !_numericalCameraIds.Contains(cameraId, StringComparer.Ordinal))
         {
             if (!_externalSources.TryGetValue(cameraId, out var source))
             {
@@ -186,13 +203,17 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
             frameEvidence = source.CreateEvidence(camera.CreateNextAcquisitionId());
         }
 
+        var referenceAxis = camera.ReferenceAxisId is { } axisId ? _axes.FirstOrDefault(axis => axis.Id == axisId) : null;
+        if (camera.ReferenceAxisId is not null && referenceAxis is null)
+            return SequenceCameraTriggerResult.Failure(SequenceContextErrorCode.TargetNotFound, "촬영 기준 축을 찾을 수 없습니다.");
         var trigger = camera.Trigger(
             recipeId,
             frameEvidence,
             inspectionEvidence: null,
             waitForExternalResult: _waitForExternalResult,
             workpieceComponentId: workpieceComponentId,
-            workpieceInstanceId: workpieceInstanceId);
+            workpieceInstanceId: workpieceInstanceId,
+            axisOffset: referenceAxis?.Position ?? 0);
         if (!trigger.IsAccepted || string.IsNullOrWhiteSpace(trigger.AcquisitionId))
         {
             var contextCode = trigger.ErrorCode switch
@@ -263,7 +284,7 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
                 $"Virtual camera '{cameraId}' no longer owns acquisition '{acquisitionId}'.");
         }
 
-        return snapshot.State switch
+        var read = snapshot.State switch
         {
             VirtualCameraState.Idle =>
                 SequenceVisionResultReadResult.Success(SequenceVisionResultState.NotTriggered),
@@ -278,7 +299,16 @@ internal sealed class DeterministicSequenceRuntimeContext : ISequenceRuntimeCont
                 SequenceContextErrorCode.Unavailable,
                 $"Virtual camera '{cameraId}' returned an unsupported state '{snapshot.State}'.")
         };
+        if (_unitId is not null && _unitMaterialFlow is not null && read.IsSuccess)
+            _unitMaterialFlow.RecordInspection(_unitId, cameraId, snapshot.Result?.WorkpieceInstanceId, read.State);
+        return read;
     }
+
+    public SequenceUnitOperationResult ExecuteUnitOperation(UnitOperationStep step, TimeSpan elapsed) =>
+        _unitMaterialFlow?.Execute(step, elapsed) ?? SequenceUnitOperationResult.Failure("Unit material flow is not configured.");
+
+    public SequenceVisionResultReadResult ReadUnitInspection(string unitId) => _unitMaterialFlow?.ReadInspection(unitId)
+        ?? SequenceVisionResultReadResult.Failure(SequenceContextErrorCode.Unavailable, "Unit inspection is not configured.");
 
     private static SequenceVisionResultReadResult ReadCompletedVisionResult(
         VirtualCameraSnapshot snapshot,

@@ -24,7 +24,8 @@ internal sealed record SimulationSequenceCommandContext(
     long CommandBoundaryTick,
     TimeSpan CommandBoundaryTime,
     string? ResetRetrySequenceId = null,
-    bool AutomaticRunConfigured = false);
+    bool AutomaticRunConfigured = false,
+    bool UnitRunActive = false);
 
 internal sealed record SimulationSequenceCommandEvent(
     string Category,
@@ -64,7 +65,7 @@ internal sealed class SimulationSequenceCommandHandler
         SimulationSequenceCommandContext context)
     {
         var state = context.State;
-        if (state.AutomaticRunActive)
+        if (state.AutomaticRunActive || context.UnitRunActive)
         {
             return Reject(
                 command,
@@ -143,7 +144,7 @@ internal sealed class SimulationSequenceCommandHandler
 
         var snapshot = executor.CaptureSnapshot();
         if (!string.Equals(state.ActiveSequenceId, abortSequence.SequenceId, StringComparison.Ordinal)
-            || snapshot.Status != SequenceExecutionStatus.Running)
+            || snapshot.Status != SequenceExecutionStatus.Running && !context.UnitRunActive)
         {
             return Reject(
                 command,
@@ -152,8 +153,8 @@ internal sealed class SimulationSequenceCommandHandler
                 $"Sequence '{abortSequence.SequenceId}' must be the active Running sequence.");
         }
 
-        var aborted = executor.Abort();
-        if (!aborted.IsSuccess)
+        var aborted = snapshot.Status == SequenceExecutionStatus.Running ? executor.Abort() : null;
+        if (aborted is not null && !aborted.IsSuccess)
         {
             return Reject(
                 command,
@@ -165,13 +166,13 @@ internal sealed class SimulationSequenceCommandHandler
         context.SequenceDebugState.ClearPendingSemanticStep();
         context.SequenceDebugState.SetPause(
             SequenceDebugPauseReason.SequenceAborted,
-            aborted.CurrentStepId);
+            aborted?.CurrentStepId ?? snapshot.CurrentStepId);
         var events = new List<SimulationSequenceCommandEvent>
         {
             new(
                 "Sequence",
                 "SequenceAborted",
-                $"{abortSequence.SequenceId} aborted at {aborted.CurrentStepId ?? "the current boundary"}.")
+                $"{abortSequence.SequenceId} aborted at {aborted?.CurrentStepId ?? snapshot.CurrentStepId ?? "the current boundary"}.")
         };
         if (state.AutomaticRunActive)
         {

@@ -38,6 +38,24 @@ public sealed class ShellKeyboardCommandBehavior : Behavior<Window>
             typeof(ShellKeyboardCommandBehavior),
             new PropertyMetadata(null));
 
+    public static readonly DependencyProperty IsModalOverlayOpenProperty = DependencyProperty.Register(
+        nameof(IsModalOverlayOpen), typeof(bool), typeof(ShellKeyboardCommandBehavior), new PropertyMetadata(false));
+
+    public static readonly DependencyProperty CloseOverlayCommandProperty = DependencyProperty.Register(
+        nameof(CloseOverlayCommand), typeof(ICommand), typeof(ShellKeyboardCommandBehavior), new PropertyMetadata(null));
+
+    public bool IsModalOverlayOpen
+    {
+        get => (bool)GetValue(IsModalOverlayOpenProperty);
+        set => SetValue(IsModalOverlayOpenProperty, value);
+    }
+
+    public ICommand? CloseOverlayCommand
+    {
+        get => (ICommand?)GetValue(CloseOverlayCommandProperty);
+        set => SetValue(CloseOverlayCommandProperty, value);
+    }
+
     public ICommand? DeleteCommand
     {
         get => (ICommand?)GetValue(DeleteCommandProperty);
@@ -81,6 +99,20 @@ public sealed class ShellKeyboardCommandBehavior : Behavior<Window>
             return;
         }
 
+        if (IsModalOverlayOpen)
+        {
+            if (e.Key == Key.Escape)
+            {
+                for (var current = Keyboard.FocusedElement as DependencyObject; current is not null; current = GetParent(current))
+                    if (current is ComboBox { IsDropDownOpen: true }
+                        || current is ComboBoxItem item && ItemsControl.ItemsControlFromItemContainer(item) is ComboBox { IsDropDownOpen: true }) return;
+                if (CloseOverlayCommand?.CanExecute(null) == true) CloseOverlayCommand.Execute(null);
+                e.Handled = true;
+            }
+            else if (ShouldSuppressModalShortcut(e.Key, Keyboard.Modifiers, IsTextEditingFocus())) e.Handled = true;
+            return;
+        }
+
         var saveCommand = ResolveSaveCommand(e.Key, Keyboard.Modifiers, SaveCommand, SaveAsCommand);
         if (saveCommand?.CanExecute(null) == true)
         {
@@ -110,6 +142,12 @@ public sealed class ShellKeyboardCommandBehavior : Behavior<Window>
         command.Execute(null);
         e.Handled = true;
     }
+
+    internal static bool ShouldSuppressModalShortcut(Key key, ModifierKeys modifiers, bool textEditing) =>
+        key is Key.F5 or Key.F6 or Key.F10
+        || key == Key.Delete && !textEditing
+        || modifiers.HasFlag(ModifierKeys.Control) && (key is Key.N or Key.O or Key.S or Key.D or Key.R
+            || !textEditing && key is Key.Z or Key.Y or Key.C or Key.V);
 
     internal static ICommand? ResolveSaveCommand(
         Key key,

@@ -93,9 +93,10 @@ public sealed class SequenceBreakpointItem : ViewModelBase
 public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
 {
     private readonly Func<SimulationCommand, Task<SimulationCommandResult>> _dispatch;
-    private readonly RuntimeTimelineViewModel _timeline = new();
+    private readonly RuntimeTimelineViewModel _timeline;
     private readonly RuntimeAlarmCollectionViewModel _alarmCollection;
     private readonly RuntimeDebuggerWatchTargetCatalog _watchTargetCatalog = new();
+    private IReadOnlyList<SimulationSequenceObservation> _sequenceObservations = Array.Empty<SimulationSequenceObservation>();
     private SimulationSnapshot? _latestSnapshot;
     private string? _projectId;
     private MachineProjectDocument? _project;
@@ -121,6 +122,7 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
     public RuntimeDebuggerViewModel(Func<SimulationCommand, Task<SimulationCommandResult>> dispatch)
     {
         _dispatch = dispatch ?? throw new ArgumentNullException(nameof(dispatch));
+        _timeline = new(DescribeTimelineSource);
         _alarmCollection = new(
             () => IsEnabled && !IsDisposed,
             SequenceName,
@@ -199,6 +201,7 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
     public bool HasVisibleAlarmHistory => _alarmCollection.HasVisibleAlarmHistory;
     public bool HasAlarmHistoryEmptyState => _alarmCollection.HasAlarmHistoryEmptyState;
     public bool HasWatches => Watches.Count > 0;
+    public IReadOnlyList<SimulationSequenceObservation> SequenceObservations => _sequenceObservations;
     public int UnacknowledgedAlarmCount => _alarmCollection.UnacknowledgedAlarmCount;
 
     public string SequenceStateText
@@ -422,6 +425,8 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
             : Breakpoints.FirstOrDefault();
         RefreshWatchTargets();
         RefreshSnapshotPresentation();
+        _timeline.RefreshLocalization();
+        RefreshTimelinePresentation();
     }
 
     public void ApplySnapshot(SimulationSnapshot snapshot)
@@ -467,6 +472,24 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
         _alarmCollection.ApplySnapshot(snapshot);
         RefreshSnapshotPresentation();
         InvalidateCommands();
+    }
+
+    private string DescribeTimelineSource(SimulationEvent runtimeEvent)
+    {
+        if (_project is null || runtimeEvent.Code != "SequenceStepTransition") return string.Empty;
+        var transition = runtimeEvent.Message.Split(" -> ", StringSplitOptions.None);
+        if (transition.Length != 2) return string.Empty;
+        var target = transition[1].TrimEnd('.');
+        foreach (var sequence in _project.Sequences)
+        {
+            string? stepId = runtimeEvent.Message.StartsWith(sequence.Id + ": ", StringComparison.Ordinal) ? target
+                : target.StartsWith(sequence.Id + ":", StringComparison.Ordinal) ? target[(sequence.Id.Length + 1)..] : null;
+            var step = sequence.Steps.FirstOrDefault(item => item.Id == stepId);
+            if (step is null) continue;
+            var unit = _project.Stations.SelectMany(station => station.Units).FirstOrDefault(item => item.Id == sequence.UnitId);
+            return $"{unit?.Name ?? sequence.Name} · {step.Name}";
+        }
+        return string.Empty;
     }
 
     public void ApplyEvent(SimulationEvent runtimeEvent)
@@ -775,6 +798,12 @@ public sealed class RuntimeDebuggerViewModel : ViewModelBase, IDisposable
 
     private void RefreshSnapshotPresentation()
     {
+        var observations = SimulationSequenceObservation.Create(_project, _latestSnapshot);
+        if (!_sequenceObservations.SequenceEqual(observations))
+        {
+            _sequenceObservations = observations;
+            OnPropertyChanged(nameof(SequenceObservations));
+        }
         OnPropertyChanged(nameof(SequenceStateText));
         OnPropertyChanged(nameof(CurrentStepText));
         OnPropertyChanged(nameof(PauseReasonText));

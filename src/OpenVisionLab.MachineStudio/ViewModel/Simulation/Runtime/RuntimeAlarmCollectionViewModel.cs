@@ -24,6 +24,7 @@ public sealed record RuntimeAlarmHistoryFilterItem(
 
 public sealed class RuntimeAlarmItem : ViewModelBase
 {
+    private RuntimeSequenceErrorLocation? _errorLocation;
     private string _source;
     private string _state;
     private string _recoveryText;
@@ -76,6 +77,9 @@ public sealed class RuntimeAlarmItem : ViewModelBase
         get => _recoveryText;
         private set => SetProperty(ref _recoveryText, value);
     }
+
+    public RuntimeSequenceErrorLocation? ErrorLocation { get => _errorLocation; internal set => SetProperty(ref _errorLocation, value); }
+    public string FixLocationCaption => OpenVisionLanguageService.T("R24.Bottom.FixLocation", "수정 위치로", "Go to fix");
 
     public long FirstSeenTick { get; }
     public TimeSpan FirstSeenTime { get; }
@@ -169,6 +173,7 @@ public sealed class RuntimeAlarmItem : ViewModelBase
         OccurrenceText = occurrenceText;
         ClearedAtText = clearedAtText;
         AcknowledgeActionText = acknowledgeActionText;
+        OnPropertyChanged(nameof(FixLocationCaption));
     }
 
     private void LastSeenTickChanged(long tick, TimeSpan time)
@@ -408,6 +413,7 @@ internal sealed class RuntimeAlarmCollectionViewModel : ViewModelBase
                 alarm.MarkSeen(snapshot.TickIndex, snapshot.SimulationTime);
             }
 
+            alarm.ErrorLocation = projection.ErrorLocation;
             RefreshAlarmPresentation(alarm);
             Alarms.Add(alarm);
         }
@@ -444,7 +450,8 @@ internal sealed class RuntimeAlarmCollectionViewModel : ViewModelBase
                 $"{error.Code} · {error.Message}",
                 sequence.Status == SequenceExecutionStatus.Faulted
                     ? "Debugger.RecoveryRetry"
-                    : "Debugger.RecoveryReset"));
+                    : "Debugger.RecoveryReset",
+                snapshot.ProjectId is { } projectId ? new RuntimeSequenceErrorLocation(projectId, error, null, snapshot.TickIndex) : null));
         }
 
         foreach (var axis in snapshot.Axes.Where(item => item.DriveAlarmActive || item.State == AxisState.Error))
@@ -613,7 +620,8 @@ internal sealed class RuntimeAlarmCollectionViewModel : ViewModelBase
         string AlarmKey,
         string Source,
         string State,
-        string RecoveryKey);
+        string RecoveryKey,
+        RuntimeSequenceErrorLocation? ErrorLocation = null);
 
     private static string T(string key, string korean, string english) =>
         OpenVisionLanguageService.T(key, korean, english);

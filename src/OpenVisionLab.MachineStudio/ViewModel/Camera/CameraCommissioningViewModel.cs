@@ -2,8 +2,10 @@ using System.Windows.Input;
 using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Devices;
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Core.Sequences;
 using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Engine;
+using OpenVisionLab.Machine.Simulation.Camera;
 using OpenVisionLab.Machine.Simulation.Scenarios;
 using OpenVisionLab.Machine.Simulation.Snapshots;
 using OpenVisionLab.Machine.Vision.Models;
@@ -20,21 +22,25 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
     private static readonly string[] PresentationPropertyNames =
     [
         nameof(CameraCountText), nameof(HasVirtualCamera), nameof(VirtualCameras),
+        nameof(CurrentCameraInputs), nameof(SelectedExecutionInput), nameof(HasCurrentCameraInputs), nameof(CurrentInputSummaryText),
+        nameof(SelectedInputStateText), nameof(SelectedInputContextText), nameof(SelectedInputStepContextText),
+        nameof(SelectedInputAcquisitionText), nameof(HasSelectedCameraInput), nameof(CurrentInputImagePath),
         nameof(SelectedVirtualCamera), nameof(SelectedCameraId), nameof(CurrentCameraRecipes),
         nameof(SelectedCameraRecipe), nameof(CurrentCameraName), nameof(CurrentCameraStateText),
         nameof(CurrentCameraResultText), nameof(CurrentCameraFrameText),
         nameof(CurrentCameraExposureTicksText), nameof(CurrentCameraTransferTicksText),
         nameof(CurrentCameraSourceText), nameof(CurrentCameraSourceModeText), nameof(CurrentCameraInputKindText),
-        nameof(CurrentCameraImagePath), nameof(HasCurrentCameraImage),
+        nameof(CurrentCameraImagePath), nameof(HasCurrentCameraImage), nameof(HasCurrentNumericalInput),
         nameof(CurrentCameraResultSourceText), nameof(CurrentCameraVerificationLevelText),
         nameof(CurrentCameraInputHashText), nameof(CurrentCameraModelKindText),
         nameof(CurrentCameraClockModeText),
         nameof(CurrentCameraFrameHashText), nameof(CurrentCameraInspectionIdText),
-        nameof(CurrentCameraInspectionMessageText), nameof(CurrentCameraInspectionMetricsText),
+        nameof(CurrentAcquisitionSteps),
+        nameof(CurrentCameraInspectionMessageText), nameof(CurrentCameraInspectionMetricsText), nameof(CurrentNumericalInput),
         nameof(CurrentVisionEvidenceHashText), nameof(VisionEvidenceStatusText),
         nameof(VisionEvidenceComparisonText), nameof(CurrentCameraEvidenceDetailsText),
         nameof(CameraCommissioningHintText), nameof(CanStartManualCameraControl),
-        nameof(CanTriggerCamera)
+        nameof(CanTriggerCamera), nameof(CurrentCaptureOutputText), nameof(CanShowHeightData), nameof(IsHeightDataView), nameof(IsImageDataView), nameof(CurrentHeightRangeText)
     ];
 
     private static readonly string[] ModePresentationPropertyNames =
@@ -44,6 +50,7 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
 
     private readonly Func<MachineProjectDocument> _projectAccessor;
     private readonly Func<CameraCommissioningProjection> _projectionAccessor;
+    private readonly Func<SimulationSnapshot> _currentSnapshotAccessor;
     private readonly Func<ManualCameraTriggerRequestInput> _triggerRequestInputAccessor;
     private readonly Func<ManualCameraSessionIdentity> _sessionIdentityAccessor;
     private readonly Func<CancellationToken> _runtimeCancellationTokenAccessor;
@@ -59,8 +66,14 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
     private readonly ManualCameraTriggerWorkflow _manualCameraTriggerWorkflow;
     private readonly CameraImageSourceApplicationWorkflow _imageSourceApplicationWorkflow;
     private CameraCommissioningProjection? _lastProjection;
+    private IReadOnlyList<CameraExecutionInputItem> _executionInputs = Array.Empty<CameraExecutionInputItem>();
+    private (DeviceDefinition Device, string Id, string Name, NumericalCameraInputKind? InputKind)[] _virtualCameraRows = [];
+    private IReadOnlyList<DeviceDefinition> _virtualCameras = Array.Empty<DeviceDefinition>();
+    private IReadOnlyList<CameraSequenceStepReference> _acquisitionStepReferences = Array.Empty<CameraSequenceStepReference>();
+    private SimulationSnapshot? _executionSnapshot;
     private bool _sessionCloseRequested;
     private bool _disposed;
+    private bool _isHeightDataView;
 
     internal CameraCommissioningViewModel(
         Func<MachineProjectDocument> projectAccessor,
@@ -79,10 +92,12 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
         Action<string, string> log,
         Action notifyIntegrationContext,
         Func<string, string> localize,
-        Action<Exception> handleCommandException)
+        Action<Exception> handleCommandException,
+        Func<bool>? canEditCapture = null)
     {
         _projectAccessor = projectAccessor ?? throw new ArgumentNullException(nameof(projectAccessor));
         _projectionAccessor = projectionAccessor ?? throw new ArgumentNullException(nameof(projectionAccessor));
+        _currentSnapshotAccessor = currentSnapshotAccessor ?? throw new ArgumentNullException(nameof(currentSnapshotAccessor));
         _sessionIdentityAccessor = sessionIdentityAccessor
             ?? throw new ArgumentNullException(nameof(sessionIdentityAccessor));
         _triggerRequestInputAccessor = triggerRequestInputAccessor
@@ -111,15 +126,20 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
             localize ?? throw new ArgumentNullException(nameof(localize)));
         ImageSourceEditor = new CameraImageSourceEditorViewModel(
             _imageSourceApplicationWorkflow.Apply);
+        CaptureEditor = new CameraCaptureEditorViewModel(canEditCapture ?? (() => false), _imageSourceApplicationWorkflow.Apply);
         Selection = new(
             _projectAccessor,
-            ImageSourceEditor.SelectCamera,
+            cameraId => { ImageSourceEditor.SelectCamera(cameraId); CaptureEditor.SelectCamera(cameraId); },
             _visionExecutionEvidence.RefreshContext,
             applyCurrentSnapshot ?? throw new ArgumentNullException(nameof(applyCurrentSnapshot)),
-            OnPropertyChanged,
+            name =>
+            {
+                OnPropertyChanged(name);
+                if (name == nameof(SelectedCameraId)) OnPropertyChanged(nameof(CurrentAcquisitionSteps));
+            },
             () => NotifyPresentationChanged());
         _manualCameraTriggerWorkflow = new(
-            currentSnapshotAccessor ?? throw new ArgumentNullException(nameof(currentSnapshotAccessor)),
+            _currentSnapshotAccessor,
             dispatchCameraCommand ?? throw new ArgumentNullException(nameof(dispatchCameraCommand)),
             _visionExecutionEvidence,
             applyMonitorSnapshot ?? throw new ArgumentNullException(nameof(applyMonitorSnapshot)),
@@ -135,15 +155,19 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
             _handleCommandException,
             useCommandManagerRequery: false);
         SelectCameraCommand = new RelayCommand(value => SelectedCameraId = value as string, _ => !_disposed);
+        ShowInputOutputCommand = new RelayCommand(value => IsHeightDataView = value as string == "height", value => !_disposed && (value as string != "height" || CanShowHeightData));
     }
 
     public CameraImageSourceEditorViewModel ImageSourceEditor { get; }
+    public CameraCaptureEditorViewModel CaptureEditor { get; }
 
     public ICommand StartManualCameraControlCommand { get; }
 
     public ICommand TriggerCameraCommand { get; }
 
     public ICommand SelectCameraCommand { get; }
+
+    public ICommand ShowInputOutputCommand { get; }
 
     internal CameraSelectionWorkflow Selection { get; }
 
@@ -157,11 +181,59 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
 
     public bool HasVirtualCamera => _projectAccessor().Devices.Any(device => device.Kind == DeviceKind.Camera);
 
-    public IReadOnlyList<DeviceDefinition> VirtualCameras => _projectAccessor().Devices
-        .Where(device => device.Kind == DeviceKind.Camera)
-        .ToArray();
+    public IReadOnlyList<DeviceDefinition> VirtualCameras
+    {
+        get
+        {
+            var rows = _projectAccessor().Devices.Where(device => device.Kind == DeviceKind.Camera)
+                .Select(device => (Device: device, device.Id, device.Name, InputKind: device.Camera?.NumericalInput?.InputKind)).ToArray();
+            if (!rows.SequenceEqual(_virtualCameraRows))
+            {
+                _virtualCameraRows = rows;
+                _virtualCameras = rows.Select(row => row.Device).ToArray();
+            }
+            return _virtualCameras;
+        }
+    }
 
     public DeviceDefinition? SelectedVirtualCamera => Selection.SelectedVirtualCamera;
+
+    public IReadOnlyList<CameraSequenceStepReference> CurrentAcquisitionSteps
+    {
+        get
+        {
+            var project = _projectAccessor();
+            var rows = SelectedVirtualCamera is null ? Array.Empty<CameraSequenceStepReference>() : project.Sequences
+                .SelectMany(sequence => sequence.Steps.Select((step, index) => (Sequence: sequence, Step: step, Order: index + 1)))
+                .Where(item => item.Step.Action == SequenceStepAction.TriggerCamera && item.Step.TargetId == SelectedCameraId)
+                .Select(item => new CameraSequenceStepReference(project.Id, SelectedCameraId!, item.Sequence.Id, item.Step.Id, item.Sequence.Name,
+                    OpenVisionLanguageService.TUserText("sequence", $"{item.Sequence.Id}.step.{item.Step.Id}.name", item.Step.Name), item.Order)).ToArray();
+            if (!rows.SequenceEqual(_acquisitionStepReferences)) _acquisitionStepReferences = rows;
+            return _acquisitionStepReferences;
+        }
+    }
+
+    public IReadOnlyList<CameraExecutionInputItem> CurrentCameraInputs => _executionInputs.Where(item => item.InputCount > 0).ToArray();
+
+    public bool HasCurrentCameraInputs => _executionInputs.Any(item => item.InputCount > 0);
+
+    public CameraExecutionInputItem? SelectedExecutionInput => _executionInputs.FirstOrDefault(item => item.Id == SelectedCameraId);
+
+    public bool HasSelectedCameraInput => SelectedExecutionInput?.InputCount > 0;
+
+    public string CurrentInputSummaryText => _executionSnapshot?.ProjectId is null || _lastProjection?.IsApplyingProject == true
+        ? OpenVisionLanguageService.T("Camera.InputOriginUnavailable")
+        : _executionSnapshot.ProjectId != _projectAccessor().Id
+            ? OpenVisionLanguageService.T("Camera.InputForeignRuntime")
+            : string.Format(System.Globalization.CultureInfo.CurrentCulture, OpenVisionLanguageService.T("Camera.CurrentInputsSummary"),
+                _executionSnapshot.RuntimeGeneration, _executionInputs.Sum(item => item.InputCount), _executionInputs.Count);
+
+    public string SelectedInputStateText => (SelectedExecutionInput?.StateText ?? OpenVisionLanguageService.T("Camera.InputNotAcquired"))
+        + (HasSelectedCameraInput && _lastProjection?.Snapshot?.Result is not null ? $" · {CurrentCameraResultSourceText}" : string.Empty);
+    public string SelectedInputContextText => SelectedExecutionInput?.ContextText ?? "—";
+    public string SelectedInputStepContextText => SelectedExecutionInput?.StepContextText ?? "—";
+    public string SelectedInputAcquisitionText => SelectedExecutionInput?.AcquisitionText ?? "—";
+    public string? CurrentInputImagePath => HasSelectedCameraInput ? CurrentCameraImagePath : null;
 
     public string? SelectedCameraId
     {
@@ -201,9 +273,45 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
     public string CurrentCameraTransferTicksText => _presentation.CurrentCameraTransferTicksText;
     public string CurrentCameraSourceText => _presentation.CurrentCameraSourceText;
     public string CurrentCameraSourceModeText => _presentation.CurrentCameraSourceModeText;
-    public string CurrentCameraInputKindText => _presentation.CurrentCameraInputKindText;
+    public string CurrentCameraInputKindText => SelectedVirtualCamera?.Camera?.NumericalInput is { } settings
+        ? string.Format(OpenVisionLanguageService.T("Camera.AppliedNumericalInput"),
+            settings.InputKind switch { NumericalCameraInputKind.Image2D => OpenVisionLanguageService.T("Camera.TwoDImage"), NumericalCameraInputKind.HeightMap3D => OpenVisionLanguageService.T("Camera.HeightMap3D"), _ => settings.InputKind.ToString() },
+            settings.RecipeName, settings.Version, settings.ConfirmedVersion)
+        : _presentation.CurrentCameraInputKindText;
+    public NumericalCameraInput? CurrentNumericalInput
+    {
+        get
+        {
+            var snapshot = _lastProjection?.Snapshot;
+            if (snapshot is { State: VirtualCameraState.FrameReady, Result: { } result }
+                && result.AcquisitionId == snapshot.CurrentAcquisitionId)
+                return result.NumericalInput ?? snapshot.NumericalInput;
+            return snapshot is { State: VirtualCameraState.AwaitingExternalResult, NumericalInput: { } pending }
+                && pending.Frame.FrameId == snapshot.CurrentAcquisitionId ? pending : null;
+        }
+    }
+    public bool HasCurrentNumericalInput => CurrentNumericalInput is not null;
+    public bool CanShowHeightData => CurrentNumericalInput?.Frame.PixelFormat == "HeightMapFloat32LE";
+    public bool IsHeightDataView
+    {
+        get => _isHeightDataView && CanShowHeightData;
+        set
+        {
+            if (SetProperty(ref _isHeightDataView, value && CanShowHeightData))
+            {
+                OnPropertyChanged(nameof(IsImageDataView));
+                OnPropertyChanged(nameof(CurrentHeightRangeText));
+            }
+        }
+    }
+    public bool IsImageDataView => !IsHeightDataView;
+    public string CurrentCaptureOutputText => OpenVisionLanguageService.T(CurrentNumericalInput is { } input
+        ? input.Frame.PixelFormat == "HeightMapFloat32LE" ? "Camera.HeightData" : "Camera.TwoDImage"
+        : SelectedVirtualCamera?.Camera?.NumericalInput?.InputKind == NumericalCameraInputKind.HeightMap3D ? "Camera.HeightData" : "Camera.TwoDImage");
+    public string CurrentHeightRangeText => IsHeightDataView && CurrentNumericalInput is { } input
+        ? $"{input.Frame.Width} × {input.Frame.Height} · {input.Samples.Min():F3}–{input.Samples.Max():F3} LU · {OpenVisionLanguageService.T("Camera.NumericalHeightLegend")}" : string.Empty;
     public string? CurrentCameraImagePath => _presentation.CurrentCameraImagePath;
-    public bool HasCurrentCameraImage => _presentation.HasCurrentCameraImage;
+    public bool HasCurrentCameraImage => HasCurrentNumericalInput || _presentation.HasCurrentCameraImage;
     public string CurrentCameraResultSourceText => _presentation.CurrentCameraResultSourceText;
     public string CurrentCameraVerificationLevelText => _presentation.CurrentCameraVerificationLevelText;
     public string CurrentCameraInputHashText => _presentation.CurrentCameraInputHashText;
@@ -253,6 +361,7 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
         ArgumentNullException.ThrowIfNull(project);
         Selection.EnsureSelectionFor(project);
         ImageSourceEditor.Load(project, projectPath, Selection.SelectedCameraId);
+        CaptureEditor.Load(project, Selection.SelectedCameraId);
         OnPropertyChanged(nameof(SelectedVirtualCamera));
         OnPropertyChanged(nameof(SelectedCameraId));
         OnPropertyChanged(nameof(CurrentCameraRecipes));
@@ -281,7 +390,9 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
         }
 
         ImageSourceEditor.RefreshLocalization();
+        CaptureEditor.RefreshLocalization();
         _visionExecutionEvidence.RefreshLocalization();
+        if (_lastProjection is not null) RefreshExecutionInputs(_currentSnapshotAccessor(), _lastProjection);
         foreach (var propertyName in PresentationPropertyNames)
         {
             OnPropertyChanged(propertyName);
@@ -301,10 +412,23 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
 
     internal void RefreshProjection(bool invalidateCommands = true)
     {
+        if (_disposed) return;
         var projection = _projectionAccessor();
-        var isModeOnlyChange = IsModeOnlyChange(_lastProjection, projection);
+        var snapshot = _currentSnapshotAccessor();
+        bool sameRuntime = _executionSnapshot?.ProjectId == snapshot.ProjectId && _executionSnapshot?.RuntimeGeneration == snapshot.RuntimeGeneration;
+        var previousInputs = _executionInputs;
+        if (snapshot.ProjectId is not null || projection.IsApplyingProject)
+        {
+            var selected = snapshot.ProjectId == _projectAccessor().Id && !projection.IsApplyingProject
+                ? snapshot.Cameras.FirstOrDefault(camera => camera.Id == SelectedCameraId)
+                : null;
+            projection = projection with { Snapshot = selected };
+        }
+        RefreshExecutionInputs(snapshot, projection);
+        var isModeOnlyChange = sameRuntime && ReferenceEquals(previousInputs, _executionInputs) && IsModeOnlyChange(_lastProjection, projection);
         _lastProjection = projection;
         _presentation.ApplyProjection(projection);
+        if (!CanShowHeightData) _isHeightDataView = false;
         if (isModeOnlyChange)
         {
             RaiseModePresentationChanged();
@@ -383,10 +507,14 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
         InvalidateCommands();
     }
 
+    internal Task TriggerFromInspectorAsync() => CanTriggerCamera ? TriggerSelectedCameraAsync() : Task.CompletedTask;
+
     private async Task TriggerSelectedCameraAsync()
     {
-        var request = _requestFactory.TryCreate(_triggerRequestInputAccessor());
-        if (request is null)
+        var input = _triggerRequestInputAccessor();
+        bool numerical = input.CameraDefinition?.NumericalInput is not null;
+        var request = numerical ? null : _requestFactory.TryCreate(input);
+        if (!numerical && request is null)
         {
             return;
         }
@@ -396,7 +524,8 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
                 _runtimeCancellationTokenAccessor(),
                 preparationToken);
-            return await _manualCameraTriggerWorkflow.ExecuteAsync(request, cancellation.Token);
+            return numerical ? await _manualCameraTriggerWorkflow.ExecuteNumericalAsync(input, cancellation.Token)
+                : await _manualCameraTriggerWorkflow.ExecuteAsync(request!, cancellation.Token);
         });
         PresentTriggerFailure(result);
     }
@@ -428,6 +557,7 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
 
     private void RaisePresentationChanged()
     {
+        ((RelayCommand)ShowInputOutputCommand).RaiseCanExecuteChanged();
         foreach (var propertyName in PresentationPropertyNames)
         {
             OnPropertyChanged(propertyName);
@@ -440,6 +570,19 @@ public sealed class CameraCommissioningViewModel : ViewModelBase, IDisposable
         {
             OnPropertyChanged(propertyName);
         }
+    }
+
+
+    private void RefreshExecutionInputs(SimulationSnapshot snapshot, CameraCommissioningProjection projection)
+    {
+        _executionSnapshot = snapshot;
+        IEnumerable<VirtualCameraSnapshot> cameras = snapshot.Cameras;
+        if (projection.IsApplyingProject || snapshot.ProjectId is not null && snapshot.ProjectId != _projectAccessor().Id)
+            cameras = Array.Empty<VirtualCameraSnapshot>();
+        else if (snapshot.ProjectId is null && snapshot.Cameras.Count == 0 && projection.Snapshot is not null)
+            cameras = [projection.Snapshot];
+        var inputs = CameraCommissioningPresentation.CreateExecutionInputs(_projectAccessor(), cameras, snapshot.RuntimeGeneration);
+        if (!_executionInputs.SequenceEqual(inputs)) _executionInputs = inputs;
     }
 
     private static bool IsModeOnlyChange(

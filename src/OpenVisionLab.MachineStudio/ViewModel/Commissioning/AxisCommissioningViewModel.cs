@@ -247,8 +247,8 @@ public sealed class AxisCommissioningViewModel : ViewModelBase, IDisposable
                         ? OpenVisionLanguageService.T("Axis.ResetForManualHint")
                         : OpenVisionLanguageService.T("Axis.VelocityMoveStartManualHint");
 
-    public bool CanJogAxis => !IsDisposed && (_axisJogInteractionActive ||
-        (CanUseManualAxis && _currentAxis?.State != AxisState.Moving));
+    public bool CanJogAxis => CanUseManualAxis
+        && (_axisJogInteractionActive || _currentAxis?.State != AxisState.Moving);
     public bool CanMoveAxisAbsolute => !IsDisposed && CanUseManualAxis
         && !_axisJogInteractionActive
         && _currentAxis?.State != AxisState.Moving
@@ -374,6 +374,11 @@ public sealed class AxisCommissioningViewModel : ViewModelBase, IDisposable
         _automaticRunActive = projection.AutomaticRunActive;
         _sequenceRunActive = projection.SequenceRunActive;
 
+        if (_axisJogInteractionActive && (axisChanged || !CanUseManualAxis))
+        {
+            EndAxisJogCommand.Execute(null);
+        }
+
         if (axisChanged && _currentAxis is not null)
         {
             _axisTargetAxisId = _currentAxis.Id;
@@ -435,6 +440,27 @@ public sealed class AxisCommissioningViewModel : ViewModelBase, IDisposable
         _axisJogStartTask = null;
         NotifyProjectionChanged();
         return StopAxisJogAfterStartAsync(axisId, startTask);
+    }
+
+    internal double? InspectorCurrentPosition => _currentAxis?.Position;
+    internal string InspectorPositionText => _currentAxis is null ? "—" : $"{_currentAxis.Position:0.0} {CurrentAxisUnit}";
+    internal void ResetInspectorInputs()
+    {
+        if (IsDisposed || _currentAxisDefinition is null) return;
+        AxisTargetPositionText = (_currentAxisDefinition.TeachingPositions?.GetValueOrDefault("검사 위치") ?? _currentAxisDefinition.HomePosition).ToString("0.###", CultureInfo.InvariantCulture);
+        AxisRelativeDistanceText = "10";
+    }
+
+    internal Task ExecuteInspectorMotionAsync(string action)
+    {
+        if (!CanUseManualAxis || _currentAxis is null || _currentAxisDefinition is null) return Task.CompletedTask;
+        if (action == "home")
+            return _dispatch(new MoveAbsoluteCommand(_currentAxis.Id, _currentAxisDefinition.HomePosition), "Axis.ActionMoveAbsolute");
+        if (action == "target" && TryGetAxisTargetPosition(out var target))
+            return _dispatch(new MoveAbsoluteCommand(_currentAxis.Id, target), "Axis.ActionMoveAbsolute");
+        if (action is "jog-" or "jog+" && TryGetAxisRelativeDistance(out var distance))
+            return _dispatch(new MoveRelativeCommand(_currentAxis.Id, action == "jog-" ? -Math.Abs(distance) : Math.Abs(distance)), "Axis.ActionMoveRelative");
+        return Task.CompletedTask;
     }
 
     internal void RefreshLocalization()

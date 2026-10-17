@@ -1,5 +1,7 @@
 using System.Threading.Channels;
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Core.Sequences;
+using OpenVisionLab.Machine.Persistence.Projects;
 using OpenVisionLab.Machine.Simulation.Commands;
 using OpenVisionLab.Machine.Simulation.Engine;
 using OpenVisionLab.Machine.Simulation.Events;
@@ -12,6 +14,53 @@ namespace OpenVisionLab.MachineStudio.Tests;
 
 public sealed class ProjectRuntimeApplicationWorkflowTests
 {
+    [Fact]
+    public async Task InvalidSequenceOpenShowsReasonPreservesProjectAndAllowsValidReopen()
+    {
+        string directory = Path.Combine(@"D:\OpenVisionLab-TestData\Machine\project-runtime-application-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string rejectedPath = Path.Combine(directory, "invalid-sequence.ovmachine");
+            string validPath = Path.Combine(directory, "valid.ovmachine");
+            var invalid = new MachineProjectDocument
+            {
+                Name = "Invalid sequence",
+                Sequences = [new()
+                {
+                    Id = "invalid", Name = "Invalid",
+                    Steps = [new() { Id = "wait", Action = SequenceStepAction.WaitVisionResult, TargetId = "missing-camera", TimeoutMs = 3000, NextStepId = "done" },
+                        new() { Id = "done", Action = SequenceStepAction.Complete }]
+                }]
+            };
+            var store = new ProjectDocumentFileStore();
+            await store.SaveAsync(invalid, rejectedPath);
+            await store.SaveAsync(new MachineProjectDocument { Name = "Recovered" }, validPath);
+            using var viewModel = new MainViewModel(new MachineProjectDocument { Name = "Retained" });
+            var retained = Assert.Single(viewModel.ProjectTree.Roots);
+            var details = new List<string>();
+            viewModel.ProjectOpenFailurePresenter = details.Add;
+
+            Assert.False(await viewModel.OpenProjectAsync(rejectedPath));
+            Assert.Same(retained, Assert.Single(viewModel.ProjectTree.Roots));
+            Assert.Null(viewModel.CurrentProjectPath);
+            Assert.Contains("FailureStepRequired", Assert.Single(details));
+            Assert.Equal(OpenVisionLanguageService.T("Project.OpenFailedStatus"), viewModel.StatusMessage);
+
+            Assert.True(await viewModel.OpenProjectAsync(validPath));
+            Assert.Equal("Recovered", Assert.Single(viewModel.ProjectTree.Roots).DisplayName);
+            Assert.Equal(Path.GetFullPath(validPath), viewModel.CurrentProjectPath);
+            Assert.True(viewModel.IsDesignMode);
+            Assert.False(viewModel.IsRunning);
+            Assert.False(viewModel.HasUnsavedChanges);
+            Assert.Single(details);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task AppliesProjectAndRestoresApplyingStateAfterCompletion()
     {

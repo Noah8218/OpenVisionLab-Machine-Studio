@@ -202,11 +202,16 @@ public sealed record DigitalSensorRuntimeConfiguration : LayoutComponentRuntimeC
         int onDelayTicks,
         int offDelayTicks,
         LayoutRuntimeTransform baseTransform,
-        LayoutRuntimeSize size)
+        LayoutRuntimeSize size,
+        bool detectAllProducts = false,
+        double? detectionCenterY = null)
         : base(id, name, LayoutComponentKind.DigitalSensor, baseTransform, size)
     {
         OutputChannelId = RequiredIdentifier(outputChannelId, nameof(outputChannelId));
-        TargetComponentId = RequiredIdentifier(targetComponentId, nameof(targetComponentId));
+        TargetComponentId = detectAllProducts ? targetComponentId : RequiredIdentifier(targetComponentId, nameof(targetComponentId));
+        DetectAllProducts = detectAllProducts;
+        if (detectionCenterY is { } center && !double.IsFinite(center)) throw new ArgumentOutOfRangeException(nameof(detectionCenterY));
+        DetectionCenterY = detectionCenterY;
 
         if (onDelayTicks < 0)
         {
@@ -230,6 +235,8 @@ public sealed record DigitalSensorRuntimeConfiguration : LayoutComponentRuntimeC
 
     public string OutputChannelId { get; }
     public string TargetComponentId { get; }
+    public bool DetectAllProducts { get; }
+    public double? DetectionCenterY { get; }
     public int OnDelayTicks { get; }
     public int OffDelayTicks { get; }
 }

@@ -11,6 +11,20 @@ namespace OpenVisionLab.MachineStudio.Tests;
 
 public sealed class SimulationRunControlWorkflowTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SpeedChangeDispatchesOnlySpeedAndPreservesRunAdmission(bool running)
+    {
+        using var engine = new RecordingSimulationEngine { BlockFirstCommand = false };
+        var state = CreateState() with { IsRunning = running };
+        using var workflow = CreateWorkflow(engine, () => state, value => state = state with { IsRunning = value });
+        await workflow.SetTimeScaleAsync(4);
+        Assert.Equal(4, Assert.IsType<SetSimulationTimeScaleCommand>(Assert.Single(engine.Commands)).TimeScale);
+        Assert.Equal(running, state.IsRunning);
+        Assert.False(workflow.IsBusy);
+    }
+
     [Fact]
     public async Task ConcurrentRunRequestsDispatchOnlyOneRunCommand()
     {

@@ -1,5 +1,7 @@
+using OpenVisionLab;
 using OpenVisionLab.Machine.Core.Layouts;
 using OpenVisionLab.Machine.Core.Projects;
+using OpenVisionLab.Machine.Core.Sequences;
 using OpenVisionLab.MachineStudio.ViewModel;
 using Xunit;
 
@@ -7,6 +9,28 @@ namespace OpenVisionLab.MachineStudio.Tests;
 
 public sealed class ProjectCommandStateTests
 {
+    [Fact]
+    public void UnitRunCaptionSeparatesUnitCyclesFromWholeMachineRepeat()
+    {
+        var project = new MachineProjectDocument
+        {
+            Stations = [new() { Id = "station", Name = "Station", Units = [new() { Id = "feed", Name = "Feed", RepeatCount = 3 }, new() { Id = "inspection", Name = "Inspection", RepeatCount = 3 }, new() { Id = "eject", Name = "Eject", RepeatCount = 3 }] }],
+            Sequences = new[] { "feed", "inspection", "eject" }.Select(id => new SequenceDefinition
+            {
+                Id = "sequence." + id, Name = id, UnitId = id,
+                Steps = [new() { Id = "complete", Action = SequenceStepAction.Complete }]
+            }).ToList()
+        };
+        using var viewModel = new MainViewModel(project);
+        Assert.Contains(string.Format(OpenVisionLanguageService.T("Shell.UnitSequencesRunTarget"), 3), viewModel.RunTargetText);
+        Assert.Contains(string.Format(OpenVisionLanguageService.T("Shell.UnitRepeatRunTarget"), 3), viewModel.RunTargetText);
+        Assert.Contains(OpenVisionLanguageService.T("Shell.SingleRunTarget"), viewModel.RunTargetText);
+        project.Stations[0].Units[1].RepeatCount = 2;
+        Assert.Contains(OpenVisionLanguageService.T("Shell.MixedUnitRepeatRunTarget"), viewModel.RunTargetText);
+        project.Sequences[0].UnitId = null;
+        Assert.DoesNotContain(OpenVisionLanguageService.T("Shell.MixedUnitRepeatRunTarget"), viewModel.RunTargetText);
+    }
+
     [Fact]
     public void ProjectTreeNewProjectCommandKeepsOneBindingCommandInstance()
     {

@@ -198,7 +198,7 @@ internal static class SmokeConnectionWorkbenchVerifier
             dryRunNavigationStep?.ComponentId is not null
             && vm.RecipeConnections.SelectedRow?.ComponentId == dryRunNavigationStep.ComponentId
             && vm.Layout.SelectedItem?.Id == dryRunNavigationStep.ComponentId);
-        vm.SelectedDocumentTabIndex = 1;
+        vm.Navigation.OpenRecipeConnectionsCommand.Execute(null);
         vm.RecipeConnections.OpenRecipeDryRunStepCommand.Execute(dryRunNavigationStep);
         Check("dry-run-timeline-opens-exact-sequence",
             vm.SelectedDocumentTabIndex == 2
@@ -215,7 +215,7 @@ internal static class SmokeConnectionWorkbenchVerifier
             vm.RecipeConnections.RecipeDryRunTimeline,
             "wait-cylinder-extended",
             "wait-stopper-extended");
-        vm.SelectedDocumentTabIndex = 1;
+        vm.Navigation.OpenRecipeConnectionsCommand.Execute(null);
         vm.RecipeConnections.PlayRecipeDryRunStepCommand.Execute(dryRunPlaybackStep);
         Check("dry-run-playback-opens-read-only-layout",
             dryRunPlaybackStep is not null
@@ -288,7 +288,7 @@ internal static class SmokeConnectionWorkbenchVerifier
         Check("sequence-links-visible", vm.RecipeConnections.SequenceUseCount > 0);
 
         var linkedRow = vm.RecipeConnections.Rows.FirstOrDefault(row => row.HasSequenceUse);
-        vm.SelectedDocumentTabIndex = 1;
+        vm.Navigation.OpenRecipeConnectionsCommand.Execute(null);
         if (linkedRow is not null)
         {
             vm.RecipeConnections.OpenSequenceStepCommand.Execute(linkedRow);
@@ -315,7 +315,7 @@ internal static class SmokeConnectionWorkbenchVerifier
         Check("connection-add-command-gate",
             stageRow is not null
             && vm.RecipeConnections.AddSequenceStepCommand.CanExecute(stageRow) == canAddTargetStep);
-        vm.SelectedDocumentTabIndex = 1;
+        vm.Navigation.OpenRecipeConnectionsCommand.Execute(null);
         if (canAddTargetStep && stageRow is not null)
         {
             vm.RecipeConnections.AddSequenceStepCommand.Execute(stageRow);

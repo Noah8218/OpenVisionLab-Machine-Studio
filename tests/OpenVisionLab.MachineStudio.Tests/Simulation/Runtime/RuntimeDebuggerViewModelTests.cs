@@ -629,6 +629,24 @@ public sealed class RuntimeDebuggerViewModelTests
         Assert.Equal("Message 204", viewModel.Timeline[0].Message);
     }
 
+
+    [Theory]
+    [InlineData(0, "0.00 s", "00:00:00.000")]
+    [InlineData(1.25, "1.25 s", "00:00:01.250")]
+    [InlineData(60, "60.00 s", "00:01:00.000")]
+    [InlineData(90000, "90000.00 s", "01:00:00.000")]
+    public void TimelineSecondsDisplayPreservesFullDurationAndExistingJournalTime(double seconds, string expected, string originalTime)
+    {
+        var commands = 0;
+        var model = new RuntimeDebuggerViewModel(command => { commands++; return Task.FromResult(Accepted(command)); });
+        model.ApplyEvent(new SimulationEvent(1, 1, TimeSpan.FromSeconds(seconds), "Sequence", "Started", "Actual event"));
+        var row = Assert.Single(model.Timeline);
+        Assert.Equal(expected, row.SecondsText);
+        Assert.Equal(originalTime, row.TimeText);
+        Assert.Equal(seconds, row.TimeSeconds);
+        Assert.Equal(0, commands);
+    }
+
     [Fact]
     public void TimelineCommandContext_PreservesCommandIdAndHandlesNonCommandEvents()
     {
@@ -904,6 +922,42 @@ public sealed class RuntimeDebuggerViewModelTests
         Assert.Same(location, model.LastSequenceError);
         model.LoadProject(project, resetSession: true);
         Assert.Null(model.LastSequenceError);
+    }
+
+    [Theory]
+    [InlineData("owned-sequence: on -> off.", "Main cycle · Turn off")]
+    [InlineData("owned-sequence: on -> missing.", "")]
+    [InlineData("unrelated: on -> off.", "")]
+    [InlineData("malformed transition", "")]
+    public void TimelineSourceUsesTheRecordedStepAndDoesNotInventAnUnknownSource(string message, string expected)
+    {
+        var project = CreateProject();
+        project.Sequences[0].Id = "owned-sequence";
+        using var model = new RuntimeDebuggerViewModel(command => Task.FromResult(Accepted(command)));
+        model.LoadProject(project, resetSession: true);
+        model.ApplyEvent(new SimulationEvent(1, 1, TimeSpan.Zero, "Sequence", "SequenceStepTransition", message));
+        Assert.Equal(expected, Assert.Single(model.Timeline).SourceText);
+        project.Sequences[0].Steps[1].Name = "Renamed · target";
+        model.LoadProject(project, resetSession: false);
+        if (expected.Length > 0) Assert.Equal("Main cycle · Renamed · target", Assert.Single(model.Timeline).SourceText);
+        model.LoadProject(project, resetSession: true);
+        Assert.Empty(model.Timeline);
+    }
+
+    [Theory]
+    [InlineData("Sequence", "SequenceFaulted", OpenVisionLab.MachineStudio.Models.Simulation.SimulationLogSeverity.Alarm)]
+    [InlineData("Alarm", "owned-alarm", OpenVisionLab.MachineStudio.Models.Simulation.SimulationLogSeverity.Alarm)]
+    [InlineData("Warning", "owned-warning", OpenVisionLab.MachineStudio.Models.Simulation.SimulationLogSeverity.Warning)]
+    [InlineData("Sequence", "SequenceStepTransition", OpenVisionLab.MachineStudio.Models.Simulation.SimulationLogSeverity.Info)]
+    public void TimelineMessageSeverityAndSeverityFilterAgree(string category, string code, OpenVisionLab.MachineStudio.Models.Simulation.SimulationLogSeverity expected)
+    {
+        using var model = new RuntimeDebuggerViewModel(command => Task.FromResult(Accepted(command)));
+        model.ApplyEvent(new SimulationEvent(1, 1, TimeSpan.Zero, category, code, "Owned event"));
+        Assert.Equal(expected, Assert.Single(model.Timeline).Severity);
+        model.SelectedTimelineSeverityFilter = model.TimelineSeverityFilters.Single(item => item.Key == expected.ToString());
+        Assert.Single(model.Timeline);
+        model.SelectedTimelineSeverityFilter = model.TimelineSeverityFilters.Single(item => item.Key == "Recovery");
+        Assert.Empty(model.Timeline);
     }
 
     private static MachineProjectDocument CreateProject() => new()

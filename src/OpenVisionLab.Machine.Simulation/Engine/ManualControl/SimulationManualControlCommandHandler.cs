@@ -63,7 +63,9 @@ internal sealed class SimulationManualControlCommandHandler
                 or StopAxesCommand => _axisCommandHandler.Apply(command, context),
             TriggerVirtualCameraCommand => _cameraCommandHandler.Apply(command, context),
             SetCylinderCommand
-                or SetConveyorCommand => _equipmentCommandHandler.Apply(command, context),
+                or SetConveyorCommand
+                or SetManualOutputCommand
+                or SetManualSampleCommand => _equipmentCommandHandler.Apply(command, context),
             SetVirtualInputCommand
                 or SetVirtualInputForceCommand
                 or SetDigitalSensorForceCommand => _inputCommandHandler.Apply(command, context),

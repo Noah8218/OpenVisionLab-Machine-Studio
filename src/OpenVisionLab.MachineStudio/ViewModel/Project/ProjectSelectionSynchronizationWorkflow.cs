@@ -30,12 +30,14 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
     private readonly Action<bool> _notifyTreeSelectionChanged;
     private readonly Action _notifyLayoutSelectionChanged;
     private readonly Action _onAxisDefinitionChanged;
+    private readonly Func<bool>? _canEditAxisDefinition;
     private readonly Action _onAnalogChannelDefinitionChanged;
     private readonly Action<string> _setStatus;
     private AxisDriveTuningEditorViewModel? _axisDriveTuningEditor;
     private AnalogIoAuthoringViewModel? _analogIoAuthoring;
     private bool _isApplyingProjectTreeGroupSelection;
     private bool _isApplyingLayoutSelection;
+    private bool _isApplyingSequenceStepSelection;
     private bool _isClearingProjectTreeGroupSelection;
     private int _disposed;
 
@@ -53,7 +55,8 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
         Action notifyLayoutSelectionChanged,
         Action onAxisDefinitionChanged,
         Action onAnalogChannelDefinitionChanged,
-        Action<string> setStatus)
+        Action<string> setStatus,
+        Func<bool>? canEditAxisDefinition = null)
     {
         _projectTree = projectTree ?? throw new ArgumentNullException(nameof(projectTree));
         _layout = layout ?? throw new ArgumentNullException(nameof(layout));
@@ -75,6 +78,7 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
         _onAnalogChannelDefinitionChanged = onAnalogChannelDefinitionChanged
             ?? throw new ArgumentNullException(nameof(onAnalogChannelDefinitionChanged));
         _setStatus = setStatus ?? throw new ArgumentNullException(nameof(setStatus));
+        _canEditAxisDefinition = canEditAxisDefinition;
 
         _projectTree.PropertyChanged += OnProjectTreePropertyChanged;
         _layout.PropertyChanged += OnLayoutPropertyChanged;
@@ -99,6 +103,61 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
 
         _projectTree.SelectedNode = null;
         _layout.SelectedItem = null;
+    }
+
+    internal LayoutItem? FindStepAxisSettingsTarget()
+    {
+        var project = _getProject();
+        var sequence = _sequenceEditor.SelectedSequence;
+        var step = _sequenceEditor.SelectedStep;
+        var draft = _sequenceEditor.SelectedStepDraft;
+        if (_disposed != 0 || sequence is null || !project.Sequences.Contains(sequence) || step is null
+            || sequence.Steps.Count(candidate => candidate.Id == step.Id) != 1 || draft is null || draft.Id != step.Id
+            || draft.Action != SequenceStepAction.MoveAxis || string.IsNullOrWhiteSpace(draft.TargetId)
+            || project.Axes.Count(axis => axis.Id == draft.TargetId) != 1) return null;
+        var layout = _layout.Definition;
+        if (layout is null || !project.Layouts.Contains(layout)
+            || (!string.IsNullOrWhiteSpace(project.Simulation.ActiveLayoutId) ? layout.Id != project.Simulation.ActiveLayoutId : project.Layouts.Count != 1)) return null;
+        var matches = layout.Components.Where(component => component.Kind is LayoutComponentKind.LinearStage or LayoutComponentKind.RotaryStage
+            && component.BehaviorBindingId == draft.TargetId).Take(2).ToArray();
+        if (matches.Length != 1 || string.IsNullOrWhiteSpace(matches[0].Id) || layout.Components.Count(component => component.Id == matches[0].Id) != 1) return null;
+        return _layout.Items.SingleOrDefault(item => ReferenceEquals(item.Component, matches[0]));
+    }
+
+    internal void SelectSequenceStepTarget()
+    {
+        if (_disposed != 0 || _sequenceEditor.SelectedStep is not { } step || string.IsNullOrEmpty(step.TargetId)) return;
+        string? signalDeviceId = null;
+        if (step.Action is SequenceStepAction.SetSignal or SequenceStepAction.WaitSignal)
+        {
+            var owners = _getProject().Devices.Where(device => device.ChannelIds.Contains(step.TargetId, StringComparer.Ordinal)).Take(2).ToArray();
+            if (owners.Length != 1 || string.IsNullOrEmpty(owners[0].Id)) return;
+            signalDeviceId = owners[0].Id;
+        }
+        var matches = _layout.Items.Where(item => step.Action switch
+        {
+            SequenceStepAction.MoveAxis or SequenceStepAction.WaitAxisDone =>
+                item.Component?.Kind is LayoutComponentKind.LinearStage or LayoutComponentKind.RotaryStage
+                    ? string.Equals(item.BehaviorBindingId, step.TargetId, StringComparison.Ordinal)
+                    : item.Component is null && item.Kind == LayoutItemKind.Axis && string.Equals(item.Id, step.TargetId, StringComparison.Ordinal),
+            SequenceStepAction.TriggerCamera or SequenceStepAction.WaitVisionResult =>
+                item.Component?.Kind == LayoutComponentKind.Camera
+                    ? string.Equals(item.BehaviorBindingId, step.TargetId, StringComparison.Ordinal)
+                    : item.Component is null && item.Kind == LayoutItemKind.Camera && string.Equals(item.Id, step.TargetId, StringComparison.Ordinal),
+            SequenceStepAction.SetSignal or SequenceStepAction.WaitSignal =>
+                item.Component is not null && string.Equals(item.BehaviorBindingId, signalDeviceId, StringComparison.Ordinal),
+            _ => false
+        }).Take(2).ToArray();
+        if (matches.Length != 1) return;
+        _isApplyingSequenceStepSelection = true;
+        try
+        {
+            _layout.Select(matches[0].Id);
+        }
+        finally
+        {
+            _isApplyingSequenceStepSelection = false;
+        }
     }
 
     internal void ClearAnalogEditor() => SetAnalogIoAuthoring(null);
@@ -178,7 +237,7 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
 
         _properties.ShowNode(node);
         SetAxisDriveTuningEditor(node?.Model is VirtualAxisDefinition axis
-            ? new AxisDriveTuningEditorViewModel(axis, _onAxisDefinitionChanged)
+            ? new AxisDriveTuningEditorViewModel(axis, _onAxisDefinitionChanged, _canEditAxisDefinition)
             : null);
         SetAnalogIoAuthoring(node?.Model is ChannelDefinition channel
             && channel.Kind is (ChannelKind.AnalogInput or ChannelKind.AnalogOutput)
@@ -198,7 +257,7 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
             return;
         }
 
-        if (!_isApplyingProjectTreeGroupSelection && IsProjectTreeGroupSelection(_projectTree.SelectedNode))
+        if (!_isApplyingProjectTreeGroupSelection && !_isApplyingSequenceStepSelection && IsProjectTreeGroupSelection(_projectTree.SelectedNode))
         {
             var selectedNode = _projectTree.SelectedNode!;
             _isClearingProjectTreeGroupSelection = true;
@@ -214,7 +273,7 @@ internal sealed class ProjectSelectionSynchronizationWorkflow : ViewModelBase, I
             _notifyTreeSelectionChanged(false);
         }
 
-        if (!_isApplyingProjectTreeGroupSelection)
+        if (!_isApplyingProjectTreeGroupSelection && !_isApplyingSequenceStepSelection)
         {
             var layoutComponentNode = _layout.SelectedItem is { } selectedItem
                 ? FindLayoutComponentNode(selectedItem.Id)

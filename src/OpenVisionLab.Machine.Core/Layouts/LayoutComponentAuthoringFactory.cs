@@ -17,15 +17,17 @@ public sealed class LayoutComponentAuthoringFactory
         MachineLayoutDefinition layout,
         LayoutComponentKind kind,
         string? selectedComponentId,
-        out LayoutComponentAuthoringFailure? failure)
+        out LayoutComponentAuthoringFailure? failure,
+        NumericalCameraInputKind? cameraInputKind = null)
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(layout);
 
         failure = null;
-        return kind switch
+        var created = kind switch
         {
             LayoutComponentKind.MachineFrame => CreateMachineFrame(project),
+            LayoutComponentKind.DigitalIo => CreateDigitalIo(project),
             LayoutComponentKind.LinearStage => CreateAxisStage(project, layout, AxisKind.Linear),
             LayoutComponentKind.RotaryStage => CreateAxisStage(project, layout, AxisKind.Rotary),
             LayoutComponentKind.DigitalSensor => CreateDigitalSensor(
@@ -35,10 +37,43 @@ public sealed class LayoutComponentAuthoringFactory
                 out failure),
             LayoutComponentKind.PneumaticCylinder => CreatePneumaticCylinder(project),
             LayoutComponentKind.Conveyor => CreateConveyor(project),
+            LayoutComponentKind.FeedPosition or LayoutComponentKind.ExitPosition => CreateMaterialPosition(project, kind),
             LayoutComponentKind.Workpiece => CreateWorkpiece(project, layout, out failure),
-            LayoutComponentKind.Camera => CreateCamera(project, layout, out failure),
+            LayoutComponentKind.Camera => CreateCamera(project, layout, out failure, cameraInputKind),
             _ => null
         } ?? SetUnsupportedFailure(ref failure);
+        if (created is null) return null;
+        var envelope = kind switch
+        {
+            LayoutComponentKind.LinearStage => (90d, 38d, 0d, 33d),
+            LayoutComponentKind.PneumaticCylinder => (58d, 32d, 0d, 28d),
+            LayoutComponentKind.Camera => (52d, 67d, 0d, 125d),
+            LayoutComponentKind.Conveyor => (205d, 55d, -4d, 18d),
+            LayoutComponentKind.DigitalSensor => (25d, 24d, 0d, 44d),
+            _ => (created.Size.Width, created.Size.Height, created.VerticalEnvelope?.BaseElevation ?? 0, created.VerticalEnvelope?.Height ?? 0)
+        };
+        if (envelope.Item4 > 0)
+        {
+            created.Size = new Size2D { Width = envelope.Item1, Height = envelope.Item2 };
+            created.VerticalEnvelope = new LayoutVerticalEnvelope { BaseElevation = envelope.Item3, Height = envelope.Item4 };
+        }
+        return created;
+    }
+
+    private static LayoutComponentDefinition CreateMaterialPosition(MachineProjectDocument project, LayoutComponentKind kind)
+    {
+        var prefix = kind == LayoutComponentKind.FeedPosition ? "feed-position" : "exit-position";
+        var ordinal = NextOrdinal(prefix, AllLayoutComponentIds(project));
+        return new LayoutComponentDefinition
+        {
+            Id = $"{prefix}-{ordinal}",
+            Name = kind == LayoutComponentKind.FeedPosition ? $"Feed position {ordinal}" : $"Exit position {ordinal}",
+            Kind = kind,
+            Transform = new Transform2D(),
+            Size = new Size2D { Width = 45, Height = 40 },
+            VerticalEnvelope = new LayoutVerticalEnvelope { BaseElevation = 0, Height = 20 },
+            ZIndex = 25
+        };
     }
 
     private static LayoutComponentDefinition? SetUnsupportedFailure(
@@ -46,6 +81,25 @@ public sealed class LayoutComponentAuthoringFactory
     {
         failure ??= new(LayoutComponentAuthoringFailureKind.UnsupportedComponentKind);
         return null;
+    }
+
+    private static LayoutComponentDefinition CreateDigitalIo(MachineProjectDocument project)
+    {
+        int ordinal = NextOrdinal("io", AllLayoutComponentIds(project).Concat(project.Channels.Select(channel => channel.Id.Replace("do.", string.Empty, StringComparison.Ordinal))));
+        string id = $"io-{ordinal}";
+        string channelId = $"do.{id}";
+        project.Channels.Add(new ChannelDefinition { Id = channelId, Name = $"I/O {ordinal}", Kind = ChannelKind.DigitalOutput, InitialValue = 1 });
+        return new LayoutComponentDefinition
+        {
+            Id = id,
+            Name = $"I/O {ordinal}",
+            Kind = LayoutComponentKind.DigitalIo,
+            Transform = new Transform2D { X = 500, Y = 200 },
+            Size = new Size2D { Width = 25, Height = 24 },
+            VerticalEnvelope = new LayoutVerticalEnvelope { BaseElevation = 0, Height = 26 },
+            ZIndex = 30,
+            BehaviorBindingId = channelId
+        };
     }
 
     private static LayoutComponentDefinition CreateMachineFrame(MachineProjectDocument project)
@@ -344,23 +398,40 @@ public sealed class LayoutComponentAuthoringFactory
     private static LayoutComponentDefinition? CreateCamera(
         MachineProjectDocument project,
         MachineLayoutDefinition layout,
-        out LayoutComponentAuthoringFailure? failure)
+        out LayoutComponentAuthoringFailure? failure,
+        NumericalCameraInputKind? cameraInputKind)
     {
         failure = null;
-        var placedCameraIds = layout.Components
+        var placedCameraIds = project.Layouts.SelectMany(candidate => candidate.Components).Concat(layout.Components)
             .Where(component => component.Kind == LayoutComponentKind.Camera)
             .Select(component => component.BehaviorBindingId)
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .ToHashSet(StringComparer.Ordinal);
         var camera = project.Devices.FirstOrDefault(device =>
-            device.Kind == DeviceKind.Camera && !placedCameraIds.Contains(device.Id));
+            device.Kind == DeviceKind.Camera && !placedCameraIds.Contains(device.Id)
+                && (cameraInputKind is null || device.Camera?.NumericalInput?.InputKind == cameraInputKind));
+        var componentIndex = NextOrdinal("camera", AllLayoutComponentIds(project).Concat(layout.Components.Select(component => component.Id)));
         if (camera is null)
         {
-            failure = new(LayoutComponentAuthoringFailureKind.CameraDeviceRequired);
-            return null;
+            var cameraIndex = NextOrdinal("device.camera", project.Devices.Select(device => device.Id));
+            camera = new DeviceDefinition
+            {
+                Id = $"device.camera-{cameraIndex}",
+                Name = cameraInputKind switch
+                {
+                    NumericalCameraInputKind.Image2D => $"2D Camera {cameraIndex}",
+                    NumericalCameraInputKind.HeightMap3D => $"3D Height Sensor {cameraIndex}",
+                    _ => $"Virtual Camera {cameraIndex}"
+                },
+                Kind = DeviceKind.Camera,
+                Camera = new VirtualCameraDefinition
+                {
+                    NumericalInput = cameraInputKind is { } inputKind ? new NumericalCameraSettings { InputKind = inputKind } : null
+                }
+            };
+            project.Devices.Add(camera);
         }
 
-        var componentIndex = NextOrdinal("camera", AllLayoutComponentIds(project));
         return new LayoutComponentDefinition
         {
             Id = $"camera-{componentIndex}",

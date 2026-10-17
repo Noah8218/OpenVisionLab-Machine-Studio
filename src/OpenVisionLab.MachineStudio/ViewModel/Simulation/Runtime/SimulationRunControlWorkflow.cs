@@ -129,6 +129,20 @@ internal sealed class SimulationRunControlWorkflow : IDisposable
         return !IsBusy && SimulationRunControlAdmissionPolicy.CanReset(_getState());
     }
 
+    internal bool CanSetTimeScale() => !IsBusy && !_getState().IsApplyingProject && !_getState().IsValidationBusy;
+
+    internal Task SetTimeScaleAsync(double timeScale, CancellationToken cancellationToken = default) =>
+        ExecuteSerializedAsync(async token =>
+        {
+            var state = _getState();
+            if (state.IsApplyingProject || state.IsValidationBusy) return;
+            var generation = Volatile.Read(ref _operationGeneration);
+            var result = await _engine.EnqueueCommandAsync(new SetSimulationTimeScaleCommand(timeScale), token);
+            if (!IsOperationCurrent(generation)) return;
+            if (result.IsAccepted) _applySnapshot(_engine.CurrentSnapshot);
+            else _log("Simulation", $"Speed rejected · {result.ErrorCode}: {result.Detail}");
+        }, cancellationToken);
+
     internal Task RunAsync(CancellationToken cancellationToken = default) =>
         ExecuteSerializedAsync(RunCoreAsync, cancellationToken);
 

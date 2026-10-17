@@ -20,7 +20,8 @@ internal sealed record MachineIntegrationRequestContext(
     MachineIntegrationArtifactEvidence? InspectionRecipeEvidence = null,
     string? ExpectedSequenceId = null,
     string? ExpectedStepId = null,
-    string? ExpectedDeviceId = null);
+    string? ExpectedDeviceId = null,
+    long RuntimeGeneration = 0);
 
 /// <summary>
 /// Applies the policy that makes a current Machine Studio sequence acquisition
@@ -43,6 +44,7 @@ internal sealed class MachineIntegrationRequestWorkflow
         return string.Join(
             "\u001F",
             context.ProjectId,
+            context.RuntimeGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture),
             context.ProjectPath ?? string.Empty,
             context.CameraId ?? string.Empty,
             context.CameraRecipe ?? string.Empty,
@@ -54,6 +56,23 @@ internal sealed class MachineIntegrationRequestWorkflow
     }
 
     internal MachineInspectionHandoffRequest? TryCreate(
+        MachineIntegrationRequestContext context,
+        string inspectionRecipePath,
+        IntegrationApplicationIdentity producer,
+        IntegrationApplicationIdentity consumer)
+    {
+        var input = CreateRequestInput(context, inspectionRecipePath, producer, consumer);
+        return input is null ? null : _factory.Create(input);
+    }
+
+    internal bool CanPrepareGenerated(MachineIntegrationRequestContext context, string recipePath,
+        IntegrationApplicationIdentity producer, IntegrationApplicationIdentity consumer) =>
+        context.CurrentCamera is { NumericalInput: { IsExternalInspection: true } generated } camera
+        && generated.Frame.FrameId == camera.CurrentAcquisitionId && generated.Frame.Equals(camera.FrameEvidence)
+        && producer.SourceState == IntegrationSourceState.Clean
+        && CreateRequestInput(context, recipePath, producer, consumer) is not null;
+
+    private MachineIntegrationHandoffRequestInput? CreateRequestInput(
         MachineIntegrationRequestContext context,
         string inspectionRecipePath,
         IntegrationApplicationIdentity producer,
@@ -145,33 +164,32 @@ internal sealed class MachineIntegrationRequestWorkflow
             : context.SourceDefinition!.Height;
         var unit = isThreeD ? context.HeightMapSource!.Unit : "mm";
 
-        return _factory.Create(
-            new MachineIntegrationHandoffRequestInput(
-                context.ProjectId,
-                context.ProjectSchema,
-                trigger.Sequence.Id,
-                trigger.Step.Id,
-                context.CameraId,
-                acquisitionId,
-                context.ProjectPath,
-                sourceRelativePath,
-                sourceWidth,
-                sourceHeight,
-                inspectionRecipePath,
-                new MachineIntegrationFrameEvidence(
-                    isThreeD ? context.HeightMapSource!.FrameId : frame.FrameId,
-                    frame.SourceRelativePath,
-                    frame.ContentSha256,
-                    frame.ContentLength),
-                producer,
-                consumer,
-                isThreeD
-                    ? IntegrationInspectionModality.ThreeD
-                    : IntegrationInspectionModality.TwoD,
-                isThreeD
-                    ? IntegrationInspectionInputKind.HeightMap
-                    : IntegrationInspectionInputKind.Image,
-                unit,
-                isThreeD ? context.InspectionRecipeEvidence : null));
+        return new MachineIntegrationHandoffRequestInput(
+            context.ProjectId,
+            context.ProjectSchema,
+            trigger.Sequence.Id,
+            trigger.Step.Id,
+            context.CameraId,
+            acquisitionId,
+            context.ProjectPath,
+            sourceRelativePath,
+            sourceWidth,
+            sourceHeight,
+            inspectionRecipePath,
+            new MachineIntegrationFrameEvidence(
+                isThreeD ? context.HeightMapSource!.FrameId : frame.FrameId,
+                frame.SourceRelativePath,
+                frame.ContentSha256,
+                frame.ContentLength),
+            producer,
+            consumer,
+            isThreeD
+                ? IntegrationInspectionModality.ThreeD
+                : IntegrationInspectionModality.TwoD,
+            isThreeD
+                ? IntegrationInspectionInputKind.HeightMap
+                : IntegrationInspectionInputKind.Image,
+            unit,
+            isThreeD ? context.InspectionRecipeEvidence : null);
     }
 }

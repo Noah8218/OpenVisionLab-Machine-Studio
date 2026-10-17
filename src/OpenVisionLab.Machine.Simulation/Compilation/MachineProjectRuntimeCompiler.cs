@@ -127,7 +127,7 @@ public sealed class MachineProjectRuntimeCompiler
         _automaticRunCompiler = new MachineProjectRuntimeAutomaticRunCompiler(_delayConverter);
     }
 
-    public MachineProjectRuntimeCompilationResult Compile(MachineProjectDocument? project)
+    public MachineProjectRuntimeCompilationResult Compile(MachineProjectDocument? project, string? projectPath = null, string? buildIdentity = null)
     {
         if (project is null)
         {
@@ -139,7 +139,7 @@ public sealed class MachineProjectRuntimeCompiler
 
         try
         {
-            return CompileCore(project);
+            return CompileCore(project, projectPath, buildIdentity);
         }
         catch (Exception exception)
         {
@@ -150,7 +150,7 @@ public sealed class MachineProjectRuntimeCompiler
         }
     }
 
-    private MachineProjectRuntimeCompilationResult CompileCore(MachineProjectDocument project)
+    private MachineProjectRuntimeCompilationResult CompileCore(MachineProjectDocument project, string? projectPath, string? buildIdentity)
     {
         var errors = new List<MachineProjectRuntimeCompilationError>();
         if (!TryGetProjectCollections(
@@ -187,7 +187,7 @@ public sealed class MachineProjectRuntimeCompiler
         }
 
         IReadOnlyList<AxisConfiguration> axes = _axisCompiler.Compile(axisDefinitions!, errors);
-        IReadOnlyList<VirtualCameraConfiguration> cameras = _cameraCompiler.Compile(deviceDefinitions!, errors);
+        IReadOnlyList<VirtualCameraConfiguration> cameras = _cameraCompiler.Compile(deviceDefinitions!, errors, axes.Select(axis => axis.Id));
         IReadOnlyDictionary<string, ChannelKind>? channelKinds = BuildSignalContract(
             channelDefinitions!,
             errors);
@@ -218,7 +218,10 @@ public sealed class MachineProjectRuntimeCompiler
                     .OfType<WorkpieceRuntimeConfiguration>()
                     .Select(component => component.Id)
                     ?? Enumerable.Empty<string>(),
-                errors);
+                errors,
+                project.Stations.Where(station => station is not null).SelectMany(station => station.Units ?? []).Where(unit => unit is not null).ToArray(),
+                layout?.Components.OfType<ConveyorRuntimeConfiguration>().Select(component => component.Id),
+                project.MaterialFlow.Enabled ? project.MaterialFlow.TotalFeedCount : null);
         }
 
         AutomaticRunConfiguration? automaticRun = _automaticRunCompiler.Compile(
@@ -231,6 +234,20 @@ public sealed class MachineProjectRuntimeCompiler
             axes,
             channelKinds,
             errors);
+
+        if (project.MaterialFlow.TotalFeedCount is { } targetCount)
+        {
+            if (targetCount is < 1 or > 100 || !project.MaterialFlow.Enabled
+                || !project.Sequences.Any(sequence => sequence.UnitId is not null && sequence.Steps.Any(step => step.Action == SequenceStepAction.FeedUnitWorkpiece)))
+                errors.Add(Error(MachineProjectRuntimeCompilationErrorCode.RuntimeConfigurationInvalid, "materialFlow.totalFeedCount", "Total supply requires enabled unit material flow, a feed step and a count from 1 to 100."));
+            if (automaticRun is not null) automaticRun = automaticRun with { Repeat = false, RepeatDelayMilliseconds = 0 };
+        }
+        var materialPositions = project.Layouts.FirstOrDefault(candidate => candidate.Id == layout?.Id)?.Components
+            .Where(component => component.Kind is LayoutComponentKind.FeedPosition or LayoutComponentKind.ExitPosition).ToArray() ?? [];
+        if (project.MaterialFlow.Enabled && materialPositions.Any(position => string.IsNullOrEmpty(position.UnitId) || string.IsNullOrEmpty(position.MaterialConveyorId)
+            || position.Kind == LayoutComponentKind.ExitPosition && position.MaterialRoute is null)
+            || project.MaterialFlow.Enabled && materialPositions.GroupBy(position => (position.UnitId, position.Kind, position.MaterialRoute)).Any(group => group.Count() > 1))
+            errors.Add(Error(MachineProjectRuntimeCompilationErrorCode.RuntimeConfigurationInvalid, "materialPositions", "Apply the unit, conveyor and exit route settings before starting material flow."));
 
         if (errors.Count > 0)
         {
@@ -247,7 +264,11 @@ public sealed class MachineProjectRuntimeCompiler
                 automaticRun,
                 layout,
                 pickPlaceWorkpiece,
-                simulation.DefaultTimeScale);
+                simulation.DefaultTimeScale,
+                CreateUnitMaterialFlowConfiguration(project, layout?.Id))
+            {
+                RunRecording = new(project.Id, project.Name, new ProjectDocumentStore().Serialize(project), buildIdentity, projectPath)
+            };
             return new MachineProjectRuntimeCompilationResult(configuration, Array.Empty<MachineProjectRuntimeCompilationError>());
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
@@ -257,6 +278,22 @@ public sealed class MachineProjectRuntimeCompiler
                 string.IsNullOrWhiteSpace(project.Id) ? null : project.Id,
                 $"Runtime configuration is invalid: {exception.Message}"));
         }
+    }
+
+    private static UnitMaterialFlowConfiguration? CreateUnitMaterialFlowConfiguration(MachineProjectDocument project, string? activeLayoutId)
+    {
+        var ownedSequences = project.Sequences.Where(sequence => sequence.UnitId is not null).ToArray();
+        if (ownedSequences.Length == 0 && !project.MaterialFlow.Enabled) return null;
+        var cameraIds = ownedSequences.ToDictionary(sequence => sequence.UnitId!, sequence => (IReadOnlyList<string>)sequence.Steps
+            .Where(step => step.Action == SequenceStepAction.WaitVisionResult).Select(step => step.TargetId).Distinct(StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
+        var conveyors = project.Layouts.FirstOrDefault(layout => layout.Id == activeLayoutId)?.Components
+            .Where(component => component.Kind == LayoutComponentKind.Conveyor && component.UnitId is not null)
+            .ToDictionary(component => component.Id, component => component.UnitId!, StringComparer.Ordinal) ?? new Dictionary<string, string>(StringComparer.Ordinal);
+        return new UnitMaterialFlowConfiguration(project.MaterialFlow.Enabled, project.MaterialFlow.WorkpieceName,
+            project.MaterialFlow.OkRoute, project.MaterialFlow.NgRoute, project.Stations.SelectMany(station => station.Units).Select(unit => unit.Id).ToArray(), cameraIds, conveyors,
+            project.MaterialFlow.TotalFeedCount, project.Layouts.FirstOrDefault(layout => layout.Id == activeLayoutId)?.Components
+                .Where(component => component.Kind is LayoutComponentKind.FeedPosition or LayoutComponentKind.ExitPosition && component.UnitId is not null && component.MaterialConveyorId is not null)
+                .Select(component => new UnitMaterialPositionConfiguration(component.UnitId!, component.Kind == LayoutComponentKind.ExitPosition, component.MaterialConveyorId!, component.MaterialRoute, component.Name)).ToArray());
     }
 
     private static bool TryGetProjectCollections(
